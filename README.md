@@ -1,29 +1,31 @@
 # Photographic Style Port
 
+**English** | [简体中文](README.zh-CN.md)
+
 Current version: v0.5.0
 
-This is an experimental tool that gives a HEIC from an iPhone **before the iPhone 16** (iPhone 15,
-14, 13 … — any model whose photos match a supported tile layout) the metadata an iPhone 16/17
-photo carries, so that Apple Photos offers the **Photographic Styles** palette (风格/ or most people would simply call it 调色盘) on it.
+This is an experimental tool that takes a HEIC from an iPhone **older than the iPhone 16**
+(iPhone 15, 14, 13 … — any model whose photos match a supported tile layout) and adds the
+metadata an iPhone 16/17 photo carries, so that Apple Photos offers the **Photographic Styles**
+palette on it (风格 in Chinese, though most people just call it 调色盘).
 
 Since v0.5 it also adds the **iOS 27 Texture/Grain** controls (质感/颗粒) that Apple introduced
-with the iPhone 18 Pro — to ported photos, and to native iPhone 16/17 style photos, which get
-only those controls added and are otherwise left byte-identical.
+with the iPhone 18 Pro. Ported photos get them as part of the port; native iPhone 16/17 photos
+get only these controls and are otherwise left byte-identical.
 
 It is an independent HEIC interoperability tool, not an Apple-supported format converter. It
 works by reading and rewriting the ISO-BMFF item graph of photo files, and it is experimental.
 
 **Keep your originals.**
 
+## Known issue
 
-Shalielie is my reply (a Chinese phrase pronouciation) to those Apple shareholder in spirit.
+- Soft skin currently seems no difference with standard. More images containing people from iPhone 18 is needed for reverse engineering. Investigating and opening issue to upload your contents are welcomed.
 
-e.g.
+- The tweaked photo feel is not identical to those models with stock style tweaking. More images are required too to investigate this issue.
 
-\- "Apple doesn't extend Photographic Style palette to older models because Apple want to provider a better and consistent user experience."
-
-\- "Shalielie 🙄."
-
+- Standalone iOS app in `swift-port` branch is under construction and is not available until my new mac arrives.
+- 
 ## Use it in a browser
 
 [![Web app visits](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fnathanatgit-shalielie%2Fweb&query=%24.value&label=web%20app%20visits&style=flat-square)](https://nathanatgit.github.io/Shalielie/)
@@ -54,7 +56,13 @@ Each tagged release provides a Python-free command-line executable for:
 - macOS arm64 (Apple silicon)
 
 Download the archive for your system from the GitHub Releases page, extract it, and run
-`photographic-style-port` (`photographic-style-port.exe` on Windows). The executable includes
+`photographic-style-port` (`photographic-style-port.exe` on Windows). Simply run
+
+```bash
+uv run photographic_style_port.py patch IN.HEIC OUT.HEIC
+```
+
+The executable includes
 the Python runtime and both built-in donor profiles; use `--version` to check which release you
 have.
 
@@ -67,9 +75,7 @@ photographic-style-port patch IN.HEIC OUT.HEIC \
 ```
 
 The `Build binary release` GitHub Actions workflow builds and smoke-tests all four targets on
-manual runs. Pushing a tag such as `v0.5.0` also creates the GitHub release and uploads the four
-archives plus `SHA256SUMS.txt`. The tag must match the versions declared in `pyproject.toml`,
-`photographic_style_port.py`, and this README.
+manual runs.
 
 ## Install from source
 
@@ -88,7 +94,7 @@ The default mode also uses two external tools — `ffmpeg` (with libx265) to enc
 | --------------- | ----------------------------------------------------------------------- |
 | Debian / Ubuntu | `sudo apt install ffmpeg libheif-examples`                            |
 | macOS           | `brew install ffmpeg libheif`                                         |
-| Windows         | `winget install Gyan.FFmpeg`, then put this repo's `tools/` on PATH |
+| Windows         | `winget install Gyan.FFmpeg`, then add this repo's `tools/` to PATH |
 
 Windows has no libheif package, so `tools/` ships a drop-in `heif-convert` backed by
 pillow-heif, which `uv sync` installs for you:
@@ -123,10 +129,10 @@ Useful flags:
 
 | Flag                               | What it's for                                                       |
 | ---------------------------------- | ------------------------------------------------------------------- |
-| `--report`                       | also write`OUTPUT.HEIC.report.json` describing what changed       |
-| `--zip`                          | bundle the HEIC and its report into`OUTPUT.zip` for transfer      |
-| `--light-maps target`            | rebuild tone maps from your photo — most likely to improve results |
-| `--scene-stats donor`            | fall back to donor tone anchors if colours look wrong               |
+| `--report`                       | also write `OUTPUT.HEIC.report.json` describing what changed      |
+| `--zip`                          | bundle the HEIC and its report into `OUTPUT.zip` for transfer     |
+| `--light-maps target`            | rebuild tone maps from your photo — the flag most likely to help   |
+| `--scene-stats donor`            | fall back to donor tone anchors if colors look wrong                |
 | `--linear-thumb reuse-thumbnail` | skip the encoder entirely                                           |
 | `--texture off`                  | leave out the iOS 27 Texture/Grain items (v0.4.4 output)            |
 
@@ -159,8 +165,8 @@ uv run photographic_style_port.py extract-donor DONOR.HEIC PROFILE.zip
 
 ## Use from an AI agent
 
-The CLI is JSON-reporting and non-interactive, so coding agents drive it well. This repo ships
-a ready-made skill in [skills/photographic-style-port/](skills/photographic-style-port/).
+The CLI is non-interactive and reports in JSON, which makes it easy for coding agents to
+drive. This repo ships a ready-made skill in [skills/photographic-style-port/](skills/photographic-style-port/).
 
 **Claude Code** — copy it into your skills directory:
 
@@ -178,8 +184,8 @@ skill on its own.
 **Other agents** (Cursor, Codex, Copilot, Continue): the skill file is plain Markdown. Point
 your agent's rules file at it, or paste its contents into `AGENTS.md` / `.cursorrules`.
 
-The skill tells an agent which mode to pick based on what's installed, that batches should be
-looped one file at a time, and never to overwrite an original.
+The skill tells the agent to pick a mode based on what's installed, to process batches one file
+at a time, and never to overwrite an original.
 
 ## What it actually does
 
@@ -188,12 +194,12 @@ stay yours, and the decoded output is pixel-identical to the input. What gets ad
 style machinery Photos looks for: the style plist and Apple MakerNote tag `0x54` from a
 normalized donor profile, plus a `linearthumbnail`, scene statistics and light maps computed
 from your own photo. For Texture/Grain it adds iOS 27's `texture_styles` item together with the
-12 empty 2026 semantic mattes that must accompany it.
+12 empty 2026 semantic mattes that must accompany it (Future investigation needed, seems related with soft skin fiter).
 
 ## Limits
 
 - **Only two tile layouts (48/12 and 45/15) have built-in profiles.** Photos without an
-  embedded thumbnail are supported since v0.5, but need the default (encoder) mode.
+  embedded thumbnail have been supported since v0.5, but need the default (encoder) mode.
 - **Texture/Grain needs iOS 27** on the phone that opens the photo.
 - **Not validated by Apple, and results vary by photo.** Try the flags above before concluding
   it does not work.
@@ -215,3 +221,14 @@ it can produce files that behave unpredictably in any photo application. Work on
 
 [MIT](LICENSE). The license covers this project's own source code; it makes no claim over any
 third-party format, trademark or metadata structure described above.
+
+## Why "Shalielie"?
+
+Shalielie is the romanized pronunciation of a Chinese phrase, and it is my reply to Apple's
+"shareholders in spirit" — the fans who defend every Apple decision as if they
+owned the company. For example:
+
+> "Apple doesn't bring the Photographic Styles palette to older models because it wants to
+> provide a better, more consistent user experience."
+>
+> "Shalielie 🙄."

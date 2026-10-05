@@ -7,7 +7,7 @@ Current version: v0.5.1
 This is an experimental tool that takes a HEIC from an iPhone **older than the iPhone 16**
 (iPhone 15, 14, 13 … — any model whose photos match a supported tile layout) and adds the
 metadata an iPhone 16/17 photo carries, so that Apple Photos offers the **Photographic Styles**
-palette on it (风格 in Chinese, though most people just call it 调色盘).
+palette on it (风格 in Chinese; Apple calls the palette 调色板).
 
 Since v0.5 it also adds the **iOS 27 Texture/Grain** controls (质感/颗粒) that Apple introduced
 with the iPhone 18 Pro. Ported photos get them as part of the port; native iPhone 16/17 photos

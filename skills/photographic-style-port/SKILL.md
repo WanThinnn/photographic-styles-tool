@@ -1,6 +1,6 @@
 ---
 name: photographic-style-port
-description: Patch an iPhone HEIC so Apple Photos offers the Photographic Styles palette (风格 / 调色盘) and the iOS 27 Texture/Grain (质感/颗粒) controls. Use when the user asks to add, enable, port or restore Photographic Styles on a .HEIC photo, to make a photo from an iPhone before the iPhone 16 stylable like an iPhone 16/17 one, to give an iPhone 16/17 photo the iPhone 18 Texture/Grain controls, or to inspect a HEIC's style-related metadata.
+description: Patch an iPhone HEIC so Apple Photos offers the Photographic Styles palette (风格 / 调色板) and the iOS 27 Texture/Grain (质感/颗粒) controls. Use when the user asks to add, enable, port or restore Photographic Styles on a .HEIC photo, to make a photo from an iPhone before the iPhone 16 stylable like an iPhone 16/17 one, to give an iPhone 16/17 photo the iPhone 18 Texture/Grain controls, or to inspect a HEIC's style-related metadata.
 ---
 
 # Photographic Style Port

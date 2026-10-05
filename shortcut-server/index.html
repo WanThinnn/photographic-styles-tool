@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shalielie Shortcut Server</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e2dd;
+    --accent: #b0582b; --ok: #2f8a4c; --warn: #b7791f; --err: #c0392b; --code: #f0eee9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161616; --card: #202020; --ink: #ececec; --muted: #9a9a9f; --line: #333;
+      --accent: #e08a5a; --ok: #5cc27d; --warn: #e0a84a; --err: #ee6b5c; --code: #2a2a2a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei UI",
+          "Noto Sans SC", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 22px; margin: 0; flex: 1; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 18px; margin-bottom: 14px; }
+  .pill { font-size: 13px; padding: 3px 10px; border-radius: 99px; border: 1px solid currentColor; }
+  .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.err { color: var(--err); }
+  .lang { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px;
+          padding: 4px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+  .url { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .url code { font-size: 17px; font-weight: 600; word-break: break-all; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 5px;
+         font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.92em; }
+  .copy { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 8px; cursor: pointer;
+          border: 1px solid var(--accent); background: none; color: var(--accent); }
+  .muted { color: var(--muted); font-size: 13.5px; }
+  ul, ol { margin: 0; padding-left: 20px; }
+  li { margin: 5px 0; }
+  .notice li::marker { color: var(--accent); }
+  .warnbox { border-left: 3px solid var(--warn); padding: 8px 12px; margin-top: 10px;
+             background: color-mix(in srgb, var(--warn) 9%, transparent); border-radius: 0 8px 8px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td.ok { color: var(--ok); } td.error { color: var(--err); } td.running { color: var(--warn); }
+  .drop { border: 1.5px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; }
+  .drop input { margin-top: 8px; max-width: 100%; }
+  #tryResult { margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Shalielie Shortcut Server</h1>
+    <span id="state" class="pill">…</span>
+    <button class="lang" id="lang">中文</button>
+  </header>
+
+  <section class="card">
+    <h2 data-i18n="addrTitle"></h2>
+    <div class="url"><code id="mainUrl">…</code>
+      <button class="copy" id="copyBtn" data-i18n="copy"></button></div>
+    <p class="muted" id="altUrls"></p>
+    <div id="mdnsWarn" class="warnbox" hidden></div>
+    <div id="modeWarn" class="warnbox" hidden></div>
+  </section>
+
+  <section class="card notice">
+    <h2 data-i18n="noticeTitle"></h2>
+    <ul data-i18n="notices"></ul>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="setupTitle"></h2>
+    <ol data-i18n="steps"></ol>
+    <p class="muted" data-i18n="stepsExtra"></p>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="tryTitle"></h2>
+    <div class="drop">
+      <div data-i18n="tryHint"></div>
+      <input type="file" id="tryFile" accept=".heic,.HEIC,image/heic">
+      <div id="tryResult" class="muted"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="jobsTitle"></h2>
+    <table>
+      <thead><tr><th data-i18n="jTime"></th><th data-i18n="jFile"></th><th data-i18n="jFrom"></th>
+        <th data-i18n="jResult"></th></tr></thead>
+      <tbody id="jobs"></tbody>
+    </table>
+  </section>
+
+  <p class="muted" id="footer"></p>
+</main>
+
+<script>
+const T = {
+  en: {
+    running: "Running", busy: "Working on a photo…", offline: "Server stopped",
+    addrTitle: "Address for your shortcut",
+    copy: "Copy", copied: "Copied",
+    alt: "If that name does not work on your iPhone, use: ",
+    mdnsOff: "<b>{name}</b> is not available ({err}). Use the IP address above instead.",
+    modeFull: "Full mode",
+    modeLite: "No-encoder mode",
+    modeWarn: "<b>No-encoder mode:</b> {missing} not found, so results use the lighter mode " +
+      "(existing thumbnail reused, donor scene statistics). Photos without an embedded " +
+      "thumbnail will fail. Install ffmpeg and restart for full results.",
+    noticeTitle: "Before you start",
+    notices: `
+      <li><b>Keep this window open.</b> Your iPhone must be on the <b>same Wi-Fi</b> as this computer.
+        Guest networks and some routers block devices from talking to each other.</li>
+      <li><b>First time only:</b> if Windows asks whether Python may use the network, allow it on
+        <b>private networks</b>. On the iPhone, allow Shortcuts to access the <b>local network</b>.</li>
+      <li><b>Send originals.</b> Only HEIC photos work (Settings › Camera › Formats › High Efficiency).
+        JPEGs and screenshots are refused.</li>
+      <li><b>Keep your originals.</b> The result is saved as a new photo; this tool is experimental.</li>
+      <li>What you get: iPhones before the 16 get the full Photographic Styles port plus Texture/Grain;
+        iPhone 16/17 photos get only Texture/Grain; iPhone 18 photos already have everything.</li>
+      <li><b>Private:</b> photos are processed on this computer and deleted right after they are sent back.
+        Nothing is uploaded anywhere.</li>`,
+    setupTitle: "Set up the shortcut on your iPhone",
+    steps: `
+      <li>Open <b>Shortcuts</b>, tap <b>+</b>, and add <b>Select Photos</b>.</li>
+      <li>Add <b>Get Contents of URL</b>. Set the URL to <code>{url}</code>, then tap the arrow to show more:
+        <b>Method</b> POST, <b>Request Body</b> Form, add a <b>File</b> field with key <code>photo</code>
+        and the <b>Photos</b> variable as its value.</li>
+      <li>Add <b>Get Details of Files</b> → <b>File Extension</b> of <b>Contents of URL</b>.</li>
+      <li>Add <b>If</b> File Extension <b>is</b> <code>heic</code>: inside it add <b>Save to Photo Album</b>
+        (Contents of URL). In <b>Otherwise</b>, add <b>Show Result</b> (Contents of URL) so you see any error.</li>
+      <li>Run it, pick a photo, then open it in Photos › <b>Edit</b>: the Styles palette should be there.</li>`,
+    stepsExtra: "Tips: turn on <b>Show in Share Sheet</b> (Images) and replace Select Photos with " +
+      "Shortcut Input to run it from Photos. For several photos, turn on Select Multiple and wrap " +
+      "steps 2–4 in <b>Repeat with Each</b>. If Edit shows no palette, save with <b>Save File</b> " +
+      "instead and import the file from the Files app.",
+    tryTitle: "Try it from this computer",
+    tryHint: "Pick a HEIC photo; the patched copy downloads when it is done.",
+    tryWorking: "Processing…", tryDone: "Done — downloaded {name}", tryFail: "Failed: ",
+    jobsTitle: "Recent photos", jTime: "Time", jFile: "Photo", jFrom: "From", jResult: "Result",
+    noJobs: "Nothing yet.",
+    ok: "done", error: "failed", runningJob: "working",
+    port: "full port", "add-texture": "Texture/Grain only (native styles)",
+    footer: "Porter v{v}. Stop the server by closing its window.",
+  },
+  zh: {
+    running: "运行中", busy: "正在处理照片…", offline: "服务器已停止",
+    addrTitle: "快捷指令使用的地址",
+    copy: "复制", copied: "已复制",
+    alt: "如果 iPhone 上这个名字无法访问，请改用：",
+    mdnsOff: "<b>{name}</b> 不可用（{err}），请使用上面的 IP 地址。",
+    modeFull: "完整模式",
+    modeLite: "免编码器模式",
+    modeWarn: "<b>免编码器模式：</b>未找到 {missing}，因此使用较轻的模式处理（沿用原有缩略图、" +
+      "使用样本的场景统计）。没有内嵌缩略图的照片会失败。安装 ffmpeg 后重新启动即可获得完整效果。",
+    noticeTitle: "使用前须知",
+    notices: `
+      <li><b>请保持这个窗口开启。</b>iPhone 必须与这台电脑连接<b>同一个 Wi-Fi</b>。
+        访客网络和部分路由器会阻止设备之间互相访问。</li>
+      <li><b>仅首次：</b>如果 Windows 询问是否允许 Python 访问网络，请在<b>专用网络</b>上允许。
+        在 iPhone 上，请允许“快捷指令”访问<b>本地网络</b>。</li>
+      <li><b>请发送原图。</b>只支持 HEIC 照片（设置 › 相机 › 格式 › 高效）。JPEG 和截图会被拒绝。</li>
+      <li><b>请保留原图。</b>结果会另存为一张新照片；本工具仍处于实验阶段。</li>
+      <li>处理结果：iPhone 16 以前的机型拍摄的照片会获得完整的摄影风格（调色盘）以及质感/颗粒；
+        iPhone 16/17 的照片只添加质感/颗粒；iPhone 18 的照片已具备全部功能。</li>
+      <li><b>隐私：</b>照片只在这台电脑上处理，发回后立即删除，不会上传到任何地方。</li>`,
+    setupTitle: "在 iPhone 上设置快捷指令",
+    steps: `
+      <li>打开<b>快捷指令</b>，点 <b>+</b>，添加<b>选择照片</b>。</li>
+      <li>添加<b>获取 URL 内容</b>。URL 填 <code>{url}</code>，点箭头展开更多选项：
+        <b>方法</b>选 POST，<b>请求体</b>选“表单”，添加一个<b>文件</b>字段，键为 <code>photo</code>，
+        值选<b>照片</b>变量。</li>
+      <li>添加<b>获取文件的详细信息</b> → <b>文件扩展名</b>，对象为 <b>URL 的内容</b>。</li>
+      <li>添加<b>如果</b> 文件扩展名 <b>是</b> <code>heic</code>：在其中添加<b>存储到相簿</b>（URL 的内容）。
+        在<b>否则</b>中添加<b>显示结果</b>（URL 的内容），以便看到错误信息。</li>
+      <li>运行并选择照片，然后在照片 App 中打开 › <b>编辑</b>：应当能看到风格（调色盘）。</li>`,
+    stepsExtra: "提示：打开<b>在共享表单中显示</b>（图像），并把“选择照片”换成“快捷指令输入”，" +
+      "即可在照片 App 中直接运行。处理多张照片时，打开“选择多个”，并用<b>对每个项目重复</b>" +
+      "包住第 2–4 步。如果编辑时没有调色盘，请改用<b>存储文件</b>，再从“文件”App 导入。",
+    tryTitle: "在这台电脑上试用",
+    tryHint: "选择一张 HEIC 照片，处理完成后会自动下载。",
+    tryWorking: "处理中…", tryDone: "完成，已下载 {name}", tryFail: "失败：",
+    jobsTitle: "最近处理", jTime: "时间", jFile: "照片", jFrom: "来源", jResult: "结果",
+    noJobs: "暂无记录。",
+    ok: "完成", error: "失败", runningJob: "处理中",
+    port: "完整移植", "add-texture": "仅添加质感/颗粒（原生风格照片）",
+    footer: "Porter v{v}。关闭服务器窗口即可停止服务。",
+  },
+};
+
+let lang = localStorageGet("lang") ||
+  ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en");
+let status = null;
+const $ = (id) => document.getElementById(id);
+const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+function patchUrl() { return status && status.urls.length ? status.urls[0] + "/patch" : location.origin + "/patch"; }
+
+function render() {
+  const t = T[lang];
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  $("lang").textContent = lang === "zh" ? "English" : "中文";
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.innerHTML = fill(t[el.dataset.i18n] || "", { url: esc(patchUrl()) });
+  });
+  const state = $("state");
+  if (!status) { state.textContent = t.offline; state.className = "pill err"; }
+  else {
+    const mode = status.mode === "full" ? t.modeFull : t.modeLite;
+    state.textContent = (status.busy ? t.busy : t.running) + " · " + mode;
+    state.className = "pill " + (status.mode === "full" ? "ok" : "warn");
+  }
+  if (!status) return;
+  $("mainUrl").textContent = patchUrl();
+  const alts = status.urls.slice(1).map((u) => u + "/patch");
+  $("altUrls").innerHTML = alts.length ? t.alt + alts.map((u) => `<code>${esc(u)}</code>`).join(" ") : "";
+  $("mdnsWarn").hidden = status.mdns.ok;
+  $("mdnsWarn").innerHTML = fill(t.mdnsOff, { name: esc(status.mdns.name), err: esc(status.mdns.error || "") });
+  const missing = [!status.tools.ffmpeg && "ffmpeg", !status.tools.heif_convert && "heif-convert"].filter(Boolean);
+  $("modeWarn").hidden = status.mode === "full";
+  $("modeWarn").innerHTML = fill(t.modeWarn, { missing: esc(missing.join(", ") || "—") });
+  $("jobs").innerHTML = status.jobs.length ? status.jobs.map((j) => {
+    const label = j.status === "ok" ? t.ok : j.status === "error" ? t.error : t.runningJob;
+    const detail = j.route ? " — " + t[j.route] : j.detail ? " — " + esc(j.detail) : "";
+    const secs = j.seconds != null ? ` (${j.seconds}s)` : "";
+    return `<tr><td>${esc(j.time)}</td><td>${esc(j.name)}</td><td>${esc(j.client)}</td>` +
+      `<td class="${esc(j.status)}">${label}${secs}${detail}</td></tr>`;
+  }).join("") : `<tr><td colspan="4" class="muted">${t.noJobs}</td></tr>`;
+  $("footer").textContent = fill(t.footer, { v: status.version });
+}
+
+async function poll() {
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    status = r.ok ? await r.json() : null;
+  } catch { status = null; }
+  render();
+}
+
+$("lang").onclick = () => { lang = lang === "zh" ? "en" : "zh"; localStorageSet("lang", lang); render(); };
+$("copyBtn").onclick = async () => {
+  try { await navigator.clipboard.writeText(patchUrl()); $("copyBtn").textContent = T[lang].copied; }
+  catch { getSelection().selectAllChildren($("mainUrl")); }
+  setTimeout(render, 1500);
+};
+$("tryFile").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const out = $("tryResult"), t = T[lang];
+  out.textContent = t.tryWorking;
+  try {
+    const r = await fetch("/patch?name=" + encodeURIComponent(f.name), { method: "POST", body: f });
+    if (!r.ok) throw new Error(await r.text());
+    const cd = r.headers.get("Content-Disposition") || "";
+    const name = decodeURIComponent((cd.match(/filename\*=UTF-8''([^;]+)/) || [])[1] || "patched.HEIC");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await r.blob());
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    out.textContent = fill(t.tryDone, { name });
+  } catch (err) {
+    out.textContent = t.tryFail + err.message;
+  }
+  e.target.value = "";
+  poll();
+};
+
+render();
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>

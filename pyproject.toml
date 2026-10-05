@@ -16,6 +16,9 @@ dependencies = []
 # `heif-convert` binary libheif would otherwise provide. Drop this group if you have
 # a real libheif on PATH.
 shim = ["pillow-heif>=1.5.0"]
+# zeroconf advertises the shortcut server as shalielie.local (shortcut-server/server.py).
+# Optional: without it the server still runs, reachable by IP address only.
+server = ["zeroconf>=0.136"]
 
 [tool.uv]
 # Not an installable package -- the porter is a single script run directly.

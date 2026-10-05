@@ -7,6 +7,21 @@ The server runs the unmodified `photographic_style_port.py`, so results are iden
 command-line tool, including the default encoder mode the iPhone cannot run on its own.
 Photos are processed in a temporary folder and deleted as soon as they are sent back.
 
+> [!CAUTION]
+> **Only use a shortcut server you run yourself, on your own computer.**
+>
+> The server receives your full original photo. Never use a server someone else runs, or a
+> shortcut someone else gives you that points to one: **sending a photo there is the same as
+> posting it online**, and you should assume it will be kept and leaked. An original HEIC
+> holds much more than the picture: GPS location, date and time, device details and, for
+> photos of people, face and depth data.
+>
+> - If you got a shortcut from someone else, check the URL in **Get Contents of URL**. It must
+>   be `shalielie.local` or your own computer's local address (`192.168.…`, `10.…`,
+>   `172.16.…`–`172.31.…`), as shown on the status page.
+> - Never make your own server reachable from the internet (port forwarding, tunnels, cloud
+>   hosting). It has no login and is meant for your home network only.
+
 ## Start it
 
 Double-click the launcher for your system:

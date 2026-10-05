@@ -493,6 +493,8 @@ def main() -> int:
         print(f"  Mode:           no-encoder ({why})")
     print(f"  Status page:    http://localhost:{args.port}/")
     print("  Stop:           close this window or press Ctrl+C")
+    print("  Privacy:        only send photos from your own devices to this computer. Never")
+    print("                  use a shortcut server someone else runs: that leaks your photos.")
     print(bar, flush=True)
 
     if not args.no_browser:

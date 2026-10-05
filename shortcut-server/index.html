@@ -41,6 +41,8 @@
   ul, ol { margin: 0; padding-left: 20px; }
   li { margin: 5px 0; }
   .notice li::marker { color: var(--accent); }
+  .danger { border: 2px solid var(--err); background: color-mix(in srgb, var(--err) 7%, var(--card)); }
+  .danger h2 { color: var(--err); }
   .warnbox { border-left: 3px solid var(--warn); padding: 8px 12px; margin-top: 10px;
              background: color-mix(in srgb, var(--warn) 9%, transparent); border-radius: 0 8px 8px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -59,6 +61,11 @@
     <span id="state" class="pill">…</span>
     <button class="lang" id="lang">中文</button>
   </header>
+
+  <section class="card danger" role="alert">
+    <h2 data-i18n="safetyTitle"></h2>
+    <ul data-i18n="safety"></ul>
+  </section>
 
   <section class="card">
     <h2 data-i18n="addrTitle"></h2>
@@ -105,6 +112,20 @@
 const T = {
   en: {
     running: "Running", busy: "Working on a photo…", offline: "Server stopped",
+    safetyTitle: "⚠ Only use a server you run yourself",
+    safety: `
+      <li>This server receives your <b>full original photo</b>. Send photos only to a server
+        running on <b>your own computer</b>. Never use a shortcut server that someone else runs
+        or gives you the address of: <b>sending a photo there is the same as posting it online</b>,
+        and you should assume it will be kept and leaked.</li>
+      <li>An original HEIC holds much more than the picture: <b>GPS location</b>, date and time,
+        device details and, for photos of people, face and depth data.</li>
+      <li><b>Got a shortcut from someone else?</b> Open it and check the URL in
+        <b>Get Contents of URL</b>. It must point to your own computer: <code>shalielie.local</code>,
+        or an address starting with <code>192.168.</code>, <code>10.</code> or
+        <code>172.16.</code>–<code>172.31.</code> that matches this page.</li>
+      <li>Never make your own server reachable from the internet: no port forwarding, tunnels
+        or cloud hosting. It has no login and is meant for your home network only.</li>`,
     addrTitle: "Address for your shortcut",
     copy: "Copy", copied: "Copied",
     alt: "If that name does not work on your iPhone, use: ",
@@ -125,8 +146,8 @@ const T = {
       <li><b>Keep your originals.</b> The result is saved as a new photo; this tool is experimental.</li>
       <li>What you get: iPhones before the 16 get the full Photographic Styles port plus Texture/Grain;
         iPhone 16/17 photos get only Texture/Grain; iPhone 18 photos already have everything.</li>
-      <li><b>Private:</b> photos are processed on this computer and deleted right after they are sent back.
-        Nothing is uploaded anywhere.</li>`,
+      <li><b>Private on your own computer:</b> photos are processed here and deleted right after they
+        are sent back. Nothing is uploaded anywhere. This holds only for a server you run yourself.</li>`,
     setupTitle: "Set up the shortcut on your iPhone",
     steps: `
       <li>Open <b>Shortcuts</b>, tap <b>+</b>, and add <b>Select Photos</b>.</li>
@@ -152,6 +173,18 @@ const T = {
   },
   zh: {
     running: "运行中", busy: "正在处理照片…", offline: "服务器已停止",
+    safetyTitle: "⚠ 只使用你自己运行的服务器",
+    safety: `
+      <li>这个服务器会收到你的<b>完整原图</b>。只把照片发送到<b>你自己电脑上</b>运行的服务器。
+        切勿使用别人运行、或别人提供地址的快捷指令服务器：<b>把照片发给它，等同于把照片公开发布到网上</b>，
+        请默认照片会被保存并泄露。</li>
+      <li>HEIC 原图包含的远不止画面：<b>GPS 位置</b>、拍摄日期和时间、设备信息；拍到人物的照片还包含
+        面部与深度数据。</li>
+      <li><b>快捷指令是别人给的？</b>请打开它，检查<b>获取 URL 内容</b>中的 URL。它必须指向你自己的电脑：
+        <code>shalielie.local</code>，或以 <code>192.168.</code>、<code>10.</code>、
+        <code>172.16.</code>–<code>172.31.</code> 开头、且与本页显示一致的地址。</li>
+      <li>切勿让你自己的服务器可以从互联网访问：不要做端口转发、内网穿透或部署到云服务器。
+        它没有登录验证，只适合在家庭网络中使用。</li>`,
     addrTitle: "快捷指令使用的地址",
     copy: "复制", copied: "已复制",
     alt: "如果 iPhone 上这个名字无法访问，请改用：",
@@ -170,7 +203,7 @@ const T = {
       <li><b>请保留原图。</b>结果会另存为一张新照片；本工具仍处于实验阶段。</li>
       <li>处理结果：iPhone 16 以前的机型拍摄的照片会获得完整的摄影风格（调色板）以及质感/颗粒；
         iPhone 16/17 的照片只添加质感/颗粒；iPhone 18 的照片已具备全部功能。</li>
-      <li><b>隐私：</b>照片只在这台电脑上处理，发回后立即删除，不会上传到任何地方。</li>`,
+      <li><b>在你自己的电脑上是私密的：</b>照片只在这台电脑上处理，发回后立即删除，不会上传到任何地方。这只对你自己运行的服务器成立。</li>`,
     setupTitle: "在 iPhone 上设置快捷指令",
     steps: `
       <li>打开<b>快捷指令</b>，点 <b>+</b>，添加<b>选择照片</b>。</li>

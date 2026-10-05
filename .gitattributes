@@ -18,6 +18,7 @@
 
 # Shell wrapper must stay LF or /bin/sh will not run it.
 tools/heif-convert text eol=lf
+*.command  text eol=lf
 
 # Windows wrappers must stay CRLF or cmd.exe mis-parses them.
 *.cmd       text eol=crlf

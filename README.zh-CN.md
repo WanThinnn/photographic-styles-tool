@@ -8,36 +8,40 @@
 tile 布局即可）拍摄的 HEIC 照片补上 iPhone 16/17 照片所携带的元数据，让编辑照片时，呈现 **摄影风格**（俗称“调色盘”）。
 
 从 v0.5 开始，加入了随 iPhone 18 Pro 推出的 **iOS 27 质感/颗粒**（Texture/Grain）调节入口。
-移植的照片会在移植时一并加上；原生的 iPhone 16/17 照片只添加这两个入口相关元数据，不触碰文件其他内容。
+移植的照片会在移植时一并加上；原生的 iPhone 16/17 照片只添加这两个入口相关元数据，原有的图像数据逐字节不变。
 
 此工具不是 Apple 官方的格式转换器。它通过读取并改写照片文件的ISO-BMFF item 结构来工作，完全是个人出于愤怒开发，并 vibecoding 而来，与Apple没有任何关系。
 
 **请务必保留原图。**
 
-## 已知问题
+**请务必保留原图。**
 
-- 目前“柔肤”与“标准”滤镜看起来没有明显差异。需要更多带有人物的 iPhone 18 照片来进行逆向分析。正在研究，欢迎提交 issue 以上传你的样图。
+**请务必保留原图。**
 
-- 有反馈声称，经过移植的照片用同样的调色盘参数调整后，与原生机型自带的风格微调效果并不完全一致。也需要更多样本来进一步研究这个问题。
+**项目当前状态**
 
-- swift-port 分支中的独立 iOS 应用仍在开发中，等到我的新 Mac 到货后才会推出。
+本工具目前处于 **可用性验证阶段** ，当前目标是让旧款 iPhone 拍摄的照片能够启用摄影风格调色盘：调色盘可以正常出现，风格与各项调节能够正确生效，编辑后可以正常保存和再次打开。
+
+风格调节效果、以及质感/颗粒的细节效果微调，将在主体工作完成后进行，使其更接近新款 iPhone 原生**摄影风格**的调节表现。在此之前，与原生照片存在差异属于预期情况。欢迎反馈问题和提供样图。
+
+**目录：** [网页版](#在浏览器中使用) · [可执行文件](#下载可执行文件) · [从源码安装](#从源码安装) · [用法](#用法) · [工作原理](#工作原理) · [已知问题与限制](#已知问题与限制) · [测试移植结果](#测试移植结果for-ai-testing) · [版本历史](#版本历史) · [AI 智能体](#通过-ai-智能体使用) · [开发者工具](#开发者工具)
 
 ## 在浏览器中使用
 
-[![Web app visits](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fnathanatgit-shalielie%2Fweb&query=%24.value&label=web%20app%20visits&style=flat-square)](https://nathanatgit.github.io/Shalielie/)
+[![Web app visits](<https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fnathanatgit-shalielie%2Fweb&query=%24.value&label=web%20app%20visits&style=flat-square>)](https://nathanatgit.github.io/Shalielie/)
 
 网页版为纯前端处理，支持 PWA ，可直接通过 Safari 分享按钮分享到主屏幕，无需安装、无需命令行。把照片拖如待放区，即可得到输出。它完全在你的设备上运行，不会上传任何内容。
 
 **https://nathanatgit.github.io/Shalielie/**
 
-网页版包含 v0.5 的质感/颗粒功能和原生照片模式。但前端脚本没有办法处理无内嵌缩略图（`linearthumbnail`）的照片（浏览器没有 HEVC 编码器，无法生成缩略图），这类照片请使用命令行工具。
+网页版包含 v0.5 的质感/颗粒功能和原生照片模式。但前端脚本没有办法处理无内嵌缩略图（`thmb`）的照片（浏览器没有 HEVC 编码器，无法生成缩略图），这类照片请使用命令行工具。
 
 网页版与 命令行/Python 工具使用同一套移植逻辑，见 [`web/README.md`](web/README.md)。
 批量处理或需要基于编码器，需要生成内嵌缩略图时请用 命令行/Python 版本。
 
 ## 下载可执行文件
 
-[![Release downloads](https://img.shields.io/github/downloads/nathanatgit/Shalielie/total?label=release%20downloads&style=flat-square)](https://github.com/nathanatgit/Shalielie/releases)
+[![Release downloads](<https://img.shields.io/github/downloads/nathanatgit/Shalielie/total?label=release%20downloads&style=flat-square>)](https://github.com/nathanatgit/Shalielie/releases)
 
 下载时请对应平台，可执行文件支持：
 
@@ -68,7 +72,7 @@ photographic-style-port patch IN.HEIC OUT.HEIC \
 
 ## 从源码安装
 
-需要 **Python 3.12+**。最省事的方式是用 [uv](https://docs.astral.sh/uv/)：
+需要 **Python 3.12+**。推荐使用 [uv](https://docs.astral.sh/uv/)：
 
 ```bash
 git clone https://github.com/nathanatgit/Shalielie.git
@@ -79,10 +83,10 @@ uv sync
 默认模式还需要两个外部工具——用于编码的 `ffmpeg`（需带 libx265），以及用于解码的
 `heif-convert`（libheif）：
 
-| 系统            | 安装方式                                                  |
-| --------------- | --------------------------------------------------------- |
-| Debian / Ubuntu | `sudo apt install ffmpeg libheif-examples`                |
-| macOS           | `brew install ffmpeg libheif`                             |
+| 系统            | 安装方式                                                          |
+| --------------- | ----------------------------------------------------------------- |
+| Debian / Ubuntu | `sudo apt install ffmpeg libheif-examples`                      |
+| macOS           | `brew install ffmpeg libheif`                                   |
 | Windows         | `winget install Gyan.FFmpeg`，再把本仓库的 `tools/` 加入 PATH |
 
 Windows 上没有 libheif 包，所以 `tools/` 附带了一个基于 pillow-heif 的 `heif-convert` 替代品，
@@ -105,24 +109,24 @@ uv run photographic_style_port.py patch INPUT.HEIC OUTPUT.HEIC
 
 `patch` 会根据照片自动决定怎么处理：
 
-| 照片                                   | 处理方式                                    |
-| -------------------------------------- | ------------------------------------------- |
-| 没有风格数据（iPhone 16 之前的机型）   | 完整移植，并加上质感/颗粒                   |
-| 有原生风格数据（iPhone 16/17）         | 只添加质感/颗粒，其余内容逐字节不变         |
-| 已经有质感/颗粒（iPhone 18）           | 拒绝处理，无需操作                          |
+| 照片                                 | 处理方式                            |
+| ------------------------------------ | ----------------------------------- |
+| 没有风格数据（iPhone 16 之前的机型） | 完整移植，并加上质感/颗粒           |
+| 有原生风格数据（iPhone 16/17）       | 只添加质感/颗粒，原有图像数据逐字节不变 |
+| 已经有质感/颗粒（iPhone 18）         | 拒绝处理，无需操作                  |
 
 `add-texture IN.HEIC OUT.HEIC` 可以显式执行第二种处理。
 
 常用参数：
 
-| 参数                               | 用途                                                  |
-| ---------------------------------- | ----------------------------------------------------- |
-| `--report`                         | 额外写出 `OUTPUT.HEIC.report.json`，记录改动内容      |
-| `--zip`                            | 把 HEIC 和报告打包成 `OUTPUT.zip`，方便传输           |
-| `--light-maps target`              | 根据你的照片重建色调图——最可能改善效果的参数          |
-| `--scene-stats donor`              | 颜色看起来不对时，改用 donor 的色调锚点               |
-| `--linear-thumb reuse-thumbnail`   | 完全跳过编码器                                        |
-| `--texture off`                    | 不添加 iOS 27 质感/颗粒项（即 v0.4.4 的输出）         |
+| 参数                               | 用途                                              |
+| ---------------------------------- | ------------------------------------------------- |
+| `--report`                       | 额外写出`OUTPUT.HEIC.report.json`，记录改动内容 |
+| `--zip`                          | 把 HEIC 和报告打包成`OUTPUT.zip`，方便传输      |
+| `--light-maps target`            | 根据你的照片重建光照图——最可能改善效果的参数    |
+| `--scene-stats donor`            | 颜色看起来不对时，改用 donor 的色调锚点           |
+| `--linear-thumb reuse-thumbnail` | 完全跳过编码器                                    |
+| `--texture off`                  | 不添加 iOS 27 质感/颗粒项（即 v0.4.4 的输出）     |
 
 默认只写出输出的 HEIC 文件，运行摘要会打印在终端中；如果还想保存为 JSON，请加 `--report` 或 `--zip`。
 
@@ -135,8 +139,7 @@ uv run photographic_style_port.py patch IN.HEIC OUT.HEIC \
   --linear-thumb reuse-thumbnail --scene-stats donor --light-maps flat
 ```
 
-在 **ffmpeg 和 heif-convert 都不存在**的情况下也能运行：它直接复用照片自带的缩略图，而不是重新编码
-一张。画质上的细节优化少一些，但无需任何配置，而且在不同机器上输出逐字节一致、可复现。
+在 **ffmpeg 和 heif-convert 都不存在**的情况下也能运行：它直接复用照片自带的缩略图，而不是重新编码。画质上的细节优化少一些，但无需任何配置，而且在不同机器上输出逐字节一致、可复现。
 
 ### 其他命令
 
@@ -147,6 +150,89 @@ uv run photographic_style_port.py extract-donor DONOR.HEIC PROFILE.zip
 ```
 
 `extract-donor` 用于为尚无内置配置的 tile 布局添加支持。
+
+## 工作原理
+
+照片的像素不会被改动，主图像、HDR 增益图、缩略图和 Exif 都来自你的照片（Exif 中仅插入 `0x54`），解码后的输出与输入逐像素一致。
+修改照片Metadata，添加的是“照片” App 所需的风格相关数据：来自归一化 donor 配置的风格 plist 和 Apple MakerNote 标签
+`0x54`，以及根据你自己的照片计算出的 `linearthumbnail` 和场景统计（加 `--light-maps target` 时光照图也由照片计算）。对于质感/颗粒，它会添加
+iOS 27 的 `texture_styles` 项，以及随之出现的 12 个空的 2026 语义遮罩（质感/颗粒必需；与柔肤的关系尚待确认）。
+
+写入的每一项元数据是什么、从哪里来、是否已在真机上验证，都记录在 **[facts.md](facts.md)** 中（英文）。
+
+## 已知问题与限制
+
+- 目前“柔肤”与“标准”滤镜看起来没有明显差异。需要更多带有人物的 iPhone 18 照片来进行逆向分析。正在研究，欢迎提交 issue 以上传你的样图。
+- 有反馈声称，经过移植的照片用同样的调色盘参数调整后，与原生机型自带的风格微调效果并不完全一致。也需要更多样本来进一步研究这个问题。
+- **只有两种 tile 布局（48/12 和 45/15）有内置配置。** 自 v0.5 起支持没有内嵌缩略图的照片，但需要使用
+  默认（编码器）模式。
+- **质感/颗粒需要打开照片的手机运行 iOS 27。**
+- **无法把普通照片变成“人像”照片。** 人像数据只会从照片本身复制，绝不会凭空生成。
+- 对于旋转角度为 90°/270° 的照片，生成的 `linearthumbnail` 存储方向会差 180°（仅限默认编码器模式）。真机测试没有看出差异，因此暂时保持现状。
+- **未经 Apple 验证，效果因照片而异。** 在放弃之前，可以请先试试上面的不同的运行参数。
+- swift-port 分支中的独立 iOS 应用仍在开发中，等到我的新 Mac 到货后才会推出。
+
+未解决的元数据问题（柔肤、仍来自 donor 的数值等）记录在 [facts.md](facts.md) 中。
+
+## 测试移植结果(For AI testing)
+
+看到调色盘只说明“照片” App 认出了这是一张可调风格的照片。移植成功需要满足以下全部条件：
+
+1. 出现调色盘。
+2. 切换风格时照片有明显变化。
+3. 色调和色彩调节对照片有明显影响。
+4. 保存、重新打开、再次编辑都正常。
+5. 没有跟随另一张照片区域分布的色块。
+6. 主图像逐像素一致，没有方块状损坏。
+7. 没有出现不该有的选项（比如没有深度数据的照片出现人像选项）。
+8. 有人物的照片中，人物和背景能分别响应调节。
+9. iOS 27 上出现质感/颗粒；原图有人像数据时，人像也可用。
+
+每次只改一个变量，并与上一个可用版本对比；测试文件请以**文件**形式传输。
+
+跨机器比较时，请比较文件结构而不是整个文件的 SHA：不同的 x265 版本编码出的 `linearthumbnail` 不同。
+只有免编码器模式能做到逐字节可复现，`tests/web/compare.mjs` 也是用它来检查网页版的。
+
+## 版本历史
+
+✅ 已在真机验证 · ☑️ 已在文件层面或通过统计校准验证 · 🔍 有待研究。
+“V” 开头的是首个版本发布前的实验。
+
+| 阶段        | 尝试内容                                                       | 结果                                             |
+| ----------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| 初始        | 照搬 donor 的整个结构                                          | 调色盘取决于文件数据，而非机型                   |
+| V4          | 单位化（identity）的风格元数据                                 | 调色盘和编辑可用 ✅                              |
+| V5          | 合成的辅助图像                                                 | 出现调色盘，但编辑无效                           |
+| V6          | 对`linearthumbnail` 做 A/B                                   | `linearthumbnail` 是关键项                     |
+| V7          | 合成`linearthumbnail`，沿用 donor 的 `hvcC`                | 全部失败                                         |
+| V8          | 合成`linearthumbnail`，**配上它自己的 `hvcC`**       | 4 个变体全部可用 ✅                              |
+| v0.1        | donor 配置；`linearthumbnail` 与 `hvcC` 匹配               | 第一个固定基线                                   |
+| v0.1.1      | 照片的`hvcC` + `colr` 随 tile 一起迁移                     | 方块状损坏消失 ✅                                |
+| V9 / v0.1.2 | Exif A/B；只写入`0x54`                                       | `0x54` 必需；不再带入 donor 的拍摄状态 ✅      |
+| V10         | 计算得出的光照图 vs 平坦光照图                                 | 都可用；donor 区域残影仍在 ✅                    |
+| V11 / v0.2  | 中性 delta map、平坦光照图、单位化系数                         | 完整编辑流程可用；donor 区域残影消失 ✅          |
+| v0.2.1      | 模板内嵌进脚本                                                 | 不再需要 donor 文件                              |
+| v0.3.0      | 采用照片自身方向；`linearthumbnail` 按存储方向生成；色调统计 | 旋转问题修复 ☑️；统计数值单位有误              |
+| v0.3.1      | 统计改用线性光；`--light-maps target`                        | 已校准 ☑️                                      |
+| v0.3.2      | 迁移照片自己的语义遮罩；人物遮罩提示设为 1.0                   | 人物和背景可分别调节 ✅                          |
+| v0.4.0      | 自动处理语义遮罩                                               | ☑️                                             |
+| v0.4.1      | `tmap` 几何信息                                              | Windows 照片中的黑边消失 ☑️                    |
+| v0.4.2      | 深度图                                                         | 原图所有辅助图像都得以保留 ☑️                  |
+| v0.4.3      | XMP 附属数据；照片自己的 HDR headroom                          | 人像可用 ✅                                      |
+| v0.4.4      | `--linear-thumb reuse-thumbnail`                             | 无需编码器 ✅；网页版使用此模式                  |
+| v0.5.0      | 质感/颗粒；原生照片模式；缩略图生成                            | 调色盘、质感/颗粒和人像可用 ✅；柔肤 🔍          |
+| v0.5.1      | 使用照片自己的`tmap` 增益图参数                              | 只有`tmap` 字节变化；像素和数据逐字节一致 ☑️ |
+
+**针对部分假设的逆向工程测试**
+
+- 针对合成的 `linearthumbnail` 后编辑无效的问题，实际原因是图像数据与 `hvcC` 不匹配，与像素内容无关（V8）。
+- 针对主图出现方块状损坏的问题，实际原因是 tile 数据与 `hvcC`/`colr` 不匹配，仅 tile 数量一致并不够（v0.1.1）。
+- 针对编辑效果跟随 donor 照片区域分布的问题，实际原因是 donor 的 delta map，与光照图无关（V11）。
+- 针对色调统计数值偏高约一倍的问题，实际原因是 Apple 以线性光记录这些统计，而 v0.3.0 写入的是 gamma 编码值（v0.3.1）。
+- 针对人物和背景被当作同一图层调节的问题，实际原因是沿用了 donor 的空遮罩，且人物遮罩提示为 -1.0（v0.3.2）。
+- 针对加入深度图后人像仍然无效的问题，实际原因是缺少深度图对应的 XMP 附属数据（v0.4.3）。
+- 针对只加 `texture_styles` 后整个调色盘消失的问题，实际原因是缺少 12 个 2026 语义遮罩，两者必须同时存在（v0.5.0）。
+- 针对 iOS 27 质感/颗粒入口的启用条件，实际起作用的是 `texture_styles` 和 2026 语义遮罩；风格数据版本 14 和 8 键的 `0x54` 即可，无需版本 16 和 13 键（v0.5.0）。
 
 ## 通过 AI 智能体使用
 
@@ -170,20 +256,15 @@ mkdir -p ~/.claude/skills && cp -r skills/photographic-style-port ~/.claude/skil
 
 这个 skill 会告诉智能体：根据已安装的工具选择模式，批量处理时逐个文件进行，不覆盖原图。
 
-## 它实际工作原理
+## 开发者工具
 
-照片的像素不会被改动，主图像、HDR 增益图、缩略图和 Exif 都原样保留，解码后的输出与输入逐像素一致。
-修改照片Metadata，添加的是“照片” App 所需的风格相关数据：来自归一化 donor 配置的风格 plist 和 Apple MakerNote 标签
-`0x54`，以及根据你自己的照片计算出的 `linearthumbnail`、场景统计和光照图。对于质感/颗粒，它会添加
-iOS 27 的 `texture_styles` 项，以及随之出现的 12 个空的 2026 语义遮罩（待确认，可能是soft skin模式相关）。
-
-## 限制
-
-- **只有两种 tile 布局（48/12 和 45/15）有内置配置。** 自 v0.5 起支持没有内嵌缩略图的照片，但需要使用
-  默认（编码器）模式。
-- **质感/颗粒需要打开照片的手机运行 iOS 27。**
-- **未经 Apple 验证，效果因照片而异。** 在放弃之前，可以请先试试上面的不同的运行参数。
-- **无法把普通照片变成“人像”照片。** 人像数据只会从照片本身复制，绝不会凭空生成。
+| 工具                          | 用途                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| `inspect`                   | 以 JSON 输出 HEIC 中与风格相关的 item 结构                                        |
+| `extract-donor`             | 从原生 iPhone 16/17 照片生成 donor 配置，用于新的 tile 布局                       |
+| `tools/style_dump.py`       | 输出 item 结构、Exif 机型信息、MakerNote 标签和风格数据结构，便于对比不同代的照片 |
+| `tools/texture_variants.py` | 从 iPhone 18 donor 配置生成质感/颗粒测试配置（见[facts.md](facts.md)）             |
+| `tests/web/`                | 检查网页版与 Python 工具的输出是否一致，见[`web/README.md`](web/README.md)       |
 
 ## 免责声明
 

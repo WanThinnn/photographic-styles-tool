@@ -1,0 +1,481 @@
+# Photographic Style Port: facts
+
+How `photographic_style_port.py` changes the metadata of a normal HEIC so that Apple Photos
+offers the Photographic Styles palette (风格 / 调色盘), Portrait editing and, on iOS 27,
+Texture/Grain (质感 / 颗粒). It covers everything tried from the early V-series experiments to
+v0.5.1: what worked, what failed, and what is still open. Usage, testing and the version history
+are in the [README](README.md).
+
+**Status labels**
+
+| Status | Meaning |
+|---|---|
+| ✅ **Proven** | Tested in Apple Photos on a device: the control appears, has a visible effect, and survives save → reopen → re-edit |
+| ☑️ **Solid** | Verified at file level (libheif opens it; payloads byte- or pixel-identical; structure matches native files) or by calibration against native files, but not phone-tested on its own |
+| 🔍 **Investigate** | A hypothesis, known gap, donor-derived value or unknown meaning; needs more work before it is final |
+
+---
+
+## 1. Overview
+
+Photos decides which editing controls to offer from **what the file contains**, not from the
+camera model. Each control appears when the file carries the data that control reads. The
+renderer already runs on older iPhones; what an older photo lacks is the data. The port adds
+it, and the decoded photo stays pixel-identical to the original. ☑️
+
+### Design principle
+Anything software can calculate or approximate is not considered a hardware-specific feature,
+so writing it into a photo is not considered adding a hardware-only capability. The end goal
+is a port that writes only five kinds of data:
+
+1. **Format declarations**: item types, URIs, schema and pixel-format fields that describe
+   what the file contains and how it is laid out.
+2. **The photo's own data**: pixels, HDR, Exif, depth, mattes and sidecars, rearranged but not
+   altered.
+3. **Values calculated from the photo**: scalars such as tone statistics.
+4. **Maps calculated from the photo**: images and grids such as light maps and the linear
+   thumbnail.
+5. **Neutral defaults**: software stand-ins for capture-time results the port cannot reproduce
+   (identity, flat, empty). They claim nothing about the scene.
+
+Exif `Make` / `Model` are never changed, so a ported photo still names the camera that took it.
+
+Today the port also takes a structural template and a few values from a **donor**, a
+normalized native iPhone 16 file embedded in the script. Donor-derived data is not part of the
+end goal and remains an **open issue** (§8).
+
+For where every piece of metadata stands today, see the status sheet in §2.1.
+
+---
+
+## 2. Metadata: status and requirements
+
+### 2.1 Status sheet
+
+Every piece of metadata the port writes, what kind of data it is (§1), and its status.
+
+A row can be ✅ and still have an open point: it works, but something about it is not yet
+understood or not yet in its final form.
+
+**Photo data and container**
+
+| Metadata | Port writes | Kind | Status | Open point |
+|---|---|---|---|---|
+| Primary image tiles + `hvcC`/`colr` | The photo's own, pixel-identical | Photo's own | ✅ | – |
+| HDR gain-map tiles + `hvcC` | The photo's own | Photo's own | ☑️ | HDR rendering not tested on its own |
+| HDR XMP sidecar (headroom) | The photo's own | Photo's own | ☑️ | – |
+| `tmap` geometry (`ispe`/`irot`) | The photo's own, or derived from the primary | Photo's own | ☑️ | – |
+| `tmap` payload (gain-map parameters) | The photo's own (since v0.5.1); donor's only for photos without a `tmap` | Photo's own | ☑️ | Photos without a `tmap` still use the donor's (§8); HDR result not phone-tested |
+| Ordinary thumbnail | The photo's own, or encoded from the primary if missing | Photo's own / map | ✅ | – |
+| Exif, Make/Model unchanged | The photo's own | Photo's own | ✅ | – |
+| Orientation `irot` / `imir` | The photo's own | Photo's own | ✅ | – |
+| Item graph (IDs, `iref`, `ipma`, `ipco`, grids) | **Donor template** | Donor | ✅ | Should be generated from the photo's layout; limits support to two layouts (§8) |
+| `mdat` and `iloc` offsets | Rebuilt | Format | ✅ | – |
+
+**Style palette**
+
+| Metadata | Port writes | Kind | Status | Open point |
+|---|---|---|---|---|
+| MakerNote `0x54` | Fixed 8-key record | Format | ✅ | Meaning of each member unknown |
+| Styles item (`metadata:styles`) | New item | Format | ✅ | – |
+| Styles `0` (schema), `e`/`f`, `g`, key `3` header | Fixed values | Format | ✅ | – |
+| Styles `1` coefficients | Identity | Neutral | ✅ | Native values not reproduced (affects the look, §9) |
+| Styles `3` tone curve | Identity | Neutral | ✅ | Native values not reproduced (affects the look, §9) |
+| Styles `c`/`d` light maps, flat (default) | Constants | Neutral | ✅ | – |
+| Styles `c`/`d` light maps, `--light-maps target` | Calculated from the photo | Map | ✅ | 180° rule only observed at `irot = 270` |
+| Styles `6` tone statistics | Calculated from the photo | Value | ☑️ | – |
+| Styles `6` `highKey` | **Donor's** | Donor | 🔍 | Derivation unknown (§8) |
+| Styles `i` (HDR range, `Gain`) | **Donor's** | Donor | 🔍 | `OriginalRangeMax` tracks headroom; `Gain` groups by generation (§8) |
+| Styles `h` | **Donor's** | Donor | 🔍 | Equals `Gain / 4`; calculable once `Gain` is resolved (§8) |
+| Styles `4`, `2`, `5`, `j` | **Donor's** | Donor | 🔍 | Unknown (§8) |
+| Styles `k` / `l` | Not written | – | ✅ | Not needed |
+| Delta map | Neutral constant tile | Neutral | ✅ | – |
+| Linear thumbnail, `generate` | Encoded from the photo with its own `hvcC` | Map | ✅ | irot 90/270 stored 180° off; no visible effect (§4.4) |
+| Linear thumbnail, `reuse-thumbnail` | The photo's own thumbnail | Photo's own | ✅ | – |
+
+**People layers and Portrait**
+
+| Metadata | Port writes | Kind | Status | Open point |
+|---|---|---|---|---|
+| Classic semantic mattes | The photo's own | Photo's own | ✅ | Which mattes are needed individually |
+| Unused matte slots (photo has mattes) | Empty refill | Neutral | ☑️ | – |
+| Matte slots (photo has no people) | **Donor's** near-empty bytes | Donor | 🔍 | Replace with generated empty frames (§8) |
+| `PersonMasksValidHint` | 1.0 when mattes are carried | Value | ✅ | – |
+| `PeopleRatio` / `SkinRatio` | Not written (stay 0) | – | 🔍 | Possible Soft Skin factor (§7) |
+| Depth map | The photo's own | Photo's own | ✅ | – |
+| XMP sidecars (depth, mattes) | The photo's own, remapped | Photo's own | ✅ | – |
+
+**Texture and Grain (iOS 27)**
+
+| Metadata | Port writes | Kind | Status | Open point |
+|---|---|---|---|---|
+| `texture_styles` item | Native iPhone 18 Pro record | Native record | ✅ | – |
+| `HardwareModel` | `iPhone19,2` | Native record | ✅ | Names a device other than the photo's own (§8) |
+| `FilmGrainSeed` | 92 for every photo | Native record | ✅ | Should be calculated per photo (§8) |
+| `TextureStylePeopleDataVersion` | 3 | Native record | ✅ | Possible Soft Skin factor (§7) |
+| `Preset`, `CaptureType`, `CaptureMode`, `PortType` | Native values | Native record | ✅ | Not tested one at a time |
+| 2026 matte set (×12) | Empty frames | Neutral | ✅ | Empty on people photos; likely why Soft Skin does nothing (§7) |
+| 2026 matte sidecars (×12) | Native XMP | Format | ☑️ | Not tested without the mattes |
+| Soft Skin result | – | – | 🔍 | Looks the same as Standard (§7) |
+
+### 2.2 What each control needs
+
+Numbers refer to the item reference in §2.3.
+
+| Control | Needs | What happens without it |
+|---|---|---|
+| **Style palette** | #1 MakerNote `0x54`, #2 styles item, #3 linear thumbnail with a matching `hvcC`, #4 delta map, #5 HDR/`tmap` structure | No `0x54` → no palette. Mismatched linear-thumbnail `hvcC` → palette appears but edits do nothing. |
+| **People layers** (people and background styled separately) | #8 the photo's own mattes with sidecars, #9 `PersonMasksValidHint = 1.0` | People and background are styled as one layer |
+| **Portrait** | #6 depth map + #7 its XMP sidecar | Portrait is not offered, or is offered but does nothing |
+| **Texture and Grain** (iOS 27) | #10 `texture_styles` + all twelve #11 2026 mattes (with #12 sidecars) | #10 without #11 **removes the whole palette** |
+
+Texture and Grain have only ever appeared as a pair; no separate requirement for either is
+known.
+
+Tested and **not** required:
+
+| Candidate | Result ✅ |
+|---|---|
+| Exif `Make` / `Model`, filename, other Exif fields | Changing them does nothing. Some real iPhone 16 photos have no style data and get no palette. |
+| Styles schema 16, keys `k` / `l` (iOS 26.5 / 27 additions) | Schema 14 works on iOS 27, palette and Texture/Grain included |
+| 13-key `0x54` (iPhone 18) | The 8-key form works on iOS 27 |
+| Item order | Does not matter |
+| Native coefficients, tone curve, light maps, delta map content | Identity, flat and neutral values work |
+| Matte content | Empty mattes are enough for the palette |
+
+### 2.3 Item reference
+
+| # | Item | Identifier | Lives in | Port writes | Evidence |
+|---|---|---|---|---|---|
+| 1 | Apple MakerNote tag `0x54` | Exif `0x8769` → MakerNote `0x927C` → tag `0x54` (type 7) | Exif item | 109-byte, 8-key bplist `{0:1, 1:0.0, 2:0.0, 3:1.0, 4:1, 5:1, 6:4, 7:0}`, identical in every native style file sampled; member meanings unknown | ✅ |
+| 2 | Styles item | `uri ` item `tag:apple.com,2023:photo:metadata:styles`, `cdsc` → primary + `tmap` | `iinf` + `mdat` | Mix of calculated, neutral and donor fields (§4.1) | ✅ |
+| 3 | Linear thumbnail | aux `tag:apple.com,2023:photo:aux:linearthumbnail` | `hvc1` item, own `hvcC`/`ispe`/`pixi`, shared `irot` | Encoded from the photo (Main10, 1024×768), or the photo's own thumbnail reused | ✅ |
+| 4 | Style delta map | aux `tag:apple.com,2023:photo:aux:styledeltamap` | `grid` of 512×512 Main10 tiles | One constant neutral tile in every slot | ✅ |
+| 5 | HDR gain map + `tmap` | aux `urn:com:apple:photo:2020:aux:hdrgainmap`; `tmap` item | `grid` + derived item | The photo's tiles, `hvcC`, `tmap` geometry, `tmap` payload (v0.5.1) and HDR XMP. | ☑️ |
+| 6 | Depth map | aux `urn:mpeg:hevc:2015:auxid:2` | `hvc1` item, own `ispe`/`pixi`/`colr`/`hvcC`, shared `irot` | The photo's own item, `auxC` included | ✅ |
+| 7 | Depth sidecar | `mime` `application/rdf+xml`, `cdsc` → depth; `apdi:*` ranges/formats, `depthBlurEffect:*`, `depthData:Accuracy`, `portraitLightingEffect:*` | `iinf` + `mdat` | The photo's own sidecar, remapped to the new depth item | ✅ |
+| 8 | Classic semantic mattes | `urn:com:apple:photo:` `2018:aux:portraiteffectsmatte`, `2019:aux:semanticskinmatte` / `semantichairmatte` / `semanticteethmatte`, `2020:aux:semanticglassesmatte` / `semanticskymatte` | `hvc1` items + XMP sidecars | The photo's own mattes; unused slots refilled with an empty matte | ✅; which mattes are individually needed 🔍 |
+| 9 | Person-mask hint | styles key `7` → `PersonMasksValidHint` | styles plist | 1.0 when the photo's mattes are carried | ✅ |
+| 10 | Texture styles item | `uri ` item named `metadata`, `tag:apple.com,2026:photo:metadata:texture_styles`, `cdsc` → primary + `tmap` | `iinf` + `mdat` (216-byte bplist) | The record from a native iPhone 18 Pro capture, unchanged (§5.1) | ✅ |
+| 11 | 2026 matte set (×12) | `tag:apple.com,2026:photo:aux:` + `semanticnosematte`, `semanticskinmattev2`, `semanticnonfaceskinmatte`, `semanticlipsmatte`, `semanticteethmattev2`, `semanticpersonmatte`, `semanticglassesmattev2`, `semanticeyebrowsmatte`, `semantictattoomatte`, `semantichandsmatte`, `semanticearsmatte`, `semanticfaceskinmatte` | 12 `hvc1` items: shared `ispe`/`pixi`/`hvcC`, own `auxC`, primary `irot`, `auxl` → primary + `tmap` | Empty 768×576 8-bit frames (156 B each) | ✅ |
+| 12 | 2026 matte sidecars (×12) | `mime` items, `cdsc` → each matte; `fsincMattes:FSINCMatteVersion 0` | `iinf` + `mdat` | Native 357-byte XMP | ☑️; never tested on its own |
+
+### 2.4 What the port writes, by kind
+
+Sorted by the five kinds in §1. The donor row is the open issue in §8.
+
+| Kind | Contents |
+|---|---|
+| Format declarations | URIs and item types of #2–#12; styles `0`, `e`/`f`, `g` (`'L00h'`, the half-float pixel format of the light maps) and the key `3` header; XMP version strings; #1 `0x54` (identical across native files, so treated as a format record; member meanings 🔍) |
+| The photo's own data | Primary, HDR and thumbnail tiles with their `hvcC`/`colr`; Exif; `irot`/`imir`; `tmap` geometry; HDR XMP; #6–#8 depth, sidecars and mattes |
+| Values calculated from the photo | Styles key `6` tone statistics; #9 hint (set from whether the photo has mattes) |
+| Maps calculated from the photo | #3 linear thumbnail; light maps with `--light-maps target`; a synthesized thumbnail when the photo has none |
+| Neutral defaults | Identity coefficients and tone curve; flat light maps (default); #4 neutral delta map; #11/#12 empty 2026 mattes; empty refill of unused matte slots |
+| Taken unchanged from a native capture | #10 `texture_styles`, including `HardwareModel` and a fixed `FilmGrainSeed` (both 🔍, §8) |
+| **Donor** | Item-graph template; `tmap` payload for photos without one; styles `i`, `h`, `4`, `highKey`, `2`, `5`, `j`; donor matte bytes in photos without people |
+
+---
+
+## 3. What `patch` does, step by step
+
+1. **Choose a route.** A photo with no style data gets the full port. A photo that already has
+   native style data (iPhone 16/17) only gets Texture/Grain added (§5.4). A photo that already
+   has `texture_styles` is refused.
+2. **Pick a template** by tile layout: `48-12` (48 primary / 12 HDR tiles, 3024×4032) or `45-15`
+   (45 / 15, 4284×5712). Any other layout is refused.
+3. **Move the photo in.** The photo's primary, HDR and thumbnail tiles go into the template's
+   item slots together with their `hvcC` and `colr`. The photo's orientation and `tmap`
+   geometry replace the template's.
+4. **Keep the photo's Exif** and insert MakerNote `0x54` (§3.3).
+5. **Write the style data:** the styles plist (§4.1), a neutral delta map (§4.2) and a linear
+   thumbnail made from the photo (§4.3).
+6. **Carry people and Portrait data:** the photo's mattes, depth map and every XMP sidecar (§6).
+7. **Add the Texture/Grain set** (§5).
+8. **Rebuild the file:** one fresh `mdat`, with every `iloc` offset rewritten.
+
+### 3.1 Payloads travel with their decoder configuration
+A compressed payload and its `hvcC` (and `colr`, where it has one) must always move together.
+This was learned twice:
+
+- **Primary tiles (v0.1 → v0.1.1).** The photo's tiles combined with the donor's `hvcC` showed
+  rectangular block corruption. Moving the photo's own `hvcC` and `colr` along fixed it, and the
+  output now decodes identically to the source. ✅
+- **Linear thumbnail (V7 → V8).** Apple stores one VCL NAL in the payload and the VPS/SPS/PPS in
+  `hvcC`. V7 replaced the payload but kept the donor's `hvcC`: the palette appeared but edits
+  did nothing. Even re-encoding the *donor's own* image failed, so the problem was never the
+  pixels. V8 encoded each candidate as a one-frame MP4 and moved the sample together with that
+  MP4's `hvcC`. All four variants worked. ✅
+
+When some items in a shared property slot get the photo's payloads and others keep donor
+payloads, the port appends a second `hvcC` and repoints only the items that changed.
+
+### 3.2 Template details (current mechanism; replacing it is open, §8)
+- `extract-donor` turns a native iPhone 16/17 HEIC into a profile ZIP: `manifest.json`,
+  `ftyp.bin`, `meta.bin`, `makernote_0x54.bin` and `payloads/<iid>.bin`. The donor's pixels,
+  HDR, thumbnail, Exif and linear thumbnail are left out, so no donor image content reaches the
+  output. ✅
+- The two profiles are embedded in the script (zlib + base85).
+- A matching tile count is not enough on its own: grid geometry, tile order, `hvcC`, `colr` and
+  property associations must all line up. ☑️
+- Do not rename the `smartstyle-port-donor-profile` format marker or the
+  `smartstyle_makernote_*` manifest keys. They are stored inside the embedded ZIPs, and renaming
+  them breaks loading.
+
+### 3.3 MakerNote `0x54`
+- Same style data, `0x54` absent → no palette; `0x54` present → palette works (V9). ✅
+- Copying the donor's **whole** Exif also brings back the palette, but it carries unrelated
+  donor capture state: one test showed a Portrait option on a photo with no usable subject.
+  Only `0x54` is inserted. ✅
+
+How the insertion works (`inject_apple_makernote_tag`):
+1. Follow IFD0 → `0x8769` ExifIFD → `0x927C` MakerNote and require the `Apple iOS` header.
+2. Rebuild the MakerNote IFD with `0x54` added or replaced, sorted by tag. If an entry is added,
+   shift every out-of-line value offset by +12.
+3. Append the rebuilt MakerNote at the end of the TIFF and point `0x927C` at it (type 7). The
+   old MakerNote stays in place, unused, so no other Exif offset moves.
+
+Photos taken with the old Photographic Styles (`SemanticStyle`, iPhone 15 era) have none of the
+new items. Changing a preset ID cannot upgrade them; the new item graph has to be built.
+☑️
+
+---
+
+## 4. Style data in detail
+
+### 4.1 The styles plist, field by field
+
+| Key | Shape | Meaning in native files | Port writes | Evidence |
+|---|---|---|---|---|
+| `0` | int | Schema: 14 (iOS 18.2), 15 (iOS 26.5), 16 (iOS 27) | 14 | ✅ |
+| `1` | 51,840 B FP16 = 2×18×24×10×3 | Per-region 2nd-order RGB polynomial `[1,R,G,B,R²,G²,B²,RG,RB,GB]`; differs per scene | Identity | ✅ |
+| `3` | 516 B = 4 B header + 256 × u16 | Global tone curve | Identity | ✅ |
+| `c`, `d` | 32×32 FP16 (`e` = `f` = 32) | Light maps (tone-mapped / linear) | Flat 0.31152 / 0.20093 by default; calculated with `--light-maps target` | flat ✅; calculated ✅ (V10); current fit ☑️ |
+| `6` | dict of stat blocks | `ToneMappedImage` / `LinearImage` percentiles, black/white point, `highKey` | Calculated from the photo (default); `highKey` from donor | ☑️ |
+| `7` | dict | `PeopleRatio`, `SkinRatio`, `PersonMasksValidHint` | Hint 1.0 when mattes are carried; ratios never written | ☑️ |
+| `g` | int | `1278226536` = `'L00h'`, pixel format of `c`/`d` | Same in every file | ☑️ |
+| `i` | dict | HDR range: `OriginalRangeMin/Max`, `Gain` | Donor values | 🔍 (§8) |
+| `h` | float | Exactly `i.Gain / 4` | Donor value | 🔍 (§8) |
+| `4` | float | Unknown | Donor value | 🔍 (§8) |
+| `2`, `5`, `j` | scalars | Unknown | Donor values (`True`, 0, 1.0) | 🔍 (§8) |
+| `k`, `l` | – | Added in iOS 26.5 / 27 | Absent | ✅ not needed |
+
+Native coefficients, tone curve and light maps all differ from scene to scene (about 93% of
+the key `1` bytes differ between two shots), but none of them is needed for the controls to
+work.
+
+**Calibration** (v0.3.1, regression on eight native files):
+- `ToneMappedImage` holds percentiles of **linear-light** display luma (mean ratio 0.980,
+  sd 0.076). v0.3.0 wrote gamma-encoded values, about 2× too high; that has since been fixed.
+- `LinearImage` is the same signal × **0.166** (leave-one-out MAE 0.013).
+- The light maps are stored rotated 180° from the primary's stored orientation, track linear
+  luma, and clamp at 0.040741. The fits are `c = clamp(0.7774·L + 0.0294)` and
+  `d = clamp(0.6542·L − 0.0128)`, with leave-one-out MAE 0.022 / 0.037 against 0.146 / 0.115
+  for the flat values.
+- All calibration files had `irot = 270`, so the 180° rule is untested at other angles.
+  🔍
+
+### 4.2 Delta map: neutral, never the donor's
+- Native delta maps are 10-bit RGB centred on 512 (about 470–560). Amplified, they show the
+  scene they came from. ☑️
+- With the donor's delta map, edits followed **the donor's scene regions** on the target.
+  Flattening the light maps did not help; a constant neutral tile did (V11). ✅
+- Editing still works with a neutral map, so it is a correction layer on top of the style, not
+  the style itself: `styled ≈ F(image, style) + D(x, y)`, with `D = 0` in ports.
+- Every tile gets the same neutral 512×512 Main10 sample with a matching `hvcC`.
+
+### 4.3 Linear thumbnail
+- Native: 1024×768, 10-bit HEVC Main10, sharing the primary's `irot`.
+- **`generate`** (default): decode the photo, return it to its **stored** orientation, scale,
+  encode Main10 with libx265, then move the sample and its `hvcC` in together. ✅
+- **`reuse-thumbnail`** (v0.4.4): reuse the photo's own 8-bit thumbnail, which needs no encoder.
+  Its `pixi` is shared with other items, so a new one is appended and only the linear thumbnail
+  points to it. This is the only mode the browser build uses. ✅
+- With neutral coefficients, flat light maps and a neutral delta map, the linear thumbnail is
+  the renderer's **only spatially varying input**. A misoriented one is therefore the main
+  possible source of blocky or patchy results.
+
+### 4.4 Orientation and `tmap`
+- Both templates share **one `irot` = 270°** across the primary, thumbnail, HDR grid, delta grid
+  and linear thumbnail. Until v0.3.0 this made every photo with a different orientation display
+  rotated. Now the photo's own `irot` (and `imir`, if the template has a slot) replaces it.
+  ☑️
+- `tmap` states its size in **display** orientation and has its own `irot`. Without updating
+  it, Windows Photos (which renders through `tmap`) showed a black band under landscape ports.
+  v0.4.1 copies the photo's `tmap` geometry, or derives it from the primary. ☑️
+- **Known inversion** 🔍: `raw_orientation_filters` swaps irot 90 and 270, so linear
+  thumbnails for those photos are stored 180° off. A phone A/B showed no visible difference,
+  so the mapping is kept. The 180° light-map rule was calibrated through the same mapping; if
+  either changes, re-derive both, and update `web/src/decode.js` to match.
+
+---
+
+## 5. Texture and Grain (iOS 27, v0.5.0)
+
+### 5.1 What iPhone 18 files add
+On iOS 27, Photos on an iPhone 15 Pro offers Texture/Grain for iPhone 18 photos, so the
+renderer runs on older hardware too. Compared with iPhone 16 files, iPhone 18 files add
+`texture_styles` (#10), the 2026 matte set (#11) with sidecars (#12), styles schema 16 with
+`k`/`l`, and a 13-key `0x54`. Only #10 and #11 matter.
+
+`texture_styles` is a 216-byte bplist with no pixel data:
+
+| Field | Value | Notes |
+|---|---|---|
+| `Preset` / `CaptureType` / `CaptureMode` / `PortType` | `Standard` / `LF` / `Still` / `PortTypeBack` | Native values; not tested separately |
+| `HardwareModel` | `iPhone19,2` | The iPhone 15 Pro value keeps the controls but makes white areas glow under some styles, so it likely selects render parameters. Names a device other than the photo's own. 🔍 (§8) |
+| `TextureStylePeopleDataVersion` | 3 | Absent / 0 / 1 / 2 did not help a build missing #11 |
+| `FilmGrainSeed` | 92 | Grain is generated from it at render time; every port gets the same pattern. 🔍 (§8) |
+
+### 5.2 On-device tests (iPhone 15 Pro, iOS 27; one 48/12 and one 45/15 photo)
+
+| Build | Palette | Texture/Grain |
+|---|---|---|
+| iPhone 18 donor profile, unmodified | ✅ | ✅ |
+| … with styles v14 and 8-key `0x54` | ✅ | ✅ |
+| … with `texture_styles` disabled | ✅ | ❌ |
+| … with `HardwareModel` → `iPhone16,1` | ✅ | ✅ but white areas glow |
+| … with the 2026 matte URIs made unrecognisable | **❌** | ❌ |
+| … with `texture_styles` placed after Exif | ✅ | ✅ |
+| **v0.4.4 file + `texture_styles` only** | **❌** | ❌ |
+| v0.4.4 file + `TextureStylePeopleDataVersion` absent / 0 / 1 / 2 | ❌ | ❌ |
+| **v0.4.4 file + `texture_styles` + 12 empty 2026 mattes (v0.5.0)** | ✅ | ✅ |
+
+`texture_styles` without the 2026 mattes removes the whole palette; item order does not matter.
+✅ The test profiles come from `tools/texture_variants.py`.
+
+### 5.3 Why it is added on top of the iPhone 16 templates
+iPhone 18 donor profiles work on photos without people but **crash on people/Portrait photos**:
+their matte set does not fit the people path. Adding the texture set to the v0.4.4 templates
+leaves that path untouched, and `--texture off` reproduces v0.4.4 byte for byte.
+
+How the set is appended (`add_texture_items`):
+- Shared `ispe`, `pixi` and `hvcC` once, then one `auxC` per matte.
+- Properties associated in native order, `ispe, pixi, auxC, hvcC, irot` (descriptive before
+  transformative, as HEIF requires).
+- Then the 12 sidecars, then the `texture_styles` item.
+- The result matches native iPhone 18 files: property bytes, order, essential flags,
+  references, payloads and sidecars. ☑️
+
+### 5.4 Photos that already have style data (`add-texture`)
+Porting a native iPhone 16/17 photo would replace its real style data with neutral values, so
+only #10–#12 are inserted:
+- `meta` grows (about 2.5 KB) and every external offset shifts by exactly that amount; new
+  payloads go into one small `mdat` at the end.
+- Before writing, every original payload must re-extract byte-identical and every new one must
+  read back as written.
+- Only Apple's native layout is accepted (iloc v1 4/4/0/0, iref v0, narrow ipma).
+- Tested on native photos with and without people, including one with depth. ✅
+
+### 5.5 Photos without a thumbnail
+Some copies re-saved by iOS have no thumbnail and no `tmap`. Since v0.5 the port encodes a
+thumbnail from the primary (416×312, 8-bit HEVC Main, stored orientation, its own `hvcC`).
+✅ The browser build cannot do this, because it has no HEVC encoder.
+
+---
+
+## 6. People layers and Portrait
+
+### 6.1 Layers in a people or Portrait photo
+Each layer is a separate auxiliary image and drives a different control:
+
+| Layer | Items | Separates | Drives | Port |
+|---|---|---|---|---|
+| Person and skin | Classic mattes #8 + sidecars | People, skin and hair from the background | People-aware styling | The photo's own mattes |
+| Mask trust | `PersonMasksValidHint` #9 | – | Whether Photos uses the masks at all | 1.0 when mattes are carried |
+| Depth | Depth map #6 + sidecar #7 | Subject from background by distance | Portrait (blur, depth effects) | The photo's own item and sidecar |
+| iOS 27 people regions | 2026 mattes #11 | Face and body regions | Texture people handling; likely Soft Skin | **Empty** (§7) |
+| Light (not semantic) | Styles `c`/`d` | Bright from dark regions | Local tone adjustment | Flat or calculated |
+
+### 6.2 Rules
+1. **Layers come only from the photo itself.** A donor matte with content would apply the
+   donor's regions to an unrelated photo, the same leak as the donor delta map. Slots the photo
+   cannot fill get an empty matte.
+2. **Never invent a layer.** A photo without mattes gets no people layer, and styling it as a
+   whole is then correct. `PeopleRatio` / `SkinRatio` are never written; they are not matte
+   coverage (on two native people photos, one matched within 10%, the other was 17× off).
+3. **Mattes and depth are independent.** A Portrait of an object has depth and no mattes.
+4. **A layer without its XMP sidecar does nothing.** The sidecar tells Photos how to read the
+   samples. Every sidecar is carried and pointed at the item's new ID.
+5. **Layers must line up with the photo:** shared primary `irot`, and `auxl` → primary + `tmap`.
+6. **Each payload keeps its own `hvcC`.** Copy `auxC` byte for byte, because Apple stores extra
+   `aux_subtype` data after the URI.
+7. **The mask-trust flag must agree with the layers.** Real mattes with the hint at -1.0 still
+   give whole-frame styling. The hint means "masks computed", not "person present"; native
+   photos without people carry 1.0 too.
+8. **Portrait must come from the photo's own depth**, never from donor capture state (§3.3).
+
+New items are appended at the end of `ipco`, so no existing property index moves. Each needs one
+`infe`, one `iloc` entry, one `ipma` entry and one `auxl`/`cdsc` reference.
+
+### 6.3 History
+
+| Version | Problem | Fix | Status |
+|---|---|---|---|
+| ≤ v0.3.1 | Edits worked, but **people and background changed as one layer**. Ports carried the donor's empty mattes and its `PersonMasksValidHint = -1.0` ("no usable masks"), and the photo's own mattes were dropped. | – | Observed ✅ |
+| v0.3.2 | — | Carry the photo's mattes, refill unused donor slots with empty ones, set the hint to 1.0 (opt-in `--people on`) | People and background now separate ✅ |
+| v0.4.0 | — | Automatic; photos without mattes come out byte-identical | ☑️ |
+| v0.4.2 | Portrait missing: the depth map was dropped | Add depth as its own item, separate from the mattes; copy `auxC` byte for byte | ✅ |
+| v0.4.3 | Portrait still did nothing: only half the XMP sidecars were carried | Carry every sidecar. This also replaced the donor's HDR headroom sidecar with the photo's. | ✅ |
+
+Flat light maps (v0.3.1 note) also make tone adjustment uniform across the frame, but that is a
+separate issue: they carry no people information.
+
+---
+
+## 7. Soft Skin 🔍
+
+**Status: needs more investigation; no fix designed yet.**
+
+- **Symptom:** on ported photos, Soft Skin looks the same as Standard.
+- **Leading hypothesis:** Soft Skin reads the 2026 mattes (#11), especially skin, face skin,
+  non-face skin, lips, nose, eyebrows and ears. The port writes all twelve **empty**, because the
+  only native reference is a scene without people, so Soft Skin has no skin region to act on.
+- **Other suspects** (unverified):
+  - `TextureStylePeopleDataVersion` may expect people data the empty mattes don't provide.
+  - `PeopleRatio` / `SkinRatio` stay 0 while real classic mattes are present, a combination
+    Apple never writes.
+  - The 2026 sidecars say `FSINCMatteVersion 0`; people captures may differ.
+- **Needed:**
+  1. Native iPhone 18 / iOS 27 photos **with people** (ideally Portrait too).
+  2. A diff against the empty form with `tools/style_dump.py`.
+  3. A check of whether 2026 mattes can be derived from the classic ones the photo already has
+     (`semanticskinmatte` → `semanticskinmattev2`, and so on).
+  4. Phone A/B, one change at a time: real skin mattes, then the ratios, then the sidecar version.
+- iPhone 18 people photos (sent as files) are welcome via issues.
+
+---
+
+## 8. Donor-derived data: open issues 🔍
+
+Nothing in the final port should come from the donor (§1). Each item below must become a format
+declaration, the photo's own data, a calculated value or map, or a neutral default. A value that
+proves identical in every native file of a format or capture generation counts as a format
+declaration. Findings come from comparing the two templates with eleven native style files
+(iPhone 16 and iPhone 18), including their HDR headroom, `tmap` parameters and Exif.
+
+| Donor data | What is known | Likely resolution | Status |
+|---|---|---|---|
+| **`tmap` payload** (gain-map headroom, gain min/max, gamma, offsets) | Up to v0.5.0 every port paired the donor's parameters with the photo's gain map, so HDR highlights used the wrong curve. **v0.5.1 copies the photo's own.** Re-saved photos without a `tmap` still get the donor's. | **Photo's own data** (done). Photos without a `tmap`: build one from the XMP headroom. | ☑️ fixed in v0.5.1 for photos with a `tmap`; 🔍 for photos without one; HDR result not phone-tested |
+| **`h`** | Exactly `i.Gain / 4` in all eleven files | **Calculated**, once `Gain` is resolved | Rule known |
+| **`i.OriginalRangeMax` / `Min`** | Max rises with HDR headroom (2.18 → 0.064, 2.72 → 0.084, ~2.8 → ~0.11, 2.92 → 0.249, 4.86 → 0.973), with two exceptions. Min stays near 0. | **Calculated** from headroom via a fit | Needs a fit and phone A/B |
+| **`i.Gain`** | Groups by generation: ~14.6 (iOS 18.2), 9.6–9.8 (iOS 26.5), 9.5–10.2 (iOS 27). Unrelated to ISO or brightness. | Probably a **per-generation format value** | 🔍 |
+| **`4`** | 4.0–5.6; same across same-day daylight shots; no link to brightness, ISO or headroom | Unknown | 🔍 |
+| **`highKey`** (in `6`) | 0.64–0.77 across very different scenes | Unknown; maybe near-constant | 🔍 |
+| **`2`, `5`, `j`** | Same in both donors (`True`, 0, 1.0) | Probably **format declarations**; confirm on native files | 🔍 |
+| **Donor matte bytes** (photos without people) | Effectively empty (max 1–8 out of 255), but still donor bytes | **Neutral default**: generated empty frame | Easy; not applied |
+| **Item-graph template** (item IDs, `iref`, `ipma`, `ipco`, grid descriptors) | Standard HEIF; the code already builds matte, depth, sidecar and texture items from scratch | **Format declarations** generated from the photo's layout; also removes the two-layout limit | Largest task |
+| **`HardwareModel = iPhone19,2`** | The only field naming a device other than the photo's own; the iPhone 15 Pro value causes white glow | Find a setting that renders correctly without it, or document it as an exception | 🔍 |
+| **`FilmGrainSeed = 92`** | Same grain pattern on every port | **Calculated** per photo, e.g. from a pixel hash | Untested |
+
+Suggested order (the `tmap` copy is done in v0.5.1): generated empty mattes → `h` from `Gain` → `OriginalRangeMax`
+fit → generated item graph. `4`, `highKey` and `Gain` need more native samples.
+
+---
+
+## 9. Other open metadata questions
+
+- **Why the look differs from a native photo.** Likely causes: the neutral defaults (identity
+  coefficients and tone curve, flat light maps) and the donor values in §8. 🔍
+- **Not yet isolated:** whether each classic matte is needed; whether the 2026 sidecars are
+  needed on their own; whether styles keys `6`/`7` can be dropped; what each `0x54` member
+  means; how the two planes of the coefficient lattice are read. 🔍

@@ -23,7 +23,7 @@ works by reading and rewriting the ISO-BMFF item graph of photo files, and it is
 **Keep your originals.**
 
 
-**Project status**
+## Project status
 
 The tool is currently at the *functionality* stage. The goal right now is to make photos from older iPhones work with the Photographic Styles palette: the palette appears, styles and adjustments apply as expected, and edits save and reopen correctly.
 

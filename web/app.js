@@ -56,6 +56,7 @@ function row(name) {
   el.className = "row";
   el.innerHTML = `<div class="name"></div><div class="status"></div><div class="act"></div>`;
   el.querySelector(".name").textContent = name;
+  el.querySelector(".name").title = name;
   list.appendChild(el);
   return {
     set(text, cls) {

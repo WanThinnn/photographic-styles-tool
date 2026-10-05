@@ -10,138 +10,177 @@
 //   A few tags are allowed inside a string — <b>, <br>, <code> — because the
 //   values are inserted as HTML. Do not paste anything untrusted in here.
 //
-// WHERE EACH KEY APPEARS
+// STYLE
+//   Chinese follows Apple's zh-Hans terms: 摄影风格, 调色板, 质感, 颗粒, 人像, “照片”App,
+//   存储到“文件”, 存储图像, 点按. Use “” quotes, not 「」. Troubleshooting entries quote
+//   the err.* messages, so keep the two in step when editing either.
+//   Bold (<b>) marks only what the reader taps or looks for while following an
+//   instruction (buttons, menu items, statuses) and the title of each
+//   troubleshooting entry. Notices and the output section stay plain.
+//
+// WHERE EACH KEY APPEARS (top of the page to the bottom)
 //   lang.name    the switch button; it names the language you switch TO
 //   meta.title   browser tab and the big heading
-//   app.lede     the paragraph under the heading
-//   drop.*       the drop area
-//   opt.quality  the checkbox label
+//   app.tagline  the line under the heading
+//   h.notice n.* "Before you start": the notices, shown first
+//   app.lede     the short description above the drop area
+//   drop.*       the drop area: the action only, no instructions
+//   tip.*        the Photo Library tip under the drop area
+//   opt.quality  the analysis switch
 //   st.*         status text on a finished row
 //   err.*        failures a visitor can see
 //   btn.*        buttons on a finished row
-//   h.* s.* p.*  the notes at the bottom: heading, numbered step, paragraph
+//   h.steps s.*  how to use it, as numbered steps
+//   h.get g.*    about the output
+//   h.trouble t.* troubleshooting
+//   p.version    the footer
 
 export const STRINGS = {
   en: {
     "lang.name": "中文",
     "meta.title": "Photographic Styles Palette Port",
-    "app.lede": "Add the Photographic Styles palette introduced with iPhone 16 to compatible HEIC "
-      + "photos from earlier iPhones, together with the Texture and Grain controls that iOS 27 "
-      + "brought with iPhone 18 Pro. Photos from iPhone 16 or 17 that already have Photographic "
-      + "Styles get just Texture and Grain. Processing happens entirely on this device; your "
-      + "photos are never uploaded.",
-    "drop.big": "Drop HEIC photos here, or tap to choose",
-    "drop.small": "On iPhone, try <b>Photo Library</b> first. If a photo is rejected as not "
-      + "a HEIC, iOS converted it — use <b>Browse</b> instead, as described below.",
-    "opt.quality": "Analyze each photo for a closer palette match. On first use, this downloads "
-      + "a small image decoder. Recommended unless it causes problems.",
+    "app.tagline": "The Photographic Styles palette for photos from older iPhones",
+
+    "h.notice": "Before you start",
+    "n.1": "Experimental, unofficial software, not affiliated with Apple.",
+    "n.2": "An Apple HEIC holds only the still image. Keep your original photos.",
+    "app.lede": "Adds the Photographic Styles palette, introduced with iPhone 16, to HEIC "
+      + "photos from earlier iPhones, plus the Texture and Grain controls on iOS 27. "
+      + "Everything runs on this device; photos are never uploaded.",
+    "drop.big": "Choose HEIC photos, or drop them here",
+    "drop.small": "Original HEIC photos from iPhone · processed on this device",
+    "tip.title": "Choosing from Photo Library",
+    "tip.body": "On iOS versions that support it, select your photos, then tap <b>•••</b> in the "
+      + "bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the "
+      + "original HEIC instead of a converted JPEG. If a photo is still rejected, choose "
+      + "<b>Browse</b> and pick it from Files.",
+    "opt.quality": "Analyze each photo so the style data matches its tones. Downloads a small "
+      + "image decoder on first use. Can be slow on iPhone; turn it off if the page freezes.",
 
     "st.reading": "Reading…",
     "st.working": "Processing…",
     "st.ready": "Ready",
-    "st.matched": "palette tuned to this photo",
-    "st.neutral": "neutral palette settings used",
-    "st.portrait": "Portrait data preserved",
-    "st.people": "people data preserved",
+    "st.matched": "matched to this photo’s tones",
+    "st.neutral": "default tone settings",
+    "st.portrait": "Portrait data kept",
+    "st.people": "people data kept",
     "st.texture": "Texture and Grain added",
     "st.native": "original Photographic Style kept",
-    "err.notheic": "This file is not a HEIC photo.",
-    "err.unsupported": "This HEIC file is not compatible with this tool yet.",
-    "err.hastexture": "This photo already has the Texture and Grain controls. Nothing to do.",
-    "err.nothumb": "This HEIC has no embedded thumbnail, which the browser version cannot create. "
-      + "Use the command-line tool for this photo.",
+    "err.notheic": "Not a HEIC photo. iOS may have converted it; see Troubleshooting.",
+    "err.unsupported": "This HEIC isn’t supported yet.",
+    "err.hastexture": "This photo already has Texture and Grain. Nothing to do.",
+    "err.nothumb": "No embedded thumbnail, which the browser can’t create. Use the "
+      + "command-line tool for this photo.",
 
     "btn.save": "Save to Photos",
     "btn.download": "Download",
     "btn.blocked": "Couldn’t open sharing",
 
-    "h.iphone": "On iPhone",
-    "s.1": "Tap the box above, choose <b>Photo Library</b>, and select your photo.",
-    "s.2": "If it is rejected as not a HEIC, your iOS converted it on the way in. In Photos "
-      + "tap <b>Share → Save to Files</b>, then return here and choose <b>Browse</b> instead.",
-    "s.3": "When processing finishes, tap <b>Save to Photos</b>, then choose <b>Save Image</b> "
-      + "in the share sheet.",
-    "s.4": "Open the saved copy in Photos and tap <b>Edit</b>. The Photographic Styles "
-      + "palette should appear; on iOS 27 it also offers <b>Texture</b> and <b>Grain</b>.",
-    "p.iphone": "Older versions of iOS always converted Photo Library picks to JPEG, which "
-      + "strips the data this page needs. Newer ones can hand over the original HEIC, so it "
-      + "is worth trying first — step 2 is only needed if yours still converts.",
-    "h.computer": "On a computer",
-    "p.computer": "Drop in the HEIC files and download the results. Transfer them to your "
-      + "iPhone with AirDrop, iCloud Drive, or your usual import method.",
-    "h.texture": "Texture and Grain (iOS 27)",
-    "p.texture": "The Texture and Grain controls appear on iPhones running iOS 27. They work on "
-      + "photos with and without people, and alongside Portrait. Photos taken on iPhone 18 "
-      + "already have them and are left alone. Behavior on earlier iOS versions has not been "
-      + "tested yet.",
-    "h.rejected": "If a photo is not accepted",
-    "p.rejected": "This tool needs a compatible HEIC photo captured by an iPhone. It rejects "
-      + "JPEGs, screenshots, copies edited or exported by other apps, and HEIC formats it does "
-      + "not support yet. Copies re-saved by iOS sometimes lack an embedded thumbnail; the "
-      + "command-line tool can handle those. Trying a file does not change the original.",
-    "h.knowing": "Worth knowing",
-    "p.knowing": "The image pixels are not re-encoded; this tool rewrites parts of the HEIC "
-      + "container and its metadata. Everything runs locally on your device, and no photo is "
-      + "uploaded. This is experimental, unofficial software, so keep your originals. This "
-      + "page processes only the still HEIC image; Live Photo motion and audio are not included "
-      + "in the processed copy.",
+    "h.steps": "How to use",
+    "s.1": "Choose your photos above, as described in the Photo Library tip. On a computer, "
+      + "drop the files in.",
+    "s.2": "Wait until each photo shows <b>Ready</b>; this takes a few seconds.",
+    "s.3": "On iPhone, tap <b>Save to Photos</b>, then <b>Save Image</b>. On a computer, "
+      + "download the result and send it to your iPhone as a file, with AirDrop or iCloud Drive.",
+    "s.4": "Open the copy in Photos and tap <b>Edit</b>. The Photographic Styles palette "
+      + "appears, and on iOS 27 also <b>Texture</b> and <b>Grain</b>.",
+
+    "h.get": "About the output",
+    "g.1": "When you edit the processed photo in Photos, the Photographic Styles palette "
+      + "and Texture controls are available: adjust the style, tone and colour, save, and "
+      + "edit again later.",
+    "g.2": "Texture and Grain are available only on iOS 27.",
+    "g.3": "Portrait and people data (depth, people masks) comes from the original "
+      + "photo’s own data; this tool never computes it. Even if the original shows people, a "
+      + "photo without Portrait depth data (you can tell: editing it shows no Portrait depth "
+      + "control) won’t have it after processing either.",
+    "g.4": "The tool is at the functionality stage: the look of styles and the detail of "
+      + "Texture and Grain differ from a native photo, which is expected. Fine-tuning comes later.",
+    "g.5": "Known issue: Soft Skin currently looks the same as Standard. More sample photos "
+      + "are needed to analyze it.",
+    "g.6": "The output HEIC does not include the Live Photo’s MOV video. To keep the "
+      + "motion, on a computer (PC or Mac) copy the original’s matching MOV and rename it to the "
+      + "new HEIC’s file name.",
+
+    "h.trouble": "Troubleshooting",
+    "t.1": "<b>“Not a HEIC photo”</b>: iOS converted the photo to JPEG while you picked it. "
+      + "Use the Photo Library tip above, or in Photos tap <b>Share → Save to Files</b> and "
+      + "choose it with <b>Browse</b>.",
+    "t.2": "<b>“No embedded thumbnail”</b>: common for copies re-saved by iOS. Use the "
+      + "command-line tool, which can create the thumbnail.",
+    "t.3": "<b>“This HEIC isn’t supported yet”</b>: screenshots, copies edited or exported by "
+      + "other apps, and photo layouts the tool does not support yet.",
+    "t.4": "<b>The page freezes or reloads</b>: turn off the analysis switch above and try "
+      + "again.",
+
     "p.version": "Version",
   },
 
   zh: {
     "lang.name": "English",
-    "meta.title": "风格调色盘移植工具",
-    "app.lede": "为 iPhone 16 之前机型拍摄的兼容 HEIC 照片添加 iPhone 16 系列引入的摄影风格调色盘，"
-      + "并一并加入 iOS 27 随 iPhone 18 Pro 推出的「质感」与「颗粒」控制。已带有摄影风格的 "
-      + "iPhone 16/17 照片只会添加质感与颗粒。全部处理都在当前设备上完成，照片不会上传。",
-    "drop.big": "拖放 HEIC 照片，或点按选取",
-    "drop.small": "在 iPhone 上可先试<b>照片图库</b>。若提示不是 HEIC 照片，说明系统已转换，"
-      + "请改用<b>浏览</b>，详见下方说明。",
-    "opt.quality": "分析照片内容，使调色盘效果更贴合原片。首次使用时会下载一个小型图像解码组件；"
-      + "除非出现问题，否则建议保持开启。",
+    "meta.title": "风格调色板移植工具",
+    "app.tagline": "让旧款 iPhone 拍摄的照片也能使用摄影风格调色板",
+
+    "h.notice": "注意事项",
+    "n.1": "实验性非官方工具，与 Apple 无关。",
+    "n.2": "Apple 的 HEIC 文件只包含静态图像，请保留原图。",
+    "app.lede": "为 iPhone 16 之前机型拍摄的 HEIC 照片加上 iPhone 16 引入的摄影风格调色板，"
+      + "并在 iOS 27 上加上质感与颗粒控制。全部处理都在本设备上完成，照片不会上传。",
+    "drop.big": "选取 HEIC 照片，或拖放到此处",
+    "drop.small": "iPhone 拍摄的 HEIC 原图 · 在本设备上处理",
+    "tip.title": "从“照片图库”选取时",
+    "tip.body": "在支持的 iOS 版本中，勾选照片后点按左下角的 <b>•••</b> → <b>选项</b> → "
+      + "<b>格式</b> → <b>当前</b>，即可上传 HEIC 原图，而不是转换后的 JPEG。若仍被拒绝，"
+      + "请改选<b>浏览</b>，从“文件”中选取。",
+    "opt.quality": "分析每张照片，使风格数据与照片的影调相匹配。首次使用时会下载一个小型图像解码组件。"
+      + "在 iPhone 上可能较慢；若页面卡住，请关闭此项。",
 
     "st.reading": "读取中…",
     "st.working": "处理中…",
     "st.ready": "已完成",
-    "st.matched": "调色盘已根据照片调整",
-    "st.neutral": "已使用中性调色盘设置",
+    "st.matched": "已匹配照片影调",
+    "st.neutral": "已使用默认影调设置",
     "st.portrait": "已保留人像数据",
     "st.people": "已保留人物数据",
     "st.texture": "已添加质感与颗粒",
     "st.native": "已保留原有摄影风格",
-    "err.notheic": "此文件不是 HEIC 照片。",
-    "err.unsupported": "本工具暂不兼容此 HEIC 文件。",
-    "err.hastexture": "此照片已带有质感与颗粒控制，无需处理。",
-    "err.nothumb": "此 HEIC 没有内嵌缩略图，网页版无法生成。请改用命令行工具处理这张照片。",
+    "err.notheic": "不是 HEIC 照片。可能已被 iOS 转换，请参阅“遇到问题”。",
+    "err.unsupported": "暂不支持此 HEIC 文件。",
+    "err.hastexture": "此照片已带有质感与颗粒，无需处理。",
+    "err.nothumb": "没有内嵌缩略图，网页版无法生成。请改用命令行工具处理这张照片。",
 
-    "btn.save": "存储到「照片」",
+    "btn.save": "存储到“照片”",
     "btn.download": "下载",
     "btn.blocked": "无法打开共享菜单",
 
-    "h.iphone": "在 iPhone 上",
-    "s.1": "点按上方区域，选择<b>照片图库</b>，然后选取照片。",
-    "s.2": "若提示不是 HEIC 照片，说明系统在导入时已转换。请在「照片」App 中点按"
-      + "<b>共享 → 存储到「文件」</b>，返回本页后改选<b>浏览</b>。",
-    "s.3": "处理完成后，点按<b>存储到「照片」</b>，再在共享菜单中选择<b>存储图像</b>。",
-    "s.4": "在「照片」App 中打开存储后的副本，点按<b>编辑</b>，此时应能看到摄影风格调色盘；"
+    "h.steps": "使用步骤",
+    "s.1": "按上方“照片图库”提示选取照片；在电脑上直接拖入文件即可。",
+    "s.2": "等待每张照片显示<b>已完成</b>，通常只需几秒。",
+    "s.3": "在 iPhone 上点按<b>存储到“照片”</b>，再点按<b>存储图像</b>；在电脑上下载结果，"
+      + "再通过隔空投送或 iCloud 云盘以文件形式传到 iPhone。",
+    "s.4": "在“照片”App 中打开副本并点按<b>编辑</b>，即可看到摄影风格调色板；"
       + "在 iOS 27 上还会出现<b>质感</b>与<b>颗粒</b>。",
-    "p.iphone": "旧版 iOS 从「照片图库」选取时总会转换为 JPEG，本页需要的数据会因此丢失；"
-      + "较新版本则可能直接提供原始 HEIC，所以值得先试一次——只有仍会转换时才需要第 2 步。",
-    "h.computer": "在电脑上",
-    "p.computer": "拖入 HEIC 文件并下载处理结果，再通过隔空投送、iCloud 云盘或你常用的方式"
-      + "将其传到 iPhone。",
-    "h.texture": "质感与颗粒（iOS 27）",
-    "p.texture": "质感与颗粒控制会在运行 iOS 27 的 iPhone 上出现，适用于有人物和无人物的照片，"
-      + "也可与人像模式同时使用。iPhone 18 拍摄的照片本身已带有这些控制，不会被处理。"
-      + "在更早的 iOS 版本上的表现尚未测试。",
-    "h.rejected": "如果照片未被接受",
-    "p.rejected": "本工具需要由 iPhone 拍摄且格式兼容的 HEIC 照片。JPEG、截屏、经其他 App "
-      + "编辑或导出的副本，以及暂不支持的 HEIC 格式都会被拒绝。经 iOS 重新存储的副本有时"
-      + "缺少内嵌缩略图，这类照片可改用命令行工具处理。尝试处理不会改动原片。",
-    "h.knowing": "注意事项",
-    "p.knowing": "图像像素不会被重新编码；本工具会改写 HEIC 容器和部分元数据。"
-      + "全部处理都在当前设备上完成，照片不会上传。本工具属于实验性非官方软件，请保留原片。"
-      + "本页仅处理 HEIC 静态图像，处理后的副本不包含实况照片的动态画面和声音。",
+
+    "h.get": "输出结果说明",
+    "g.1": "处理后的照片在“照片”App 中编辑时可启用摄影风格调色板与质感调节，"
+      + "支持风格、影调和色彩调整，存储后可再次编辑。",
+    "g.2": "质感与颗粒调节仅在 iOS 27 上可用。",
+    "g.3": "人像与人物数据（深度、人物遮罩）来自原图的原始数据，本工具不会凭空计算。"
+      + "原图即使拍到了人物，如果没有人像景深数据（判断方法：编辑原图时看不到人像景深控制），"
+      + "处理后也不会有。",
+    "g.4": "当前处于可用性验证阶段：风格效果以及质感/颗粒的细节与原生照片存在差异，"
+      + "属于预期情况，微调会在之后进行。",
+    "g.5": "已知问题：“柔肤”目前与“标准”看起来没有差别，有待更多样本进一步分析。",
+    "g.6": "生成的 HEIC 不包含实况照片对应的 MOV 视频。若要保留动态画面，需在电脑（PC 或 Mac）"
+      + "上将原文件对应的 MOV 手动复制一份，并重命名为与新 HEIC 相同的文件名。",
+
+    "h.trouble": "遇到问题",
+    "t.1": "<b>“不是 HEIC 照片”</b>：选取时 iOS 把照片转换成了 JPEG。请按上方“照片图库”提示操作，"
+      + "或在“照片”App 中点按<b>共享 → 存储到“文件”</b>，再通过<b>浏览</b>选取。",
+    "t.2": "<b>“没有内嵌缩略图”</b>：常见于经 iOS 重新存储的副本。请改用命令行工具，它可以生成缩略图。",
+    "t.3": "<b>“暂不支持此 HEIC 文件”</b>：截屏、经其他 App 编辑或导出的副本，以及暂不支持的照片布局。",
+    "t.4": "<b>页面卡住或自动刷新</b>：关闭上方的分析开关后重试。",
+
     "p.version": "版本",
   },
 };

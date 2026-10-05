@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -49,7 +49,11 @@ self.addEventListener("activate", (event) => {
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
-    const response = await fetch(request);
+    // Revalidate instead of trusting the HTTP cache (GitHub Pages allows 10 minutes), so a
+    // freshly deployed page never runs with stale scripts or copy. Unchanged files cost a 304.
+    // A navigation Request cannot be re-initialised, so it is refetched by URL.
+    const response = await fetch(request.mode === "navigate" ? request.url : request,
+                                 { cache: "no-cache" });
     if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch (error) {

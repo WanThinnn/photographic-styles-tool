@@ -91,6 +91,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import io
 import hashlib
 import json
@@ -3143,7 +3144,137 @@ def build_parser():
     return p
 
 
+# ---------------------------------------------------------------- drop mode ---
+# Dropping files onto the executable (or passing bare file paths) patches every HEIC among
+# them, next to its original, and skips everything else. Windows starts a program with the
+# dropped paths as its arguments, so no subcommand is involved.
+
+DROP_SUFFIX_PORT = "_PhotographicStyle.HEIC"
+DROP_SUFFIX_TEXTURE = "_TextureGrain.HEIC"
+
+
+def sniff_photo(path: Path) -> str:
+    """'heic', or a short name for what the file is instead."""
+    try:
+        with path.open("rb") as f:
+            head = f.read(12)
+    except OSError:
+        return "unreadable"
+    if head[:3] == b"\xff\xd8\xff":
+        return "JPEG"
+    if head[:4] == b"\x89PNG":
+        return "PNG"
+    if head[4:8] == b"ftyp":
+        brand = head[8:12]
+        if brand in (b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx", b"mif1", b"msf1"):
+            return "heic"
+        return f"ISO media ({brand.decode('latin1', 'replace').strip()})"
+    return "not a photo"
+
+
+def is_drop_invocation(argv: List[str]) -> bool:
+    """True when every argument is an existing file or folder and none is a subcommand."""
+    if not argv or argv[0].startswith("-"):
+        return False
+    if argv[0] in {"patch", "add-texture", "extract-donor", "profiles", "inspect"}:
+        return False
+    return all(Path(a).exists() for a in argv)
+
+
+def unique_path(path: Path) -> Path:
+    """path, or 'name (2).ext', 'name (3).ext' … so nothing is ever overwritten."""
+    if not path.exists():
+        return path
+    n = 2
+    while True:
+        candidate = path.with_name(f"{path.stem} ({n}){path.suffix}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def launched_from_explorer() -> bool:
+    """Whether this console window closes when we exit (double-click or drag-and-drop on
+    Windows). A shell that started us shares the console, so the console has more processes
+    attached; a PyInstaller one-file build adds its own bootloader process."""
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        ids = (ctypes.c_uint32 * 8)()
+        count = ctypes.windll.kernel32.GetConsoleProcessList(ids, 8)
+    except Exception:
+        return False
+    return count <= (2 if getattr(sys, "frozen", False) else 1)
+
+
+def drop_mode(paths: List[str]) -> int:
+    # File names can hold characters the console code page (e.g. GBK) cannot print; a name
+    # shown with '?' is better than a crash halfway through a batch.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    files: List[Path] = []
+    for a in paths:
+        p = Path(a)
+        files.extend(sorted(c for c in p.iterdir() if c.is_file()) if p.is_dir() else [p])
+
+    full = shutil.which("ffmpeg") is not None and shutil.which("heif-convert") is not None
+    mode = ("full mode (ffmpeg + heif-convert)" if full else
+            "no-encoder mode (install ffmpeg and heif-convert for full mode)")
+    print(f"Photographic Style Port {VERSION} -- {len(files)} file(s), {mode}\n")
+
+    done = skipped = failed = 0
+    for src in files:
+        kind = sniff_photo(src)
+        if kind != "heic":
+            print(f"  SKIP  {src.name}: {kind}, not a HEIC")
+            skipped += 1
+            continue
+        try:
+            native = discover_heic(src.read_bytes())["styles_item"] is not None
+        except (PortError, OSError) as e:
+            print(f"  FAIL  {src.name}: {e}")
+            failed += 1
+            continue
+        out = unique_path(src.with_name(src.stem + (DROP_SUFFIX_TEXTURE if native else DROP_SUFFIX_PORT)))
+        args = argparse.Namespace(
+            target=str(src), output=str(out), profile=None, report=False, zip=False, texture="on",
+            linear_thumb="generate" if full else "reuse-thumbnail",
+            scene_stats="target" if full else "donor", light_maps="flat")
+        log = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(log):
+                cmd_patch(args)
+        except (PortError, subprocess.CalledProcessError, OSError, zipfile.BadZipFile) as e:
+            msg = str(e)
+            if "already carries texture_styles" in msg:
+                print(f"  SKIP  {src.name}: already has Texture/Grain, nothing to do")
+                skipped += 1
+            else:
+                if "no thumbnail to reuse" in msg:
+                    msg = "no embedded thumbnail; this photo needs full mode (ffmpeg + heif-convert)"
+                print(f"  FAIL  {src.name}: {msg}")
+                failed += 1
+            if out.exists() and out.stat().st_size == 0:
+                out.unlink()
+            continue
+        print(f"  OK    {src.name} -> {out.name}"
+              + ("  (Texture/Grain added; native style kept)" if native else ""))
+        done += 1
+
+    print(f"\n{done} done, {skipped} skipped, {failed} failed. Results are next to the originals.")
+    if launched_from_explorer():
+        try:
+            input("\nPress Enter to close this window.")
+        except EOFError:
+            pass
+    return 0 if failed == 0 else 1
+
+
 def main():
+    if is_drop_invocation(sys.argv[1:]):
+        return drop_mode(sys.argv[1:])
     parser = build_parser()
     args = parser.parse_args()
     try:

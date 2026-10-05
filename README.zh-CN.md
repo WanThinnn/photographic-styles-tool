@@ -70,6 +70,12 @@ photographic-style-port patch IN.HEIC OUT.HEIC \
 
 `Build binary release` 由 GitHub Actions 工作流自动生成。
 
+### 拖放使用
+
+把 HEIC 照片（或装有照片的文件夹）拖到 `photographic-style-port.exe` 上即可（也可以不带命令、直接传入文件路径）。每张 HEIC 会在原图旁边生成 `文件名_PhotographicStyle.HEIC`；iPhone 16/17 拍摄的照片生成 `文件名_TextureGrain.HEIC`。JPEG、PNG 等其他文件会被跳过，已有文件不会被覆盖，处理结束后会列出每个文件的结果。
+
+可执行文件**不包含** HEVC 编码器。若 PATH 中有 `ffmpeg` 和 `heif-convert`，拖放时使用完整模式；否则使用免编码器模式，可处理 iPhone 原图，但无法处理没有内嵌缩略图的副本。
+
 ## 从源码安装
 
 需要 **Python 3.12+**。推荐使用 [uv](https://docs.astral.sh/uv/)：

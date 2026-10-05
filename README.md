@@ -72,6 +72,17 @@ check which release you have.
 The default mode still calls `ffmpeg` and `heif-convert`. For a completely standalone run, use
 the [no-encoder mode](#no-encoder-mode).
 
+### Drag and drop
+
+Drop HEIC photos, or a folder of them, onto `photographic-style-port.exe` (or pass file paths
+with no command). Each HEIC is patched next to its original as `NAME_PhotographicStyle.HEIC`;
+photos from iPhone 16/17 get `NAME_TextureGrain.HEIC`. JPEGs, PNGs and other files are
+skipped, existing files are never overwritten, and a summary lists every file.
+
+The executable does **not** include an HEVC encoder. Drag and drop uses full mode when `ffmpeg`
+and `heif-convert` are on PATH, and the [no-encoder mode](#no-encoder-mode) otherwise, which
+handles original iPhone photos but not copies without an embedded thumbnail.
+
 ## Install from source
 
 Needs **Python 3.12+**. [uv](https://docs.astral.sh/uv/) is the shortest path:

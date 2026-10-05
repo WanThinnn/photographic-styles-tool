@@ -130,6 +130,10 @@ jobs:
           profiles = json.loads(Path("packaged-profiles.json").read_text(encoding="utf-8"))
           assert {profile["name"] for profile in profiles} == {"45-15", "48-12"}
           PY
+          # Drop mode: bare file paths, no subcommand. A non-photo must be skipped, not fail.
+          printf 'not a photo' > dropped.txt
+          "./dist/$EXECUTABLE" dropped.txt | tee drop-output.txt
+          grep -q '0 done, 1 skipped, 0 failed' drop-output.txt
 
       - name: Package executable
         shell: bash

@@ -106,7 +106,7 @@ import zlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
 URI_HDR_GAIN = "urn:com:apple:photo:2020:aux:hdrgainmap"
 URI_LINEAR_THUMB = "tag:apple.com,2023:photo:aux:linearthumbnail"
@@ -2341,6 +2341,57 @@ def replace_ipco_property(meta: bytes, property_index: int, new_box: bytes) -> b
     return bytes(rebuilt)
 
 
+def idat_item_bytes(data: bytes | bytearray, iid: int, meta_box=None) -> bytes | None:
+    """Payload of a construction-method-1 item, which lives inside meta/idat."""
+    if meta_box is None:
+        meta_box = top_box(data, "meta")
+    it = parse_iloc(data, meta_box)["items"].get(iid)
+    if it is None or it["construction_method"] != 1 or len(it["extents"]) != 1:
+        return None
+    idat = find_child(meta_children(data, meta_box), "idat")
+    start = idat[0] + idat[2] + it["base_offset"] + it["extents"][0]["offset"]
+    return bytes(data[start:start + it["extents"][0]["length"]])
+
+
+def replace_idat_item(meta: bytes, iid: int, payload: bytes) -> bytes:
+    """Replace the payload of a single-extent construction-method-1 (idat) item.
+
+    idat extents are relative to the start of the idat data, so items stored after the
+    replaced one move by the size difference. The iloc fields are patched first because
+    that is size neutral; the idat splice and the meta/idat size repair follow.
+    """
+    mb = top_box(meta, "meta")
+    iloc = parse_iloc(meta, mb)
+    it = iloc["items"].get(iid)
+    if it is None or it["construction_method"] != 1 or len(it["extents"]) != 1:
+        raise PortError(f"Item {iid} is not a single-extent idat item")
+    old = it["extents"][0]
+    start = it["base_offset"] + old["offset"]
+    delta = len(payload) - old["length"]
+    data = bytearray(meta)
+    osz, lsz = iloc["offset_size"], iloc["length_size"]
+    if delta:
+        for other, oit in iloc["items"].items():
+            if other == iid or oit["construction_method"] != 1:
+                continue
+            for e in oit["extents"]:
+                if oit["base_offset"] + e["offset"] > start:
+                    if not osz:
+                        raise PortError("Cannot move idat items without iloc offset fields")
+                    data[e["offset_pos"]:e["offset_pos"]+osz] = (e["offset"] + delta).to_bytes(osz, "big")
+    data[old["length_pos"]:old["length_pos"]+lsz] = len(payload).to_bytes(lsz, "big")
+
+    mb = top_box(data, "meta")
+    io_, isz, ih, _ = find_child(meta_children(data, mb), "idat")
+    if ih != 8 or mb[2] != 8:
+        raise PortError("64-bit meta/idat box sizes are not supported")
+    p = io_ + ih + start
+    data[p:p + old["length"]] = payload
+    data[io_:io_+4] = (isz + delta).to_bytes(4, "big")
+    data[mb[0]:mb[0]+4] = (mb[1] + delta).to_bytes(4, "big")
+    return bytes(data)
+
+
 def discover_target(data: bytes):
     disc = discover_heic(data)
     if disc["hdr_grid"] is None or not disc["hdr_tiles"]:
@@ -2492,7 +2543,16 @@ def cmd_patch(args):
         meta = replace_item_property_with_source(meta, donor_tmap, "irot", src_irot or IROT_IDENTITY)
         after = dimensions_for_item(parse_ipco_ipma(meta, top_box(meta, "meta")), donor_tmap)
         tmap_report = {"tmap_item": donor_tmap, "tmap_ispe": list(after),
-                       "tmap_ispe_was": list(before)}
+                       "tmap_ispe_was": list(before), "tmap_payload": "donor"}
+        # v0.5.1: the tmap payload holds the gain-map parameters (headroom, gain min/max,
+        # gamma, offsets) that turn the gain-map tiles into HDR. Those tiles are the
+        # target's, so their parameters must be too; until now every port carried the
+        # donor's. A target without a tmap keeps the donor payload.
+        src_tmap = (idat_item_bytes(target_data, target_tmaps[0], td["meta"])
+                    if target_tmaps else None)
+        if src_tmap is not None:
+            meta = replace_idat_item(meta, donor_tmap, src_tmap)
+            tmap_report["tmap_payload"] = "target"
     else:
         tmap_report = {"tmap_item": None}
 
@@ -2870,6 +2930,7 @@ def cmd_patch(args):
         was, now = tmap_report["tmap_ispe_was"], tmap_report["tmap_ispe"]
         print(f"  tmap display size: {was[0]}x{was[1]} -> {now[0]}x{now[1]}"
               + ("" if was != now else " (unchanged)"))
+        print(f"  tmap gain-map parameters: {tmap_report['tmap_payload']}")
     print(f"  scene statistics: {stats_report['scene_stats']}"
           + (f" ({', '.join(stats_report['scene_stats_fields'])})"
              if stats_report.get("scene_stats_fields") else ""))

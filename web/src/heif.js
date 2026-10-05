@@ -265,6 +265,54 @@ export function replaceIpcoProperty(meta, propertyIndex, newBox, expectedType) {
   return rebuilt;
 }
 
+/** Payload of a construction-method-1 item, which lives inside meta/idat; null otherwise. */
+export function idatItemBytes(d, iid, metaBox) {
+  const m = metaBox || topBox(d, "meta");
+  const it = parseIloc(d, m).items.get(iid);
+  if (!it || it.constructionMethod !== 1 || it.extents.length !== 1) return null;
+  const idat = findChild(metaChildren(d, m), "idat");
+  const e = it.extents[0];
+  return slice(d, idat.off + idat.hdr + it.baseOffset + e.offset, e.length).slice();
+}
+
+/**
+ * Replace the payload of a single-extent idat item. Items stored after it move by the size
+ * difference; iloc is patched first (size neutral), then idat is spliced and the meta/idat
+ * sizes repaired. Mirrors replace_idat_item in the Python tool.
+ */
+export function replaceIdatItem(meta, iid, payload) {
+  let m = topBox(meta, "meta");
+  const iloc = parseIloc(meta, m);
+  const it = iloc.items.get(iid);
+  if (!it || it.constructionMethod !== 1 || it.extents.length !== 1)
+    throw new Error(`Item ${iid} is not a single-extent idat item`);
+  const old = it.extents[0];
+  const start = it.baseOffset + old.offset;
+  const delta = payload.length - old.length;
+  const data = meta.slice();
+  const osz = iloc.offsetSize, lsz = iloc.lengthSize;
+  if (delta) {
+    for (const [other, oit] of iloc.items) {
+      if (other === iid || oit.constructionMethod !== 1) continue;
+      for (const e of oit.extents) {
+        if (oit.baseOffset + e.offset <= start) continue;
+        if (!osz) throw new Error("Cannot move idat items without iloc offset fields");
+        data.set(be(e.offset + delta, osz), e.offsetPos);
+      }
+    }
+  }
+  data.set(be(payload.length, lsz), old.lengthPos);
+
+  m = topBox(data, "meta");
+  const idat = findChild(metaChildren(data, m), "idat");
+  if (idat.hdr !== 8 || m.hdr !== 8) throw new Error("64-bit meta/idat box sizes are not supported");
+  const p = idat.off + idat.hdr + start;
+  const out = concat([slice(data, 0, p), payload, slice(data, p + old.length, data.length - (p + old.length))]);
+  out.set(be(idat.size + delta, 4), idat.off);
+  out.set(be(m.size + delta, 4), m.off);
+  return out;
+}
+
 export function replaceItemPropertyWithSource(meta, iid, type, sourceBox) {
   if (!sourceBox) return meta;
   const props = parseIpcoIpma(meta, topBox(meta, "meta"));

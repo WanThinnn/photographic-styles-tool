@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { loadProfile } from "../../web/src/zip.js";
 import { patch, selectProfile } from "../../web/src/port.js";
-import { discoverHeic, extractItem, auxUriForItem } from "../../web/src/heif.js";
+import { discoverHeic, extractItem, auxUriForItem, idatItemBytes } from "../../web/src/heif.js";
 import { parseBplist } from "../../web/src/bplist.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
@@ -58,8 +58,9 @@ for (const name of cases) {
   const problems = [];
   for (const iid of ids) {
     let a = null, b = null;
-    try { a = extractItem(js, dj.iloc, iid); } catch {}
-    try { b = extractItem(py, dp.iloc, iid); } catch {}
+    // idat items (grids, tmap) are stored inside meta, so extractItem cannot read them.
+    try { a = extractItem(js, dj.iloc, iid); } catch { a = idatItemBytes(js, iid); }
+    try { b = extractItem(py, dp.iloc, iid); } catch { b = idatItemBytes(py, iid); }
     if (!a && !b) continue;
     if (!a || !b) { problems.push(`item ${iid} present in only one output`); continue; }
     if (a.length === b.length && a.every((v, i) => v === b[i])) continue;

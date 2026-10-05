@@ -11,7 +11,7 @@ import {
   propertyForItem, propertyBoxBytes, dimensionsForItem, auxUriForItem,
   irotAngleForItem, imirAxisForItem, displayDimensions, findItemsByType,
   replaceIpcoProperty, replaceItemPropertyWithSource, appendIpcoProperty,
-  repointItemProperty, addItems, ispeBox, IROT_IDENTITY,
+  repointItemProperty, addItems, ispeBox, IROT_IDENTITY, idatItemBytes, replaceIdatItem,
   MATTE_URIS, MATTE_URI_SET, DEPTH_URI,
 } from "./heif.js";
 import { injectAppleMakerNoteTag } from "./exif.js";
@@ -21,7 +21,7 @@ import {
   linearLumaFromRgb, LIGHTMAP_N,
 } from "./styles.js";
 
-export const VERSION = "0.5.0-web";
+export const VERSION = "0.5.1-web";
 
 // Every rejection a visitor can hit reduces to one of two things: the file is not a
 // HEIC at all, or it is a HEIC this build cannot handle. Nothing else is actionable.
@@ -119,6 +119,14 @@ export async function patch(targetData, profile, opts = {}) {
     meta = replaceItemPropertyWithSource(meta, donorTmap, "ispe", srcIspe);
     meta = replaceItemPropertyWithSource(meta, donorTmap, "irot", srcIrot || IROT_IDENTITY);
     report.tmap = dimensionsForItem(parseIpcoIpma(meta, topBox(meta, "meta")), donorTmap);
+    // The tmap payload holds the gain-map parameters for the target's gain-map tiles, so it
+    // must be the target's too. A target without a tmap keeps the donor payload.
+    const srcTmap = targetTmaps.length ? idatItemBytes(targetData, targetTmaps[0]) : null;
+    report.tmapPayload = "donor";
+    if (srcTmap) {
+      meta = replaceIdatItem(meta, donorTmap, srcTmap);
+      report.tmapPayload = "target";
+    }
   }
 
   // Semantic mattes and depth.

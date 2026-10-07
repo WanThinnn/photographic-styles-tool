@@ -290,14 +290,14 @@ fileInput.addEventListener("change", () => {
   fileInput.value = "";
 });
 
-$("lang").addEventListener("click", () => {
-  lang = lang === "zh" ? "en" : "zh";
+$("lang").addEventListener("change", () => {
+  lang = $("lang").value;
   rememberLanguage(lang);
   applyLanguage(lang);
 });
 
 // Visit counter behind the README badge. The only request this site makes to a
-// third party, and it carries nothing but the fact that the page was opened —
+// counter service, and it carries nothing but the fact that the page was opened —
 // no photo ever reaches it. Fired once per browser session so a reload is not a
 // new visit, and fire-and-forget: a counter that is down is not worth an error.
 // If sessionStorage is blocked the visit goes uncounted, which undercounts

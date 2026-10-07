@@ -1,4 +1,4 @@
-// All localized page copy, in both languages, lives here.
+// All localized page copy (Vietnamese, English and Chinese) lives here.
 //
 // EDITING
 //   Change the text to the right of a key. Keys are shared between en and zh, so
@@ -36,7 +36,97 @@
 //   p.version    the footer
 
 export const STRINGS = {
+  vi: {
+    "h.conversiondetails": "Chi tiết",
+    "h.help": "Hướng dẫn & thông tin",
+    "app.hero": "Một sắc thái mới.",
+    "help.steps": "Chọn ảnh, chờ xử lý xong rồi lưu bản sao. Mở ảnh trong ứng dụng Ảnh trên iPhone → Sửa để điều chỉnh Phong cách nhiếp ảnh. Kết cấu và Hạt cần iOS 27.",
+    "help.formats": "Hỗ trợ HEIC, JPG, PNG, WebP, GIF, BMP và AVIF. Các định dạng khác được chuyển thành HEIC mới; ảnh động chỉ dùng một khung hình.",
+    "help.original": "Hãy giữ ảnh gốc. Dữ liệu Chân dung sẵn có được bảo toàn; chuyển đổi ảnh thông thường không tạo thêm HDR hay dữ liệu Chân dung.",
+    "help.live": "Lưu vào Ảnh chỉ lưu ảnh tĩnh. Xuất cặp Live Photo cần video MOV gốc tương ứng và công cụ nhập tương thích.",
+    "help.slow": "Lần chuyển đổi đầu tiên cần tải bộ mã hóa. Nếu trang chạy chậm, hãy tắt tùy chọn khớp sắc độ rồi thử lại.",
+    "help.language": "Ngôn ngữ mặc định theo trình duyệt. App luôn ưu tiên và ghi nhớ ngôn ngữ bạn chọn.",
+    "date.kept": "Thời gian chụp trong file:",
+    "t.date": "<b>Ngày chụp</b>: file giữ metadata thời gian chụp gốc. Ảnh và iCloud có thể gán ngày lưu; web không kiểm soát được ngày trong thư viện.",
+    "date.missing": "Không đọc được thời gian chụp gốc. Ứng dụng Ảnh có thể dùng ngày nhập ảnh.",
+    "lang.name": "Tiếng Việt",
+    "lang.label": "Ngôn ngữ",
+    "meta.title": "Next-generation Photographic Styles",
+    "app.tagline": "Phong cách nhiếp ảnh cho ảnh của bạn",
+    "p.author": "bởi Elio",
+    "h.notice": "Trước khi bắt đầu",
+    "n.1": "Công cụ thử nghiệm, không chính thức và không liên kết với Apple.",
+    "n.2": "File HEIC của Apple chỉ chứa ảnh tĩnh. Hãy giữ ảnh gốc.",
+    "app.lede": "Thêm Phong cách, Kết cấu và Hạt. Xử lý riêng tư trên thiết bị của bạn.",
+    "drop.big": "Chọn ảnh",
+    "drop.small": "HEIC, JPG, PNG & nhiều định dạng khác · hoặc kéo thả vào đây",
+    "raster.help": "JPG/PNG và các định dạng được hỗ trợ, kể cả ảnh Android, được chuyển thành HEIC mới có Phong cách, Kết cấu và Hạt. Ảnh động chỉ dùng một khung hình. Lần đầu cần tải bộ mã hóa; ảnh luôn được xử lý trên thiết bị này.",
+    "st.rasterworking": "Đang chuyển ảnh sang HEIC có Phong cách…",
+    "st.rastertiles": "Đang mã hóa các phần ảnh:",
+    "st.rasterready": "đã chuyển thành HEIC có Phong cách, Kết cấu và Hạt",
+    "raster.note": "Giữ nguyên file gốc. Điểm ảnh trong suốt được ghép lên nền đen. Chuyển đổi này không khôi phục HDR, Chân dung hay Live Photo từ ảnh tĩnh.",
+    "raster.resized": "Giữ nguyên file gốc. Ảnh đầu ra được thu nhỏ để phù hợp giới hạn xử lý; điểm ảnh trong suốt được ghép lên nền đen. Không tạo thêm HDR, Chân dung hay Live Photo.",
+    "err.rasterdecode": "Trình duyệt không đọc được ảnh này. Chưa tạo file đầu ra.",
+    "err.rasterencode": "Không thể chuyển ảnh sang HEIC. Kiểm tra kết nối rồi thử lại; trình duyệt cũng có thể đã hết bộ nhớ.",
+    "tip.title": "Chọn ảnh từ thư viện",
+    "tip.body": "Trên phiên bản iOS có hỗ trợ, chọn ảnh rồi chạm <b>•••</b> ở góc dưới bên trái → <b>Tùy chọn</b> → <b>Định dạng</b> → <b>Hiện tại</b> để gửi HEIC gốc thay vì JPEG đã chuyển đổi. Nếu vẫn không nhận ảnh, chọn <b>Duyệt</b> và lấy ảnh từ Tệp.",
+    "opt.quality": "Khớp Phong cách với sắc độ của ảnh",
+    "h.formats": "Định dạng & xử lý",
+    "opt.analysishelp": "Khớp sắc độ phân tích từng ảnh và tải bộ giải mã nhỏ trong lần đầu. Tắt tùy chọn này nếu xử lý chậm hoặc trang bị treo.",
+    "st.reading": "Đang đọc…",
+    "st.working": "Đang xử lý…",
+    "st.experimental": "bản thử nghiệm — cần kiểm tra trong Ảnh trên iPhone",
+    "st.encoderload": "Đang tải bộ mã hóa ảnh:",
+    "err.reloadencoder": "Bộ mã hóa cần hỗ trợ ngoại tuyến để cài đặt xong. Tải lại trang một lần rồi chọn lại ảnh. Dùng HTTPS hoặc localhost.",
+    "st.thumbnail": "Đang tạo ảnh thu nhỏ còn thiếu…",
+    "err.encoder": "Không tạo được ảnh thu nhỏ. Kiểm tra kết nối rồi thử lại; trình duyệt cũng có thể đã hết bộ nhớ. Công cụ dòng lệnh hỗ trợ bước này.",
+    "st.ready": "Đã xong",
+    "st.matched": "đã khớp với sắc độ ảnh",
+    "st.neutral": "dùng sắc độ mặc định",
+    "st.portrait": "đã giữ dữ liệu Chân dung",
+    "st.people": "đã giữ dữ liệu người trong ảnh",
+    "st.texture": "đã thêm Kết cấu và Hạt",
+    "st.native": "đã giữ Phong cách nhiếp ảnh gốc",
+    "err.notheic": "Định dạng ảnh không được hỗ trợ. Chọn HEIC, JPG, PNG, WebP, GIF, BMP hoặc AVIF.",
+    "err.unsupported": "Chưa hỗ trợ file HEIC này.",
+    "err.hastexture": "Ảnh đã có Kết cấu và Hạt, không cần xử lý thêm.",
+    "err.nohdr": "Không tìm thấy bản đồ tăng sáng HDR được hỗ trợ. Web và công cụ dòng lệnh đều chưa hỗ trợ HEIC này.",
+    "err.nothumb": "Thiếu ảnh thu nhỏ. Trình duyệt có thể tạo bằng bộ mã hóa tùy chọn.",
+    "btn.save": "Lưu vào Ảnh",
+    "btn.download": "Tải xuống",
+    "btn.livezip": "Tải cặp Live Photo",
+    "btn.savestill": "Lưu ảnh tĩnh",
+    "live.help": "Live Photo: chọn HEIC và MOV gốc từ Tệp, cùng lúc hoặc riêng lẻ. Tải cặp đã kiểm tra dưới dạng ZIP, giải nén và nhập cả hai bằng công cụ hỗ trợ Live Photo. Lưu ảnh tĩnh chỉ lưu ảnh; khung hình video không thay đổi.",
+    "live.waitphoto": "Đã đọc video. Đang chờ HEIC xử lý thành công có cùng mã Live Photo.",
+    "live.waitmovie": "Phát hiện ảnh Live Photo. Thêm MOV gốc để giữ cặp file. Chỉ lưu HEIC sẽ tạo ảnh tĩnh.",
+    "live.paired": "Video tương ứng được giữ nguyên. Tải cặp Live Photo, giải nén ZIP rồi nhập cả hai bằng công cụ hỗ trợ Live Photo. Chỉ lưu HEIC sẽ tạo ảnh tĩnh.",
+    "live.matched": "Đã ghép với ảnh đã xử lý. Video được giữ nguyên trong cặp file tải xuống.",
+    "live.invalidmov": "Không đọc được metadata ghép Live Photo trong MOV này. Hãy chọn video Live Photo gốc.",
+    "live.duplicate": "Đã có video mang mã Live Photo này. Tải lại trang nếu muốn thay video.",
+    "live.changed": "Không xác nhận được ảnh đầu ra thuộc cùng Live Photo. Đã dừng xuất cặp; không nhập file này như Live Photo.",
+    "btn.blocked": "Không mở được menu chia sẻ",
+    "h.steps": "Cách sử dụng",
+    "s.1": "Chọn ảnh theo hướng dẫn thư viện. Trên máy tính, bạn có thể kéo thả file vào vùng chọn ảnh.",
+    "s.2": "Chờ mỗi ảnh hiện <b>Đã xong</b>; thường chỉ mất vài giây.",
+    "s.3": "Trên iPhone, chạm <b>Lưu vào Ảnh</b> rồi <b>Lưu hình ảnh</b>. Trên máy tính, tải kết quả và chuyển sang iPhone dưới dạng file bằng AirDrop hoặc iCloud Drive.",
+    "s.4": "Mở bản sao trong Ảnh rồi chạm <b>Sửa</b> để dùng bảng Phong cách nhiếp ảnh. Trên iOS 27 còn có <b>Kết cấu</b> và <b>Hạt</b>.",
+    "h.get": "Về ảnh đầu ra",
+    "g.1": "Ảnh sau xử lý có thể chỉnh Phong cách, sắc độ, màu sắc và Kết cấu trong ứng dụng Ảnh, lưu lại rồi chỉnh tiếp sau này.",
+    "g.2": "Kết cấu và Hạt chỉ có trên iOS 27.",
+    "g.3": "Dữ liệu Chân dung và người trong ảnh lấy từ ảnh gốc; công cụ không tự tạo. Nếu ảnh gốc không có điều chỉnh độ sâu Chân dung thì ảnh sau xử lý cũng không có.",
+    "g.4": "Công cụ đang trong giai đoạn hoàn thiện chức năng. Hiệu ứng Phong cách, Kết cấu và Hạt có thể khác ảnh được chụp với tính năng gốc.",
+    "g.5": "Làm mịn da hoạt động khi ảnh gốc có dữ liệu người của Apple, như ảnh Chân dung hoặc ảnh người từ iPhone 16 trở lên. Công cụ không tự nhận diện khuôn mặt; ảnh khác có thể cho kết quả như Phong cách Tiêu chuẩn.",
+    "g.6": "Với Live Photo, thêm MOV gốc tương ứng và tải cặp file đã kiểm tra. Nhập cả hai bằng công cụ hỗ trợ Live Photo. Chỉ lưu HEIC sẽ tạo ảnh tĩnh; khung hình video không thay đổi.",
+    "h.trouble": "Khi gặp lỗi",
+    "t.1": "<b>Định dạng ảnh không được hỗ trợ</b>: chọn HEIC, JPG, PNG, WebP, GIF, BMP hoặc AVIF. Với ảnh iPhone, chọn HEIC gốc để giữ nhiều metadata nhất.",
+    "t.2": "Ảnh thu nhỏ còn thiếu được tạo trên thiết bị. Bộ mã hóa khoảng 32 MB được tải trong lần đầu và lưu đệm khi có thể. HEIC SDR hoặc đã đổi kích thước tự dùng chế độ thử nghiệm; hãy kiểm tra màu trong Ảnh trên iPhone.",
+    "t.3": "<b>Chưa hỗ trợ file HEIC này</b>: có thể là ảnh chụp màn hình, ảnh đã chỉnh hoặc xuất từ ứng dụng khác, hay cấu trúc ảnh chưa được hỗ trợ.",
+    "t.4": "<b>Trang bị treo hoặc tự tải lại</b>: tắt tùy chọn khớp sắc độ rồi thử lại.",
+    "p.version": "Phiên bản",
+  },
   en: {
+    "lang.label": "Language",
+    "help.language": "The default language follows your browser. Your language choice is remembered and always takes priority.",
     "h.conversiondetails": "Details",
     "h.help": "Help & information",
     "app.hero": "A new mood.",
@@ -149,6 +239,8 @@ export const STRINGS = {
   },
 
   zh: {
+    "lang.label": "语言",
+    "help.language": "默认语言跟随浏览器。手动选择的语言会被记住，并始终优先。",
     "h.conversiondetails": "详情",
     "h.help": "帮助与说明",
     "app.hero": "新的色调。",
@@ -256,11 +348,26 @@ export const STRINGS = {
 
 const STORE_KEY = "psport.lang";
 
+function savedLanguage() {
+  try { const saved = localStorage.getItem(STORE_KEY); return STRINGS[saved] ? saved : null; }
+  catch { return null; }
+}
+
+export function preferredLanguage({saved, languages = []} = {}) {
+  if (Object.hasOwn(STRINGS, saved)) return saved;
+  for (const locale of languages) {
+    const code = locale.toLowerCase().split('-')[0];
+    if (Object.hasOwn(STRINGS, code)) return code;
+  }
+  return 'en';
+}
+
+function browserLanguages() {
+  return navigator.languages || [navigator.language || 'en'];
+}
+
 export function pickLanguage() {
-  const saved = (() => { try { return localStorage.getItem(STORE_KEY); } catch { return null; } })();
-  if (saved && STRINGS[saved]) return saved;
-  const nav = (navigator.languages || [navigator.language || "en"]).join(",").toLowerCase();
-  return /\bzh\b|zh-/.test(nav) ? "zh" : "en";
+  return preferredLanguage({saved:savedLanguage(), languages:browserLanguages()});
 }
 
 export function rememberLanguage(lang) {
@@ -273,8 +380,10 @@ export function t(lang, key) {
 
 /** Fill every [data-i18n] element and set the document language. */
 export function applyLanguage(lang) {
-  document.documentElement.lang = lang === "zh" ? "zh-Hans" : "en";
+  document.documentElement.lang = lang === "zh" ? "zh-Hans" : lang === "vi" ? "vi" : "en";
   document.title = t(lang, "meta.title");
+  const selector = document.getElementById('lang');
+  if(selector) selector.value=lang;
   for (const el of document.querySelectorAll("[data-i18n]"))
     el.innerHTML = t(lang, el.dataset.i18n);
 }

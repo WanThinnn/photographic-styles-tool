@@ -16,26 +16,22 @@
 <meta property="og:type" content="website">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230062cc'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='white'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="icons/photographic-styles.svg">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <main>
   <header class="top">
-    <svg class="logo" viewBox="0 0 36 36" aria-hidden="true">
-      <defs><linearGradient id="brand" x2="1" y2="1"><stop stop-color="#8054de"/><stop offset="1" stop-color="#4389dc"/></linearGradient></defs>
-      <rect width="36" height="36" rx="10" fill="url(#brand)"/>
-      <circle cx="18" cy="18" r="8" fill="none" stroke="#fff" stroke-width="2.5"/>
-      <circle cx="18" cy="18" r="2.8" fill="#fff"/>
-    </svg>
+    <img class="logo" src="icons/photographic-styles.svg" width="36" height="36" alt="" aria-hidden="true">
     <div class="title">
       <h1 data-i18n="meta.title">Next-generation Photographic Styles</h1>
       <span class="tagline" data-i18n="app.tagline"></span>
     </div>
-    <button id="lang" type="button">
+    <label class="language">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
-      <span data-i18n="lang.name">中文</span>
-    </button>
+      <span class="sr-only" data-i18n="lang.label">Language</span>
+      <select id="lang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh">中文</option></select>
+    </label>
   </header>
 
   <section class="intro">
@@ -69,7 +65,7 @@
       <section><h2 data-i18n="h.steps"></h2><p data-i18n="help.steps"></p><p data-i18n="tip.body"></p></section>
       <section><h2 data-i18n="h.formats"></h2><p data-i18n="help.formats"></p><p data-i18n="help.original"></p><p data-i18n="help.live"></p></section>
       <section><h2 data-i18n="h.trouble"></h2><p data-i18n="help.slow"></p><p data-i18n="t.date"></p></section>
-      <section><p data-i18n="n.1"></p></section>
+      <section><p data-i18n="n.1"></p><p data-i18n="help.language"></p></section>
     </div>
   </details>
 

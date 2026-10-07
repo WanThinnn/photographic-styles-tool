@@ -196,7 +196,23 @@ Private HEIC/MOV fixtures are read locally when available and are never bundled 
 
 ## Not supported
 
-Photos without an HDR gain map are rejected, and only the two known tile layouts (48/12 and
-45/15) have profiles. Photos without an embedded thumbnail are also rejected here, with a message
-pointing to the command-line tool: since v0.5 the Python tool encodes a missing thumbnail, but
-the browser has no HEVC encoder to do the same.
+The standard mode requires an HDR gain map and known StyleDeltaMap dimensions. A missing
+thumbnail is generated locally using libheif decoding and FFmpeg.wasm x265
+Main10 encoding. The official pinned encoder is downloaded on demand (about 32 MB),
+verified by SHA-256 and cached when storage is available. It requires cross-origin
+isolation supplied by the service worker, including on GitHub Pages. After the worker installs,
+reload once before generating thumbnails. Failures stop export rather than substituting
+another photo's thumbnail. Primary image tiles, HDR and depth payloads are kept unchanged.
+
+**Experimental support for SDR and resized HEIC photos** must be enabled before selecting
+such a file. It adds Styles metadata to the original photo graph, with an estimated
+StyleDeltaMap size that follows the photo's stored orientation. It does not invent HDR
+data, detect people or re-encode the primary image. This route is not validated on iPhone;
+a successfully written file is not proof that Photos will offer Styles or render them
+correctly. Its outputs are named `_ExperimentalStyle.HEIC`. The photo-graph route also
+keeps HDR gain maps stored as a single HEVC item (not only maps stored as tile grids).
+
+Safari sharing a HEIC saves a still image. A ZIP is only a package of Live Photo resources,
+not a Photos asset. Creating a Live Photo in Photos requires a native importer that adds
+the `.photo` and `.pairedVideo` resources in one PhotoKit creation request. No such native
+importer is included in this browser build.

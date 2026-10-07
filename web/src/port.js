@@ -1,9 +1,8 @@
 // The patch pipeline, ported from cmd_patch in photographic_style_port.py.
 //
-// The browser build always uses the reuse-thumbnail linearthumbnail, which is the
-// on-device-validated path that needs no HEVC encoder. Decoding is only needed for
-// the optional target scene statistics and c/d light maps, and is supplied by the
-// caller as a `decode` callback so this module stays dependency free.
+// Reuse the source thumbnail when available. The caller can provide an encoded
+// Main10 linear thumbnail when it is missing; the photo graph keeps original data.
+// Optional scene statistics and light maps use the caller's `decode` callback.
 
 import { topBox, boxes, be, concat, slice, u } from "./box.js";
 import {
@@ -46,12 +45,12 @@ export function selectProfile(index, primaryTiles, hdrTiles) {
  * plist and 0x54 record are used, so any layout of a known size works; like the Python
  * build, a layout without its own profile uses 48-12.
  */
-export function profileFor(index, d) {
+export function profileFor(index, d, experimental = false) {
   try {
     return selectProfile(index, d.primaryTiles.length, d.hdrTiles.length);
   } catch (e) {
     const [w, h] = dimensionsForItem(d.props, d.primary);
-    if (styleDeltaSize(w, h) && index["48-12"]) return "48-12";
+    if (styleDeltaSize(w, h, experimental) && index["48-12"]) return "48-12";
     throw e;
   }
 }
@@ -65,17 +64,21 @@ export function profileFor(index, d) {
  */
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
-  if (td.hdrGrid === null || !td.hdrTiles.length) throw new Error(UNSUPPORTED);
+  const hasHdr = td.hdrGrid !== null && (td.infos.get(td.hdrGrid)?.type === "hvc1" || td.hdrTiles.length > 0);
+  if (!hasHdr && !opts.experimental) throw new Error(UNSUPPORTED);
   if ((td.thumbnail === null && !opts.linearThumb) || td.exifItem === null) throw new Error(UNSUPPORTED);
 
   // v0.6.2: the photo's own item graph whenever its StyleDeltaMap size is known.
-  if (opts.graph !== "donor" && styleDeltaSize(...dimensionsForItem(td.props, td.primary))) {
+  if (opts.graph !== "donor" && styleDeltaSize(...dimensionsForItem(td.props, td.primary), opts.experimental === true)) {
     const out = await graftPatch(targetData, profile, opts);
     out.report.version = VERSION;
+    out.report.experimental = opts.experimental === true;
     return out;
   }
+  
+  if (td.hdrGrid === null || !td.hdrTiles.length) throw new Error(UNSUPPORTED);
   // Generated thumbnails are supported only by the photo's own graph.
-  if (td.thumbnail === null || opts.linearThumb) throw new Error(UNSUPPORTED);
+  if (td.thumbnail === null || opts.linearThumb || opts.experimental) throw new Error(UNSUPPORTED);
 
   const { manifest } = profile;
   let meta = profile.meta;

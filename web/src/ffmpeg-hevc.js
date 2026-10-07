@@ -35,9 +35,10 @@ async function verifiedAsset(asset, onProgress) {
 export async function ensureHevcEncoder(onProgress) {
   if (!ready) ready = (async () => {
     if (!globalThis.crossOriginIsolated || !globalThis.SharedArrayBuffer)
-      throw Error('FFmpeg.wasm requires cross-origin isolation; reload after service worker installation');
+      throw Error('Thumbnail encoding needs isolation headers. Reload the page after offline support is installed.');
     const script = await verifiedAsset(FFMPEG_ASSETS[0], onProgress);
     const wasm = await verifiedAsset(FFMPEG_ASSETS[1], onProgress);
+    const threadScript = await verifiedAsset(FFMPEG_ASSETS[2], onProgress);
     worker = new Worker(new URL('./ffmpeg-worker.js', import.meta.url));
     worker.onmessage = ({data}) => {
       const call = pending.get(data.id); if (!call) return;
@@ -45,8 +46,11 @@ export async function ensureHevcEncoder(onProgress) {
       pending.delete(data.id); clearTimeout(call.timer);
       if (data.error) call.reject(Error(data.error)); else call.resolve(data.output);
     };
-    worker.onerror = () => releaseHevcEncoder();
-    await request({operation: 'load', script, wasm}, [script.buffer, wasm.buffer]);
+    worker.onerror = (err) => {
+      console.error("FFmpeg Worker error:", err);
+      releaseHevcEncoder();
+    };
+    await request({operation: 'load', script, wasm, threadScript}, [script.buffer, wasm.buffer, threadScript.buffer]);
   })().catch(error => { releaseHevcEncoder(); throw error; });
   await ready;
 }
@@ -99,9 +103,9 @@ export function encodeRgbThumbnail(rgb, width, height, onProgress) {
     await ensureHevcEncoder(onProgress);
     onProgress?.({stage: 'encode'});
     const input = rgb.slice();
-    const args = ['-hide_banner', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${width}x${height}`,
+    const args = ['-hide_banner', '-threads', '1', '-filter_threads', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${width}x${height}`,
       '-r', '1', '-i', 'input.raw', '-frames:v', '1', '-an', '-c:v', 'libx265',
-      '-pix_fmt', 'yuv420p10le', '-profile:v', 'main10', '-tag:v', 'hvc1',
+      '-preset', 'ultrafast', '-crf', '18', '-pix_fmt', 'yuv420p10le', '-profile:v', 'main10', '-tag:v', 'hvc1',
       '-x265-params', 'info=0:pools=none:frame-threads=1', '-movflags', '+faststart', 'output.mp4'];
     const output = await request({operation: 'encode', pixels: input, args}, [input.buffer]);
     const result = extractEncodedHevc(output);

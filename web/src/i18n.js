@@ -59,6 +59,13 @@ export const STRINGS = {
 
     "st.reading": "Reading…",
     "st.working": "Processing…",
+    "opt.experimental": "Experimental support for SDR and resized HEIC photos. Keeps original image data and adds Styles metadata. Photos compatibility and colours need iPhone testing; no HDR is created. Enable before selecting a photo.",
+    "err.experimental": "This SDR or resized HEIC needs experimental support. Enable the experimental option and select the photo again. iPhone compatibility is not verified.",
+    "st.experimental": "experimental — verify in iPhone Photos",
+    "st.encoderload": "Loading thumbnail encoder:",
+    "err.reloadencoder": "The thumbnail encoder needs offline support to finish installing. Reload this page once, then select the photo again. Use HTTPS or localhost.",
+    "st.thumbnail": "Creating missing thumbnail…",
+    "err.encoder": "Could not create the missing thumbnail. Check your connection and retry; the browser may have run out of memory. The command-line tool supports this step.",
     "st.ready": "Ready",
     "st.matched": "matched to this photo’s tones",
     "st.neutral": "default tone settings",
@@ -70,8 +77,7 @@ export const STRINGS = {
     "err.unsupported": "This HEIC isn’t supported yet.",
     "err.hastexture": "This photo already has Texture and Grain. Nothing to do.",
     "err.nohdr": "No supported HDR gain map was found. This HEIC is unsupported by both the web and command-line tool.",
-    "err.nothumb": "No embedded thumbnail, which the browser can’t create. Use the "
-      + "command-line tool for this photo.",
+    "err.nothumb": "Missing thumbnail. The browser can generate one with the optional encoder.",
 
     "btn.save": "Save to Photos",
     "btn.download": "Download",
@@ -117,8 +123,7 @@ export const STRINGS = {
     "t.1": "<b>“Not a HEIC photo”</b>: iOS converted the photo to JPEG while you picked it. "
       + "Use the Photo Library tip above, or in Photos tap <b>Share → Save to Files</b> and "
       + "choose it with <b>Browse</b>.",
-    "t.2": "<b>“No embedded thumbnail”</b>: common for copies re-saved by iOS. Use the "
-      + "command-line tool, which can create the thumbnail.",
+    "t.2": "Missing thumbnails are generated locally. The optional encoder downloads about 32 MB on first use and is cached when possible. SDR or resized HEIC photos require experimental support and iPhone testing.",
     "t.3": "<b>“This HEIC isn’t supported yet”</b>: screenshots, copies edited or exported by "
       + "other apps, and photo layouts the tool does not support yet.",
     "t.4": "<b>The page freezes or reloads</b>: turn off the analysis switch above and try "
@@ -148,6 +153,13 @@ export const STRINGS = {
 
     "st.reading": "读取中…",
     "st.working": "处理中…",
+    "opt.experimental": "实验性支持 SDR 及调整尺寸的 HEIC。保留原始图像数据并添加风格元数据，但兼容性及颜色需在 iPhone 上验证，不会生成 HDR。请在选取照片前启用。",
+    "err.experimental": "此 SDR 或调整尺寸的 HEIC 需要实验性支持。启用实验选项后重新选择照片，iPhone 兼容性尚未验证。",
+    "st.experimental": "实验性输出，请在 iPhone 照片中验证",
+    "st.encoderload": "正在载入缩略图编码器：",
+    "err.reloadencoder": "缩略图编码器需要离线支持完成安装。请刷新页面一次后重新选取照片，并使用 HTTPS 或 localhost。",
+    "st.thumbnail": "正在生成缺失的缩略图…",
+    "err.encoder": "无法生成缺失的缩略图，请检查网络后重试，浏览器也可能内存不足。命令行工具支持此步骤。",
     "st.ready": "已完成",
     "st.matched": "已匹配照片影调",
     "st.neutral": "已使用默认影调设置",
@@ -159,7 +171,7 @@ export const STRINGS = {
     "err.unsupported": "暂不支持此 HEIC 文件。",
     "err.hastexture": "此照片已带有质感与颗粒，无需处理。",
     "err.nohdr": "未找到支持的 HDR 增益图。网页版和命令行工具均不支持此 HEIC 文件。",
-    "err.nothumb": "没有内嵌缩略图，网页版无法生成。请改用命令行工具处理这张照片。",
+    "err.nothumb": "缺少缩略图，浏览器可使用可选编码器生成。",
 
     "btn.save": "存储到“照片”",
     "btn.download": "下载",
@@ -201,7 +213,7 @@ export const STRINGS = {
     "h.trouble": "遇到问题",
     "t.1": "<b>“不是 HEIC 照片”</b>：选取时 iOS 把照片转换成了 JPEG。请按上方“照片图库”提示操作，"
       + "或在“照片”App 中点按<b>共享 → 存储到“文件”</b>，再通过<b>浏览</b>选取。",
-    "t.2": "<b>“没有内嵌缩略图”</b>：常见于经 iOS 重新存储的副本。请改用命令行工具，它可以生成缩略图。",
+    "t.2": "缺失的缩略图在本地生成。首次使用会下载约 32 MB 编码器，并尽可能缓存。SDR 或调整尺寸的 HEIC 需启用实验性支持并在 iPhone 上验证。",
     "t.3": "<b>“暂不支持此 HEIC 文件”</b>：截屏、经其他 App 编辑或导出的副本，以及暂不支持的照片布局。",
     "t.4": "<b>页面卡住或自动刷新</b>：关闭上方的分析开关后重试。",
 

@@ -4,10 +4,10 @@ self.onmessage = async ({data: {id, operation, script, wasm, threadScript, pixel
   try {
     if (operation === 'load') {
       const url = URL.createObjectURL(new Blob([script], {type: 'text/javascript'}));
-      
+      const threadURL = URL.createObjectURL(new Blob([threadScript], {type: 'text/javascript'}));
       try { importScripts(url); core = await createFFmpegCore({wasmBinary: wasm,
-        mainScriptUrlOrBlob: url}); }
-      finally { URL.revokeObjectURL(url); }
+        mainScriptUrlOrBlob: url + '#' + btoa(JSON.stringify({wasmURL: '', workerURL: threadURL}))}); }
+      finally { URL.revokeObjectURL(url); URL.revokeObjectURL(threadURL); }
       self.postMessage({id});
       return;
     }

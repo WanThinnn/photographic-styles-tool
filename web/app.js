@@ -1,6 +1,7 @@
 import { loadProfile } from "./src/zip.js";
 import { patch, profileFor, VERSION, UNSUPPORTED } from "./src/port.js";
-import { discoverHeic } from "./src/heif.js";
+import { discoverHeic, dimensionsForItem } from "./src/heif.js";
+import { styleDeltaSize } from "./src/graft.js";
 import { addTexture, hasTexture } from "./src/texture.js";
 import { decodeToRgb, loadLibheif } from "./src/decode.js";
 import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js";
@@ -163,18 +164,34 @@ async function handleFile(file) {
       bits = [T("st.native"), T("st.texture")];
       suffix = "_TextureGrain.HEIC";
     } else {
-      // The CLI also requires an HDR gain map; do not suggest it for SDR files.
-      if (d.hdrGrid === null || !d.hdrTiles.length) { ui.set(T("err.nohdr"), "err"); return; }
-      // No encoder in the browser, so a photo without a thumbnail needs the desktop tool.
-      if (d.thumbnail === null) { ui.set(T("err.nothumb"), "err"); return; }
-      const name = profileFor(profileIndex, d);
+      const needsExperimental = d.hdrGrid === null
+        || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));
+      if (needsExperimental && !$("experimental").checked) { ui.set(T("err.experimental"), "err"); return; }
+      const name = profileFor(profileIndex, d, needsExperimental);
       const profile = await getProfile(name);
+      // Start processing; if the thumbnail is missing, dynamically load the generator.
+      let linearThumb = undefined;
+      if (d.thumbnail === null) {
+        if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
+        const { generateLinearThumbnail } = await import("./src/linear-thumbnail.js");
+        try {
+          linearThumb = await generateLinearThumbnail(bytes, progress => {
+            if (progress.stage === "modelDownload")
+              ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
+            else ui.set(T(progress.stage === "encode" ? "st.thumbnail" : "st.working"));
+          });
+        } catch (e) {
+          console.error("could not generate thumbnail", e);
+          ui.set(T("err.encoder"), "err");
+          return;
+        }
+      }
 
       const canDecode = quality.checked ? await ensureDecode(bytes) : false;
       ui.set(T("st.working"));
       const opts = canDecode
-        ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target" }
-        : { sceneStats: "donor" };
+        ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target", linearThumb, experimental: needsExperimental }
+        : { sceneStats: "donor", linearThumb, experimental: needsExperimental };
       let report;
       ({ data, report } = await patch(bytes, profile, opts));
       // patch() degrades rather than failing when the decoder misbehaves, so trust
@@ -185,7 +202,8 @@ async function handleFile(file) {
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));
       else if (report.mattes.transplanted.length) bits.push(T("st.people"));
       if (report.texture !== "off") bits.push(T("st.texture"));
-      suffix = "_PhotographicStyle.HEIC";
+      if (needsExperimental) bits.push(T("st.experimental"));
+      suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
     }
     ui.set(`${T("st.ready")} — ${bits.join(sep)}`, "ok");
 
@@ -271,8 +289,13 @@ function countVisit() {
 // Keep installation and offline support progressive: unsupported browsers use
 // the page exactly as before, while HTTPS/localhost deployments gain a PWA.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
+  const registerSW = () => {
     navigator.serviceWorker.register("./sw.js", { scope: "./" })
       .catch((e) => console.warn("offline support unavailable:", e));
-  });
+  };
+  if (document.readyState === "complete") {
+    registerSW();
+  } else {
+    window.addEventListener("load", registerSW);
+  }
 }

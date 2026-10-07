@@ -49,12 +49,14 @@ const STYLE_LINEAR_THUMB = [1024, 768];
 const same = (a, b) => !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
 const ascii = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0));
 
-/** StyleDeltaMap size for a primary of this stored size, or null when none is known. */
-export function styleDeltaSize(width, height) {
+export function styleDeltaSize(width, height, experimental = false) {
   for (const [w, h, dw, dh] of STYLE_DELTA_SIZES) {
     if (w === width && h === height) return [dw, dh];
     if (h === width && w === height) return [dh, dw];
   }
+  // Experimental geometry keeps portrait/landscape axes aligned with the source.
+  if (experimental && [width, height].every(n => Number.isInteger(n) && n >= 64 && n <= 8192))
+    return [width, height].map(n => Math.max(64, Math.round(n * (5 / 7) / 64) * 64));
   return null;
 }
 
@@ -146,11 +148,11 @@ function rebuildHeic(data, d, ftyp, meta, payloads) {
 }
 
 /** graft_style_graph: returns [bytes, report]. */
-export function graftStyleGraph(targetData, td, stylesBlob, mn54, mn54Type, linearThumb, texture = true) {
+export function graftStyleGraph(targetData, td, stylesBlob, mn54, mn54Type, linearThumb, texture = true, experimental = false) {
   const props = td.props;
   const primary = td.primary;
   const [pw, ph] = dimensionsForItem(props, primary);
-  const size = styleDeltaSize(pw, ph);
+  const size = styleDeltaSize(pw, ph, experimental);
   if (!size) throw new Error(`No StyleDeltaMap size known for a ${pw}x${ph} primary`);
   const [dw, dh] = size;
   const cols = Math.ceil(dw / 512), rows = Math.ceil(dh / 512);
@@ -265,6 +267,6 @@ export async function graftPatch(targetData, profile, opts = {}) {
     neutralized: [], emptied: [],
   };
   const [data, gr] = graftStyleGraph(targetData, td, blob, profile.mn54,
-    Number(manifest.smartstyle_makernote_type ?? 7), linearThumb, opts.texture !== false);
+    Number(manifest.smartstyle_makernote_type ?? 7), linearThumb, opts.texture !== false, opts.experimental === true);
   return { data, report: { ...report, ...gr } };
 }

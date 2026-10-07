@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v9`;
+const CACHE_NAME = `${CACHE_PREFIX}v14`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -54,6 +54,14 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function isolated(response) {
+  if (!response) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Embedder-Policy", "require-corp");
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
+}
+
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
@@ -63,10 +71,10 @@ async function networkFirst(request) {
     const response = await fetch(request.mode === "navigate" ? request.url : request,
                                  { cache: "no-cache" });
     if (response.ok) await cache.put(request, response.clone());
-    return response;
+    return isolated(response);
   } catch (error) {
     const cached = await cache.match(request, { ignoreSearch: true });
-    if (cached) return cached;
+    if (cached) return isolated(cached);
     throw error;
   }
 }
@@ -82,7 +90,10 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      networkFirst(request).catch(() => caches.match("./index.html"))
+      networkFirst(request).catch(async () => {
+        const cached = await caches.match("./index.html");
+        return isolated(cached);
+      })
     );
     return;
   }

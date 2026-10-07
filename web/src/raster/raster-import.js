@@ -12,6 +12,7 @@ import {
 import { addTextureItems, upgradeStylesV16 } from "./texture.js";
 import {
   applySceneStatistics, applyPersonMetadata, setPersonMasksValid, linearLumaFromRgb,
+  buildLightMaps, applyLightMaps,
 } from "./styles.js";
 import {installPortraitMatte} from './portrait-matte.js';
 import { extractRasterExif, preserveRasterExif, buildAppleStyleExif } from "./exif.js";
@@ -228,17 +229,22 @@ async function openBrowserImage(file, onProgress, {reportFailure = true} = {}) {
   return { image, close };
 }
 
-function sceneLuma(image) {
+export function sampleRasterLuma(image, width = 256, height = 192) {
   const canvas = document.createElement("canvas");
-  canvas.width = 256; canvas.height = 192;
+  canvas.width = width; canvas.height = height;
   const ctx = colorContext(canvas, { alpha: false, willReadFrequently: true });
-  drawContained(ctx, image, canvas.width, canvas.height);
+  if (!ctx) throw Error('Could not create tone-analysis canvas');
+  // Letterboxing biases percentiles towards artificial black, particularly in
+  // portraits/panoramas. Stretching for analysis samples the entire real image.
+  ctx.drawImage(image, 0, 0, width, height);
   const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
   const rgb = new Uint8Array(canvas.width * canvas.height * 3);
   for (let i = 0, p = 0; i < rgba.length; i += 4) {
     rgb[p++] = rgba[i]; rgb[p++] = rgba[i + 1]; rgb[p++] = rgba[i + 2];
   }
-  return Array.from(linearLumaFromRgb(rgb)).sort((a, b) => a - b);
+  const luma = linearLumaFromRgb(rgb);
+  canvas.width = canvas.height = 0;
+  return luma;
 }
 
 /** Minimal Apple Exif containing Orientation=6 and only MakerNote tag 0x54. */
@@ -499,6 +505,7 @@ export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult 
   const stylesId = Number(manifest.donor_styles_item);
   let styles = payloads.get(stylesId);
   if (sortedLuma) [styles] = applySceneStatistics(styles, "target", sortedLuma);
+  if (encoded.lightMaps) [styles] = applyLightMaps(styles, ...encoded.lightMaps);
   if (faceResult?.state === "generated") {
     [styles] = setPersonMasksValid(styles);
     [styles] = applyPersonMetadata(styles, faceResult.personMetadata);
@@ -586,7 +593,9 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
       thumb: thumb.chunks[0], thumbHvcc: thumb.hvcc, thumbColr: thumb.colr,
       hdr: hdr.chunks[0], hdrHvcc: hdr.hvcc, hdrColr: hdr.colr,
       sourceExif, linearThumbnail, texture: true,
-    }, analyze ? sceneLuma(image) : null, null, geometry);
+      // Like the HEIC route, spatial maps follow the primary's stored orientation.
+      lightMaps: analyze ? buildLightMaps(sampleRasterLuma(stored, 32, 32)) : null,
+    }, analyze ? Array.from(sampleRasterLuma(image)).sort((a, b) => a - b) : null, null, geometry);
     return {data, geometry};
   } finally {
     opened?.close();

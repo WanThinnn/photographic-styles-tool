@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {imageFormat} from '../../web/src/image-format.js';
-import {targetGeometry, buildRasterHeic} from '../../web/src/raster/raster-import.js';
+import {targetGeometry, buildRasterHeic, sampleRasterLuma} from '../../web/src/raster/raster-import.js';
+import {buildLightMaps} from '../../web/src/raster/styles.js';
+import {parseBplist} from '../../web/src/raster/bplist.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
 import {discoverHeic, dimensionsForItem, extractItem, auxUriForItem, MATTE_URIS,
@@ -45,6 +47,30 @@ test('software colour conversion preserves black/white and RGB endpoint ranges',
   }
 });
 
+test('tone sampling has no artificial dark border for portrait and panorama inputs',()=>{
+  const previous=globalThis.document;
+  try {
+    for (const image of [{width:1200,height:1600},{width:8000,height:600}]) {
+      let sampledFullImage=false;
+      globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({
+        drawImage(source,x,y,width,height) {
+          assert.equal(source,image);
+          sampledFullImage=x===0&&y===0&&width===256&&height===192;
+        },
+        getImageData(x,y,width,height) {
+          const data=new Uint8ClampedArray(width*height*4).fill(sampledFullImage?255:0);
+          return {data};
+        },
+      })})};
+      const luma=sampleRasterLuma(image);
+      assert.equal(luma.length,256*192);
+      assert.ok(luma.every(value=>Math.abs(value-1)<1e-12));
+    }
+  } finally {
+    if(previous===undefined) delete globalThis.document; else globalThis.document=previous;
+  }
+});
+
 const fixture = JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets = await generateSyntheticHevc(null, async (_, options) => {
   const asset = options.pixelFormat !== 'gray' ? fixture.assets.delta
@@ -59,9 +85,10 @@ test('new raster container keeps own tiles, independent Main10 thumbnail and rem
   const codec = propertyBoxBytes(profile.meta,d.props,d.primaryTiles[0],'hvcC');
   const linear = {...assets.delta, width:768,height:1024,
     pixi:box('pixi',Uint8Array.of(0,0,0,0,3,10,10,10)),colr:assets.delta.colr};
+  const maps=buildLightMaps(Float64Array.from({length:1024},(_,i)=>i/1023));
   const output = buildRasterHeic(profile,{main:Array(geometry.primaryTiles).fill(payload),
     mainHvcc:codec,thumb:payload,thumbHvcc:codec,hdr:payload,hdrHvcc:codec,
-    linearThumbnail:linear},null,null,geometry);
+    linearThumbnail:linear,lightMaps:maps},[0.2,0.4,0.8],null,geometry);
   const result = discoverHeic(output);
   assert.deepEqual(dimensionsForItem(result.props,result.primary),[600,900]);
   assert.equal(result.primaryTiles.length,geometry.primaryTiles);
@@ -69,6 +96,10 @@ test('new raster container keeps own tiles, independent Main10 thumbnail and rem
   assert.equal(readExifOrientation(extractItem(output,result.iloc,result.exifItem)),6);
   assert.deepEqual(dimensionsForItem(result.props,result.linearThumb),[768,1024]);
   assert.ok(result.stylesItem !== null);
+  const styles=parseBplist(extractItem(output,result.iloc,result.stylesItem));
+  assert.deepEqual(styles.get('c'),maps[0]);
+  assert.deepEqual(styles.get('d'),maps[1]);
+  assert.equal(styles.get('6').get('ToneMappedImage').get('p50'),0.4);
   assert.ok(hasTexture(result.infos));
   assert.equal([...result.infos.keys()].some(id => auxUriForItem(result.props,id) === MATTE_URIS.portraiteffectsmatte),false);
 });

@@ -222,6 +222,12 @@ from JPEG/PNG input. Apple Photos rendering still needs device verification.
 
 Run `node --test tests/web/raster-import.mjs` for container, geometry and colour checks.
 
+With tone matching enabled, raster scene statistics sample the entire photo without
+black letterbox margins. Spatial c/d light maps are computed from this photo in
+stored orientation using the same formulas as the HEIC route, rather than constant
+maps. This corrects analysis mismatches; it does not establish that Apple's Styles
+sliders will render identically to a native capture. Compare on an iPhone.
+
 Capture dates, time-zone offsets and fractional seconds in source EXIF are retained.
 Each result shows the original capture time when readable; sources without a capture
 date are identified instead of assigning a fabricated date. Shared File objects also

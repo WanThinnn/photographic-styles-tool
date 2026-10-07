@@ -38,7 +38,7 @@
 export const STRINGS = {
   en: {
     "h.conversiondetails": "Conversion details",
-    "date.kept": "Original capture time kept:",
+    "date.kept": "Capture time in the file:",
     "date.missing": "The source has no readable capture time. Photos may use the import date.",
     "lang.name": "中文",
     "meta.title": "Photographic Styles Palette Port",
@@ -143,7 +143,7 @@ export const STRINGS = {
     "h.conversiondetails": "转换详情",
     "h.formats": "格式与处理方式",
     "opt.analysishelp": "影调匹配会分析每张照片，首次使用需下载小型解码器。如处理缓慢或页面卡住，可关闭此选项。",
-    "date.kept": "已保留原始拍摄时间：",
+    "date.kept": "文件中的拍摄时间：",
     "date.missing": "原图没有可读取的拍摄时间，“照片”可能使用导入日期。",
     "raster.help": "JPG/PNG 等支持的图像（包括 Android 照片）会转换为包含风格及质感/颗粒的新 HEIC。动画仅使用一帧。首次转换需下载编码器，照片处理均在本设备完成。",
     "st.rasterworking": "正在转换为风格 HEIC…",

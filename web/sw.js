@@ -1,13 +1,12 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v21`;
-const DOWNLOAD_CACHE = 'psport-local-downloads-v1';
-const downloadRoot = new URL('__local_download__/', self.registration.scope).href;
+const CACHE_NAME = `${CACHE_PREFIX}v23`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
   "./icons/icon-180.png",
@@ -33,7 +32,6 @@ const APP_SHELL = [
   "./src/model-download.js",
   "./src/port.js",
   "./src/photo-date.js",
-  "./src/local-download.js",
   "./src/styles.js",
   "./src/texture.js",
   "./src/raster/box.js",
@@ -76,6 +74,8 @@ self.addEventListener("activate", (event) => {
           .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
           .map((name) => caches.delete(name))
       ))
+      // Remove temporary photo copies made by the retired download experiment.
+      .then(() => caches.delete('psport-local-downloads-v1'))
       .then(() => self.clients.claim())
   );
 });
@@ -88,19 +88,6 @@ function isolated(response) {
   return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
 }
 
-self.addEventListener('message', event => {
-  if (event.data === 'local-download-v1') event.ports[0]?.postMessage('local-download-v1');
-});
-
-async function localDownload(request) {
-  const cache = await caches.open(DOWNLOAD_CACHE);
-  const response = await cache.match(request);
-  if (response && Number(response.headers.get('X-Local-Expires')) > Date.now()) return response;
-  if (response) await cache.delete(request);
-  // Never send local export paths to GitHub Pages, even when a file expired.
-  return new Response('This local download expired. Select the original photo again to generate a new file.',
-    {status:410, headers:{'Content-Type':'text/plain; charset=utf-8', 'Cache-Control':'no-store'}});
-}
 
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
@@ -128,10 +115,6 @@ self.addEventListener("fetch", (event) => {
   // retain their existing failure behavior and are never persisted here.
   if (url.origin !== self.location.origin) return;
 
-  if (url.href.startsWith(downloadRoot)) {
-    event.respondWith(localDownload(request).catch(() => new Response('Local download unavailable.', {status:503})));
-    return;
-  }
 
   if (request.mode === "navigate") {
     event.respondWith(

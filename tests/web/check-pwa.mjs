@@ -86,7 +86,7 @@ if (!shellMatch) {
 
   const shouldCache = new Set(
     walk(WEB)
-      .filter((path) => /\.(?:html|js|json|png|webmanifest|zip)$/.test(path))
+      .filter((path) => /\.(?:html|css|js|json|png|webmanifest|zip)$/.test(path))
       .filter((path) => normalize(path) !== normalize(join(WEB, "sw.js")))
       .map((path) => `./${normalize(path).slice(normalize(WEB).length + 1).replaceAll("\\", "/")}`)
   );

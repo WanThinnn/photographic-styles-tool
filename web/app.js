@@ -8,7 +8,6 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js"
 import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
 import { imageFormat, RASTER_MIMES } from "./src/image-format.js";
 import { photoCaptureDate } from "./src/photo-date.js";
-import { localDownloadUrl } from "./src/local-download.js";
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
@@ -98,7 +97,8 @@ function row(name) {
   return {
     set(text, cls) {
       const s = el.querySelector(".status");
-      s.textContent = text;
+      s.textContent = cls === 'ok' ? T("st.ready") : text;
+      if (cls === 'ok') this.note(text, 'processing');
       s.className = `status ${cls || ""}`;
     },
     note(text, kind = "live") {
@@ -107,34 +107,23 @@ function row(name) {
         note = document.createElement("p");
         note.className = "live-note";
         note.dataset.note = kind;
-        if (kind === "conversion") {
-          const details = document.createElement("details"), summary = document.createElement("summary");
-          details.className = "live-note";
+        let details = el.querySelector('.result-details');
+        if (!details) {
+          details = document.createElement('details');
+          const summary = document.createElement('summary');
           summary.textContent = T("h.conversiondetails");
-          details.append(summary, note);
+          details.className = 'result-details';
+          details.append(summary);
           el.appendChild(details);
-        } else el.appendChild(note);
+        }
+        details.appendChild(note);
       }
       note.textContent = text;
     },
-    async link(blob, filename, key = "btn.download", timestamp) {
+    link(blob, filename, key = "btn.download") {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
-      if (blob.type === 'image/heic') {
-        try {
-          const localUrl = await localDownloadUrl(blob, filename, timestamp);
-          if (localUrl) {
-            URL.revokeObjectURL(a.href);
-            a.href = localUrl;
-            // Navigate to the named file, giving Safari its native file preview /
-            // download flow rather than forcing the anchor's Blob download route.
-            a.removeAttribute('download');
-            a.target = '_blank';
-            a.rel = 'noopener';
-          }
-        } catch (error) { console.warn('Using browser download fallback', error); }
-      }
       a.textContent = T(key);
       a.className = el.querySelector(".act").children.length ? "dl alt" : "dl";
       el.querySelector(".act").appendChild(a);
@@ -188,7 +177,7 @@ async function handleFile(file) {
       ui.note(result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
       showCaptureDate(ui, date);
       if (navigator.canShare?.({files: [output]})) ui.share(output);
-      await ui.link(output, outName, "btn.download", date?.timestamp);
+      ui.link(output, outName);
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
@@ -256,7 +245,7 @@ async function handleFile(file) {
       ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
     showCaptureDate(ui, date);
     if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile, !!liveIdentifier);
-    await ui.link(new Blob([data], { type: "image/heic" }), outName, "btn.download", date?.timestamp);
+    ui.link(new Blob([data], { type: "image/heic" }), outName);
     if (liveIdentifier) {
       ui.note(T("live.waitmovie"));
       const photo = { identifier: liveIdentifier, source: bytes, output: data, name: outName, ui };

@@ -61,6 +61,12 @@ test('reported Safari/iCloud date mismatch retains the complete original EXIF',{
   const before=read(safariOriginal),after=read(safariSaved);
   const exif=bytes=>{const d=discoverHeic(bytes);return extractItem(bytes,d.iloc,d.exifItem);};
   assert.deepEqual(exif(after),exif(before));
+  // Date bytes alone are insufficient if the metadata stops describing the
+  // displayed image. Verify the original EXIF association still reaches it.
+  const sourceGraph=discoverHeic(before),outputGraph=discoverHeic(after);
+  const exifReferences=d=>d.refs.filter(ref=>ref.type==='cdsc'&&ref.from===d.exifItem);
+  assert.deepEqual(exifReferences(outputGraph),exifReferences(sourceGraph));
+  assert.ok(exifReferences(outputGraph).some(ref=>ref.to.includes(outputGraph.primary)));
   assert.deepEqual(photoCaptureDate(after),photoCaptureDate(before));
   assert.equal(photoCaptureDate(after).date,'2026:10:03 17:14:19');
 });

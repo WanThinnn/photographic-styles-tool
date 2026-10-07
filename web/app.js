@@ -8,6 +8,7 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js"
 import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
 import { imageFormat, RASTER_MIMES } from "./src/image-format.js";
 import { photoCaptureDate } from "./src/photo-date.js";
+import { localDownloadUrl } from "./src/local-download.js";
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
@@ -116,10 +117,24 @@ function row(name) {
       }
       note.textContent = text;
     },
-    link(blob, filename, key = "btn.download") {
+    async link(blob, filename, key = "btn.download", timestamp) {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
+      if (blob.type === 'image/heic') {
+        try {
+          const localUrl = await localDownloadUrl(blob, filename, timestamp);
+          if (localUrl) {
+            URL.revokeObjectURL(a.href);
+            a.href = localUrl;
+            // Navigate to the named file, giving Safari its native file preview /
+            // download flow rather than forcing the anchor's Blob download route.
+            a.removeAttribute('download');
+            a.target = '_blank';
+            a.rel = 'noopener';
+          }
+        } catch (error) { console.warn('Using browser download fallback', error); }
+      }
       a.textContent = T(key);
       a.className = el.querySelector(".act").children.length ? "dl alt" : "dl";
       el.querySelector(".act").appendChild(a);
@@ -173,7 +188,7 @@ async function handleFile(file) {
       ui.note(result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
       showCaptureDate(ui, date);
       if (navigator.canShare?.({files: [output]})) ui.share(output);
-      ui.link(output, outName);
+      await ui.link(output, outName, "btn.download", date?.timestamp);
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
@@ -241,7 +256,7 @@ async function handleFile(file) {
       ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
     showCaptureDate(ui, date);
     if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile, !!liveIdentifier);
-    ui.link(new Blob([data], { type: "image/heic" }), outName);
+    await ui.link(new Blob([data], { type: "image/heic" }), outName, "btn.download", date?.timestamp);
     if (liveIdentifier) {
       ui.note(T("live.waitmovie"));
       const photo = { identifier: liveIdentifier, source: bytes, output: data, name: outName, ui };

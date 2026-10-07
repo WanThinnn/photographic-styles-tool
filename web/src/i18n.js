@@ -39,7 +39,7 @@ export const STRINGS = {
   en: {
     "h.conversiondetails": "Conversion details",
     "date.kept": "Capture time in the file:",
-    "t.date": "<b>Photos or iCloud shows the save date</b>: capture time in the file and the date assigned by Photos can differ after saving from Safari. Check the photo's Info panel. If its date is wrong, use Adjust Date &amp; Time in Photos; preserving file metadata does not guarantee the library date.",
+    "t.date": "<b>Photos or iCloud shows the save date</b>: try Download and Safari's file preview instead of Save to Photos. With offline support active, Download opens a local file URL with the original capture time in its download headers. This does not guarantee the Photos library date. Local download links expire after one hour; expired copies are removed on the next export. Check the photo's Info panel after saving.",
     "date.missing": "The source has no readable capture time. Photos may use the import date.",
     "lang.name": "中文",
     "meta.title": "Photographic Styles Palette Port",
@@ -145,7 +145,7 @@ export const STRINGS = {
     "h.formats": "格式与处理方式",
     "opt.analysishelp": "影调匹配会分析每张照片，首次使用需下载小型解码器。如处理缓慢或页面卡住，可关闭此选项。",
     "date.kept": "文件中的拍摄时间：",
-    "t.date": "<b>照片或 iCloud 显示保存日期</b>：从 Safari 保存后，文件中的拍摄时间可能与照片图库指定的日期不同。请检查照片的信息面板；如果日期不正确，可在照片中调整日期与时间。保留文件元数据不能保证图库日期正确。",
+    "t.date": "<b>照片或 iCloud 显示保存日期</b>：请尝试下载后使用 Safari 文件预览，而不是直接保存到照片。离线支持启用时，下载使用本地文件 URL，并在下载响应中提供原始拍摄时间，但不能保证图库日期正确。本地下载链接一小时后失效，过期副本会在下次导出时删除。保存后请检查照片的信息面板。",
     "date.missing": "原图没有可读取的拍摄时间，“照片”可能使用导入日期。",
     "raster.help": "JPG/PNG 等支持的图像（包括 Android 照片）会转换为包含风格及质感/颗粒的新 HEIC。动画仅使用一帧。首次转换需下载编码器，照片处理均在本设备完成。",
     "st.rasterworking": "正在转换为风格 HEIC…",

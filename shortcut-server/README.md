@@ -1,5 +1,7 @@
 # Shortcut server
 
+**English** | [简体中文](README.zh-CN.md)
+
 Run the porter on your computer and use it from an **iOS shortcut**: pick a photo on the
 iPhone, and the patched HEIC comes back to your photo library a few seconds later.
 
@@ -70,15 +72,16 @@ The status page walks through it, with your actual address filled in:
 
 ## API
 
-`POST /patch` with the HEIC as the raw body (`?name=IMG_1234.HEIC` optional) or as
+`POST /patch` with the HEIC as the raw body (`?name=photo.HEIC` optional) or as
 `multipart/form-data`. Responses:
 
 | Status | Body                                  | When                                              |
 | ------ | ------------------------------------- | ------------------------------------------------- |
 | 200    | patched HEIC (`image/heic`)           | `X-Shalielie-Mode: port` or `add-texture`         |
-| 409    | text                                  | nothing to do (e.g. an iPhone 18 photo)           |
+| 409    | text                                  | nothing to do (an iPhone 18 photo, or one already patched) |
 | 415    | text                                  | not a HEIC — usually a JPEG that iOS converted     |
 | 422    | text                                  | the porter refused the photo; the message says why |
+| 504    | text                                  | the porter timed out                              |
 
 `GET /api/status` returns the server's mode, addresses and recent jobs as JSON.
 

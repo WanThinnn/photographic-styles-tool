@@ -128,16 +128,16 @@ node tests/web/check-pwa.mjs      # manifest, icons, and offline asset coverage
 ```
 
 ```
-IMG_5037: BYTE-IDENTICAL (2436545)
-IMG_5048: BYTE-IDENTICAL (1819103)
-IMG_5049: BYTE-IDENTICAL (1867038)
-IMG_4995: EQUIVALENT (styles plist repacked, all items match)
-IMG_4997: EQUIVALENT (styles plist repacked, all items match)
-IMG_4999: EQUIVALENT (styles plist repacked, all items match)
-IMG_5096 add-texture: BYTE-IDENTICAL (3955304)
-IMG_5102 add-texture: BYTE-IDENTICAL (1562445)
-IMG_5165 add-texture: BYTE-IDENTICAL (1977002)
-IMG_5168 add-texture: BYTE-IDENTICAL (2002601)
+photo 1: BYTE-IDENTICAL (2431116)
+photo 2: BYTE-IDENTICAL (1813693)
+photo 3: BYTE-IDENTICAL (1861646)
+portrait 1: EQUIVALENT (styles plist repacked, all items match)
+portrait 2: EQUIVALENT (styles plist repacked, all items match)
+portrait 3: EQUIVALENT (styles plist repacked, all items match)
+native 1 add-texture: BYTE-IDENTICAL (3955304)
+native 2 add-texture: BYTE-IDENTICAL (1562445)
+native 3 add-texture: BYTE-IDENTICAL (2007006)
+native 4 add-texture: BYTE-IDENTICAL (2056959)
 ```
 
 Three are byte-for-byte identical. The other three differ only in how the styles plist is

@@ -334,9 +334,9 @@ work.
   v0.4.1 copies the photo's `tmap` geometry, or derives it from the primary. ☑️
 - **90/270 inversion, fixed in v0.6.2** ✅: up to v0.6.1 `raw_orientation_filters` (and
   `web/src/decode.js`) swapped irot 90 and 270, so linear thumbnails of those photos were
-  stored 180° off. An early A/B showed nothing, but IMG_5860 (irot 270, sky above trees) got a
-  glow in the sky and foliage with both the donor and the photo graph; the corrected rotation
-  removed it, and IMG_5037 still passed. Checked against 30 native files: Apple's own linear
+  stored 180° off. An early A/B showed nothing, but a 24 MP photo at irot 270 with sky above
+  trees got a glow in the sky and foliage with both the donor and the photo graph; the
+  corrected rotation removed it, and a 12 MP irot-270 photo that had passed still passed. Checked against 30 native files: Apple's own linear
   thumbnails match the corrected stored-orientation sample at every irot (r 0.83–0.97), never
   the 180°-turned one.
 - With the photo's own graph (v0.6.2) the photo's `irot`, `imir` and `tmap` are simply kept.

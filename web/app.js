@@ -6,6 +6,8 @@ import { addTexture, hasTexture } from "./src/texture.js";
 import { decodeToRgb, loadLibheif } from "./src/decode.js";
 import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js";
 import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
+import { imageFormat, RASTER_MIMES } from "./src/image-format.js";
+import { photoCaptureDate } from "./src/photo-date.js";
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
@@ -85,17 +87,6 @@ async function ensureDecode(bytes) {
   return decodeAvailable;
 }
 
-/** Identify the container from its magic bytes, so a transcoded upload is obvious. */
-function sniff(b) {
-  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
-  if (b.length > 7 && b[0] === 0x89 && b[1] === 0x50) return "png";
-  if (b.length > 11 && String.fromCharCode(b[4], b[5], b[6], b[7]) === "ftyp") {
-    const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
-    return /^(hei|mif|msf|avi)/.test(brand) ? "heic" : "iso";
-  }
-  return "unknown";
-}
-
 function row(name) {
   const el = document.createElement("div");
   el.className = "row";
@@ -109,12 +100,19 @@ function row(name) {
       s.textContent = text;
       s.className = `status ${cls || ""}`;
     },
-    note(text) {
-      let note = el.querySelector(".live-note");
+    note(text, kind = "live") {
+      let note = el.querySelector(`[data-note="${kind}"]`);
       if (!note) {
         note = document.createElement("p");
         note.className = "live-note";
-        el.appendChild(note);
+        note.dataset.note = kind;
+        if (kind === "conversion") {
+          const details = document.createElement("details"), summary = document.createElement("summary");
+          details.className = "live-note";
+          summary.textContent = T("h.conversiondetails");
+          details.append(summary, note);
+          el.appendChild(details);
+        } else el.appendChild(note);
       }
       note.textContent = text;
     },
@@ -149,7 +147,36 @@ async function handleFile(file) {
       await handleMovie(file, bytes, ui);
       return;
     }
-    if (sniff(bytes) !== "heic") { ui.set(T("err.notheic"), "err"); return; }
+    const format = imageFormat(bytes);
+    if (RASTER_MIMES[format]) {
+      if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
+      const { importRaster } = await import("./src/raster/raster-import.js");
+      let result;
+      try {
+        result = await importRaster(new File([bytes], file.name, {type: RASTER_MIMES[format]}),
+          null, progress => {
+            if (progress.stage === "modelDownload")
+              ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
+            else if (progress.stage === "main") ui.set(`${T("st.rastertiles")} ${progress.done}/${progress.total}`);
+            else ui.set(T("st.rasterworking"));
+          }, {analyze: quality.checked});
+      } catch (error) {
+        console.error("Raster conversion failed", file.name, error);
+        ui.set(T(/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
+        return;
+      }
+      const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
+      const date = photoCaptureDate(result.data);
+      const output = new File([result.data], outName, {type: "image/heic",
+        ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {})});
+      ui.set(`${T("st.ready")} — ${T("st.rasterready")}`, "ok");
+      ui.note(result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
+      showCaptureDate(ui, date);
+      if (navigator.canShare?.({files: [output]})) ui.share(output);
+      ui.link(output, outName);
+      return;
+    }
+    if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
 
     const d = discoverHeic(bytes);
     const liveIdentifier = photoContentIdentifier(bytes);
@@ -166,7 +193,6 @@ async function handleFile(file) {
     } else {
       const needsExperimental = d.hdrGrid === null
         || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));
-      if (needsExperimental && !$("experimental").checked) { ui.set(T("err.experimental"), "err"); return; }
       const name = profileFor(profileIndex, d, needsExperimental);
       const profile = await getProfile(name);
       // Start processing; if the thumbnail is missing, dynamically load the generator.
@@ -207,10 +233,13 @@ async function handleFile(file) {
     }
     ui.set(`${T("st.ready")} — ${bits.join(sep)}`, "ok");
 
-    const outName = file.name.replace(/\.(heic|heif)$/i, "") + suffix;
+    const outName = file.name.replace(/\.[^.]+$/, "") + suffix;
     // On iPhone the share sheet lands the file straight in Photos; elsewhere a plain
     // download is the shorter route.
-    const shareFile = new File([data], outName, { type: "image/heic" });
+    const date = photoCaptureDate(data);
+    const shareFile = new File([data], outName, { type: "image/heic",
+      ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
+    showCaptureDate(ui, date);
     if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile, !!liveIdentifier);
     ui.link(new Blob([data], { type: "image/heic" }), outName);
     if (liveIdentifier) {
@@ -227,6 +256,11 @@ async function handleFile(file) {
     console.error("could not port", file.name, e);
     ui.set(T("err.unsupported"), "err");
   }
+}
+
+function showCaptureDate(ui, date) {
+  ui.note(date ? `${T("date.kept")} ${date.date}${date.subsec ? '.' + date.subsec : ''}${date.offset ? ' ' + date.offset : ''}`
+    : T("date.missing"), "date");
 }
 
 async function handleFiles(files) {

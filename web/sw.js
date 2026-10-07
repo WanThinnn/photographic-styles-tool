@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v14`;
+const CACHE_NAME = `${CACHE_PREFIX}v18`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -25,12 +25,35 @@ const APP_SHELL = [
   "./src/heif.js",
   "./src/hevc-linear-tags.js",
   "./src/i18n.js",
+  "./src/image-format.js",
   "./src/linear-thumbnail.js",
   "./src/live-photo.js",
   "./src/model-download.js",
   "./src/port.js",
+  "./src/photo-date.js",
   "./src/styles.js",
   "./src/texture.js",
+  "./src/raster/box.js",
+  "./src/raster/bplist.js",
+  "./src/raster/exif.js",
+  "./src/raster/ffmpeg-assets.js",
+  "./src/raster/ffmpeg-hevc.js",
+  "./src/raster/ffmpeg-worker.js",
+  "./src/raster/generated-profile.js",
+  "./src/raster/heif.js",
+  "./src/raster/hevc-color.js",
+  "./src/raster/hevc-encoder.js",
+  "./src/raster/hevc-linear-tags.js",
+  "./src/raster/linear-thumbnail.js",
+  "./src/raster/model-download.js",
+  "./src/raster/native-empty-texture.js",
+  "./src/raster/portrait-matte.js",
+  "./src/raster/raster-color.js",
+  "./src/raster/raster-import.js",
+  "./src/raster/styles.js",
+  "./src/raster/synthetic-hevc.js",
+  "./src/raster/texture.js",
+  "./src/raster/zip.js",
   "./src/zip.js"
 ];
 

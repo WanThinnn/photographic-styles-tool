@@ -1,0 +1,596 @@
+// Raster conversion adapted from ref/Elio-backup; isolated from the native HEIC path.
+import {releaseHevcEncoder} from './ffmpeg-hevc.js';
+import {buildGeneratedProfile} from './generated-profile.js';
+import { topBox, metaChildren, findChild, be, box, concat } from "./box.js";
+import {
+  discoverHeic, discoverImageItems, parseIloc, parseIpcoIpma, extractItem, propertyForItem,
+  replaceItemPropertyWithSource, compactItemProperties, repointItemProperty, removeItems, setItemReference, ispeBox, addItems,
+  propertyBoxBytes, auxUriForItem, dimensionsForItem, DEPTH_URI, MATTE_URIS,
+  appendIpcoProperty, associateItemProperty, setItemPropertyAssociations,
+  itemOrientation, displayDimensions,
+} from "./heif.js";
+import { addTextureItems, upgradeStylesV16 } from "./texture.js";
+import {
+  applySceneStatistics, applyPersonMetadata, setPersonMasksValid, linearLumaFromRgb,
+} from "./styles.js";
+import {installPortraitMatte} from './portrait-matte.js';
+import { extractRasterExif, preserveRasterExif, buildAppleStyleExif } from "./exif.js";
+import { rasterFrame, rasterColr, rasterVideoColorSpace, checkEncodedColorSpace, resolveEncodedColorSpace } from "./raster-color.js";
+import {blackWhiteI420, measureHevcRange, hevcOutputColor} from './hevc-color.js';
+import { encodeSelectedLinearThumbnail as encodeLinearThumbnail, linearGeometry } from "./linear-thumbnail.js";
+import { supportedHevcConfig } from "./hevc-encoder.js";
+import {ensureHevcEncoder, encodeHevcPixels} from './ffmpeg-hevc.js';
+import {rgbaToI420} from './raster-color.js';
+import {generateSyntheticHevc} from './synthetic-hevc.js';
+
+const TILE = 512, MAX_PRIMARY_TILES = 48;
+const THUMB_W = 416, THUMB_H = 312;
+
+const bytes = (s) => new TextEncoder().encode(s);
+
+function colorContext(canvas, options = {}) {
+  // Browser HEVC encoders commonly output BT.709. Convert source ICC/P3 colours here
+  // rather than feeding P3 samples that the encoder may silently label as BT.709.
+  return canvas.getContext("2d", { ...options, colorSpace: "srgb" });
+}
+
+function hvccBox(description) {
+  const record = ArrayBuffer.isView(description)
+    ? new Uint8Array(description.buffer, description.byteOffset, description.byteLength).slice()
+    : new Uint8Array(description).slice();
+  return box("hvcC", record);
+}
+
+export async function encodeCanvases(width, height, count, draw, bitrate, progress, onProgress) {
+  const config = await supportedHevcConfig(width, height, bitrate);
+  if (!config) {
+    const canvas = document.createElement('canvas'); canvas.width=width; canvas.height=height;
+    const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace:'srgb'});
+    if(!ctx)throw Error('Could not create software HEVC canvas');
+    const colorSpace=rasterVideoColorSpace(), chunks=[]; let hvcc;
+    for(let i=0;i<count;i++) {
+      draw(ctx,i);
+      const pixels=rgbaToI420(ctx.getImageData(0,0,width,height).data,width,height,colorSpace);
+      const result=await encodeHevcPixels(pixels,{width,height,pixelFormat:'yuv420p',...colorSpace},onProgress);
+      if(hvcc&&!same(hvcc,result.hvcc))throw Error('Software HEVC configurations differ between tiles');
+      hvcc=result.hvcc;chunks.push(result.payload);progress?.(i+1,count);
+    }
+    return {chunks,hvcc,colr:rasterColr(colorSpace)};
+  }
+  onProgress?.({stage: "codec", operation: "encode", source: "WebCodecs VideoEncoder"});
+  let description = null, encoderError = null, inputColorSpace = null, outputColorSpace = null;
+  const outputColorSpaces = [];
+  const chunks = [];
+  const encoder = new VideoEncoder({
+    output(chunk, metadata) {
+      if (metadata?.decoderConfig?.colorSpace) outputColorSpaces.push(metadata.decoderConfig.colorSpace);
+      if (metadata?.decoderConfig?.description) {
+        const source = metadata.decoderConfig.description;
+        description = ArrayBuffer.isView(source)
+          ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength).slice()
+          : new Uint8Array(source).slice();
+      }
+      const payload = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(payload);
+      chunks.push(payload);
+    },
+    error(error) { encoderError = error; },
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = colorContext(canvas, { alpha: false, desynchronized: true });
+  if (!ctx) throw new Error("Could not create raster import canvas");
+  try {
+    encoder.configure(config);
+    // Full-range input endpoints stay unambiguous even if the encoder converts to
+    // limited range but reports fullRange=true (observed on the user's iPhone).
+    const probeSpace = {...rasterVideoColorSpace(), fullRange: true};
+    const probe = new VideoFrame(blackWhiteI420(width, height), {format: 'I420',
+      codedWidth: width, codedHeight: height, timestamp: 0, duration: 1_000_000, colorSpace: probeSpace});
+    try { encoder.encode(probe, { keyFrame: true }); }
+    finally { probe.close(); }
+    await encoder.flush();
+    if (encoderError) throw encoderError;
+    if (!description || chunks.length !== 1) throw Error('HEVC colour calibration returned no probe frame');
+    const fullRange = await measureHevcRange(description, chunks[0], config, onProgress);
+    outputColorSpace = resolveEncodedColorSpace(hevcOutputColor(description, outputColorSpaces.at(-1), probeSpace, fullRange));
+    // Keep input samples full-range; the measured output range belongs to the
+    // encoded bitstream, not to the samples submitted to VideoFrame.
+    inputColorSpace = {...outputColorSpace, fullRange: true};
+    chunks.length = 0;
+    outputColorSpaces.length = 0;
+    for (let i = 0; i < count; i++) {
+      draw(ctx, i);
+      const prepared = rasterFrame(ctx, width, height, (i + 1) * 1_000_000, inputColorSpace);
+      const frame = prepared.frame;
+      if (inputColorSpace) checkEncodedColorSpace(prepared.colorSpace, inputColorSpace);
+      else inputColorSpace = prepared.colorSpace;
+      try { encoder.encode(frame, { keyFrame: true }); }
+      finally { frame.close(); }
+      if (encoder.encodeQueueSize > 3) await new Promise((resolve) => {
+        const done = () => { encoder.removeEventListener("dequeue", done); resolve(); };
+        encoder.addEventListener("dequeue", done, { once: true });
+      });
+      progress?.(i + 1, count);
+    }
+    await encoder.flush();
+  } finally { encoder.close(); }
+  if (encoderError) throw encoderError;
+  if (!description || chunks.length !== count)
+    throw new Error(`HEVC encoder returned ${chunks.length}/${count} raster frames`);
+  for (const colorSpace of outputColorSpaces)
+    checkEncodedColorSpace(hevcOutputColor(description, colorSpace, outputColorSpace, outputColorSpace.fullRange), outputColorSpace);
+  return { chunks, hvcc: hvccBox(description), colr: rasterColr(outputColorSpace) };
+}
+
+function drawContained(ctx, image, width, height) {
+  ctx.save();
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, width, height);
+  const scale = Math.min(width / image.width, height / image.height);
+  const w = image.width * scale, h = image.height * scale;
+  ctx.drawImage(image, (width - w) / 2, (height - h) / 2, w, h);
+  ctx.restore();
+}
+
+const even = (value) => Math.max(16, Math.round(value / 2) * 2);
+
+function fitWithinTileBudget(width, height, limit, tileSize = TILE) {
+  if (Math.ceil(width / tileSize) * Math.ceil(height / tileSize) <= limit)
+    return [width, height];
+  let bestScale = 0;
+  for (let columns = 1; columns <= limit; columns++) {
+    const rows = Math.floor(limit / columns);
+    const scale = Math.min(columns * tileSize / width, rows * tileSize / height, 1);
+    if (scale > bestScale) bestScale = scale;
+  }
+  return [Math.max(1, Math.floor(width * bestScale)),
+    Math.max(1, Math.floor(height * bestScale))];
+}
+
+export function targetGeometry(image) {
+  if (![image.width, image.height].every(n => Number.isInteger(n) && n > 0))
+    throw Error('Invalid raster image dimensions');
+  // Keep the source's displayed pixel dimensions whenever 48 donor slots can hold it.
+  // The donor carries irot=270, so the encoded grid uses the swapped stored dimensions.
+  const fitted = fitWithinTileBudget(image.height, image.width, MAX_PRIMARY_TILES);
+  // Very wide panoramas can fit 48 primary tiles but overflow the 12 HDR slots.
+  const [storedWidth, storedHeight] = fitWithinTileBudget(...fitted, 12, TILE * 2);
+  const displayWidth = storedHeight, displayHeight = storedWidth;
+  const primaryColumns = Math.ceil(storedWidth / TILE);
+  const primaryRows = Math.ceil(storedHeight / TILE);
+  const mapScale = Math.min(1, 2880 / storedWidth, 2160 / storedHeight);
+  const thumbScale = Math.min(THUMB_W / storedWidth, THUMB_H / storedHeight);
+  const hdrWidth = Math.max(1, Math.round(storedWidth / 2));
+  const hdrHeight = Math.max(1, Math.round(storedHeight / 2));
+  const deltaWidth = Math.max(1, Math.round(storedWidth * mapScale));
+  const deltaHeight = Math.max(1, Math.round(storedHeight * mapScale));
+  return {
+    displayWidth, displayHeight, storedWidth, storedHeight,
+    sourceWidth: image.width, sourceHeight: image.height,
+    resized: displayWidth !== image.width || displayHeight !== image.height,
+    primaryColumns, primaryRows, primaryTiles: primaryColumns * primaryRows,
+    hdrWidth, hdrHeight,
+    hdrColumns: Math.ceil(hdrWidth / TILE), hdrRows: Math.ceil(hdrHeight / TILE),
+    deltaWidth, deltaHeight,
+    deltaColumns: Math.ceil(deltaWidth / TILE), deltaRows: Math.ceil(deltaHeight / TILE),
+    thumbWidth: even(storedWidth * thumbScale), thumbHeight: even(storedHeight * thumbScale),
+  };
+}
+
+function storedCanvas(image, geometry) {
+  const canvas = document.createElement("canvas");
+  canvas.width = geometry.storedWidth; canvas.height = geometry.storedHeight;
+  const ctx = colorContext(canvas, { alpha: false });
+  ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // The donor primary carries irot=270. Draw the upright source through
+  // its inverse so Photos presents it upright after applying the item transform.
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.translate(-geometry.displayWidth / 2, -geometry.displayHeight / 2);
+  ctx.drawImage(image, 0, 0, geometry.displayWidth, geometry.displayHeight);
+  ctx.restore();
+  return canvas;
+}
+
+function thumbnailCanvas(stored, geometry) {
+  const canvas = document.createElement("canvas");
+  canvas.width = geometry.thumbWidth; canvas.height = geometry.thumbHeight;
+  const ctx = colorContext(canvas, { alpha: false });
+  ctx.drawImage(stored, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+async function openBrowserImage(file, onProgress, {reportFailure = true} = {}) {
+  let image, close = () => image?.close?.();
+  onProgress?.({stage: "codec", operation: "decode", source: "createImageBitmap"});
+  try { image = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch {
+    try { image = await createImageBitmap(file); }
+    catch {
+      const url = URL.createObjectURL(file);
+      try {
+        const element = new Image();
+        onProgress?.({stage: "codec", operation: "decode", source: "Image.decode()"});
+        element.src = url;
+        await element.decode();
+        image = element;
+        close = () => URL.revokeObjectURL(url);
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        const reason = error?.message || String(error);
+        if (reportFailure) onProgress?.({stage: "codec", operation: "decode", source: "Image.decode()", decodeError: reason});
+        throw new Error(`Raster image decode failed: ${reason}`);
+      }
+    }
+  }
+  return { image, close };
+}
+
+function sceneLuma(image) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256; canvas.height = 192;
+  const ctx = colorContext(canvas, { alpha: false, willReadFrequently: true });
+  drawContained(ctx, image, canvas.width, canvas.height);
+  const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const rgb = new Uint8Array(canvas.width * canvas.height * 3);
+  for (let i = 0, p = 0; i < rgba.length; i += 4) {
+    rgb[p++] = rgba[i]; rgb[p++] = rgba[i + 1]; rgb[p++] = rgba[i + 2];
+  }
+  return Array.from(linearLumaFromRgb(rgb)).sort((a, b) => a - b);
+}
+
+/** Minimal Apple Exif containing Orientation=6 and only MakerNote tag 0x54. */
+export function buildRasterExif(mn54, makerType = 7, sourceExif = null, geometry = null) {
+  const minimal = buildAppleStyleExif(mn54, makerType);
+  return sourceExif ? preserveRasterExif(sourceExif, minimal, {
+    width: geometry?.storedWidth, height: geometry?.storedHeight,
+  }) : minimal;
+}
+
+function setGridLayout(meta, iid, width, height, columns = null, rows = null) {
+  const iloc = parseIloc(meta, topBox(meta, "meta"));
+  const item = iloc.items.get(iid);
+  if (!item || item.constructionMethod !== 1 || item.extents.length !== 1)
+    throw new Error(`Grid item ${iid} is not stored in idat`);
+  const idat = findChild(metaChildren(meta, topBox(meta, "meta")), "idat");
+  const extent = item.extents[0];
+  const offset = idat.off + idat.hdr + item.baseOffset + extent.offset;
+  if (extent.length < 8 || meta[offset] !== 0 || (meta[offset + 1] & 1))
+    throw new Error(`Grid item ${iid} has an unsupported descriptor`);
+  const out = meta.slice();
+  if (columns !== null && rows !== null) {
+    if (columns < 1 || columns > 256 || rows < 1 || rows > 256)
+      throw new Error(`Grid item ${iid} has invalid ${columns}x${rows} layout`);
+    out[offset + 2] = rows - 1;
+    out[offset + 3] = columns - 1;
+  }
+  out.set(be(width, 2), offset + 4);
+  out.set(be(height, 2), offset + 6);
+  return out;
+}
+
+function replaceIspe(meta, iid, width, height) {
+  const props = parseIpcoIpma(meta, topBox(meta, "meta"));
+  const ispe = propertyForItem(props, iid, "ispe");
+  if (!ispe) throw new Error(`Item ${iid} has no ispe property`);
+  return replaceItemPropertyWithSource(meta, iid, "ispe", ispeBox(width, height));
+}
+
+function same(a, b) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/** Capture a source Portrait depth auxiliary and its XMP sidecar for compatibility re-encode. */
+export function extractPortraitDepth(source, discovery = discoverHeic(source)) {
+  const depthId = [...discovery.infos.keys()]
+    .find((iid) => auxUriForItem(discovery.props, iid) === DEPTH_URI);
+  if (depthId === undefined) return null;
+  const item = discovery.iloc.items.get(depthId);
+  if (!item || item.constructionMethod !== 0 || !item.extents.length) return null;
+  const boxes = ["ispe", "pixi", "colr", "hvcC", "irot", "imir"]
+    .map((type) => propertyBoxBytes(source, discovery.props, depthId, type)).filter(Boolean);
+  const auxc = propertyBoxBytes(source, discovery.props, depthId, "auxC");
+  if (!auxc || !boxes.some((b) => String.fromCharCode(...b.slice(4, 8)) === "hvcC"))
+    return null;
+  const sidecars = [];
+  for (const ref of discovery.refs) {
+    if (ref.type !== "cdsc" || !ref.to.includes(depthId)) continue;
+    const info = discovery.infos.get(ref.from);
+    const sidecar = discovery.iloc.items.get(ref.from);
+    if (info?.type !== "mime" || !sidecar || sidecar.constructionMethod !== 0) continue;
+    sidecars.push({
+      contentType: info.contentType || "application/rdf+xml",
+      payload: extractItem(source, discovery.iloc, ref.from),
+    });
+  }
+  return {
+    itemType: discovery.infos.get(depthId)?.type || "hvc1",
+    payload: extractItem(source, discovery.iloc, depthId), boxes, auxc, sidecars,
+  };
+}
+
+function appendPortraitDepth(meta, payloads, depth, primary) {
+  if (!depth) return [meta, null];
+  const tmaps = [...discoverHeic(meta).infos]
+    .filter(([, info]) => info.type === "tmap").map(([iid]) => iid);
+  let assigned;
+  [meta, assigned] = addItems(meta, [{
+    key: "portrait-depth", itemType: depth.itemType || "hvc1",
+    boxes: depth.boxes || [], auxc: depth.auxc,
+    refType: "auxl", refTo: [primary, ...tmaps],
+  }]);
+  const depthId = assigned.get("portrait-depth");
+  payloads.set(depthId, depth.payload);
+  const specs = (depth.sidecars || []).map((sidecar, index) => ({
+    key: `portrait-depth-xmp-${index}`, itemType: "mime",
+    contentType: sidecar.contentType || "application/rdf+xml",
+    refType: "cdsc", refTo: [depthId], _payload: sidecar.payload,
+  }));
+  if (specs.length) {
+    let sidecarIds;
+    [meta, sidecarIds] = addItems(meta, specs);
+    for (const spec of specs) payloads.set(sidecarIds.get(spec.key), spec._payload);
+  }
+  return [meta, depthId];
+}
+
+/** Adapt the 48/12 donor graph to encoded raster geometry. Exported for container tests. */
+export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult = null,
+  geometry = null) {
+  const manifest = profile.manifest;
+  if (Number(manifest.primary_tile_count) !== 48 || Number(manifest.hdr_tile_count) !== 12)
+    throw new Error("Raster import requires the 48/12 profile");
+  if (encoded.main.length < 1 || encoded.main.length > 48)
+    throw new Error("Raster import needs between 1 and 48 primary tiles");
+  let meta = profile.meta.slice();
+  const payloads = new Map(profile.retained);
+  let primarySlots = manifest.donor_primary_tiles.map(Number);
+  let hdrSlots = manifest.donor_hdr_tiles.map(Number);
+  let deltaSlots = manifest.donor_delta_tiles.map(Number);
+  if (geometry) {
+    const primaryId = Number(manifest.donor_primary_item);
+    const hdrId = Number(manifest.donor_hdr_grid_item);
+    const deltaId = Number(manifest.donor_delta_grid_item);
+    const tmapId = [...discoverHeic(meta).infos].find(([, info]) => info.type === "tmap")?.[0];
+    const primaryColumns = geometry.primaryColumns ?? 8;
+    const primaryRows = geometry.primaryRows ?? 6;
+    const primaryCount = geometry.primaryTiles ?? encoded.main.length;
+    if (primaryCount !== encoded.main.length || primaryCount > primarySlots.length
+        || primaryColumns * primaryRows !== primaryCount)
+      throw new Error("Raster geometry does not match encoded primary tiles");
+    const unusedPrimary = primarySlots.slice(primaryCount);
+    if (unusedPrimary.length) {
+      meta = removeItems(meta, unusedPrimary);
+      unusedPrimary.forEach((iid) => payloads.delete(iid));
+    }
+    primarySlots = primarySlots.slice(0, primaryCount);
+    meta = setItemReference(meta, "dimg", primaryId, primarySlots);
+    meta = setGridLayout(meta, primaryId, geometry.storedWidth, geometry.storedHeight,
+      primaryColumns, primaryRows);
+    meta = replaceIspe(meta, primaryId, geometry.storedWidth, geometry.storedHeight);
+
+    const hdrColumns = geometry.hdrColumns ?? 4;
+    const hdrRows = geometry.hdrRows ?? 3;
+    const hdrCount = hdrColumns * hdrRows;
+    if (hdrCount < 1 || hdrCount > hdrSlots.length)
+      throw new Error("Raster HDR grid exceeds donor capacity");
+    const unusedHdr = hdrSlots.slice(hdrCount);
+    if (unusedHdr.length) {
+      meta = removeItems(meta, unusedHdr);
+      unusedHdr.forEach((iid) => payloads.delete(iid));
+    }
+    hdrSlots = hdrSlots.slice(0, hdrCount);
+    meta = setItemReference(meta, "dimg", hdrId, hdrSlots);
+    meta = setGridLayout(meta, hdrId, geometry.hdrWidth, geometry.hdrHeight,
+      hdrColumns, hdrRows);
+    meta = replaceIspe(meta, hdrId, geometry.hdrWidth, geometry.hdrHeight);
+    if (Number.isFinite(deltaId)) {
+      const deltaColumns = geometry.deltaColumns ?? 6;
+      const deltaRows = geometry.deltaRows ?? 5;
+      const deltaCount = deltaColumns * deltaRows;
+      if (deltaCount > deltaSlots.length)
+        throw new Error(`Raster StyleDeltaMap needs ${deltaCount} tiles`);
+      const unusedDelta = deltaSlots.slice(deltaCount);
+      if (unusedDelta.length) {
+        meta = removeItems(meta, unusedDelta);
+        unusedDelta.forEach((iid) => payloads.delete(iid));
+      }
+      deltaSlots = deltaSlots.slice(0, deltaCount);
+      meta = setItemReference(meta, "dimg", deltaId, deltaSlots);
+      meta = setGridLayout(meta, deltaId, geometry.deltaWidth, geometry.deltaHeight,
+        deltaColumns, deltaRows);
+      meta = replaceIspe(meta, deltaId, geometry.deltaWidth, geometry.deltaHeight);
+    }
+    if (tmapId !== undefined)
+      meta = replaceIspe(meta, tmapId, geometry.displayWidth, geometry.displayHeight);
+    meta = replaceIspe(meta, Number(manifest.donor_thumbnail_item),
+      geometry.thumbWidth, geometry.thumbHeight);
+  }
+
+  // The donor's old people mattes must never leak into a newly imported screenshot/photo.
+  const donorDiscovery = discoverHeic(meta);
+  const donorMaskIds = new Set([...donorDiscovery.infos.keys()].filter(id =>
+    Object.values(MATTE_URIS).includes(auxUriForItem(donorDiscovery.props, id))));
+  const donorPeople = [...donorMaskIds, ...donorDiscovery.refs.filter(ref =>
+    ref.type === 'cdsc' && ref.to.some(id => donorMaskIds.has(id))).map(ref => ref.from)];
+  if (donorPeople.length) {
+    meta = removeItems(meta, donorPeople);
+    donorPeople.forEach((iid) => payloads.delete(iid));
+  }
+
+  primarySlots.forEach((iid, i) => payloads.set(iid, encoded.main[i]));
+  payloads.set(Number(manifest.donor_thumbnail_item), encoded.thumb);
+  payloads.set(Number(manifest.donor_linear_thumb_item), encoded.linearThumbnail?.payload || encoded.thumb);
+  hdrSlots.forEach((iid) => payloads.set(iid, encoded.hdr));
+  const makerType = Number(manifest.smartstyle_makernote_type ?? 7);
+  const exif = buildRasterExif(profile.mn54, makerType, encoded.sourceExif, geometry);
+  payloads.set(Number(manifest.donor_exif_item), exif);
+
+  let props = parseIpcoIpma(meta, topBox(meta, "meta"));
+  for (const iid of primarySlots)
+    meta = replaceItemPropertyWithSource(meta, iid, "hvcC", encoded.mainHvcc);
+  const thumb = Number(manifest.donor_thumbnail_item);
+  meta = replaceItemPropertyWithSource(meta, thumb, "hvcC", encoded.thumbHvcc);
+
+  // Encoded RGB/YUV color must travel with its own colr, never the donor's ICC profile.
+  const assignColor = (ids, color) => {
+    let index;
+    [meta, index] = appendIpcoProperty(meta, color);
+    for (const iid of ids) {
+      const current = parseIpcoIpma(meta, topBox(meta, "meta"));
+      const kept = (current.associations.get(iid) || []).filter(a => !["colr", "clli", "mdcv"].includes(current.properties[a.index - 1]?.type));
+      meta = setItemPropertyAssociations(meta, iid, [...kept.map(a => [a.index, a.essential]), [index, false]]);
+    }
+  };
+  const tmapItems = [...discoverHeic(meta).infos].filter(([, info]) => info.type === "tmap")
+    .map(([iid]) => iid);
+  assignColor([Number(manifest.donor_primary_item), ...primarySlots, ...tmapItems],
+    encoded.mainColr || rasterColr(rasterVideoColorSpace()));
+  assignColor([thumb, Number(manifest.donor_linear_thumb_item)],
+    encoded.thumbColr || rasterColr(rasterVideoColorSpace()));
+  // WebCodecs raster frames are Main8 even when the generated template is Main10.
+  let rasterPixiIndex;
+  [meta, rasterPixiIndex] = appendIpcoProperty(meta, box('pixi', new Uint8Array([0,0,0,0,3,8,8,8])));
+  for (const id of [Number(manifest.donor_primary_item), ...primarySlots, Number(manifest.donor_hdr_grid_item), ...hdrSlots, thumb]) {
+    const current = parseIpcoIpma(meta, topBox(meta, 'meta'));
+    const kept = (current.associations.get(id) || []).filter(a => current.properties[a.index - 1]?.type !== 'pixi');
+    meta = setItemPropertyAssociations(meta, id, [...kept.map(a => [a.index, a.essential]), [rasterPixiIndex, false]]);
+  }
+
+  // linearthumbnail reuses the encoded thumbnail, including its dimensions/pixi/hvcC.
+  const linear = Number(manifest.donor_linear_thumb_item);
+  props = parseIpcoIpma(meta, topBox(meta, "meta"));
+  for (const type of ["ispe", "pixi", "hvcC"]) {
+    const from = propertyForItem(props, linear, type), to = propertyForItem(props, thumb, type);
+    if (from && to && from.index !== to.index)
+      meta = repointItemProperty(meta, linear, from.index, to.index);
+    props = parseIpcoIpma(meta, topBox(meta, "meta"));
+  }
+  if (encoded.linearThumbnail) {
+    const lt = encoded.linearThumbnail;
+    for (const [type, value] of [["ispe", ispeBox(lt.width, lt.height)],
+      ["pixi", lt.pixi], ["hvcC", lt.hvcc], ["colr", lt.colr]]) {
+      let index;
+      [meta, index] = appendIpcoProperty(meta, value);
+      const current = parseIpcoIpma(meta, topBox(meta, "meta"));
+      const kept = (current.associations.get(linear) || []).filter(a => {
+        const name = current.properties[a.index - 1]?.type;
+        return type === "colr" ? !["colr", "clli", "mdcv"].includes(name) : name !== type;
+      });
+      meta = setItemPropertyAssociations(meta, linear, [...kept.map(a => [a.index, a.essential]), [index, type === "hvcC"]]);
+    }
+  }
+
+  for (const iid of hdrSlots)
+    meta = replaceItemPropertyWithSource(meta, iid, "hvcC", encoded.hdrHvcc);
+  // WebCodecs emits ordinary 3-plane video; point the gain-map grid at a 3x8 pixi.
+  props = parseIpcoIpma(meta, topBox(meta, "meta"));
+  const hdrGrid = Number(manifest.donor_hdr_grid_item);
+  assignColor([hdrGrid, ...hdrSlots], encoded.hdrColr || rasterColr(rasterVideoColorSpace()));
+  props = parseIpcoIpma(meta, topBox(meta, "meta"));
+  const primary = Number(manifest.donor_primary_item);
+  const hdrPixi = propertyForItem(props, hdrGrid, "pixi");
+  const rgbPixi = propertyForItem(props, primary, "pixi");
+  if (hdrPixi && rgbPixi && hdrPixi.index !== rgbPixi.index)
+    meta = repointItemProperty(meta, hdrGrid, hdrPixi.index, rgbPixi.index);
+
+  const stylesId = Number(manifest.donor_styles_item);
+  let styles = payloads.get(stylesId);
+  if (sortedLuma) [styles] = applySceneStatistics(styles, "target", sortedLuma);
+  if (faceResult?.state === "generated") {
+    [styles] = setPersonMasksValid(styles);
+    [styles] = applyPersonMetadata(styles, faceResult.personMetadata);
+  }
+  if (encoded.texture !== false) [styles] = upgradeStylesV16(styles);
+  payloads.set(stylesId, styles);
+
+  // A compatibility re-encode rebuilds the main/HDR graph, but Portrait depth is an
+  // independent HEVC auxiliary. Keep its original bitstream, codec properties,
+  // orientation, auxiliary relationship, and blur-parameter XMP sidecar intact.
+  [meta] = appendPortraitDepth(meta, payloads, encoded.sourceDepth, primary);
+
+  if (encoded.texture !== false) {
+    let texturePayloads;
+    [meta, texturePayloads] = addTextureItems(meta, primary, {
+    matteOverrides: new Map([...(faceResult?.overrides || []), ...(encoded.sourceSkin || []), ...(encoded.sourceDngMattes || [])]),
+    texturePeopleData: faceResult?.texturePeopleData,
+  });
+    for (const [iid, payload] of texturePayloads) payloads.set(iid, payload);
+  }
+  const portraitResult=installPortraitMatte(meta,payloads,null,null,encoded.sourceDngMattes?.get(MATTE_URIS.portraiteffectsmatte)
+    ||faceResult?.overrides?.get(MATTE_URIS.portraiteffectsmatte),primary);
+  meta=portraitResult.meta;
+  meta=compactItemProperties(meta).meta;
+
+  const iloc = parseIloc(meta, topBox(meta, "meta"));
+  const ids = [...iloc.items].filter(([, item]) => item.constructionMethod === 0 && item.extents.length)
+    .map(([iid]) => iid).sort((a, b) => a - b);
+  const missing = ids.filter((iid) => !payloads.has(iid));
+  if (missing.length) throw new Error(`Profile is missing payload(s): ${missing}`);
+  let cursor = profile.ftyp.length + meta.length + 8;
+  const metaOut = meta.slice(), chunks = [];
+  const outIloc = parseIloc(metaOut, topBox(metaOut, "meta"));
+  for (const iid of ids) {
+    const payload = payloads.get(iid);
+    const extent = outIloc.items.get(iid).extents[0];
+    metaOut.set(be(cursor, outIloc.offsetSize), extent.offsetPos);
+    metaOut.set(be(payload.length, outIloc.lengthSize), extent.lengthPos);
+    chunks.push(payload); cursor += payload.length;
+  }
+  if (cursor >= 2 ** 32) throw new Error("file too large for 32-bit offsets");
+  const mdat = concat(chunks);
+  const result = concat([profile.ftyp, metaOut, box("mdat", mdat)]);
+  const check = discoverHeic(result);
+  for (const iid of ids)
+    if (!same(extractItem(result, check.iloc, iid), payloads.get(iid)))
+      throw new Error(`self-check failed: raster item ${iid} unreadable`);
+  return result;
+}
+
+
+/** Browser-decoded still image -> new HEIC. No source HEIC graph is re-encoded here. */
+export async function importRaster(file, profile, onProgress = () => {}, {analyze = true} = {}) {
+  // Independent Main10 auxiliary/masks always require the verified WASM encoder.
+  let opened, stored;
+  try {
+    await ensureHevcEncoder(onProgress);
+    const sourceExif = extractRasterExif(new Uint8Array(await file.arrayBuffer()));
+    opened = await openBrowserImage(file, onProgress);
+    const image = opened.image;
+    if (!image.width || !image.height) throw Error('Raster image decode failed: empty image');
+    const geometry = targetGeometry(image);
+    onProgress({stage: 'prepare', ...geometry});
+    const assets = await generateSyntheticHevc(onProgress);
+    // Construct neutral maps and scene metadata rather than borrowing another photo.
+    profile = buildGeneratedProfile('48-12', assets);
+    const linearThumbnail = await encodeLinearThumbnail(image, {angle: 270}, onProgress);
+    stored = storedCanvas(image, geometry);
+    const main = await encodeCanvases(TILE, TILE, geometry.primaryTiles, (ctx, i) => {
+      ctx.fillStyle = 'black'; ctx.fillRect(0, 0, TILE, TILE);
+      ctx.drawImage(stored, -(i % geometry.primaryColumns) * TILE,
+        -Math.floor(i / geometry.primaryColumns) * TILE);
+    }, 3_000_000, (done, total) => onProgress({stage: 'main', done, total}), onProgress);
+    onProgress({stage: 'auxiliary'});
+    const thumb = await encodeCanvases(geometry.thumbWidth, geometry.thumbHeight, 1,
+      ctx => ctx.drawImage(stored, 0, 0, geometry.thumbWidth, geometry.thumbHeight),
+      800_000, undefined, onProgress);
+    // A neutral auxiliary is compatibility data, not recovered HDR from an SDR input.
+    const hdr = await encodeCanvases(TILE, TILE, 1, ctx => {
+      ctx.fillStyle = 'black'; ctx.fillRect(0, 0, TILE, TILE);
+    }, 200_000, undefined, onProgress);
+    onProgress({stage: 'assemble'});
+    const data = buildRasterHeic(profile, {
+      main: main.chunks, mainHvcc: main.hvcc, mainColr: main.colr,
+      thumb: thumb.chunks[0], thumbHvcc: thumb.hvcc, thumbColr: thumb.colr,
+      hdr: hdr.chunks[0], hdrHvcc: hdr.hvcc, hdrColr: hdr.colr,
+      sourceExif, linearThumbnail, texture: true,
+    }, analyze ? sceneLuma(image) : null, null, geometry);
+    return {data, geometry};
+  } finally {
+    opened?.close();
+    if (stored) stored.width = stored.height = 0;
+    releaseHevcEncoder();
+  }
+}

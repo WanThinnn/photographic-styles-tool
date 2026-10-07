@@ -160,6 +160,10 @@ Python's.
 
 ## Layout
 
+Instructions, input-format guidance and output notes are collapsed by default using
+native HTML `details`/`summary` controls. Processing and download controls stay visible;
+each raster result keeps its longer conversion notes behind an expandable summary.
+
 | File | Role |
 |---|---|
 | `src/box.js` | ISO-BMFF box reading and writing |
@@ -194,7 +198,38 @@ it does not turn arbitrary photos and videos into Live Photos.
 Run `node --test tests/web/live-photo.mjs` to verify container parsing and pair preservation.
 Private HEIC/MOV fixtures are read locally when available and are never bundled into the site.
 
-## Not supported
+## JPG, PNG and Android images
+
+The picker and drop area accept JPEG, PNG, WebP, GIF, BMP and AVIF as well as HEIC.
+Browser decoding determines format availability (animated images use one frame).
+These still images are converted locally into a new `_PhotographicStyle.HEIC` with
+Styles and Texture/Grain, without changing the original file. Camera/EXIF metadata
+from JPEG/PNG/WebP is preserved where supported; stored orientation is updated to
+match the newly encoded pixels. Transparency is flattened onto black.
+
+The raster pipeline under `src/raster/` is adapted from `ref/Elio-backup` and kept
+separate from the existing native HEIC processing. It builds neutral auxiliaries
+and Styles fields from readable constants; it does not copy another photo's pixels
+or face masks. Main tiles use a platform HEVC encoder when available, with the
+verified FFmpeg.wasm encoder as a fallback. The independent P3-linear Main10
+thumbnail always uses WASM. The same on-demand encoder cache and isolation
+requirements described below apply; reload once after first installation.
+
+Dimensions are preserved within the 48 primary / 12 auxiliary tile budget; larger
+photos and extreme panoramas are reduced without stretching. The output is SDR:
+this route does not recreate HDR gain maps, Portrait depth or Live Photo motion
+from JPEG/PNG input. Apple Photos rendering still needs device verification.
+
+Run `node --test tests/web/raster-import.mjs` for container, geometry and colour checks.
+
+Capture dates, time-zone offsets and fractional seconds in source EXIF are retained.
+Each result shows the original capture time when readable; sources without a capture
+date are identified instead of assigning a fabricated date. Shared File objects also
+use that timestamp when the original specifies a time zone. Browser downloads may
+still have a current filesystem creation date, and Safari's Photos import decides the
+asset date independently: this web app cannot set PhotoKit's `creationDate` directly.
+
+## HEIC compatibility
 
 The standard mode requires an HDR gain map and known StyleDeltaMap dimensions. A missing
 thumbnail is generated locally using libheif decoding and FFmpeg.wasm x265
@@ -204,8 +239,9 @@ isolation supplied by the service worker, including on GitHub Pages. After the w
 reload once before generating thumbnails. Failures stop export rather than substituting
 another photo's thumbnail. Primary image tiles, HDR and depth payloads are kept unchanged.
 
-**Experimental support for SDR and resized HEIC photos** must be enabled before selecting
-such a file. It adds Styles metadata to the original photo graph, with an estimated
+**Experimental support for SDR and resized HEIC photos** is selected automatically
+when the file needs it; there is no checkbox to enable. Native style photos retain
+their original route. This mode adds Styles metadata to the original photo graph, with an estimated
 StyleDeltaMap size that follows the photo's stored orientation. It does not invent HDR
 data, detect people or re-encode the primary image. This route is not validated on iPhone;
 a successfully written file is not proof that Photos will offer Styles or render them

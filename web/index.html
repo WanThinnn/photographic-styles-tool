@@ -167,6 +167,12 @@
   .notes { display: flex; flex-direction: column; gap: .75rem; margin-top: .5rem; }
   section.card { padding: .95rem 1.05rem; }
   section h2 { font-size: .98rem; margin: 0 0 .5rem; }
+  details.card { padding: .75rem 1rem; }
+  details > summary { cursor: pointer; font-size: .92rem; font-weight: 600; }
+  details > summary::marker { color: var(--muted); }
+  details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 3px; }
+  details[open] > summary { margin-bottom: .75rem; }
+  details p { font-size: .88rem; color: var(--muted); margin: .5rem 0; }
   .steps { list-style: none; margin: 0; padding: 0; counter-reset: s; display: flex; flex-direction: column; gap: .6rem; }
   /* Not a grid: the text arrives as HTML with <b> inside, and a grid would turn every
      fragment into its own cell. The number sits in the padding instead. */
@@ -205,17 +211,6 @@
     </button>
   </header>
 
-  <section class="card notice" aria-labelledby="notice-h">
-    <h2 id="notice-h">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
-      <span data-i18n="h.notice"></span>
-    </h2>
-    <ul class="bullets">
-      <li data-i18n="n.1"></li>
-      <li data-i18n="n.2"></li>
-    </ul>
-  </section>
-
   <p class="sub" data-i18n="app.lede"></p>
 
   <div id="drop" role="button" tabindex="0">
@@ -226,43 +221,41 @@
     <span data-i18n="drop.small"></span>
   </div>
   <input type="file" id="file" multiple
-         accept="image/heic,image/heif,video/quicktime,.heic,.heif,.mov">
-
-  <p class="sub" data-i18n="live.help"></p>
-
-  <div class="tip" role="note">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3Z"/></svg>
-    <div>
-      <h2 data-i18n="tip.title"></h2>
-      <p data-i18n="tip.body"></p>
-    </div>
-  </div>
+         accept="image/heic,image/heif,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,video/quicktime,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.mov">
 
   <div class="opts card">
     <input type="checkbox" id="quality" role="switch" checked>
     <label for="quality" data-i18n="opt.quality"></label>
   </div>
 
-  <div class="opts card">
-    <input type="checkbox" id="experimental">
-    <label for="experimental" data-i18n="opt.experimental"></label>
-  </div>
   <div id="list" aria-live="polite"></div>
   <p id="boot"></p>
 
   <div class="notes">
-    <section class="card">
-      <h2 data-i18n="h.steps"></h2>
+    <details class="card">
+      <summary data-i18n="h.steps"></summary>
       <ol class="steps">
         <li data-i18n="s.1"></li>
         <li data-i18n="s.2"></li>
         <li data-i18n="s.3"></li>
         <li data-i18n="s.4"></li>
       </ol>
-    </section>
+    </details>
 
-    <section class="card">
-      <h2 data-i18n="h.get"></h2>
+    <details class="card">
+      <summary data-i18n="tip.title"></summary>
+      <p data-i18n="tip.body"></p>
+    </details>
+
+    <details class="card">
+      <summary data-i18n="h.formats"></summary>
+      <p data-i18n="raster.help"></p>
+      <p data-i18n="live.help"></p>
+      <p data-i18n="opt.analysishelp"></p>
+    </details>
+
+    <details class="card">
+      <summary data-i18n="h.get"></summary>
       <ul class="bullets">
         <li data-i18n="g.1"></li>
         <li data-i18n="g.2"></li>
@@ -271,17 +264,25 @@
         <li data-i18n="g.5"></li>
         <li data-i18n="g.6"></li>
       </ul>
-    </section>
+    </details>
 
-    <section class="card">
-      <h2 data-i18n="h.trouble"></h2>
+    <details class="card">
+      <summary data-i18n="h.trouble"></summary>
       <ul class="bullets">
         <li data-i18n="t.1"></li>
         <li data-i18n="t.2"></li>
         <li data-i18n="t.3"></li>
         <li data-i18n="t.4"></li>
       </ul>
-    </section>
+    </details>
+
+    <details class="card notice">
+      <summary data-i18n="h.notice"></summary>
+      <ul class="bullets">
+        <li data-i18n="n.1"></li>
+        <li data-i18n="n.2"></li>
+      </ul>
+    </details>
   </div>
 
   <footer><span data-i18n="p.version"></span> <span id="version"></span> · <a href="https://github.com/nathanatgit/Shalielie">GitHub</a></footer>

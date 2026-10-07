@@ -7,7 +7,7 @@ import {
   parseIloc, parseIpcoIpma, extractItem, propertyForItem, propertyBoxBytes, dimensionsForItem,
   auxUriForItem, irotAngleForItem, imirAxisForItem, findItemsByType, appendIpcoProperty,
   addItems, auxcBox, ispeBox, refBox, discoverHeic, URI_STYLE_DELTA, URI_LINEAR_THUMB,
-  URI_STYLES, MATTE_URI_SET,
+  URI_STYLES, MATTE_URI_SET, DEPTH_URI,
 } from "./heif.js";
 import { injectAppleMakerNoteTag } from "./exif.js";
 import { addTextureItems, softSkinPeople, filmGrainSeed } from "./texture.js";
@@ -255,6 +255,15 @@ export async function graftPatch(targetData, profile, opts = {}) {
     blob = b3;
     report.personMasksValidHint = `${before} -> 1.0`;
   }
+  // Same report shape as the donor path, which the app reads: here the photo's own mattes
+  // and depth simply stay where they are.
+  const auxNames = (pred) => [...td.infos.keys()]
+    .map((i) => auxUriForItem(td.props, i)).filter((u) => u && pred(u)).map((u) => u.split(":").pop());
+  report.mattes = {
+    transplanted: auxNames((u) => MATTE_URI_SET.has(u)),
+    added: auxNames((u) => u === DEPTH_URI).map(() => "depth"),
+    neutralized: [], emptied: [],
+  };
   const [data, gr] = graftStyleGraph(targetData, td, blob, profile.mn54,
     Number(manifest.smartstyle_makernote_type ?? 7), linearThumb, opts.texture !== false);
   return { data, report: { ...report, ...gr } };

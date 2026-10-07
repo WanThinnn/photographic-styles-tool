@@ -79,3 +79,6 @@ desktop.ini
 
 # Cached libheif bundle for tests/web/libheif-api.mjs (1.8 MB, refetched on demand).
 tests/web/.cache/
+
+# Local previous project and reference checkouts
+ref/

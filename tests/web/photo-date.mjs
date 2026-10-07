@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {exifDateFields, photoCaptureDate} from '../../web/src/photo-date.js';
 import {buildRasterExif} from '../../web/src/raster/raster-import.js';
 import {concat,be} from '../../web/src/box.js';
+import {discoverHeic,extractItem} from '../../web/src/heif.js';
 
 function datedExif() {
   const le = (n,size) => be(n,size).reverse(), text = s => new TextEncoder().encode(s+'\0');
@@ -49,4 +50,17 @@ for(const [original,processed] of [
 test('missing and malformed date metadata is not replaced with the current time',()=>{
   assert.deepEqual(exifDateFields(null),{});
   assert.deepEqual(exifDateFields(Uint8Array.of(1,2,3)),{});
+});
+
+const safariOriginal='C:/Users/WanThinnn/Downloads/iCloud Photos (24444)/iCloud Photos/IMG_0486.HEIC';
+const safariSaved='C:/Users/WanThinnn/Downloads/IMG_0612.HEIC';
+test('reported Safari/iCloud date mismatch retains the complete original EXIF',{
+  skip:!fs.existsSync(safariOriginal)||!fs.existsSync(safariSaved),
+},()=>{
+  const read=path=>new Uint8Array(fs.readFileSync(path));
+  const before=read(safariOriginal),after=read(safariSaved);
+  const exif=bytes=>{const d=discoverHeic(bytes);return extractItem(bytes,d.iloc,d.exifItem);};
+  assert.deepEqual(exif(after),exif(before));
+  assert.deepEqual(photoCaptureDate(after),photoCaptureDate(before));
+  assert.equal(photoCaptureDate(after).date,'2026:10:03 17:14:19');
 });

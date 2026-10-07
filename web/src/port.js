@@ -66,7 +66,7 @@ export function profileFor(index, d) {
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
   if (td.hdrGrid === null || !td.hdrTiles.length) throw new Error(UNSUPPORTED);
-  if (td.thumbnail === null || td.exifItem === null) throw new Error(UNSUPPORTED);
+  if ((td.thumbnail === null && !opts.linearThumb) || td.exifItem === null) throw new Error(UNSUPPORTED);
 
   // v0.6.2: the photo's own item graph whenever its StyleDeltaMap size is known.
   if (opts.graph !== "donor" && styleDeltaSize(...dimensionsForItem(td.props, td.primary))) {
@@ -74,6 +74,8 @@ export async function patch(targetData, profile, opts = {}) {
     out.report.version = VERSION;
     return out;
   }
+  // Generated thumbnails are supported only by the photo's own graph.
+  if (td.thumbnail === null || opts.linearThumb) throw new Error(UNSUPPORTED);
 
   const { manifest } = profile;
   let meta = profile.meta;

@@ -214,7 +214,7 @@ export async function graftPatch(targetData, profile, opts = {}) {
   const angle = irotAngleForItem(targetData, td.props, primary);
   const mirror = imirAxisForItem(targetData, td.props, primary);
   const thumb = td.thumbnail;
-  const linearThumb = {
+  const linearThumb = opts.linearThumb || {
     sample: extractItem(targetData, td.iloc, thumb),
     hvcC: propertyBoxBytes(targetData, td.props, thumb, "hvcC"),
     ispe: propertyBoxBytes(targetData, td.props, thumb, "ispe"),

@@ -109,7 +109,7 @@ import zlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 URI_HDR_GAIN = "urn:com:apple:photo:2020:aux:hdrgainmap"
 URI_LINEAR_THUMB = "tag:apple.com,2023:photo:aux:linearthumbnail"
@@ -161,6 +161,30 @@ MATTE_2026_XMP = (
     '      </rdf:Description>\n'
     '   </rdf:RDF>\n'
     '</x:xmpmeta>\n').encode("utf-8")
+
+# v0.6.1: an exactly empty 2016x1512 matte frame (8-bit HEVC, every sample 0). Both built-in
+# profiles carry their classic matte slots (portrait, skin, sky) with this one hvcC; a slot
+# the photo does not fill used to keep the donor's near-empty matte, which still held faint
+# donor scene content (sky up to 9/255).
+CLASSIC_MATTE_HVCC = bytes.fromhex(
+    "0000007168766343010408000000bfc80000000096f000fcfcf8f800000b03a00001001740010c01ffff04"
+    "0800000300bfc8000003000096170240a100010023420101040800000300bfc8000003000096c00fc2005f"
+    "1f138817b91655370202020080a2000100094401c061d2c8405324")
+CLASSIC_MATTE_EMPTY = base64.b64decode(
+    "AAADZSgBrwYF/nFq2rScpRjGD3ve5znOc5znOc5znOc5znOc5znQjAb//wjiUEbA65wTXPgAAAMAAAMAAAMA"
+    "AAMAAAMAb0Bhx0umN7O24AAAAwAAAwAAAwAAAwAAAwAYUC0JXlj6/gAAAwAAAwAAAwAAAwAAAwAAe8ANvF68"
+    "IAAAAwAAAwAAAwAAAwAAAwABlRArhYAAAAMAAAMAAAMAAAMAAAMAAdsOrgAAAwAAAwAAAwAAAwAAAwAAAwD+"
+    "gAAAAwAAAwAAAwAAAwAAAwAAAwAAQ8AAAAMAAAMAAAMAAAMAAAMAAAMACIgAAAMAAAMAAAMAAAMAAAMAAAMB"
+    "IQAAAwAAAwAAAwAAAwAAAwAAEJAAAAMAAAMAAAMAAAMAAAMAANSAAAADAAADAAADAAADAAADAAXUAAADAAAD"
+    "AAADAAADAAADACxgAAADAAADAAADAAADAAADAMSAAAADAAADAAADAAADAAADAzIAAAMAAAMAAAMAAAMAAAno"
+    "AAADAAADAAADAAADAAAcUAAAAwAAAwAAAwAAAwAAUsAAAAMAAAMAAAMAAAMAALuAAAADAAADAAADAAADAAFL"
+    "AAADAAADAAADAAADAAJuAAADAAADAAADAAADAAP6AAADAAADAAADAAADAAY8AAADAAADAAADAAADAAkYAAAD"
+    "AAADAAADAAADAAzIAAADAAADAAADAAADABFwAAADAAADAAADAAADABWwAAADAAADAAADAAADABoQAAADAAAD"
+    "AAADAAADAB3wAAADAAADAAADAAADACLgAAADAAADAAADAAADACbgAAADAAADAAADAAADAClgAAADAAADAAAD"
+    "AAADACxgAAADAAADAAADAAADAC4gAAADAAADAAADAAADAC7gAAADAAADAAADAAADAC7gAAADAAADAAADAAAD"
+    "ADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAg"
+    "AAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAAD"
+    "AAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADAAADAAADAAADAAADAAIm")
 
 # v0.6.0: Soft Skin. iOS 27 smooths skin per face, from TextureStylePostProcessedPeopleData in
 # texture_styles plus one semanticpersoninstances matte per face. Phone A/B on ports and on
@@ -1688,15 +1712,31 @@ def soft_skin_people(data: bytes, disc):
         return None
     width, height = dimensions_for_item(disc["props"], disc["primary"])
     irot = irot_angle_for_item(data, disc["props"], disc["primary"])
-    root = {}
-    for key, value in TEXTURE_STYLES_HEADER:
-        root[key] = value
-        if key == "CaptureMode":
-            root["TextureStylePostProcessedPeopleData"] = [
-                soft_skin_people_entry(f, i, irot, width, height) for i, f in enumerate(faces)]
-    return {"faces": len(faces), "texture": build_bplist(root),
+    return {"faces": len(faces),
+            "entries": [soft_skin_people_entry(f, i, irot, width, height) for i, f in enumerate(faces)],
             "mattes": {**{uri: skin for uri in SOFT_SKIN_SKIN_URIS}, SOFT_SKIN_PERSON_URI: person},
             "instances": [(SOFT_SKIN_INSTANCE_KEYS[i], person) for i in range(len(faces))]}
+
+
+def film_grain_seed(data: bytes, disc) -> int:
+    """v0.6.1: a per-photo FilmGrainSeed. Native photos all differ (6-264 across 15 iOS 27
+    files) while every port used to get 92, so every port had the same grain pattern. The
+    seed is the CRC-32 of the photo's first primary tile, so it is stable for a photo and
+    the browser build computes the same value."""
+    return zlib.crc32(extract_item(data, disc["iloc"], disc["primary_tiles"][0])) % 256
+
+
+def texture_styles_payload(people=None, grain_seed=None) -> bytes:
+    """The texture_styles plist: the native header with the photo's grain seed, plus the
+    people entries when there are any. Without either it is the native 216-byte record."""
+    if people is None and grain_seed is None:
+        return TEXTURE_STYLES_BLOB
+    root = {}
+    for key, value in TEXTURE_STYLES_HEADER:
+        root[key] = grain_seed if key == "FilmGrainSeed" and grain_seed is not None else value
+        if key == "CaptureMode" and people is not None:
+            root["TextureStylePostProcessedPeopleData"] = people["entries"]
+    return build_bplist(root)
 
 
 def soft_skin_instance_xmp(key: str) -> bytes:
@@ -1706,7 +1746,7 @@ def soft_skin_instance_xmp(key: str) -> bytes:
         "</fsincMattes:InstanceMaskReferenceKey>\n").encode("utf-8") + marker)
 
 
-def add_texture_items(meta: bytes, primary: int, people=None):
+def add_texture_items(meta: bytes, primary: int, people=None, grain_seed=None):
     """Add the iOS 27 Texture/Grain item set to a meta box: every missing 2026 matte (empty,
     with its XMP sidecar) plus the texture_styles item, wired as iPhone 18 files wire them.
 
@@ -1766,7 +1806,7 @@ def add_texture_items(meta: bytes, primary: int, people=None):
     meta, tex = add_items(meta, [{
         "key": "texture", "item_type": "uri ", "item_name": "metadata",
         "content_type": URI_TEXTURE_STYLES, "ref_type": "cdsc", "ref_to": targets}])
-    payloads[tex["texture"]] = people["texture"] if people else TEXTURE_STYLES_BLOB
+    payloads[tex["texture"]] = texture_styles_payload(people, grain_seed)
     summary = f"added #{tex['texture']} -> {targets}, {len(missing)} 2026 mattes"
 
     if people:
@@ -3024,6 +3064,20 @@ def cmd_patch(args):
         people_report["people"] = ("target auxiliaries carried" if carried
                                    else "none (target has no mattes or depth)")
 
+    # v0.6.1: every matte slot the photo does not fill gets an exactly empty frame, not the
+    # donor's near-empty matte. Only slots still on the shared matte hvcC qualify, so the
+    # payload always matches its decoder configuration.
+    now_props = parse_ipco_ipma(meta, top_box(meta, "meta"))
+    emptied = []
+    for uri, iid in donor_slots.items():
+        if uri.split(":")[-1] in people_report["mattes_transplanted"]:
+            continue
+        if property_box_bytes(meta, now_props, iid, "hvcC") == CLASSIC_MATTE_HVCC:
+            payloads[iid] = CLASSIC_MATTE_EMPTY
+            emptied.append(uri.split(":")[-1])
+    if emptied:
+        people_report["mattes_emptied"] = emptied
+
     # v0.5.0: add the iOS 27 Texture/Grain set (2026 mattes + texture_styles). Appending keeps
     # every existing property index, so the manifest's linearthumbnail hvcC index still holds.
     # An external iOS 27 donor profile brings its own set.
@@ -3034,7 +3088,8 @@ def cmd_patch(args):
         texture_report = {"texture_styles": f"from profile #{existing_tex[0]}"}
     elif args.texture == "on":
         meta, tex_payloads, summary = add_texture_items(
-            meta, int(manifest["donor_primary_item"]), soft_skin_people(target_data, td))
+            meta, int(manifest["donor_primary_item"]), soft_skin_people(target_data, td),
+            film_grain_seed(target_data, td))
         payloads.update(tex_payloads)
         texture_report = {"texture_styles": summary}
 
@@ -3249,6 +3304,8 @@ def cmd_patch(args):
           + (f" ({', '.join(maps_report['light_maps_fields'])})"
              if maps_report.get("light_maps_fields") else ""))
     print(f"  target auxiliaries: {people_report['people']}")
+    if people_report.get("mattes_emptied"):
+        print(f"    empty matte slots: {', '.join(people_report['mattes_emptied'])}")
     if people_report["mattes_transplanted"] or people_report["mattes_added"]:
         if people_report["mattes_transplanted"]:
             print(f"    transplanted: {', '.join(people_report['mattes_transplanted'])}")
@@ -3295,7 +3352,7 @@ def add_texture_bytes(data: bytes):
         raise PortError("An item payload sits before the end of meta; cannot shift offsets safely")
 
     new_meta, new_payloads, summary = add_texture_items(
-        data[mo:mo+ms], disc["primary"], soft_skin_people(data, disc))
+        data[mo:mo+ms], disc["primary"], soft_skin_people(data, disc), film_grain_seed(data, disc))
     delta = len(new_meta) - ms
 
     # New payloads travel in one small mdat appended after everything else.

@@ -3,7 +3,7 @@
 How `photographic_style_port.py` changes the metadata of a normal HEIC so that Apple Photos
 offers the Photographic Styles palette (风格 / 调色板), Portrait editing and, on iOS 27,
 Texture/Grain (质感 / 颗粒). It covers everything tried from the early V-series experiments to
-v0.6.0: what worked, what failed, and what is still open. Usage, testing and the version history
+v0.6.1: what worked, what failed, and what is still open. Usage, testing and the version history
 are in the [README](README.md).
 
 **Status labels**
@@ -99,8 +99,7 @@ understood or not yet in its final form.
 | Metadata | Port writes | Kind | Status | Open point |
 |---|---|---|---|---|
 | Classic semantic mattes | The photo's own | Photo's own | ✅ | Which mattes are needed individually |
-| Unused matte slots (photo has mattes) | Empty refill | Neutral | ☑️ | – |
-| Matte slots (photo has no people) | **Donor's** near-empty bytes | Donor | 🔍 | Replace with generated empty frames (§8) |
+| Matte slots the photo does not fill (with or without people) | Exactly empty 2016×1512 frame (since v0.6.1; before, the donor's near-empty matte) | Neutral | ☑️ | Not phone-tested on its own |
 | `PersonMasksValidHint` | 1.0 when mattes are carried | Value | ✅ | – |
 | `PeopleRatio` / `SkinRatio` | Not written (stay 0) | – | ✅ | Not needed for Soft Skin (§7) |
 | Depth map | The photo's own | Photo's own | ✅ | – |
@@ -112,7 +111,7 @@ understood or not yet in its final form.
 |---|---|---|---|---|
 | `texture_styles` item | Native iPhone 18 Pro record | Native record | ✅ | – |
 | `HardwareModel` | `iPhone19,2` | Native record | ✅ | Names a device other than the photo's own (§8) |
-| `FilmGrainSeed` | 92 for every photo | Native record | ✅ | Differs in every native photo; should be calculated per photo (§8) |
+| `FilmGrainSeed` | CRC-32 of the photo's first primary tile mod 256 (since v0.6.1; before, 92 for every photo) | Value | ☑️ | Native photos all differ; per-photo seed not phone-tested |
 | `TextureStylePeopleDataVersion` | 3 | Native record | ✅ | – |
 | `Preset`, `CaptureType`, `CaptureMode`, `PortType` | Native values | Native record | ✅ | Not tested one at a time |
 | `TextureStylePostProcessedPeopleData` (photos with people) | One entry per face: boxes and angles from the photo's face regions, a fixed landmark layout, median native colour statistics | Value / neutral | ✅ | Turned faces (beyond ~30°) less accurate (§7) |
@@ -176,9 +175,9 @@ Sorted by the five kinds in §1. The donor row is the open issue in §8.
 | Values calculated from the photo | Styles key `6` tone statistics; #9 hint (set from whether the photo has mattes); face boxes and angles in the #10 people data (from the photo's face regions) |
 | Fixed values from native Soft Skin photos | Landmark layout and colour statistics in the #10 people data (medians of 14 native faces) |
 | Maps calculated from the photo | #3 linear thumbnail; light maps with `--light-maps target`; a synthesized thumbnail when the photo has none |
-| Neutral defaults | Identity coefficients and tone curve; flat light maps (default); #4 neutral delta map; #11/#12 empty 2026 mattes; empty refill of unused matte slots |
+| Neutral defaults | Identity coefficients and tone curve; flat light maps (default); #4 neutral delta map; #11/#12 empty 2026 mattes; an exactly empty frame in every matte slot the photo does not fill |
 | Taken unchanged from a native capture | #10 `texture_styles`, including `HardwareModel` and a fixed `FilmGrainSeed` (both 🔍, §8) |
-| **Donor** | Item-graph template; `tmap` payload for photos without one; styles `i`, `h`, `4`, `highKey`, `2`, `5`, `j`; donor matte bytes in photos without people |
+| **Donor** | Item-graph template; `tmap` payload for photos without one; styles `i`, `h`, `4`, `highKey`, `2`, `5`, `j` |
 
 ---
 
@@ -331,7 +330,7 @@ renderer runs on older hardware too. Compared with iPhone 16 files, iPhone 18 fi
 | `Preset` / `CaptureType` / `CaptureMode` / `PortType` | `Standard` / `LF` / `Still` / `PortTypeBack` | Native values; not tested separately |
 | `HardwareModel` | `iPhone19,2` | The iPhone 15 Pro value keeps the controls but makes white areas glow under some styles, so it likely selects render parameters. Names a device other than the photo's own. 🔍 (§8) |
 | `TextureStylePeopleDataVersion` | 3 | Absent / 0 / 1 / 2 did not help a build missing #11 |
-| `FilmGrainSeed` | 92 | Grain is generated from it at render time; every port gets the same pattern. 🔍 (§8) |
+| `FilmGrainSeed` | 92 | Grain is generated from it at render time. Up to v0.6.0 every port got this same pattern; since v0.6.1 the port writes a per-photo seed (§8) |
 
 ### 5.2 On-device tests (iPhone 15 Pro, iOS 27; one 48/12 and one 45/15 photo)
 
@@ -498,13 +497,13 @@ headroom, `tmap` parameters, lenses and Exif.
 | **`5`** | 0 or 2; both values occur with the same lens, phone and iOS | Unknown | 🔍 |
 | **`j`** | 1.0 up to iOS 18.2; 1.0–1.33 on iOS 26.5/27 | Unknown | 🔍 |
 | **MakerNote `0x54`** | Members `1`/`2` are 0 in every photo shot with the pad untouched and −0.84…0.99 in Apple's demo shots: very likely the Tone/Color pad position at capture. `4` (1 or 11) and `6` (4 or 8) vary too. | The port's 0/0 is the neutral pad, a **neutral default**; `4`, `6` unknown | ☑️ `1`/`2`; 🔍 `4`, `6` |
-| **Donor matte bytes** (photos without people) | Effectively empty (max 1–8 out of 255), but still donor bytes | **Neutral default**: generated empty frame | Easy; not applied |
+| **Donor matte bytes** (slots the photo does not fill) | Near-empty but not empty: up to 9/255, faint donor sky | **Neutral default**: an exactly empty frame on the slots' shared `hvcC` | ☑️ done in v0.6.1; not phone-tested |
 | **Item-graph template** (item IDs, `iref`, `ipma`, `ipco`, grid descriptors) | Standard HEIF; the code already builds matte, depth, sidecar and texture items from scratch | **Format declarations** generated from the photo's layout; also removes the two-layout limit | Largest task |
 | **`HardwareModel = iPhone19,2`** | The only field naming a device other than the photo's own; the iPhone 15 Pro value causes white glow | Find a setting that renders correctly without it, or document it as an exception | 🔍 |
-| **`FilmGrainSeed = 92`** | Same grain pattern on every port; native photos all differ (6–264 across 15 iOS 27 files) | **Calculated** per photo, e.g. from a pixel hash | Untested |
+| **`FilmGrainSeed = 92`** | Same grain pattern on every port; native photos all differ (6–264 across 15 iOS 27 files) | **Calculated** per photo: CRC-32 of the first primary tile mod 256 | ☑️ done in v0.6.1; not phone-tested |
 
-Suggested order (the `tmap` copy is done in v0.5.1): generated empty mattes → per-photo
-`FilmGrainSeed` → generated item graph. `4`, `5`, `j`, `highKey`, `Gain` and `OriginalRangeMax`
+Done: the `tmap` copy (v0.5.1), empty matte slots and per-photo `FilmGrainSeed` (v0.6.1).
+Next: the generated item graph. `4`, `5`, `j`, `highKey`, `Gain` and `OriginalRangeMax`
 do not follow anything measured so far; more random photos will not settle them, controlled
 captures (same scene, one setting changed) might. New tile layouts seen in native files: 45/28,
 35/12 and 54/15.

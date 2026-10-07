@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Current version: v0.6.0
+Current version: v0.6.1
 
 This is an experimental tool that takes a HEIC from an iPhone **older than the iPhone 16**
 (iPhone 15, 14, 13 … — any model whose photos match a supported tile layout) and adds the
@@ -258,6 +258,7 @@ thumbnail differently. Only the no-encoder mode is reproducible byte for byte, a
 | v0.5.0      | Texture/Grain; native-photo mode; thumbnail synthesis                        | Palette, Texture/Grain and Portrait ✅; Soft Skin 🔍              |
 | v0.5.1      | Photo's own`tmap` gain-map parameters                                      | Only the`tmap` bytes change; pixels and payloads identical ☑️ |
 | v0.6.0      | Soft Skin from the photo's face regions and mattes; Windows drag and drop    | Soft Skin ✅ (needs all four parts, phone A/B); no-people output unchanged ☑️ |
+| v0.6.1      | Exactly empty frames in unfilled matte slots; per-photo`FilmGrainSeed`     | Two donor-derived values gone ☑️; phone test pending 🔍         |
 
 **Reverse-engineering tests of key assumptions**
 

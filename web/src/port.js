@@ -15,13 +15,18 @@ import {
   MATTE_URIS, MATTE_URI_SET, DEPTH_URI,
 } from "./heif.js";
 import { injectAppleMakerNoteTag } from "./exif.js";
-import { addTextureItems, hasTexture, softSkinPeople } from "./texture.js";
+import {
+  addTextureItems, hasTexture, softSkinPeople, filmGrainSeed,
+  CLASSIC_MATTE_EMPTY, CLASSIC_MATTE_HVCC,
+} from "./texture.js";
+
+const sameBytes = (a, b) => !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
 import {
   applySceneStatistics, applyLightMaps, setPersonMasksValid, buildLightMaps,
   linearLumaFromRgb, LIGHTMAP_N,
 } from "./styles.js";
 
-export const VERSION = "0.6.0-web";
+export const VERSION = "0.6.1-web";
 
 // Every rejection a visitor can hit reduces to one of two things: the file is not a
 // HEIC at all, or it is a HEIC this build cannot handle. Nothing else is actionable.
@@ -255,6 +260,18 @@ export async function patch(targetData, profile, opts = {}) {
     }
   }
 
+  // v0.6.1: every matte slot the photo does not fill gets an exactly empty frame, not the
+  // donor's near-empty matte. Only slots on the shared matte hvcC qualify.
+  const nowProps = parseIpcoIpma(meta, topBox(meta, "meta"));
+  report.mattes.emptied = [];
+  for (const [uri, iid] of donorSlots) {
+    if (report.mattes.transplanted.includes(uri.split(":").pop())) continue;
+    if (sameBytes(propertyBoxBytes(meta, nowProps, iid, "hvcC"), CLASSIC_MATTE_HVCC)) {
+      payloads.set(iid, CLASSIC_MATTE_EMPTY);
+      report.mattes.emptied.push(uri.split(":").pop());
+    }
+  }
+
   // iOS 27 Texture/Grain set (2026 mattes + texture_styles). Appending keeps every existing
   // property index, so the manifest's linearthumbnail hvcC index below still holds.
   report.texture = "off";
@@ -263,7 +280,7 @@ export async function patch(targetData, profile, opts = {}) {
     if (hasTexture(portInfos)) report.texture = "from profile";
     else {
       const [m6, texPayloads, summary] = addTextureItems(meta, Number(manifest.donor_primary_item),
-        softSkinPeople(targetData, td));
+        softSkinPeople(targetData, td), filmGrainSeed(targetData, td));
       meta = m6;
       for (const [iid, blob] of texPayloads) payloads.set(iid, blob);
       report.texture = summary;

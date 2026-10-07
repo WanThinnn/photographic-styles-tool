@@ -84,9 +84,10 @@ def check_output(name, src, out):
     tex = texture(out)
     people = tex.get("TextureStylePostProcessedPeopleData", [])
     check(f"{name}: one people entry per face region ({len(faces)})", len(people) == len(faces) > 0)
-    check(f"{name}: texture header is the v0.5 header",
+    check(f"{name}: texture header is the native header with the photo's grain seed",
           [(k, v) for k, v in tex.items() if k != "TextureStylePostProcessedPeopleData"]
-          == list(p.TEXTURE_STYLES_HEADER))
+          == [(k, p.film_grain_seed(src, ds) if k == "FilmGrainSeed" else v)
+              for k, v in p.TEXTURE_STYLES_HEADER])
     check(f"{name}: people data sits after CaptureMode",
           list(tex).index("TextureStylePostProcessedPeopleData") == list(tex).index("CaptureMode") + 1)
     if NATIVE_ENTRY is not None:
@@ -167,14 +168,24 @@ with tempfile.TemporaryDirectory() as work:
             run(["add-texture", str(f)], out)
         data = out.read_bytes()
         name = f"{mode} {f.name[:40]}"
+        print(name)
         if p.soft_skin_people(src, d) is not None:
-            print(name)
             check_output(name, src, data)
         else:
             tex = texture(data)
-            check(f"{name}: no faces or mattes, so the v0.5 texture item and no instances",
+            check(f"{name}: no faces or mattes, so no people data and no instances",
                   "TextureStylePostProcessedPeopleData" not in tex
                   and item_for_uri(p.discover_heic(data), p.URI_PERSON_INSTANCES) is None)
+        tex = texture(data)
+        check(f"{name}: FilmGrainSeed is the photo's own ({p.film_grain_seed(src, d)})",
+              tex["FilmGrainSeed"] == p.film_grain_seed(src, d))
+        if mode == "patch":
+            do = p.discover_heic(data)
+            own = {p.aux_uri_for_item(d["props"], i) for i in d["infos"]}
+            slots = [i for i in do["infos"] if p.aux_uri_for_item(do["props"], i) in p.MATTE_URIS.values()
+                     and p.aux_uri_for_item(do["props"], i) not in own]
+            check(f"{name}: matte slots the photo does not fill are exactly empty ({len(slots)})",
+                  all(p.extract_item(data, do["iloc"], i) == p.CLASSIC_MATTE_EMPTY for i in slots))
 
 # The synthesis must land near what iOS 27 itself writes, judged on native Soft Skin photos.
 if NATIVE.exists():

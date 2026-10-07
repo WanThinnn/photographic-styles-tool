@@ -54,6 +54,45 @@ const MATTE_XMP = utf8(
   + "   </rdf:RDF>\n"
   + "</x:xmpmeta>\n");
 
+// v0.6.1: an exactly empty 2016x1512 matte frame for every classic matte slot the photo does
+// not fill; see CLASSIC_MATTE_EMPTY in photographic_style_port.py.
+export const CLASSIC_MATTE_HVCC = hex(
+  "0000007168766343010408000000bfc80000000096f000fcfcf8f800000b03a00001001740010c01ffff04"
+  + "0800000300bfc8000003000096170240a100010023420101040800000300bfc8000003000096c00fc2005f"
+  + "1f138817b91655370202020080a2000100094401c061d2c8405324");
+export const CLASSIC_MATTE_EMPTY = b64(
+  "AAADZSgBrwYF/nFq2rScpRjGD3ve5znOc5znOc5znOc5znOc5znQjAb//wjiUEbA65wTXPgAAAMAAAMAAAMA"
+  + "AAMAAAMAb0Bhx0umN7O24AAAAwAAAwAAAwAAAwAAAwAYUC0JXlj6/gAAAwAAAwAAAwAAAwAAAwAAe8ANvF68"
+  + "IAAAAwAAAwAAAwAAAwAAAwABlRArhYAAAAMAAAMAAAMAAAMAAAMAAdsOrgAAAwAAAwAAAwAAAwAAAwAAAwD+"
+  + "gAAAAwAAAwAAAwAAAwAAAwAAAwAAQ8AAAAMAAAMAAAMAAAMAAAMAAAMACIgAAAMAAAMAAAMAAAMAAAMAAAMB"
+  + "IQAAAwAAAwAAAwAAAwAAAwAAEJAAAAMAAAMAAAMAAAMAAAMAANSAAAADAAADAAADAAADAAADAAXUAAADAAAD"
+  + "AAADAAADAAADACxgAAADAAADAAADAAADAAADAMSAAAADAAADAAADAAADAAADAzIAAAMAAAMAAAMAAAMAAAno"
+  + "AAADAAADAAADAAADAAAcUAAAAwAAAwAAAwAAAwAAUsAAAAMAAAMAAAMAAAMAALuAAAADAAADAAADAAADAAFL"
+  + "AAADAAADAAADAAADAAJuAAADAAADAAADAAADAAP6AAADAAADAAADAAADAAY8AAADAAADAAADAAADAAkYAAAD"
+  + "AAADAAADAAADAAzIAAADAAADAAADAAADABFwAAADAAADAAADAAADABWwAAADAAADAAADAAADABoQAAADAAAD"
+  + "AAADAAADAB3wAAADAAADAAADAAADACLgAAADAAADAAADAAADACbgAAADAAADAAADAAADAClgAAADAAADAAAD"
+  + "AAADACxgAAADAAADAAADAAADAC4gAAADAAADAAADAAADAC7gAAADAAADAAADAAADAC7gAAADAAADAAADAAAD"
+  + "ADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAg"
+  + "AAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADADAgAAAD"
+  + "AAADAAADAAADADAgAAADAAADAAADAAADADAgAAADAAADAAADAAADAAADAAADAAADAAADAAIm");
+
+// CRC-32 (IEEE), equal to Python's zlib.crc32.
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+export function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** v0.6.1: per-photo FilmGrainSeed; see film_grain_seed in photographic_style_port.py. */
+export function filmGrainSeed(data, d) {
+  return crc32(extractItem(data, d.iloc, d.primaryTiles[0])) % 256;
+}
+
 // v0.6.0: Soft Skin. Port of soft_skin_people & co. in photographic_style_port.py; see the
 // comment there. iOS 27 smooths skin per face from TextureStylePostProcessedPeopleData plus
 // one semanticpersoninstances matte per face, and only when the skin v2 / face skin / person
@@ -206,19 +245,24 @@ export function softSkinPeople(data, d) {
   if (!skin || !person) return null;
   const [width, height] = dimensionsForItem(d.props, d.primary);
   const irot = irotAngleForItem(data, d.props, d.primary);
-  const root = new Map();
-  for (const [key, value] of TEXTURE_STYLES_HEADER) {
-    root.set(key, value);
-    if (key === "CaptureMode")
-      root.set("TextureStylePostProcessedPeopleData",
-        faces.map((f, i) => softSkinPeopleEntry(f, i, irot, width, height)));
-  }
   return {
     faces: faces.length,
-    texture: buildBplist(root),
+    entries: faces.map((f, i) => softSkinPeopleEntry(f, i, irot, width, height)),
     mattes: new Map([...SOFT_SKIN_SKIN_URIS.map((u) => [u, skin]), [SOFT_SKIN_PERSON_URI, person]]),
     instances: faces.map((_, i) => [SOFT_SKIN_INSTANCE_KEYS[i], person]),
   };
+}
+
+/** The texture_styles plist; see texture_styles_payload in photographic_style_port.py. */
+export function textureStylesPayload(people = null, grainSeed = null) {
+  if (people === null && grainSeed === null) return TEXTURE_STYLES_BLOB;
+  const root = new Map();
+  for (const [key, value] of TEXTURE_STYLES_HEADER) {
+    root.set(key, key === "FilmGrainSeed" && grainSeed !== null ? grainSeed : value);
+    if (key === "CaptureMode" && people !== null)
+      root.set("TextureStylePostProcessedPeopleData", people.entries);
+  }
+  return buildBplist(root);
 }
 
 function softSkinInstanceXmp(key) {
@@ -238,7 +282,7 @@ export function hasTexture(infos) {
  * people (softSkinPeople), also what Soft Skin needs.
  * Returns [meta, Map(itemId -> payload), summary].
  */
-export function addTextureItems(meta, primary, people = null) {
+export function addTextureItems(meta, primary, people = null, grainSeed = null) {
   const props0 = parseIpcoIpma(meta, topBox(meta, "meta"));
   if (props0.flags & 1) throw new Error("Wide ipma is not supported for adding Texture/Grain items");
   const infos = parseIinf(meta, topBox(meta, "meta"));
@@ -298,7 +342,7 @@ export function addTextureItems(meta, primary, people = null) {
     key: "texture", itemType: "uri ", itemName: "metadata",
     contentType: URI_TEXTURE_STYLES, refType: "cdsc", refTo: targets,
   }]);
-  payloads.set(tex.get("texture"), people ? people.texture : TEXTURE_STYLES_BLOB);
+  payloads.set(tex.get("texture"), textureStylesPayload(people, grainSeed));
   let summary = `added #${tex.get("texture")} -> [${targets}], ${missing.length} 2026 mattes`;
 
   if (people) {
@@ -348,7 +392,7 @@ export function addTexture(data) {
       if (e.offset < mo + ms) throw new Error("payload before end of meta");
 
   const [newMeta, newPayloads, summary] = addTextureItems(data.slice(mo, mo + ms), d.primary,
-    softSkinPeople(data, d));
+    softSkinPeople(data, d), filmGrainSeed(data, d));
   const delta = newMeta.length - ms;
   const metaOut = newMeta.slice();
   const niloc = parseIloc(metaOut, topBox(metaOut, "meta"));

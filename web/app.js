@@ -8,6 +8,13 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js"
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
 
+// Fetch the decoder while the visitor is still choosing a photo (or switches analysis on),
+// so the first photo does not wait for the download, and someone just reading the page
+// downloads nothing. A failure here is harmless: ensureDecode() tries again and falls back.
+const warmDecoder = () => { if (quality.checked) loadLibheif().catch(() => {}); };
+quality.addEventListener("change", warmDecoder);
+for (const ev of ["pointerdown", "dragenter", "focus"]) drop.addEventListener(ev, warmDecoder, { once: true });
+
 let lang = pickLanguage();
 const T = (key) => t(lang, key);
 

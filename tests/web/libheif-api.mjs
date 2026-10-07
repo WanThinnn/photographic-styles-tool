@@ -90,5 +90,46 @@ if (!existsSync(sample)) {
   check("display() fills in actual pixels", lit > w * h * 0.5, `${lit}/${w * h} non-black`);
 }
 
+// v0.6.2: analysis decodes the embedded thumbnail, wrapped by thumbnailHeic(), not the
+// 12-24 MP primary. It must decode with the real bundle, in the stored orientation (no irot
+// applied), at the thumbnail's size, and look like the full image.
+const { thumbnailHeic } = await import("../../web/src/decode.js");
+const { discoverHeic, dimensionsForItem, irotAngleForItem } = await import("../../web/src/heif.js");
+const decodeRgba = async (bytes) => {
+  const t0 = performance.now();
+  const image = new resolved.HeifDecoder().decode(intoSandbox(bytes))[0];
+  const w = image.get_width(), h = image.get_height();
+  const imageData = runInContext("({})", sandbox);
+  imageData.width = w; imageData.height = h;
+  imageData.data = runInContext(`new Uint8ClampedArray(${w * h * 4})`, sandbox);
+  const out = await new Promise((res, rej) => image.display(imageData, (r) => (r ? res(r) : rej(new Error("display")))));
+  const mean = [0, 1, 2].map((c) => {
+    let s = 0;
+    for (let i = c; i < out.data.length; i += 4) s += out.data[i];
+    return s / (w * h);
+  });
+  return { w, h, mean, ms: performance.now() - t0 };
+};
+for (const rel of ["noSmartStyle/IMG_5037.HEIC", "noSmartStyle/IMG_5049.HEIC"]) {
+  const path = `${ROOT}${rel}`;
+  if (!existsSync(path)) continue;
+  const bytes = new Uint8Array(readFileSync(path));
+  const d = discoverHeic(bytes);
+  const mini = thumbnailHeic(bytes);
+  const label = `photo ${rel.slice(-7, -5)} (irot ${irotAngleForItem(bytes, d.props, d.primary)})`;
+  check(`${label}: thumbnail wrapped as a one-item HEIC`, mini instanceof Uint8Array && mini.length < 200000,
+    mini ? `${mini.length} bytes` : "null");
+  if (!mini) continue;
+  const small = await decodeRgba(mini);
+  const [tw, th] = dimensionsForItem(d.props, d.thumbnail);
+  check(`${label}: decodes at the thumbnail's stored size`, small.w === tw && small.h === th,
+    `${small.w}x${small.h} vs ${tw}x${th}`);
+  const big = await decodeRgba(bytes);
+  const diff = Math.max(...small.mean.map((v, i) => Math.abs(v - big.mean[i])));
+  check(`${label}: same average colour as the full image (max ${diff.toFixed(1)}/255)`, diff < 4);
+  check(`${label}: much faster (${small.ms.toFixed(0)} ms vs ${big.ms.toFixed(0)} ms full)`,
+    small.ms * 5 < big.ms);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

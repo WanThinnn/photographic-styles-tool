@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Current version: v0.6.1
+Current version: v0.6.2
 
 This is an experimental tool that takes a HEIC from an iPhone **older than the iPhone 16**
 (iPhone 15, 14, 13 … — any model whose photos match a supported tile layout) and adds the
@@ -193,14 +193,14 @@ device — is documented in **[facts.md](facts.md)**.
 - **The look after editing is not identical to a native photo.** The port uses neutral defaults
   where Apple's capture-time values cannot be reproduced, and a few values still come from the
   donor profile. More native samples are needed.
-- **Only two tile layouts (48/12 and 45/15) have built-in profiles.** Other layouts are refused.
+- **Supported sizes: 12 MP, 24 MP and front-camera photos**, in any tile layout. The style data
+  is added to the photo's own file structure, which needs the size of the style's delta map;
+  48 MP photos (and any other size) fall back to the two built-in layouts (48/12 and 45/15).
 - **Photos without an embedded thumbnail** need the default (encoder) mode, not the browser or
   no-encoder mode.
 - **Texture/Grain needs iOS 27** on the phone that opens the photo.
 - **A normal photo cannot be turned into a "people" photo.** Portrait data is only ever copied
   from the photo itself, never invented.
-- **Linear-thumbnail orientation** for photos with a 90°/270° rotation is stored 180° off in the
-  default (encoder) mode. A phone test showed no visible difference, so it is left as is for now.
 - **Not validated by Apple, and results vary by photo.** Try the flags above before concluding
   it does not work.
 - **The standalone iOS app** in the `swift-port` branch is under construction and not available
@@ -259,6 +259,7 @@ thumbnail differently. Only the no-encoder mode is reproducible byte for byte, a
 | v0.5.1      | Photo's own`tmap` gain-map parameters                                      | Only the`tmap` bytes change; pixels and payloads identical ☑️ |
 | v0.6.0      | Soft Skin from the photo's face regions and mattes; Windows drag and drop    | Soft Skin ✅ (needs all four parts, phone A/B); no-people output unchanged ☑️ |
 | v0.6.1      | Exactly empty frames in unfilled matte slots; per-photo`FilmGrainSeed`     | Two donor-derived values gone; palette, styles, people and Soft Skin unchanged ✅ |
+| v0.6.2      | Style items added to the photo's own item graph; 90°/270° rotation fixed      | Any tile layout of a known size; re-saved photos without thumbnail/`tmap`; sky/foliage glow on 270° photos gone ✅ |
 
 **Reverse-engineering tests of key assumptions**
 

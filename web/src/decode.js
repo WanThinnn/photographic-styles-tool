@@ -48,14 +48,16 @@ export async function loadLibheif() {
 /** ffmpeg's transpose semantics, expressed as a canvas transform. */
 function orientationTransform(ctx, w, h, angle, mirror) {
   // Undo the display rotation to recover the stored orientation, matching
-  // raw_orientation_filters() in the Python implementation.
+  // raw_orientation_filters() in the Python implementation. irot turns counter-clockwise,
+  // so 90 is undone clockwise (canvas +pi/2) and 270 counter-clockwise. v0.6.2: these two
+  // were swapped up to v0.6.1.
   const swap = angle === 90 || angle === 270;
   const outW = swap ? h : w;
   const outH = swap ? w : h;
   ctx.translate(outW / 2, outH / 2);
-  if (angle === 90) ctx.rotate(-Math.PI / 2);
+  if (angle === 90) ctx.rotate(Math.PI / 2);
   else if (angle === 180) ctx.rotate(Math.PI);
-  else if (angle === 270) ctx.rotate(Math.PI / 2);
+  else if (angle === 270) ctx.rotate(-Math.PI / 2);
   if (mirror === 0) ctx.scale(-1, 1);
   else if (mirror === 1) ctx.scale(1, -1);
   ctx.translate(-w / 2, -h / 2);

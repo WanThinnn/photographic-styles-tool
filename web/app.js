@@ -1,5 +1,5 @@
 import { loadProfile } from "./src/zip.js";
-import { patch, selectProfile, VERSION, UNSUPPORTED } from "./src/port.js";
+import { patch, profileFor, VERSION, UNSUPPORTED } from "./src/port.js";
 import { discoverHeic } from "./src/heif.js";
 import { addTexture, hasTexture } from "./src/texture.js";
 import { decodeToRgb, loadLibheif } from "./src/decode.js";
@@ -107,7 +107,7 @@ async function handleFile(file) {
     } else {
       // No encoder in the browser, so a photo without a thumbnail needs the desktop tool.
       if (d.thumbnail === null) { ui.set(T("err.nothumb"), "err"); return; }
-      const name = selectProfile(profileIndex, d.primaryTiles.length, d.hdrTiles.length);
+      const name = profileFor(profileIndex, d);
       const profile = await getProfile(name);
 
       const canDecode = quality.checked ? await ensureDecode(bytes) : false;

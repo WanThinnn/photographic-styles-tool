@@ -109,7 +109,7 @@ import zlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 
 URI_HDR_GAIN = "urn:com:apple:photo:2020:aux:hdrgainmap"
 URI_LINEAR_THUMB = "tag:apple.com,2023:photo:aux:linearthumbnail"
@@ -276,6 +276,28 @@ V02_NEUTRAL_DELTA_HVCC = bytes.fromhex(
     "010102200000030090000003000003005aa0040200804d96566924cae680800000"
     "03008000000c84a2000100074401c172b46240"
 )
+
+# v0.6.2: the style items are added to the photo's own item graph instead of moving the
+# photo into a donor graph. These are the format declarations native files use for them;
+# each is identical in all 31 native style files sampled (iPhone 16/17/18) and both donors.
+STYLE_PIXI_10BIT = bytes.fromhex("000000107069786900000000030a0a0a")   # 3 x 10-bit
+STYLE_DELTA_COLR = base64.b64decode(   # ICC "Display P3 Linear", prof
+    "AAACPGNvbHJwcm9mAAACMGFwcGwEAAAAbW50clJHQiBYWVogB+MAAQABAAAAAAAAYWNzcEFQUEwAAAAAQVBQ"
+    "TAAAAAAAAAAAAAAAAAAAAAAAAPbWAAEAAAAA0y1hcHBsX7/VQcvuTpXllWLEtDLoDwAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAALZGVzYwAAAQgAAAA+Y3BydAAAAUgAAABQd3RwdAAAAZgAAAAUclhZWgAAAawA"
+    "AAAUZ1hZWgAAAcAAAAAUYlhZWgAAAdQAAAAUclRSQwAAAegAAAAQY2hhZAAAAfgAAAAsY2ljcAAAAiQAAAAM"
+    "YlRSQwAAAegAAAAQZ1RSQwAAAegAAAAQbWx1YwAAAAAAAAABAAAADGVuVVMAAAAiAAAAHABEAGkAcwBwAGwA"
+    "YQB5ACAAUAAzACAATABpAG4AZQBhAHIAAG1sdWMAAAAAAAAAAQAAAAxlblVTAAAANAAAABwAQwBvAHAAeQBy"
+    "AGkAZwBoAHQAIABBAHAAcABsAGUAIABJAG4AYwAuACwAIAAyADAAMQA5WFlaIAAAAAAAAPbWAAEAAAAA0y1Y"
+    "WVogAAAAAAAAg98AAD2/////u1hZWiAAAAAAAABKvwAAsTcAAAq5WFlaIAAAAAAAACg4AAARCwAAyLlwYXJh"
+    "AAAAAAAAAAAAAQAAc2YzMgAAAAAAAQxCAAAF3v//8yYAAAeTAAD9kP//+6L///2jAAAD3AAAwG5jaWNwAAAA"
+    "AAwIAAE=")
+STYLE_BRANDS = (b"MiHA", b"heix")   # added after MiHB, as in every native style file
+# StyleDeltaMap size per primary size (stored orientation), as native files have it. Tiles
+# are 512x512; the grid covers the map with ceil(w/512) x ceil(h/512) of them.
+STYLE_DELTA_SIZES = {(4032, 3024): (2880, 2160), (5712, 4284): (4096, 3072),
+                     (3088, 2316): (2240, 1680)}
+STYLE_LINEAR_THUMB = (1024, 768)
 
 # Built-in, phone-validated v0.2 donor profiles. These are complete normalized
 # donor-profile ZIP files compressed with zlib and encoded as base85 so normal
@@ -1870,17 +1892,20 @@ def raw_orientation_filters(angle: int, mirror) -> List[str]:
     same shared irot property - so the linearthumbnail must be generated from the stored
     orientation, not the displayed one.
 
-    The angle mapping is anchored on the phone-validated IMG_5037 case: a stored landscape
-    primary carrying irot=270 decodes as portrait and needs one clockwise quarter turn
-    (ffmpeg `transpose=1`) to return to the stored landscape frame.
+    irot is a counter-clockwise rotation, so undoing irot=90 takes one clockwise quarter turn
+    (ffmpeg `transpose=1`) and irot=270 one counter-clockwise turn (`transpose=2`). v0.6.2:
+    up to v0.6.1 these two were swapped, so linear thumbnails of 90/270 photos were stored
+    180 degrees off; on a photo with sky above trees that showed as a glow in the sky and
+    foliage (phone A/B). Sampled this way, native light maps and linear thumbnails match the
+    photo with no further flip at every irot (30 native files).
     """
     filters: List[str] = []
     if angle == 90:
-        filters.append("transpose=2")
+        filters.append("transpose=1")
     elif angle == 180:
         filters.extend(["transpose=2", "transpose=2"])
     elif angle == 270:
-        filters.append("transpose=1")
+        filters.append("transpose=2")
     if mirror is not None:
         # Mirroring is self-inverse, so the same flip undoes it.
         filters.append("hflip" if mirror == 0 else "vflip")
@@ -2073,13 +2098,13 @@ def target_luma_distributions(decoded_png: Path, sample_w: int = 256, sample_h: 
 def target_light_maps(decoded_png: Path, angle: int = 0, mirror=None):
     """Build target-derived 32x32 FP16 c/d light maps.
 
-    Sampled in the primary's stored (pre-irot) orientation and then rotated 180 degrees,
-    which is the layout every native sample uses. Rotating a row-major square grid by 180
-    degrees is exactly reversing the flattened array.
+    Sampled in the primary's stored (pre-irot) orientation, the layout every native sample
+    uses (r 0.94-0.99 against 30 native maps at irot 0, 180 and 270). Up to v0.6.1 the grid
+    was also reversed (rotated 180 degrees), which only cancelled the swapped 90/270 mapping
+    in raw_orientation_filters and left 0/180 photos upside down.
     """
     grid = sample_linear_luma(decoded_png, LIGHTMAP_N, LIGHTMAP_N,
                               raw_orientation_filters(angle, mirror))
-    grid = grid[::-1]
     out = []
     for slope, intercept in ((C_MAP_SLOPE, C_MAP_INTERCEPT), (D_MAP_SLOPE, D_MAP_INTERCEPT)):
         vals = [max(LIGHTMAP_FLOOR, min(1.0, slope * v + intercept)) for v in grid]
@@ -2753,6 +2778,266 @@ def discover_target(data: bytes):
     return disc
 
 
+def style_delta_size(width: int, height: int):
+    """StyleDeltaMap size for a primary of this stored size, or None when no native file of
+    that size has been seen."""
+    if (width, height) in STYLE_DELTA_SIZES:
+        return STYLE_DELTA_SIZES[(width, height)]
+    if (height, width) in STYLE_DELTA_SIZES:
+        dw, dh = STYLE_DELTA_SIZES[(height, width)]
+        return dh, dw
+    return None
+
+
+def ftyp_with_style_brands(ftyp: bytes) -> bytes:
+    """Add MiHA and heix right after MiHB, where native style files list them."""
+    major, minor = ftyp[8:12], ftyp[12:16]
+    brands = [ftyp[i:i+4] for i in range(16, len(ftyp), 4)]
+    missing = [b for b in STYLE_BRANDS if b not in brands]
+    if not missing:
+        return ftyp
+    at = brands.index(b"MiHB") + 1 if b"MiHB" in brands else len(brands)
+    return _box("ftyp", major + minor + b"".join(brands[:at] + missing + brands[at:]))
+
+
+def append_iref(meta: bytes, ref_box: bytes) -> bytes:
+    """Append one reference box to iref (version 0, 16-bit item IDs)."""
+    mb = top_box(meta, "meta")
+    ro, rsz, rh, _ = find_child(meta_children(meta, mb), "iref")
+    new_iref = _box("iref", meta[ro+rh:ro+rsz] + ref_box)
+    mo, ms, mh, _ = mb
+    rebuilt = bytearray(meta[mo+mh:mo+mh+4])
+    for (bo, bs, _bh, bt) in boxes(meta, mo+mh+4, mo+ms):
+        rebuilt += new_iref if bt == "iref" else meta[bo:bo+bs]
+    return _box("meta", bytes(rebuilt))
+
+
+def move_item_to_idat(meta: bytes, iid: int, payload: bytes) -> bytes:
+    """Store a freshly added single-extent item in idat (construction method 1), as Apple
+    stores grid descriptors. The iloc fields are size neutral and edited first; the idat
+    append and the meta size repair follow."""
+    mb = top_box(meta, "meta")
+    iloc = parse_iloc(meta, mb)
+    if (iloc["version"], iloc["base_offset_size"], iloc["index_size"]) != (1, 0, 0):
+        raise PortError("Unsupported iloc layout for an idat item")
+    e = iloc["items"][iid]["extents"][0]
+    io_, isz, ih, _ = find_child(meta_children(meta, mb), "idat")
+    if ih != 8 or mb[2] != 8:
+        raise PortError("64-bit meta/idat box sizes are not supported")
+    m = bytearray(meta)
+    cm_pos = e["offset_pos"] - 6   # item_ID, cm, data_reference_index, extent_count
+    m[cm_pos + 1] = (m[cm_pos + 1] & 0xF0) | 1
+    osz, lsz = iloc["offset_size"], iloc["length_size"]
+    m[e["offset_pos"]:e["offset_pos"]+osz] = (isz - ih).to_bytes(osz, "big")
+    m[e["length_pos"]:e["length_pos"]+lsz] = len(payload).to_bytes(lsz, "big")
+    end = io_ + isz
+    m[end:end] = payload
+    m[io_:io_+4] = (isz + len(payload)).to_bytes(4, "big")
+    m[mb[0]:mb[0]+4] = (mb[1] + len(payload)).to_bytes(4, "big")
+    return bytes(m)
+
+
+def rebuild_heic(data: bytes, disc, ftyp: bytes, meta: bytes, payloads: Dict[int, bytes]) -> bytes:
+    """Write a new ftyp + meta in front of the photo's own payloads. Untouched payloads stay
+    byte for byte where they were, moved only by the header growth; items in `payloads`
+    (new ones, or existing ones being replaced) go into one mdat appended at the end."""
+    fo, fs, _fh, _ = top_box(data, "ftyp")
+    mo, ms = disc["meta"][0], disc["meta"][1]
+    if fo != 0 or mo < fs:
+        raise PortError("Expected ftyp first and meta after it")
+    old = disc["iloc"]["items"]
+    if any(e["offset"] < mo + ms for it in old.values() if it["construction_method"] == 0
+           for e in it["extents"]):
+        raise PortError("An item payload sits before the end of meta; cannot shift offsets safely")
+    shift = (len(ftyp) - fs) + (len(meta) - ms)
+    head = ftyp + bytes(data[fs:mo])
+    tail = bytes(data[mo + ms:])
+    m = bytearray(meta)
+    niloc = parse_iloc(m, top_box(m, "meta"))
+    if (niloc["offset_size"], niloc["length_size"]) != (4, 4):
+        raise PortError("Unsupported iloc layout; only 4-byte offsets and lengths are handled")
+    cursor = len(head) + len(m) + len(tail) + 8
+    extra = bytearray()
+    for iid, it in sorted(niloc["items"].items()):
+        if it["construction_method"] != 0 or not it["extents"]:
+            continue
+        if iid in payloads:
+            if len(it["extents"]) != 1:
+                raise PortError(f"Item {iid} is not single-extent")
+            e = it["extents"][0]
+            m[e["offset_pos"]:e["offset_pos"]+4] = (cursor + len(extra)).to_bytes(4, "big")
+            m[e["length_pos"]:e["length_pos"]+4] = len(payloads[iid]).to_bytes(4, "big")
+            extra += payloads[iid]
+        elif iid in old:
+            for e, oe in zip(it["extents"], old[iid]["extents"]):
+                m[e["offset_pos"]:e["offset_pos"]+4] = (oe["offset"] + shift).to_bytes(4, "big")
+    if cursor + len(extra) >= 2**32:
+        raise PortError("File too large for 32-bit iloc offsets")
+    result = head + bytes(m) + tail
+    if extra:
+        result += (8 + len(extra)).to_bytes(4, "big") + b"mdat" + bytes(extra)
+
+    # Self-check: every untouched payload re-extracts byte-identical, every new one as written.
+    check = discover_heic(result)
+    for iid, it in old.items():
+        if it["construction_method"] == 0 and iid not in payloads and \
+                extract_item(result, check["iloc"], iid) != extract_item(data, disc["iloc"], iid):
+            raise PortError(f"Self-check failed: item {iid} payload changed")
+    for iid, blob in payloads.items():
+        if extract_item(result, check["iloc"], iid) != blob:
+            raise PortError(f"Self-check failed: item {iid} unreadable")
+    return result
+
+
+def graft_style_graph(target_data: bytes, td, styles_blob: bytes, mn54: bytes, mn54_type: int,
+                      linear_thumb: dict, texture: bool = True):
+    """v0.6.2: give the photo the Photographic Style items inside its OWN item graph.
+
+    Native style files differ from an iPhone 15 photo only by a linear thumbnail, a
+    StyleDeltaMap grid, the styles item, MakerNote 0x54 and two ftyp brands; tiles, HDR,
+    tmap, Exif, mattes, depth and sidecars are the photo's own already. So those are added
+    and nothing else moves: no donor item graph, and any tile layout works as long as the
+    StyleDeltaMap size for the primary is known. Returns (result_bytes, report).
+    """
+    props = td["props"]
+    primary = int(td["primary"])
+    pw, ph = dimensions_for_item(props, primary)
+    size = style_delta_size(pw, ph)
+    if size is None:
+        raise PortError(f"No StyleDeltaMap size known for a {pw}x{ph} primary")
+    dw, dh = size
+    cols, rows = -(-dw // 512), -(-dh // 512)
+    irot = property_for_item(props, primary, "irot")
+    rot = [(irot["index"], True)] if irot is not None else []
+    targets = [primary] + find_items_by_type(td["infos"], "tmap")[:1]
+    mo, ms = td["meta"][0], td["meta"][1]
+    meta = bytes(target_data[mo:mo+ms])
+    ao, _asz, ah, _ = parse_ipco_ipma(meta, top_box(meta, "meta"))["ipma_box"]
+    if int.from_bytes(meta[ao+ah+1:ao+ah+4], "big") & 1:
+        raise PortError("Wide ipma is not supported")
+
+    # Properties, appended so no existing index moves; associated in native order.
+    meta, colr_i = append_ipco_property(meta, STYLE_DELTA_COLR)
+    meta, pixi_i = append_ipco_property(meta, STYLE_PIXI_10BIT)
+    meta, d_ispe = append_ipco_property(meta, _ispe_box(dw, dh))
+    meta, d_auxc = append_ipco_property(meta, _auxc_box(URI_STYLE_DELTA))
+    meta, t_ispe = append_ipco_property(meta, _ispe_box(512, 512))
+    meta, t_hvcc = append_ipco_property(meta, V02_NEUTRAL_DELTA_HVCC)
+    meta, l_ispe = append_ipco_property(meta, linear_thumb["ispe"])
+    l_pixi = pixi_i
+    if linear_thumb["pixi"] != STYLE_PIXI_10BIT:
+        meta, l_pixi = append_ipco_property(meta, linear_thumb["pixi"])
+    meta, l_auxc = append_ipco_property(meta, _auxc_box(URI_LINEAR_THUMB))
+    meta, l_hvcc = append_ipco_property(meta, linear_thumb["hvcC"])
+
+    meta, lt = add_items(meta, [{"key": "lt", "ref_type": "auxl", "ref_to": targets,
+                                 "reuse": [(l_ispe, False)] + rot + [(l_pixi, False), (l_auxc, True),
+                                                                     (l_hvcc, True)]}])
+    meta, tiles = add_items(meta, [{"key": f"t{n}", "reuse": [(t_ispe, True), (colr_i, True), (t_hvcc, True)]}
+                                   for n in range(rows * cols)])
+    tile_ids = [tiles[f"t{n}"] for n in range(rows * cols)]
+    meta, grid = add_items(meta, [{"key": "grid", "item_type": "grid", "ref_type": "auxl",
+                                   "ref_to": targets,
+                                   "reuse": [(colr_i, True), (d_ispe, False)] + rot
+                                   + [(pixi_i, False), (d_auxc, True)]}])
+    meta = append_iref(meta, _ref_box("dimg", grid["grid"], tile_ids))
+    # ImageGrid descriptor: version 0, 16-bit sizes, rows-1, columns-1, width, height.
+    meta = move_item_to_idat(meta, grid["grid"], bytes([0, 0, rows - 1, cols - 1])
+                             + dw.to_bytes(2, "big") + dh.to_bytes(2, "big"))
+    meta, st = add_items(meta, [{"key": "styles", "item_type": "uri ", "item_name": "metadata",
+                                 "content_type": URI_STYLES, "ref_type": "cdsc", "ref_to": targets}])
+
+    exif = int(td["exif_item"])
+    payloads = {lt["lt"]: linear_thumb["sample"], st["styles"]: styles_blob,
+                exif: inject_apple_makernote_tag(extract_item(target_data, td["iloc"], exif),
+                                                 mn54, 0x54, mn54_type)}
+    payloads.update({t: V02_NEUTRAL_DELTA_SAMPLE for t in tile_ids})
+    report = {"graph": "photo", "style_delta_map": [dw, dh, rows, cols],
+              "linear_thumb_item": lt["lt"], "styles_item": st["styles"]}
+    if texture:
+        meta, tex_payloads, summary = add_texture_items(
+            meta, primary, soft_skin_people(target_data, td), film_grain_seed(target_data, td))
+        payloads.update(tex_payloads)
+        report["texture_styles"] = summary
+    else:
+        report["texture_styles"] = "off"
+    ftyp = ftyp_with_style_brands(bytes(target_data[:top_box(target_data, "ftyp")[1]]))
+    return rebuild_heic(target_data, td, ftyp, meta, payloads), report
+
+
+def patch_with_photo_graph(args, target: Path, output: Path, target_data: bytes, td):
+    """`patch --graph photo`: style data as today, item graph from the photo (see
+    graft_style_graph). The styles plist and the 0x54 record still come from a built-in
+    profile; their donor-derived values are a separate open question (facts.md §8)."""
+    if td["thumbnail"] is None and args.linear_thumb == "reuse-thumbnail":
+        raise PortError("Target has no thumbnail to reuse; use --linear-thumb generate")
+    if args.profile:
+        manifest, _ftyp, _meta, retained, mn54 = load_profile(Path(args.profile))
+    else:
+        try:
+            name = select_builtin_profile(len(td["primary_tiles"]), len(td["hdr_tiles"]))
+        except PortError:
+            name = "48-12"   # only its styles plist and 0x54 record are used
+        manifest, _ftyp, _meta, retained, mn54 = load_profile(builtin_profile_bytes(name))
+    styles_blob = retained[int(manifest["donor_styles_item"])]
+    mn54_type = int(manifest.get("smartstyle_makernote_type", 7))
+
+    primary = int(td["primary"])
+    angle = irot_angle_for_item(target_data, td["props"], primary)
+    mirror = imir_axis_for_item(target_data, td["props"], primary)
+    pw, ph = dimensions_for_item(td["props"], primary)
+    lt_w, lt_h = STYLE_LINEAR_THUMB if pw >= ph else STYLE_LINEAR_THUMB[::-1]
+    needs_decode = (args.linear_thumb == "generate" or args.scene_stats in ("target", "tone-only")
+                    or args.light_maps == "target")
+    with tempfile.TemporaryDirectory(prefix="photographic-style-port-") as tmp:
+        work = Path(tmp)
+        decoded = decode_target_primary(target, work) if needs_decode else None
+        if args.linear_thumb == "generate":
+            hvcc, sample, _nal = encode_target_linear_thumbnail(decoded, work, lt_w, lt_h, angle, mirror)
+            linear_thumb = {"sample": sample, "hvcC": hvcc, "ispe": _ispe_box(lt_w, lt_h),
+                            "pixi": STYLE_PIXI_10BIT}
+        else:
+            thumb = int(td["thumbnail"])
+            linear_thumb = {"sample": extract_item(target_data, td["iloc"], thumb),
+                            **{k: property_box_bytes(target_data, td["props"], thumb, k)
+                               for k in ("hvcC", "ispe", "pixi")}}
+        linear = (target_luma_distributions(decoded)
+                  if args.scene_stats in ("target", "tone-only") else None)
+        light_maps = (target_light_maps(decoded, angle, mirror)
+                      if args.light_maps == "target" else None)
+
+    styles_blob, stats_report = apply_scene_statistics(styles_blob, args.scene_stats, linear)
+    maps_report = {"light_maps": "flat"}
+    if light_maps is not None:
+        styles_blob, maps_report = apply_light_maps(styles_blob, light_maps[0], light_maps[1])
+    has_mattes = any(aux_uri_for_item(td["props"], i) in MATTE_URIS.values() for i in td["infos"])
+    if has_mattes:
+        styles_blob, _prev = set_person_masks_valid(styles_blob)
+
+    result, report = graft_style_graph(target_data, td, styles_blob, mn54, mn54_type,
+                                       linear_thumb, texture=args.texture == "on")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(result)
+    report = {"tool_version": VERSION, "target": target.name, "output": output.name,
+              "output_sha256": sha256_bytes(result), "linear_thumb_mode": args.linear_thumb,
+              "person_masks_valid_hint": 1.0 if has_mattes else None,
+              **report, **stats_report, **maps_report}
+    report_json = json.dumps(report, indent=2)
+    if args.report:
+        output.with_suffix(output.suffix + ".report.json").write_text(report_json, encoding="utf-8")
+    if args.zip:
+        with zipfile.ZipFile(output.with_suffix(".zip"), "w", compression=zipfile.ZIP_DEFLATED) as z:
+            z.write(output, arcname=output.name)
+            z.writestr(output.name + ".report.json", report_json)
+    print(f"Created patched HEIC: {output}")
+    print(f"  item graph: the photo's own; StyleDeltaMap {report['style_delta_map'][0]}x"
+          f"{report['style_delta_map'][1]} ({report['style_delta_map'][2]}x{report['style_delta_map'][3]} tiles)")
+    print(f"  linear thumbnail: {args.linear_thumb}; scene statistics: {stats_report['scene_stats']}; "
+          f"light maps: {maps_report['light_maps']}")
+    print(f"  texture/grain (iOS 27): {report['texture_styles']}")
+    print(f"  SHA-256: {report['output_sha256']}")
+
+
 def cmd_patch(args):
     target = Path(args.target)
     output = Path(args.output)
@@ -2770,6 +3055,11 @@ def cmd_patch(args):
         write_add_texture(target, output, args.report, args.zip)
         return
     td = discover_target(target_data)
+    graph = getattr(args, "graph", "auto")
+    if graph == "photo" or (graph == "auto" and style_delta_size(
+            *dimensions_for_item(td["props"], int(td["primary"]))) is not None):
+        patch_with_photo_graph(args, target, output, target_data, td)
+        return
     synth_thumb = td["thumbnail"] is None
     if synth_thumb and args.linear_thumb == "reuse-thumbnail":
         raise PortError("Target has no thumbnail to reuse; use --linear-thumb generate, "
@@ -3494,6 +3784,12 @@ def build_parser():
                    help="Add the iOS 27 Texture/Grain item set (texture_styles + the 2026 "
                         "semantic mattes) so Photos offers the Texture/Grain controls (default "
                         "on); 'off' reproduces the v0.4.4 item graph")
+    a.add_argument("--graph", choices=("auto", "photo", "donor"), default="auto",
+                   help="Item graph: 'photo' adds the style items to the photo's own graph "
+                        "(any tile layout of a 12 MP, 24 MP or front-camera photo); 'donor' "
+                        "moves the photo into a built-in donor graph (48/12 and 45/15 only, "
+                        "the pre-v0.6.2 behaviour); 'auto' (default) uses 'photo' whenever the "
+                        "photo's size is known, otherwise 'donor'")
     a.set_defaults(func=cmd_patch)
 
     a = sub.add_parser("add-texture",

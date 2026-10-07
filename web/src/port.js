@@ -20,13 +20,15 @@ import {
   CLASSIC_MATTE_EMPTY, CLASSIC_MATTE_HVCC,
 } from "./texture.js";
 
+import { graftPatch, styleDeltaSize } from "./graft.js";
+
 const sameBytes = (a, b) => !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
 import {
   applySceneStatistics, applyLightMaps, setPersonMasksValid, buildLightMaps,
   linearLumaFromRgb, LIGHTMAP_N,
 } from "./styles.js";
 
-export const VERSION = "0.6.1-web";
+export const VERSION = "0.6.2-web";
 
 // Every rejection a visitor can hit reduces to one of two things: the file is not a
 // HEIC at all, or it is a HEIC this build cannot handle. Nothing else is actionable.
@@ -40,6 +42,21 @@ export function selectProfile(index, primaryTiles, hdrTiles) {
 }
 
 /**
+ * v0.6.2: the profile for a photo. With the photo's own item graph only the profile's styles
+ * plist and 0x54 record are used, so any layout of a known size works; like the Python
+ * build, a layout without its own profile uses 48-12.
+ */
+export function profileFor(index, d) {
+  try {
+    return selectProfile(index, d.primaryTiles.length, d.hdrTiles.length);
+  } catch (e) {
+    const [w, h] = dimensionsForItem(d.props, d.primary);
+    if (styleDeltaSize(w, h) && index["48-12"]) return "48-12";
+    throw e;
+  }
+}
+
+/**
  * @param targetData  Uint8Array of the source HEIC
  * @param profile     from loadProfile()
  * @param opts.decode async (targetData, {width,height,angle,mirror}) -> Uint8Array RGB,
@@ -50,6 +67,13 @@ export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
   if (td.hdrGrid === null || !td.hdrTiles.length) throw new Error(UNSUPPORTED);
   if (td.thumbnail === null || td.exifItem === null) throw new Error(UNSUPPORTED);
+
+  // v0.6.2: the photo's own item graph whenever its StyleDeltaMap size is known.
+  if (opts.graph !== "donor" && styleDeltaSize(...dimensionsForItem(td.props, td.primary))) {
+    const out = await graftPatch(targetData, profile, opts);
+    out.report.version = VERSION;
+    return out;
+  }
 
   const { manifest } = profile;
   let meta = profile.meta;

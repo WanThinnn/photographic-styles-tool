@@ -3,7 +3,7 @@
 How `photographic_style_port.py` changes the metadata of a normal HEIC so that Apple Photos
 offers the Photographic Styles palette (风格 / 调色板), Portrait editing and, on iOS 27,
 Texture/Grain (质感 / 颗粒). It covers everything tried from the early V-series experiments to
-v0.6.1: what worked, what failed, and what is still open. Usage, testing and the version history
+v0.6.2: what worked, what failed, and what is still open. Usage, testing and the version history
 are in the [README](README.md).
 
 **Status labels**
@@ -65,11 +65,11 @@ understood or not yet in its final form.
 | HDR gain-map tiles + `hvcC` | The photo's own | Photo's own | ☑️ | HDR rendering not tested on its own |
 | HDR XMP sidecar (headroom) | The photo's own | Photo's own | ☑️ | – |
 | `tmap` geometry (`ispe`/`irot`) | The photo's own, or derived from the primary | Photo's own | ☑️ | – |
-| `tmap` payload (gain-map parameters) | The photo's own (since v0.5.1); donor's only for photos without a `tmap` | Photo's own | ☑️ | Photos without a `tmap` still use the donor's (§8); HDR result not phone-tested |
+| `tmap` payload (gain-map parameters) | The photo's own (since v0.5.1); a photo without one keeps none (v0.6.2) | Photo's own | ✅ | Donor's only on the `--graph donor` fallback |
 | Ordinary thumbnail | The photo's own, or encoded from the primary if missing | Photo's own / map | ✅ | – |
 | Exif, Make/Model unchanged | The photo's own | Photo's own | ✅ | – |
 | Orientation `irot` / `imir` | The photo's own | Photo's own | ✅ | – |
-| Item graph (IDs, `iref`, `ipma`, `ipco`, grids) | **Donor template** | Donor | ✅ | Should be generated from the photo's layout; limits support to two layouts (§8) |
+| Item graph (IDs, `iref`, `ipma`, `ipco`, grids) | The photo's own, plus the style items (v0.6.2, §3); donor template only for sizes without a known StyleDeltaMap | Photo's own / format | ✅ | 48 MP photos (640-pixel delta tiles) not handled |
 | `mdat` and `iloc` offsets | Rebuilt | Format | ✅ | – |
 
 **Style palette**
@@ -82,7 +82,7 @@ understood or not yet in its final form.
 | Styles `1` coefficients | Identity | Neutral | ✅ | Native values not reproduced (affects the look, §9) |
 | Styles `3` tone curve | Identity | Neutral | ✅ | Native values not reproduced (affects the look, §9) |
 | Styles `c`/`d` light maps, flat (default) | Constants | Neutral | ✅ | – |
-| Styles `c`/`d` light maps, `--light-maps target` | Calculated from the photo | Map | ✅ | 180° rule only observed at `irot = 270` |
+| Styles `c`/`d` light maps, `--light-maps target` | Calculated from the photo | Map | ✅ | Stored orientation, no flip (fixed in v0.6.2, §4.1) |
 | Styles `6` tone statistics | Calculated from the photo | Value | ☑️ | – |
 | Styles `6` `highKey` | **Donor's** | Donor | 🔍 | Derivation unknown (§8) |
 | Styles `i` (HDR range, `Gain`) | **Donor's** | Donor | 🔍 | Neither follows headroom or generation alone (§8) |
@@ -91,7 +91,7 @@ understood or not yet in its final form.
 | Styles `4`, `5`, `j` | **Donor's** | Donor | 🔍 | All three vary between native files; unknown (§8) |
 | Styles `k` / `l` | Not written | – | ✅ | Not needed; `False` in every native file that has them |
 | Delta map | Neutral constant tile | Neutral | ✅ | – |
-| Linear thumbnail, `generate` | Encoded from the photo with its own `hvcC` | Map | ✅ | irot 90/270 stored 180° off; no visible effect (§4.4) |
+| Linear thumbnail, `generate` | Encoded from the photo with its own `hvcC` | Map | ✅ | irot 90/270 were stored 180° off up to v0.6.1, causing a glow on some photos; fixed (§4.4) |
 | Linear thumbnail, `reuse-thumbnail` | The photo's own thumbnail | Photo's own | ✅ | – |
 
 **People layers and Portrait**
@@ -177,7 +177,7 @@ Sorted by the five kinds in §1. The donor row is the open issue in §8.
 | Maps calculated from the photo | #3 linear thumbnail; light maps with `--light-maps target`; a synthesized thumbnail when the photo has none |
 | Neutral defaults | Identity coefficients and tone curve; flat light maps (default); #4 neutral delta map; #11/#12 empty 2026 mattes; an exactly empty frame in every matte slot the photo does not fill |
 | Taken unchanged from a native capture | #10 `texture_styles`, including `HardwareModel` and a fixed `FilmGrainSeed` (both 🔍, §8) |
-| **Donor** | Item-graph template; `tmap` payload for photos without one; styles `i`, `h`, `4`, `highKey`, `2`, `5`, `j` |
+| **Donor** | Styles `i`, `h`, `4`, `highKey`, `2`, `5`, `j` |
 
 ---
 
@@ -186,17 +186,41 @@ Sorted by the five kinds in §1. The donor row is the open issue in §8.
 1. **Choose a route.** A photo with no style data gets the full port. A photo that already has
    native style data (iPhone 16/17) only gets Texture/Grain added (§5.4). A photo that already
    has `texture_styles` is refused.
-2. **Pick a template** by tile layout: `48-12` (48 primary / 12 HDR tiles, 3024×4032) or `45-15`
-   (45 / 15, 4284×5712). Any other layout is refused.
-3. **Move the photo in.** The photo's primary, HDR and thumbnail tiles go into the template's
-   item slots together with their `hvcC` and `colr`. The photo's orientation and `tmap`
-   geometry replace the template's.
-4. **Keep the photo's Exif** and insert MakerNote `0x54` (§3.3).
+2. **Keep the photo's own item graph** (v0.6.2, default). A native iPhone 16+ file differs from
+   an iPhone 15 photo only by a linear thumbnail, a StyleDeltaMap grid, the styles item,
+   MakerNote `0x54` and the `ftyp` brands `MiHA`/`heix`. Tiles, HDR, `tmap`, Exif, mattes, depth
+   and sidecars are already the photo's own, so they stay where they are, byte for byte.
+3. **Add the style items** with the property bytes every native file uses (identical in 31
+   native files and both donors): linear thumbnail (`ispe`, `pixi` 3×10-bit, `auxC`, `hvcC`,
+   primary `irot`; `auxl` → primary + `tmap`); StyleDeltaMap grid (`colr` "Display P3 Linear"
+   ICC, `ispe`, `pixi`, `auxC`, primary `irot`; descriptor in `idat`; `dimg` → 512×512 tiles with
+   `ispe`/`colr`/`hvcC`); styles `uri` item named `metadata` (`cdsc` → primary + `tmap`). The
+   StyleDeltaMap size comes from the native table below; a photo of another size falls back to
+   the donor graph.
+4. **Insert MakerNote `0x54`** into the photo's Exif (§3.3).
 5. **Write the style data:** the styles plist (§4.1), a neutral delta map (§4.2) and a linear
    thumbnail made from the photo (§4.3).
-6. **Carry people and Portrait data:** the photo's mattes, depth map and every XMP sidecar (§6).
-7. **Add the Texture/Grain set** (§5).
-8. **Rebuild the file:** one fresh `mdat`, with every `iloc` offset rewritten.
+6. **Add the Texture/Grain set** (§5), with Soft Skin data when the photo has people (§7).
+7. **Rebuild the file:** new `ftyp` and `meta` in front, every original payload in place
+   (offsets shift by the header growth), new payloads in one appended `mdat`, then a
+   self-check.
+
+| Primary (stored) | StyleDeltaMap | Tiles |
+|---|---|---|
+| 4032×3024 (12 MP) | 2880×2160 | 6×5 |
+| 5712×4284 (24 MP) | 4096×3072 | 8×6 |
+| 3088×2316 (front) | 2240×1680 | 5×4 |
+| portrait-stored | the same, swapped | |
+
+8064×6048 (48 MP) natives use 640-pixel delta tiles and are not handled yet.
+
+**Phone A/B** (v0.6.2): 48/12 photos with and without an encoder, a Portrait photo with a face
+(Portrait, people layers, Soft Skin), and 24 MP / 12 MP re-saved photos without thumbnail or
+`tmap` all work with the photo's own graph. ✅
+
+**Donor graph** (`--graph donor`, the only route up to v0.6.1): pick a template by tile layout
+(`48-12` or `45-15`), move the photo's tiles, thumbnail, orientation, `tmap`, mattes, depth and
+sidecars into its item slots with their `hvcC`/`colr`, then write one fresh `mdat`.
 
 ### 3.1 Payloads travel with their decoder configuration
 A compressed payload and its `hvcC` (and `colr`, where it has one) must always move together.
@@ -273,12 +297,12 @@ work.
 - `ToneMappedImage` holds percentiles of **linear-light** display luma (mean ratio 0.980,
   sd 0.076). v0.3.0 wrote gamma-encoded values, about 2× too high; that has since been fixed.
 - `LinearImage` is the same signal × **0.166** (leave-one-out MAE 0.013).
-- The light maps are stored rotated 180° from the primary's stored orientation, track linear
-  luma, and clamp at 0.040741. The fits are `c = clamp(0.7774·L + 0.0294)` and
-  `d = clamp(0.6542·L − 0.0128)`, with leave-one-out MAE 0.022 / 0.037 against 0.146 / 0.115
-  for the flat values.
-- All calibration files had `irot = 270`, so the 180° rule is untested at other angles.
-  🔍
+- The light maps are stored in the primary's stored orientation, track linear luma, and clamp
+  at 0.040741. The fits are `c = clamp(0.7774·L + 0.0294)` and `d = clamp(0.6542·L − 0.0128)`,
+  with leave-one-out MAE 0.022 / 0.037 against 0.146 / 0.115 for the flat values.
+- Orientation re-checked in v0.6.2 on 30 native files at `irot` 0, 180 and 270: the native
+  `c` map matches the stored-orientation sample as is (r 0.94–0.99). The "180° rule" used up to
+  v0.6.1 only cancelled the swapped 90/270 mapping (§4.4) and left 0/180 maps upside down. ☑️
 
 ### 4.2 Delta map: neutral, never the donor's
 - Native delta maps are 10-bit RGB centred on 512 (about 470–560). Amplified, they show the
@@ -308,10 +332,14 @@ work.
 - `tmap` states its size in **display** orientation and has its own `irot`. Without updating
   it, Windows Photos (which renders through `tmap`) showed a black band under landscape ports.
   v0.4.1 copies the photo's `tmap` geometry, or derives it from the primary. ☑️
-- **Known inversion** 🔍: `raw_orientation_filters` swaps irot 90 and 270, so linear
-  thumbnails for those photos are stored 180° off. A phone A/B showed no visible difference,
-  so the mapping is kept. The 180° light-map rule was calibrated through the same mapping; if
-  either changes, re-derive both, and update `web/src/decode.js` to match.
+- **90/270 inversion, fixed in v0.6.2** ✅: up to v0.6.1 `raw_orientation_filters` (and
+  `web/src/decode.js`) swapped irot 90 and 270, so linear thumbnails of those photos were
+  stored 180° off. An early A/B showed nothing, but IMG_5860 (irot 270, sky above trees) got a
+  glow in the sky and foliage with both the donor and the photo graph; the corrected rotation
+  removed it, and IMG_5037 still passed. Checked against 30 native files: Apple's own linear
+  thumbnails match the corrected stored-orientation sample at every irot (r 0.83–0.97), never
+  the 180°-turned one.
+- With the photo's own graph (v0.6.2) the photo's `irot`, `imir` and `tmap` are simply kept.
 
 ---
 
@@ -488,7 +516,7 @@ headroom, `tmap` parameters, lenses and Exif.
 
 | Donor data | What is known | Likely resolution | Status |
 |---|---|---|---|
-| **`tmap` payload** (gain-map headroom, gain min/max, gamma, offsets) | Up to v0.5.0 every port paired the donor's parameters with the photo's gain map, so HDR highlights used the wrong curve. **v0.5.1 copies the photo's own.** Re-saved photos without a `tmap` still get the donor's. | **Photo's own data** (done). Photos without a `tmap`: build one from the XMP headroom. | ☑️ fixed in v0.5.1 for photos with a `tmap`; 🔍 for photos without one; HDR result not phone-tested |
+| **`tmap` payload** (gain-map headroom, gain min/max, gamma, offsets) | Up to v0.5.0 every port paired the donor's parameters with the photo's gain map, so HDR highlights used the wrong curve. **v0.5.1 copies the photo's own.** Re-saved photos without a `tmap` still get the donor's. | **Photo's own data** (done). Since v0.6.2 a photo without a `tmap` keeps none, as it came. | ✅ v0.5.1 / v0.6.2; re-saved photos without `tmap` phone-tested |
 | **`h`** | Exactly `i.Gain / 4` in all 30 files | **Calculated**, once `Gain` is resolved | Rule known |
 | **`i.OriginalRangeMax` / `Min`** | Rises with HDR headroom but is not a function of it: iPhone 18 Pro Max shots reach ~1.0 at headroom 3.4–3.9, an iPhone 17 shot at 4.84 gives 0.31, one at 3.07 gives 0.02. Min is −0.16…0. | Depends on the scene; not calculable from headroom alone | 🔍 |
 | **`i.Gain`** | 14.6 (iOS 18.2); 8.4–9.8 (iOS 26.5) with one 2.29; 7.7–10.6 (iOS 27). Not a per-generation constant. | Unknown | 🔍 |
@@ -499,12 +527,12 @@ headroom, `tmap` parameters, lenses and Exif.
 | **`j`** | 1.0 up to iOS 18.2; 1.0–1.33 on iOS 26.5/27 | Unknown | 🔍 |
 | **MakerNote `0x54`** | Members `1`/`2` are 0 in every photo shot with the pad untouched and −0.84…0.99 in Apple's demo shots: very likely the Tone/Color pad position at capture. `4` (1 or 11) and `6` (4 or 8) vary too. | The port's 0/0 is the neutral pad, a **neutral default**; `4`, `6` unknown | ☑️ `1`/`2`; 🔍 `4`, `6` |
 | **Donor matte bytes** (slots the photo does not fill) | Near-empty but not empty: up to 9/255, faint donor sky | **Neutral default**: an exactly empty frame on the slots' shared `hvcC` | ✅ done in v0.6.1 |
-| **Item-graph template** (item IDs, `iref`, `ipma`, `ipco`, grid descriptors) | Standard HEIF; the code already builds matte, depth, sidecar and texture items from scratch | **Format declarations** generated from the photo's layout; also removes the two-layout limit | Largest task |
+| **Item-graph template** (item IDs, `iref`, `ipma`, `ipco`, grid descriptors) | Native files add only five things to an iPhone 15 photo's graph (§3) | **The photo's own graph** plus those items, with native format declarations; the two-layout limit goes with it | ✅ done in v0.6.2 (phone-tested); donor graph kept as a fallback for unknown sizes |
 | **`HardwareModel = iPhone19,2`** | The only field naming a device other than the photo's own; the iPhone 15 Pro value causes white glow | Find a setting that renders correctly without it, or document it as an exception | 🔍 |
 | **`FilmGrainSeed = 92`** | Same grain pattern on every port; native photos all differ (6–264 across 15 iOS 27 files) | **Calculated** per photo: CRC-32 of the first primary tile mod 256 | ✅ done in v0.6.1 |
 
 Done: the `tmap` copy (v0.5.1), empty matte slots and per-photo `FilmGrainSeed` (v0.6.1).
-Next: the generated item graph. `4`, `5`, `j`, `highKey`, `Gain` and `OriginalRangeMax`
+The item graph followed in v0.6.2. `4`, `5`, `j`, `highKey`, `Gain` and `OriginalRangeMax`
 do not follow anything measured so far; more random photos will not settle them, controlled
 captures (same scene, one setting changed) might. New tile layouts seen in native files: 45/28,
 35/12 and 54/15.

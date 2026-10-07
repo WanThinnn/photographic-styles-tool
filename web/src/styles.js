@@ -74,7 +74,8 @@ function setHalf(view, value) {
 
 /** Build the 32x32 FP16 c/d maps from a linear-luma grid in stored orientation. */
 export function buildLightMaps(linearGrid) {
-  const grid = Array.from(linearGrid).reverse(); // rot180 == reversing a row-major square
+  // Native maps use the stored orientation as is; see target_light_maps in Python.
+  const grid = Array.from(linearGrid);
   const make = (slope, intercept) =>
     packFloat16LE(grid.map((v) => Math.max(LIGHTMAP_FLOOR, Math.min(1, slope * v + intercept))));
   return [make(C_MAP_SLOPE, C_MAP_INTERCEPT), make(D_MAP_SLOPE, D_MAP_INTERCEPT)];

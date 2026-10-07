@@ -378,7 +378,7 @@ const infeBox = (iid, itemType = "hvc1", contentType = null, name = "") => {
   return box("infe", concat(parts));
 };
 
-const refBox = (type, from, toIds) =>
+export const refBox = (type, from, toIds) =>
   box(type, concat([be(from, 2), be(toIds.length, 2), ...toIds.map((t) => be(t, 2))]));
 
 export const auxcBox = (uri) => {

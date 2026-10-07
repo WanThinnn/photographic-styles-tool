@@ -96,8 +96,9 @@ export const STRINGS = {
       + "control) won’t have it after processing either.",
     "g.4": "The tool is at the functionality stage: the look of styles and the detail of "
       + "Texture and Grain differ from a native photo, which is expected. Fine-tuning comes later.",
-    "g.5": "Known issue: Soft Skin currently looks the same as Standard. More sample photos "
-      + "are needed to analyze it.",
+    "g.5": "Soft Skin works when the original carries Apple’s own people data (face regions, "
+      + "skin and Portrait masks), as Portrait-mode photos and iPhone 16+ photos of people do. "
+      + "Faces are never detected, so other photos keep a Soft Skin that looks like Standard.",
     "g.6": "The output HEIC does not include the Live Photo’s MOV video. To keep the "
       + "motion, on a computer (PC or Mac) copy the original’s matching MOV and rename it to the "
       + "new HEIC’s file name.",
@@ -170,7 +171,9 @@ export const STRINGS = {
       + "处理后也不会有。",
     "g.4": "当前处于可用性验证阶段：风格效果以及质感/颗粒的细节与原生照片存在差异，"
       + "属于预期情况，微调会在之后进行。",
-    "g.5": "已知问题：“柔肤”目前与“标准”看起来没有差别，有待更多样本进一步分析。",
+    "g.5": "原图本身带有 Apple 的人物数据（人脸区域、皮肤遮罩和人像遮罩）时，“柔肤”可以生效，"
+      + "人像模式照片和 iPhone 16 及以后机型拍的人物照片都有这些数据。本工具不会自行检测人脸，"
+      + "其他照片的“柔肤”仍与“标准”看起来一样。",
     "g.6": "生成的 HEIC 不包含实况照片对应的 MOV 视频。若要保留动态画面，需在电脑（PC 或 Mac）"
       + "上将原文件对应的 MOV 手动复制一份，并重命名为与新 HEIC 相同的文件名。",
 

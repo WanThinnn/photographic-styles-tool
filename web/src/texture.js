@@ -9,7 +9,9 @@ import { topBox, metaChildren, findChild, be, concat } from "./box.js";
 import {
   discoverHeic, parseIloc, parseIinf, parseIpcoIpma, extractItem, propertyForItem,
   auxUriForItem, findItemsByType, appendIpcoProperty, addItems, auxcBox,
+  propertyBoxBytes, dimensionsForItem, irotAngleForItem, MATTE_URIS,
 } from "./heif.js";
+import { buildBplist, BplistReal } from "./bplist.js";
 
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const hex = (s) => Uint8Array.from(s.match(/../g), (h) => parseInt(h, 16));
@@ -52,15 +54,191 @@ const MATTE_XMP = utf8(
   + "   </rdf:RDF>\n"
   + "</x:xmpmeta>\n");
 
+// v0.6.0: Soft Skin. Port of soft_skin_people & co. in photographic_style_port.py; see the
+// comment there. iOS 27 smooths skin per face from TextureStylePostProcessedPeopleData plus
+// one semanticpersoninstances matte per face, and only when the skin v2 / face skin / person
+// mattes are real. Everything comes from the photo: its face-region XMP, semanticskinmatte
+// and portraiteffectsmatte. Values are rounded and typed exactly as the Python build writes
+// them, so both produce the same bytes.
+const URI_PERSON_INSTANCES = "tag:apple.com,2026:photo:aux:semanticpersoninstances";
+const SOFT_SKIN_SKIN_URIS = ["semanticskinmattev2", "semanticfaceskinmatte"]
+  .map((n) => `tag:apple.com,2026:photo:aux:${n}`);
+const SOFT_SKIN_PERSON_URI = "tag:apple.com,2026:photo:aux:semanticpersonmatte";
+const SOFT_SKIN_INSTANCE_KEYS = ["FSINCInstanceMask9",
+  ...Array.from({ length: 9 }, (_, i) => `FSINCInstanceMask${i}`)];
+const TEXTURE_STYLES_HEADER = [["Preset", "Standard"], ["CaptureType", "LF"],
+  ["CaptureMode", "Still"], ["PortType", "PortTypeBack"], ["HardwareModel", "iPhone19,2"],
+  ["TextureStylePeopleDataVersion", 3], ["FilmGrainSeed", 92]];
+// Median face layout of 14 native iOS 27 Soft Skin faces; see SOFT_SKIN_LANDMARKS in Python.
+const SOFT_SKIN_LANDMARKS = [
+  -0.3411, -0.1971, -0.1456, -0.1813, -0.2857, -0.1842, -0.2046, -0.183, -0.2917, -0.2316,
+  -0.2028, -0.2305, -0.2593, -0.2173, 0.3462, -0.216, 0.1382, -0.1951, 0.2886, -0.1967,
+  0.2046, -0.1939, 0.2885, -0.2529, 0.1912, -0.2427, 0.2363, -0.2343, -0.4396, -0.3135,
+  -0.2977, -0.3602, -0.1383, -0.3263, -0.1331, -0.3882, -0.3011, -0.4217, -0.4498, -0.3449,
+  0.4441, -0.3325, 0.2915, -0.3779, 0.133, -0.3542, 0.1279, -0.4186, 0.2995, -0.4409, 0.4506,
+  -0.366, -0.188, 0.3426, -0.1588, 0.2971, -0.1076, 0.2627, -0.0523, 0.2449, -0.0037, 0.253,
+  0.045, 0.2402, 0.1087, 0.2598, 0.1666, 0.2991, 0.2101, 0.335, 0.1474, 0.3798, 0.0745,
+  0.4022, -0.0015, 0.4111, -0.0758, 0.401, -0.1437, 0.3733, -0.0008, 0.3182, -0.0007, 0.3325,
+  -0.0845, 0.3189, 0.0861, 0.3152, -0.0835, 0.3274, 0.0864, 0.3322, -0.0079, -0.2384, -0.0096,
+  -0.1509, -0.0097, -0.0697, -0.0126, 0.0174, 0.1254, 0.1286, 0.0584, 0.1219, -0.0088, 0.1251,
+  -0.0673, 0.1186, -0.1329, 0.1264, 0.1241, -0.0042, -0.1267, -0.0032, 0.1102, 0.054, -0.1153,
+  0.0489, 0.6088, -0.1704, 0.6101, -0.0178, 0.6033, 0.1255, 0.5716, 0.2813, 0.5101, 0.4279,
+  0.4194, 0.5368, 0.2905, 0.6203, 0.1554, 0.6812, -0.0025, 0.7043, -0.1426, 0.6773, -0.2791,
+  0.6185, -0.384, 0.5307, -0.4829, 0.4244, -0.5531, 0.2924, -0.5871, 0.1388, -0.6052, -0.0192,
+  -0.6, -0.1667];
+const SOFT_SKIN_ROI_PER_XMP = [0.9682, 0.967];
+const SOFT_SKIN_SKIN_ROI = 1.8;
+const SOFT_SKIN_FACE_COLOR = [0.6843, 0.5275, 0.4353];
+const SOFT_SKIN_SMOOTH_COLOR = [0.6651, 0.5179, 0.4315];
+const SOFT_SKIN_ROUGHNESS = 0.0121;
+const SOFT_SKIN_EYE_COLOR = [0.5776, 0.4579, 0.3829];
+const SOFT_SKIN_EYE_VARIANCE = 0.0052;
+
+const R = (v) => new BplistReal(v);
+const r6 = (x) => Math.floor(x * 1e6 + 0.5) / 1e6;
+const radians = (deg) => deg * (Math.PI / 180);
+// Python's float % (floored), which JS % (truncated) is not.
+const wrap = (deg) => { const a = deg + 180; return a - 360 * Math.floor(a / 360) - 180; };
+const clamp = (c) => Math.min(1, Math.max(0, c));
+const obj = (pairs) => new Map(pairs);
+
+/** Face regions from the photo's MWG region XMP, in stored orientation. */
+export function xmpFaceRegions(data, d) {
+  for (const iid of [...d.infos.keys()].sort((a, b) => a - b)) {
+    if (d.infos.get(iid).type !== "mime") continue;
+    let xmp;
+    try { xmp = new TextDecoder().decode(extractItem(data, d.iloc, iid)); } catch { continue; }
+    if (!xmp.includes("mwg-rs:Regions")) continue;
+    const faces = [];
+    for (const [, li] of xmp.matchAll(/<rdf:li rdf:parseType="Resource">([\s\S]*?)<\/rdf:li>/g)) {
+      if (!li.includes("<mwg-rs:Type>Face</mwg-rs:Type>")) continue;
+      const area = {};
+      let ok = true;
+      for (const tag of ["x", "y", "w", "h"]) {
+        const m = li.match(new RegExp(`<stArea:${tag}>([^<]+)</stArea:${tag}>`));
+        if (!m) { ok = false; break; }
+        area[tag] = parseFloat(m[1]);
+      }
+      if (!ok) continue;
+      const angle = (tag) => {
+        const m = li.match(new RegExp(`<apple-fi:${tag}>([^<]+)</apple-fi:${tag}>`));
+        return m ? parseFloat(m[1]) : 0;
+      };
+      faces.push({ ...area, yaw: angle("AngleInfoYaw"), roll: angle("AngleInfoRoll") });
+    }
+    return faces;
+  }
+  return [];
+}
+
+function softSkinPeopleEntry(face, index, irot, width, height) {
+  const box = (x, y, w, h) => {
+    const x0 = clamp(x), y0 = clamp(y), x1 = clamp(x + w), y1 = clamp(y + h);
+    return obj([["y", R(r6(y0))], ["x", R(r6(x0))], ["width", R(r6(x1 - x0))], ["height", R(r6(y1 - y0))]]);
+  };
+  const fw = face.w * SOFT_SKIN_ROI_PER_XMP[0], fh = face.h * SOFT_SKIN_ROI_PER_XMP[1];
+  const scale = fw * width;
+  const theta = radians(face.roll);
+  const c = Math.cos(theta), s = Math.sin(theta);
+  const marks = [];
+  for (let k = 0; k < SOFT_SKIN_LANDMARKS.length; k += 2) {
+    const u = SOFT_SKIN_LANDMARKS[k], v = SOFT_SKIN_LANDMARKS[k + 1];
+    marks.push(obj([["point", obj([
+      ["x", R(r6(clamp((face.x * width + (u * c - v * s) * scale) / width)))],
+      ["y", R(r6(clamp((face.y * height + (u * s + v * c) * scale) / height)))],
+    ])], ["error", R(0.02)]]));
+  }
+  const side = SOFT_SKIN_SKIN_ROI * scale;
+  const reals = (a) => a.map(R);
+  const full = () => obj([["y", R(0)], ["x", R(0)], ["width", R(1)], ["height", R(1)]]);
+  return obj([
+    ["faceSkinROI", box(face.x - side / 2 / width, face.y - side / 2 / height, side / width, side / height)],
+    ["faceID", index],
+    ["faceYaw", R(r6(radians(wrap(face.yaw))))],
+    ["faceROI", box(face.x - fw / 2, face.y - fh / 2, fw, fh)],
+    ["imageStats", obj([
+      ["Mattify", obj([["SkipPerson", false], ["HighlightsToMaskRatio", R(0)], ["faceID", index],
+        ["AverageFaceColor", reals(SOFT_SKIN_FACE_COLOR)]])],
+      ["SkinSmoothingStandalone", obj([["faceID", index],
+        ["SkinSmoothAverageFaceColour", reals(SOFT_SKIN_SMOOTH_COLOR)],
+        ["SkinSmoothSkipPerson", false], ["SkinSmoothFaceRoughness", R(SOFT_SKIN_ROUGHNESS)]])],
+      ["UnderEyeBrightening", obj([["faceID", index], ["RightEyeIsBiModal", false],
+        ["LeftEyeLumaVariance", R(SOFT_SKIN_EYE_VARIANCE)], ["LeftEyeIsBiModal", false],
+        ["LeftEyeAverageColor", reals(SOFT_SKIN_EYE_COLOR)],
+        ["RightEyeAverageColor", reals(SOFT_SKIN_EYE_COLOR)],
+        ["RightEyeLumaVariance", R(SOFT_SKIN_EYE_VARIANCE)]])],
+    ])],
+    ["faceLandmarkType", 1],
+    ["faceUnitOfAngle", 1],
+    ["instanceROI", full()],
+    ["instanceMaskReferenceKey", SOFT_SKIN_INSTANCE_KEYS[index]],
+    ["faceROIAndLandmarksROIRelativeScalingROI", full()],
+    ["facePitch", R(0)],
+    ["faceRoll", R(r6(-radians(wrap(face.roll - irot))))],
+    ["faceLandmarks", marks],
+  ]);
+}
+
+/**
+ * Everything Soft Skin needs, taken from the photo, or null when the photo lacks any of it
+ * (face regions, semanticskinmatte, portraiteffectsmatte). null keeps the v0.5 output.
+ */
+export function softSkinPeople(data, d) {
+  const faces = xmpFaceRegions(data, d);
+  if (!faces.length || faces.length > SOFT_SKIN_INSTANCE_KEYS.length) return null;
+  const found = new Map();
+  for (const iid of d.infos.keys()) {
+    const uri = auxUriForItem(d.props, iid);
+    if ((uri === MATTE_URIS.semanticskinmatte || uri === MATTE_URIS.portraiteffectsmatte)
+        && !found.has(uri)) found.set(uri, iid);
+  }
+  const sources = new Map();
+  for (const [uri, iid] of found) {
+    const src = { payload: extractItem(data, d.iloc, iid) };
+    for (const t of ["ispe", "pixi", "hvcC"]) {
+      src[t] = propertyBoxBytes(data, d.props, iid, t);
+      if (!src[t]) return null;
+    }
+    sources.set(uri, src);
+  }
+  const skin = sources.get(MATTE_URIS.semanticskinmatte);
+  const person = sources.get(MATTE_URIS.portraiteffectsmatte);
+  if (!skin || !person) return null;
+  const [width, height] = dimensionsForItem(d.props, d.primary);
+  const irot = irotAngleForItem(data, d.props, d.primary);
+  const root = new Map();
+  for (const [key, value] of TEXTURE_STYLES_HEADER) {
+    root.set(key, value);
+    if (key === "CaptureMode")
+      root.set("TextureStylePostProcessedPeopleData",
+        faces.map((f, i) => softSkinPeopleEntry(f, i, irot, width, height)));
+  }
+  return {
+    faces: faces.length,
+    texture: buildBplist(root),
+    mattes: new Map([...SOFT_SKIN_SKIN_URIS.map((u) => [u, skin]), [SOFT_SKIN_PERSON_URI, person]]),
+    instances: faces.map((_, i) => [SOFT_SKIN_INSTANCE_KEYS[i], person]),
+  };
+}
+
+function softSkinInstanceXmp(key) {
+  const xmp = new TextDecoder().decode(MATTE_XMP);
+  const marker = "         <fsincMattes:FSINCMatteVersion>";
+  return utf8(xmp.replace(marker,
+    `         <fsincMattes:InstanceMaskReferenceKey>${key}</fsincMattes:InstanceMaskReferenceKey>\n`
+    + marker));
+}
+
 export function hasTexture(infos) {
   return [...infos.values()].some((i) => i.uri === URI_TEXTURE_STYLES);
 }
 
 /**
- * Add every missing 2026 matte (with its XMP sidecar) and the texture_styles item.
+ * Add every missing 2026 matte (with its XMP sidecar) and the texture_styles item; with
+ * people (softSkinPeople), also what Soft Skin needs.
  * Returns [meta, Map(itemId -> payload), summary].
  */
-export function addTextureItems(meta, primary) {
+export function addTextureItems(meta, primary, people = null) {
   const props0 = parseIpcoIpma(meta, topBox(meta, "meta"));
   if (props0.flags & 1) throw new Error("Wide ipma is not supported for adding Texture/Grain items");
   const infos = parseIinf(meta, topBox(meta, "meta"));
@@ -69,6 +247,20 @@ export function addTextureItems(meta, primary) {
   const targets = [primary, ...findItemsByType(infos, "tmap").slice(0, 1)];
   const irot = propertyForItem(props0, primary, "irot");
   const payloads = new Map();
+  // A source matte's ispe/pixi/hvcC are appended once, then shared by every item using it.
+  const sourceProps = new Map();
+  const sourceAssoc = (src) => {
+    if (!sourceProps.has(src)) {
+      const idx = [];
+      for (const b of [src.ispe, src.pixi, src.hvcC]) {
+        let i;
+        [meta, i] = appendIpcoProperty(meta, b);
+        idx.push(i);
+      }
+      sourceProps.set(src, idx);
+    }
+    return sourceProps.get(src);
+  };
 
   if (missing.length) {
     // auxC (descriptive) must precede irot (transformative), so associate in native order.
@@ -77,16 +269,23 @@ export function addTextureItems(meta, primary) {
     [meta, pixiI] = appendIpcoProperty(meta, MATTE_PIXI);
     [meta, hvccI] = appendIpcoProperty(meta, MATTE_HVCC);
     const specs = [];
+    const filled = new Map();
     for (const uri of missing) {
+      const src = people ? people.mattes.get(uri) : undefined;
+      let [mIspe, mPixi, mHvcc] = [ispeI, pixiI, hvccI];
+      if (src) {
+        [mIspe, mPixi, mHvcc] = sourceAssoc(src);
+        filled.set(uri, src.payload);
+      }
       let auxcI;
       [meta, auxcI] = appendIpcoProperty(meta, auxcBox(uri));
-      const reuse = [[ispeI, false], [pixiI, false], [auxcI, true], [hvccI, true]];
+      const reuse = [[mIspe, false], [mPixi, false], [auxcI, true], [mHvcc, true]];
       if (irot) reuse.push([irot.index, true]);
       specs.push({ key: uri, reuse, refType: "auxl", refTo: targets });
     }
     let mattes, sidecars;
     [meta, mattes] = addItems(meta, specs);
-    for (const iid of mattes.values()) payloads.set(iid, MATTE_EMPTY);
+    for (const [uri, iid] of mattes) payloads.set(iid, filled.get(uri) ?? MATTE_EMPTY);
     [meta, sidecars] = addItems(meta, missing.map((uri) => ({
       key: `xmp:${uri}`, itemType: "mime", contentType: "application/rdf+xml",
       refType: "cdsc", refTo: [mattes.get(uri)],
@@ -99,8 +298,31 @@ export function addTextureItems(meta, primary) {
     key: "texture", itemType: "uri ", itemName: "metadata",
     contentType: URI_TEXTURE_STYLES, refType: "cdsc", refTo: targets,
   }]);
-  payloads.set(tex.get("texture"), TEXTURE_STYLES_BLOB);
-  return [meta, payloads, `added #${tex.get("texture")} -> [${targets}], ${missing.length} 2026 mattes`];
+  payloads.set(tex.get("texture"), people ? people.texture : TEXTURE_STYLES_BLOB);
+  let summary = `added #${tex.get("texture")} -> [${targets}], ${missing.length} 2026 mattes`;
+
+  if (people) {
+    let auxcI;
+    [meta, auxcI] = appendIpcoProperty(meta, auxcBox(URI_PERSON_INSTANCES));
+    const specs = people.instances.map(([, src], n) => {
+      const [mIspe, mPixi, mHvcc] = sourceAssoc(src);
+      const reuse = [[mIspe, false], [mPixi, false], [auxcI, true], [mHvcc, true]];
+      if (irot) reuse.push([irot.index, true]);
+      return { key: `instance${n}`, reuse, refType: "auxl", refTo: targets };
+    });
+    let inst, instXmp;
+    [meta, inst] = addItems(meta, specs);
+    [meta, instXmp] = addItems(meta, people.instances.map((_, n) => ({
+      key: `xmp${n}`, itemType: "mime", contentType: "application/rdf+xml",
+      refType: "cdsc", refTo: [inst.get(`instance${n}`)],
+    })));
+    people.instances.forEach(([key, src], n) => {
+      payloads.set(inst.get(`instance${n}`), src.payload);
+      payloads.set(instXmp.get(`xmp${n}`), softSkinInstanceXmp(key));
+    });
+    summary += `, Soft Skin for ${people.faces} face(s)`;
+  }
+  return [meta, payloads, summary];
 }
 
 /**
@@ -125,7 +347,8 @@ export function addTexture(data) {
     for (const e of it.extents)
       if (e.offset < mo + ms) throw new Error("payload before end of meta");
 
-  const [newMeta, newPayloads, summary] = addTextureItems(data.slice(mo, mo + ms), d.primary);
+  const [newMeta, newPayloads, summary] = addTextureItems(data.slice(mo, mo + ms), d.primary,
+    softSkinPeople(data, d));
   const delta = newMeta.length - ms;
   const metaOut = newMeta.slice();
   const niloc = parseIloc(metaOut, topBox(metaOut, "meta"));

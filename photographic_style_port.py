@@ -95,8 +95,10 @@ import contextlib
 import io
 import hashlib
 import json
+import math
 import os
 import plistlib
+import re
 import shutil
 import struct
 import subprocess
@@ -107,7 +109,7 @@ import zlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 
 URI_HDR_GAIN = "urn:com:apple:photo:2020:aux:hdrgainmap"
 URI_LINEAR_THUMB = "tag:apple.com,2023:photo:aux:linearthumbnail"
@@ -159,6 +161,50 @@ MATTE_2026_XMP = (
     '      </rdf:Description>\n'
     '   </rdf:RDF>\n'
     '</x:xmpmeta>\n').encode("utf-8")
+
+# v0.6.0: Soft Skin. iOS 27 smooths skin per face, from TextureStylePostProcessedPeopleData in
+# texture_styles plus one semanticpersoninstances matte per face. Phone A/B on ports and on
+# add-texture photos: Soft Skin works only with all of these together - the people entries,
+# the instance mattes, and real skin v2 / face skin / person mattes - and with any one of them
+# missing it looks the same as Standard. Everything comes from the photo itself: its face
+# regions (MWG XMP), its semanticskinmatte and its portraiteffectsmatte. Nothing is detected.
+URI_PERSON_INSTANCES = "tag:apple.com,2026:photo:aux:semanticpersoninstances"
+SOFT_SKIN_SKIN_URIS = ("tag:apple.com,2026:photo:aux:semanticskinmattev2",
+                       "tag:apple.com,2026:photo:aux:semanticfaceskinmatte")
+SOFT_SKIN_PERSON_URI = "tag:apple.com,2026:photo:aux:semanticpersonmatte"
+# Native files key the first face's instance matte 9, later faces from 0 up.
+SOFT_SKIN_INSTANCE_KEYS = ("FSINCInstanceMask9",) + tuple(f"FSINCInstanceMask{i}" for i in range(9))
+TEXTURE_STYLES_HEADER = (("Preset", "Standard"), ("CaptureType", "LF"), ("CaptureMode", "Still"),
+                         ("PortType", "PortTypeBack"), ("HardwareModel", "iPhone19,2"),
+                         ("TextureStylePeopleDataVersion", 3), ("FilmGrainSeed", 92))
+# Median face layout of 14 native iOS 27 Soft Skin faces (iPhone 18, 2026): 76 landmarks in
+# face-local units (origin at the faceROI centre, scaled by faceROI width in pixels, before
+# rotation by the XMP roll). Leave-one-out on frontal faces: faceROI centre within 1-6% and
+# landmarks within 3-10% of face width of what iOS writes.
+SOFT_SKIN_LANDMARKS = (
+    -0.3411, -0.1971, -0.1456, -0.1813, -0.2857, -0.1842, -0.2046, -0.183, -0.2917, -0.2316,
+    -0.2028, -0.2305, -0.2593, -0.2173, 0.3462, -0.216, 0.1382, -0.1951, 0.2886, -0.1967,
+    0.2046, -0.1939, 0.2885, -0.2529, 0.1912, -0.2427, 0.2363, -0.2343, -0.4396, -0.3135,
+    -0.2977, -0.3602, -0.1383, -0.3263, -0.1331, -0.3882, -0.3011, -0.4217, -0.4498, -0.3449,
+    0.4441, -0.3325, 0.2915, -0.3779, 0.133, -0.3542, 0.1279, -0.4186, 0.2995, -0.4409, 0.4506,
+    -0.366, -0.188, 0.3426, -0.1588, 0.2971, -0.1076, 0.2627, -0.0523, 0.2449, -0.0037, 0.253,
+    0.045, 0.2402, 0.1087, 0.2598, 0.1666, 0.2991, 0.2101, 0.335, 0.1474, 0.3798, 0.0745,
+    0.4022, -0.0015, 0.4111, -0.0758, 0.401, -0.1437, 0.3733, -0.0008, 0.3182, -0.0007, 0.3325,
+    -0.0845, 0.3189, 0.0861, 0.3152, -0.0835, 0.3274, 0.0864, 0.3322, -0.0079, -0.2384, -0.0096,
+    -0.1509, -0.0097, -0.0697, -0.0126, 0.0174, 0.1254, 0.1286, 0.0584, 0.1219, -0.0088, 0.1251,
+    -0.0673, 0.1186, -0.1329, 0.1264, 0.1241, -0.0042, -0.1267, -0.0032, 0.1102, 0.054, -0.1153,
+    0.0489, 0.6088, -0.1704, 0.6101, -0.0178, 0.6033, 0.1255, 0.5716, 0.2813, 0.5101, 0.4279,
+    0.4194, 0.5368, 0.2905, 0.6203, 0.1554, 0.6812, -0.0025, 0.7043, -0.1426, 0.6773, -0.2791,
+    0.6185, -0.384, 0.5307, -0.4829, 0.4244, -0.5531, 0.2924, -0.5871, 0.1388, -0.6052, -0.0192,
+    -0.6, -0.1667)
+SOFT_SKIN_ROI_PER_XMP = (0.9682, 0.967)   # faceROI size / XMP face-region size
+SOFT_SKIN_SKIN_ROI = 1.8                  # faceSkinROI side, in face widths (native 1.7-1.9)
+# Native medians; the colour statistics describe the face, not the photo.
+SOFT_SKIN_FACE_COLOR = (0.6843, 0.5275, 0.4353)
+SOFT_SKIN_SMOOTH_COLOR = (0.6651, 0.5179, 0.4315)
+SOFT_SKIN_ROUGHNESS = 0.0121
+SOFT_SKIN_EYE_COLOR = (0.5776, 0.4579, 0.3829)
+SOFT_SKIN_EYE_VARIANCE = 0.0052
 
 # v0.2 phone-validated neutral Photographic Style spatial baseline (V11).
 # c/d are stored as 32x32 FP16 maps. These constants were the flat-map
@@ -1437,7 +1483,230 @@ def add_items(meta: bytes, specs: List[dict]):
     return _box("meta", bytes(rebuilt)), assigned
 
 
-def add_texture_items(meta: bytes, primary: int):
+def build_bplist(root) -> bytes:
+    """Binary plist, laid out exactly like web/src/bplist.js buildBplist so both builds write
+    identical bytes: depth-first object order, strings deduplicated, nothing else. plistlib
+    packs differently, which matters wherever JS and Python output are compared byte-wise."""
+    objects, strings = [], {}
+
+    def add(obj):
+        if isinstance(obj, str):
+            if obj not in strings:
+                strings[obj] = len(objects)
+                objects.append(("string", obj))
+            return strings[obj]
+        if isinstance(obj, (bytes, bytearray)):
+            objects.append(("data", bytes(obj)))
+        elif isinstance(obj, bool):
+            objects.append(("bool", obj))
+        elif isinstance(obj, int):
+            objects.append(("int", obj))
+        elif isinstance(obj, float):
+            objects.append(("real", obj))
+        elif obj is None:
+            objects.append(("null", None))
+        elif isinstance(obj, dict):
+            me = len(objects)
+            objects.append(None)
+            keys = [add(k) for k in obj]
+            objects[me] = ("dict", (keys, [add(obj[k]) for k in obj]))
+            return me
+        elif isinstance(obj, (list, tuple)):
+            me = len(objects)
+            objects.append(None)
+            objects[me] = ("array", [add(v) for v in obj])
+            return me
+        else:
+            raise PortError(f"Cannot encode {type(obj).__name__} in a binary plist")
+        return len(objects) - 1
+
+    def sized(base, count):
+        if count < 15:
+            return bytes([base | count])
+        if count < 0x100:
+            return bytes([base | 0x0F, 0x10, count])
+        if count < 0x10000:
+            return bytes([base | 0x0F, 0x11]) + count.to_bytes(2, "big")
+        return bytes([base | 0x0F, 0x12]) + count.to_bytes(4, "big")
+
+    root_index = add(root)
+    ref = 1 if len(objects) < 0x100 else 2 if len(objects) < 0x10000 else 4
+
+    def encode(kind, v):
+        if kind == "null":
+            return b"\x00"
+        if kind == "bool":
+            return b"\x09" if v else b"\x08"
+        if kind == "int":
+            for marker, n in ((0x10, 1), (0x11, 2), (0x12, 4)):
+                if 0 <= v < 1 << (8 * n):
+                    return bytes([marker]) + v.to_bytes(n, "big")
+            return b"\x13" + v.to_bytes(8, "big", signed=True)
+        if kind == "real":
+            return b"\x23" + struct.pack(">d", v)
+        if kind == "data":
+            return sized(0x40, len(v)) + v
+        if kind == "string":
+            if v.isascii():
+                return sized(0x50, len(v)) + v.encode("ascii")
+            units = v.encode("utf-16-be")
+            return sized(0x60, len(units) // 2) + units
+        if kind == "array":
+            return sized(0xA0, len(v)) + b"".join(i.to_bytes(ref, "big") for i in v)
+        keys, values = v
+        return (sized(0xD0, len(keys)) + b"".join(i.to_bytes(ref, "big") for i in keys)
+                + b"".join(i.to_bytes(ref, "big") for i in values))
+
+    body = bytearray(b"bplist00")
+    offsets = []
+    for kind, v in objects:
+        offsets.append(len(body))
+        body += encode(kind, v)
+    table_start = len(body)
+    osz = 1 if table_start < 0x100 else 2 if table_start < 0x10000 else 4
+    body += b"".join(o.to_bytes(osz, "big") for o in offsets)
+    body += bytes(6) + bytes([osz, ref]) + len(objects).to_bytes(8, "big") \
+        + root_index.to_bytes(8, "big") + table_start.to_bytes(8, "big")
+    return bytes(body)
+
+
+def _r6(x: float) -> float:
+    """Round to 1e-6 with the same IEEE steps as the web build, so both write equal doubles."""
+    return math.floor(x * 1e6 + 0.5) / 1e6
+
+
+def xmp_face_regions(data: bytes, disc) -> List[dict]:
+    """Face regions from the photo's MWG region XMP: centre x/y and w/h, normalized to the
+    stored (sensor) orientation, plus Apple's face yaw/roll in degrees."""
+    for iid, info in sorted(disc["infos"].items()):
+        if info.get("type") != "mime":
+            continue
+        try:
+            xmp = extract_item(data, disc["iloc"], iid).decode("utf-8", "replace")
+        except PortError:
+            continue
+        if "mwg-rs:Regions" not in xmp:
+            continue
+        faces = []
+        for li in re.findall(r'<rdf:li rdf:parseType="Resource">(.*?)</rdf:li>', xmp, re.S):
+            if "<mwg-rs:Type>Face</mwg-rs:Type>" not in li:
+                continue
+            area = {}
+            for tag in ("x", "y", "w", "h"):
+                m = re.search(rf"<stArea:{tag}>([^<]+)</stArea:{tag}>", li)
+                if m is None:
+                    break
+                area[tag] = float(m.group(1))
+            else:
+                angles = {}
+                for tag in ("AngleInfoYaw", "AngleInfoRoll"):
+                    m = re.search(rf"<apple-fi:{tag}>([^<]+)</apple-fi:{tag}>", li)
+                    angles[tag] = float(m.group(1)) if m else 0.0
+                faces.append({**area, "yaw": angles["AngleInfoYaw"],
+                              "roll": angles["AngleInfoRoll"]})
+        return faces
+    return []
+
+
+def soft_skin_people_entry(face: dict, index: int, irot: int, width: int, height: int) -> dict:
+    """One TextureStylePostProcessedPeopleData entry, keyed and ordered as iOS 27 writes it.
+
+    faceROI is the XMP region as a top-left box at the native size ratio. The XMP roll is the
+    face's rotation in stored pixels, which places the landmark template; faceRoll is the
+    same angle relative to the display, so the primary's irot comes off. Every box is cut
+    to the frame, as in native files. instanceROI is the full frame: no matte is decoded.
+    """
+    clamp = lambda c: min(1.0, max(0.0, c))  # noqa: E731
+    wrap = lambda deg: (deg + 180.0) % 360.0 - 180.0  # noqa: E731
+
+    def box(x, y, w, h):
+        x0, y0, x1, y1 = clamp(x), clamp(y), clamp(x + w), clamp(y + h)
+        return {"y": _r6(y0), "x": _r6(x0), "width": _r6(x1 - x0), "height": _r6(y1 - y0)}
+
+    fw, fh = face["w"] * SOFT_SKIN_ROI_PER_XMP[0], face["h"] * SOFT_SKIN_ROI_PER_XMP[1]
+    scale = fw * width
+    theta = math.radians(face["roll"])
+    c, s = math.cos(theta), math.sin(theta)
+    marks = []
+    for k in range(0, len(SOFT_SKIN_LANDMARKS), 2):
+        u, v = SOFT_SKIN_LANDMARKS[k], SOFT_SKIN_LANDMARKS[k + 1]
+        marks.append({"point": {"x": _r6(clamp((face["x"] * width + (u * c - v * s) * scale) / width)),
+                                "y": _r6(clamp((face["y"] * height + (u * s + v * c) * scale) / height))},
+                      "error": 0.02})
+    side = SOFT_SKIN_SKIN_ROI * scale
+    eye = list(SOFT_SKIN_EYE_COLOR)
+    return {
+        "faceSkinROI": box(face["x"] - side / 2 / width, face["y"] - side / 2 / height,
+                           side / width, side / height),
+        "faceID": index,
+        "faceYaw": _r6(math.radians(wrap(face["yaw"]))),
+        "faceROI": box(face["x"] - fw / 2, face["y"] - fh / 2, fw, fh),
+        "imageStats": {
+            "Mattify": {"SkipPerson": False, "HighlightsToMaskRatio": 0.0, "faceID": index,
+                        "AverageFaceColor": list(SOFT_SKIN_FACE_COLOR)},
+            "SkinSmoothingStandalone": {"faceID": index,
+                                        "SkinSmoothAverageFaceColour": list(SOFT_SKIN_SMOOTH_COLOR),
+                                        "SkinSmoothSkipPerson": False,
+                                        "SkinSmoothFaceRoughness": SOFT_SKIN_ROUGHNESS},
+            "UnderEyeBrightening": {"faceID": index, "RightEyeIsBiModal": False,
+                                    "LeftEyeLumaVariance": SOFT_SKIN_EYE_VARIANCE,
+                                    "LeftEyeIsBiModal": False, "LeftEyeAverageColor": eye,
+                                    "RightEyeAverageColor": list(eye),
+                                    "RightEyeLumaVariance": SOFT_SKIN_EYE_VARIANCE},
+        },
+        "faceLandmarkType": 1,
+        "faceUnitOfAngle": 1,
+        "instanceROI": {"y": 0.0, "x": 0.0, "width": 1.0, "height": 1.0},
+        "instanceMaskReferenceKey": SOFT_SKIN_INSTANCE_KEYS[index],
+        "faceROIAndLandmarksROIRelativeScalingROI": {"y": 0.0, "x": 0.0, "width": 1.0, "height": 1.0},
+        "facePitch": 0.0,
+        "faceRoll": _r6(-math.radians(wrap(face["roll"] - irot))),
+        "faceLandmarks": marks,
+    }
+
+
+def soft_skin_people(data: bytes, disc):
+    """Everything Soft Skin needs, taken from the photo, or None when the photo lacks any of
+    it (face regions, semanticskinmatte, portraiteffectsmatte). None keeps the v0.5 output."""
+    faces = xmp_face_regions(data, disc)
+    if not faces or len(faces) > len(SOFT_SKIN_INSTANCE_KEYS):
+        return None
+    found = {}
+    for iid in disc["infos"]:
+        uri = aux_uri_for_item(disc["props"], iid)
+        if uri in (MATTE_URIS["semanticskinmatte"], MATTE_URIS["portraiteffectsmatte"]):
+            found.setdefault(uri, iid)
+    sources = {}
+    for uri, iid in found.items():
+        boxes_ = {t: property_box_bytes(data, disc["props"], iid, t) for t in ("ispe", "pixi", "hvcC")}
+        if any(b is None for b in boxes_.values()):
+            return None
+        sources[uri] = {"payload": extract_item(data, disc["iloc"], iid), **boxes_}
+    skin = sources.get(MATTE_URIS["semanticskinmatte"])
+    person = sources.get(MATTE_URIS["portraiteffectsmatte"])
+    if skin is None or person is None:
+        return None
+    width, height = dimensions_for_item(disc["props"], disc["primary"])
+    irot = irot_angle_for_item(data, disc["props"], disc["primary"])
+    root = {}
+    for key, value in TEXTURE_STYLES_HEADER:
+        root[key] = value
+        if key == "CaptureMode":
+            root["TextureStylePostProcessedPeopleData"] = [
+                soft_skin_people_entry(f, i, irot, width, height) for i, f in enumerate(faces)]
+    return {"faces": len(faces), "texture": build_bplist(root),
+            "mattes": {**{uri: skin for uri in SOFT_SKIN_SKIN_URIS}, SOFT_SKIN_PERSON_URI: person},
+            "instances": [(SOFT_SKIN_INSTANCE_KEYS[i], person) for i in range(len(faces))]}
+
+
+def soft_skin_instance_xmp(key: str) -> bytes:
+    marker = b"         <fsincMattes:FSINCMatteVersion>"
+    return MATTE_2026_XMP.replace(marker, (
+        f"         <fsincMattes:InstanceMaskReferenceKey>{key}"
+        "</fsincMattes:InstanceMaskReferenceKey>\n").encode("utf-8") + marker)
+
+
+def add_texture_items(meta: bytes, primary: int, people=None):
     """Add the iOS 27 Texture/Grain item set to a meta box: every missing 2026 matte (empty,
     with its XMP sidecar) plus the texture_styles item, wired as iPhone 18 files wire them.
 
@@ -1454,6 +1723,19 @@ def add_texture_items(meta: bytes, primary: int):
     targets = [primary] + find_items_by_type(infos, "tmap")[:1]
     irot = property_for_item(props, primary, "irot")
     payloads = {}
+    # v0.6.0: with people (see soft_skin_people), the skin v2 / face skin / person mattes carry
+    # the photo's own matte payload with that matte's ispe/pixi/hvcC instead of the empty frame.
+    source_props = {}
+
+    def source_assoc(meta, src):
+        # Per source matte, not per byte value, so the web build appends the same boxes.
+        if id(src) not in source_props:
+            idx = []
+            for b in (src["ispe"], src["pixi"], src["hvcC"]):
+                meta, i = append_ipco_property(meta, b)
+                idx.append(i)
+            source_props[id(src)] = idx
+        return meta, source_props[id(src)]
 
     if missing:
         # auxC is descriptive and irot transformative; HEIF wants descriptive properties
@@ -1462,15 +1744,20 @@ def add_texture_items(meta: bytes, primary: int):
         meta, ispe_i = append_ipco_property(meta, MATTE_2026_ISPE)
         meta, pixi_i = append_ipco_property(meta, MATTE_2026_PIXI)
         meta, hvcc_i = append_ipco_property(meta, MATTE_2026_HVCC)
-        specs = []
+        specs, filled = [], {}
         for uri in missing:
+            src = people["mattes"].get(uri) if people else None
+            m_ispe, m_pixi, m_hvcc = ispe_i, pixi_i, hvcc_i
+            if src is not None:
+                meta, (m_ispe, m_pixi, m_hvcc) = source_assoc(meta, src)
+                filled[uri] = src["payload"]
             meta, auxc_i = append_ipco_property(meta, _auxc_box(uri))
-            assoc = [(ispe_i, False), (pixi_i, False), (auxc_i, True), (hvcc_i, True)]
+            assoc = [(m_ispe, False), (m_pixi, False), (auxc_i, True), (m_hvcc, True)]
             if irot is not None:
                 assoc.append((irot["index"], True))
             specs.append({"key": uri, "reuse": assoc, "ref_type": "auxl", "ref_to": targets})
         meta, mattes = add_items(meta, specs)
-        payloads.update({iid: MATTE_2026_EMPTY for iid in mattes.values()})
+        payloads.update({iid: filled.get(uri, MATTE_2026_EMPTY) for uri, iid in mattes.items()})
         meta, sidecars = add_items(meta, [
             {"key": f"xmp:{uri}", "item_type": "mime", "content_type": "application/rdf+xml",
              "ref_type": "cdsc", "ref_to": [mattes[uri]]} for uri in missing])
@@ -1479,8 +1766,30 @@ def add_texture_items(meta: bytes, primary: int):
     meta, tex = add_items(meta, [{
         "key": "texture", "item_type": "uri ", "item_name": "metadata",
         "content_type": URI_TEXTURE_STYLES, "ref_type": "cdsc", "ref_to": targets}])
-    payloads[tex["texture"]] = TEXTURE_STYLES_BLOB
+    payloads[tex["texture"]] = people["texture"] if people else TEXTURE_STYLES_BLOB
     summary = f"added #{tex['texture']} -> {targets}, {len(missing)} 2026 mattes"
+
+    if people:
+        # One semanticpersoninstances matte per face, wired like the 2026 mattes, each with an
+        # XMP sidecar naming the key its people entry points at.
+        meta, auxc_i = append_ipco_property(meta, _auxc_box(URI_PERSON_INSTANCES))
+        specs = []
+        for n, (_key, src) in enumerate(people["instances"]):
+            meta, (m_ispe, m_pixi, m_hvcc) = source_assoc(meta, src)
+            assoc = [(m_ispe, False), (m_pixi, False), (auxc_i, True), (m_hvcc, True)]
+            if irot is not None:
+                assoc.append((irot["index"], True))
+            specs.append({"key": f"instance{n}", "reuse": assoc, "ref_type": "auxl",
+                          "ref_to": targets})
+        meta, inst = add_items(meta, specs)
+        meta, inst_xmp = add_items(meta, [
+            {"key": f"xmp{n}", "item_type": "mime", "content_type": "application/rdf+xml",
+             "ref_type": "cdsc", "ref_to": [inst[f"instance{n}"]]}
+            for n in range(len(people["instances"]))])
+        for n, (key, src) in enumerate(people["instances"]):
+            payloads[inst[f"instance{n}"]] = src["payload"]
+            payloads[inst_xmp[f"xmp{n}"]] = soft_skin_instance_xmp(key)
+        summary += f", Soft Skin for {people['faces']} face(s)"
     return meta, payloads, summary
 
 
@@ -2724,7 +3033,8 @@ def cmd_patch(args):
     if args.texture == "on" and existing_tex:
         texture_report = {"texture_styles": f"from profile #{existing_tex[0]}"}
     elif args.texture == "on":
-        meta, tex_payloads, summary = add_texture_items(meta, int(manifest["donor_primary_item"]))
+        meta, tex_payloads, summary = add_texture_items(
+            meta, int(manifest["donor_primary_item"]), soft_skin_people(target_data, td))
         payloads.update(tex_payloads)
         texture_report = {"texture_styles": summary}
 
@@ -2984,7 +3294,8 @@ def add_texture_bytes(data: bytes):
     if any(e["offset"] < mo + ms for it in external.values() for e in it["extents"]):
         raise PortError("An item payload sits before the end of meta; cannot shift offsets safely")
 
-    new_meta, new_payloads, summary = add_texture_items(data[mo:mo+ms], disc["primary"])
+    new_meta, new_payloads, summary = add_texture_items(
+        data[mo:mo+ms], disc["primary"], soft_skin_people(data, disc))
     delta = len(new_meta) - ms
 
     # New payloads travel in one small mdat appended after everything else.

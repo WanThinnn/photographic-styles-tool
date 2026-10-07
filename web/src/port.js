@@ -15,13 +15,13 @@ import {
   MATTE_URIS, MATTE_URI_SET, DEPTH_URI,
 } from "./heif.js";
 import { injectAppleMakerNoteTag } from "./exif.js";
-import { addTextureItems, hasTexture } from "./texture.js";
+import { addTextureItems, hasTexture, softSkinPeople } from "./texture.js";
 import {
   applySceneStatistics, applyLightMaps, setPersonMasksValid, buildLightMaps,
   linearLumaFromRgb, LIGHTMAP_N,
 } from "./styles.js";
 
-export const VERSION = "0.5.1-web";
+export const VERSION = "0.6.0-web";
 
 // Every rejection a visitor can hit reduces to one of two things: the file is not a
 // HEIC at all, or it is a HEIC this build cannot handle. Nothing else is actionable.
@@ -262,7 +262,8 @@ export async function patch(targetData, profile, opts = {}) {
     const portInfos = parseIinf(meta, topBox(meta, "meta"));
     if (hasTexture(portInfos)) report.texture = "from profile";
     else {
-      const [m6, texPayloads, summary] = addTextureItems(meta, Number(manifest.donor_primary_item));
+      const [m6, texPayloads, summary] = addTextureItems(meta, Number(manifest.donor_primary_item),
+        softSkinPeople(targetData, td));
       meta = m6;
       for (const [iid, blob] of texPayloads) payloads.set(iid, blob);
       report.texture = summary;

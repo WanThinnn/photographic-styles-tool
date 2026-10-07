@@ -105,6 +105,11 @@ export class BplistData {
   constructor(bytes) { this.bytes = bytes; }
 }
 
+/** A number that must be written as a real even when it is whole (1.0, 0.0). */
+export class BplistReal {
+  constructor(value) { this.value = value; }
+}
+
 export function buildBplist(root) {
   // Flatten the object graph. Values are not deduplicated except for the small
   // primitives where identity is unambiguous; Photos does not care either way.
@@ -119,6 +124,7 @@ export function buildBplist(root) {
       return i;
     }
     if (obj instanceof Uint8Array) return objects.push({ kind: "data", value: obj }) - 1;
+    if (obj instanceof BplistReal) return objects.push({ kind: "real", value: obj.value }) - 1;
     if (typeof obj === "boolean") return objects.push({ kind: "bool", value: obj }) - 1;
     if (typeof obj === "number") {
       const isInt = Number.isInteger(obj) && Math.abs(obj) < 2 ** 63;

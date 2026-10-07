@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Current version: v0.5.1
+Current version: v0.6.0
 
 This is an experimental tool that takes a HEIC from an iPhone **older than the iPhone 16**
 (iPhone 15, 14, 13 … — any model whose photos match a supported tile layout) and adds the
@@ -176,16 +176,20 @@ from your photo (Exif only gains tag `0x54`), and the decoded output is pixel-id
 input. What gets added is the style data Photos looks for: the style plist and Apple MakerNote tag
 `0x54`, plus a linear thumbnail and scene statistics computed from your own photo (light maps
 too, with `--light-maps target`). For Texture/Grain it adds iOS 27's
-`texture_styles` item together with the 12 empty 2026 semantic mattes that must accompany it.
+`texture_styles` item together with the 12 2026 semantic mattes that must accompany it. On a
+photo with people (face regions plus Apple's skin and Portrait mattes), the skin and person
+mattes among them carry the photo's own mattes, and `texture_styles` gains the per-face data
+Soft Skin needs, so Soft Skin works.
 
 Every metadata item it writes — what it is, where it comes from, and whether it is proven on a
 device — is documented in **[facts.md](facts.md)**.
 
 ## Known issues and limits
 
-- **Soft Skin looks the same as Standard.** Ported photos carry empty iOS 27 people mattes, so
-  Soft Skin likely has no skin region to work on. More iPhone 18 photos with people are needed
-  to investigate; opening an issue with your photos (as files) is welcome.
+- **Soft Skin needs Apple's own people data in the photo:** face regions, a skin matte and a
+  Portrait matte, as in Portrait-mode shots and iPhone 16+ photos of people. Faces are never
+  detected, so photos without that data keep a Soft Skin that looks like Standard. Strongly
+  turned faces (beyond ~30°) get less accurate face data.
 - **The look after editing is not identical to a native photo.** The port uses neutral defaults
   where Apple's capture-time values cannot be reproduced, and a few values still come from the
   donor profile. More native samples are needed.
@@ -202,7 +206,7 @@ device — is documented in **[facts.md](facts.md)**.
 - **The standalone iOS app** in the `swift-port` branch is under construction and not available
   until my new Mac arrives.
 
-Open metadata questions are tracked in [facts.md](facts.md) (Soft Skin, donor-derived values).
+Open metadata questions are tracked in [facts.md](facts.md) (donor-derived values).
 
 ## Testing a port
 
@@ -253,6 +257,7 @@ thumbnail differently. Only the no-encoder mode is reproducible byte for byte, a
 | v0.4.4      | `--linear-thumb reuse-thumbnail`                                           | No encoder needed ✅; used by the web build                       |
 | v0.5.0      | Texture/Grain; native-photo mode; thumbnail synthesis                        | Palette, Texture/Grain and Portrait ✅; Soft Skin 🔍              |
 | v0.5.1      | Photo's own`tmap` gain-map parameters                                      | Only the`tmap` bytes change; pixels and payloads identical ☑️ |
+| v0.6.0      | Soft Skin from the photo's face regions and mattes; Windows drag and drop    | Soft Skin ✅ (needs all four parts, phone A/B); no-people output unchanged ☑️ |
 
 **Reverse-engineering tests of key assumptions**
 

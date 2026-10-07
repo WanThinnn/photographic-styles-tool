@@ -176,6 +176,24 @@ Python's.
 `src/port.js` takes the decoder as a callback, so nothing but `decode.js` knows libheif
 exists — which is also why `port.js` runs unchanged under Node for the comparison tests.
 
+## Live Photo pairs
+
+Select an original HEIC and its matching MOV from Files, together or in separate selections.
+The browser pairs them using the HEIC Apple MakerNote content identifier and the MOV
+QuickTime content identifier, and checks for a still-image-time metadata key. Filenames
+are not used as proof of pairing. After successful image processing, **Download Live Photo
+pair** exports a ZIP containing the processed HEIC, the byte-identical original MOV and
+`pair.json`. Processing must preserve the photo's identifier or pair export stops.
+
+Extract the ZIP and import both resources together using a Live Photo-aware importer.
+The browser's **Save still photo** button shares only the HEIC; it does not create a paired
+Photos asset. Video frames receive no Styles changes. Unsupported HEIC files remain
+unsupported even when their MOV is supplied. This feature preserves an existing pair;
+it does not turn arbitrary photos and videos into Live Photos.
+
+Run `node --test tests/web/live-photo.mjs` to verify container parsing and pair preservation.
+Private HEIC/MOV fixtures are read locally when available and are never bundled into the site.
+
 ## Not supported
 
 Photos without an HDR gain map are rejected, and only the two known tile layouts (48/12 and

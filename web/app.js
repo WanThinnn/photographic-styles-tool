@@ -4,6 +4,7 @@ import { discoverHeic } from "./src/heif.js";
 import { addTexture, hasTexture } from "./src/texture.js";
 import { decodeToRgb, loadLibheif } from "./src/decode.js";
 import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js";
+import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
@@ -20,6 +21,42 @@ const T = (key) => t(lang, key);
 
 let profileIndex = null;
 const profileCache = new Map();
+const liveMovies = new Map();
+const livePhotos = [];
+
+function attachMovie(photo) {
+  const movie = liveMovies.get(photo.identifier);
+  if (!movie || photo.paired) return;
+  try {
+    const zip = livePhotoPackage(photo.source, photo.output, movie.bytes, photo.name);
+    photo.ui.link(new Blob([zip], { type: "application/zip" }),
+      photo.name.replace(/\.[^.]+$/, "") + "_LivePhoto.zip", "btn.livezip");
+    photo.ui.note(T("live.paired"));
+    movie.ui.set(T("live.matched"), "ok");
+    photo.paired = true;
+  } catch (e) {
+    console.error("Live Photo export stopped", e);
+    photo.ui.note(T("live.changed"));
+  }
+}
+
+async function handleMovie(file, bytes, ui) {
+  try {
+    const metadata = moviePairingMetadata(bytes);
+    if (!metadata.contentIdentifier || !metadata.hasStillImageTimeKey)
+      throw new Error("Missing Live Photo metadata");
+    if (liveMovies.has(metadata.contentIdentifier)) {
+      ui.set(T("live.duplicate"), "err");
+      return;
+    }
+    liveMovies.set(metadata.contentIdentifier, { bytes, ui });
+    ui.set(T("live.waitphoto"));
+    for (const photo of livePhotos) attachMovie(photo);
+  } catch (e) {
+    console.error("could not read Live Photo movie", file.name, e);
+    ui.set(T("live.invalidmov"), "err");
+  }
+}
 
 async function getProfile(name) {
   if (!profileCache.has(name)) {
@@ -71,19 +108,28 @@ function row(name) {
       s.textContent = text;
       s.className = `status ${cls || ""}`;
     },
-    link(blob, filename) {
+    note(text) {
+      let note = el.querySelector(".live-note");
+      if (!note) {
+        note = document.createElement("p");
+        note.className = "live-note";
+        el.appendChild(note);
+      }
+      note.textContent = text;
+    },
+    link(blob, filename, key = "btn.download") {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
-      a.textContent = T("btn.download");
+      a.textContent = T(key);
       a.className = el.querySelector(".act").children.length ? "dl alt" : "dl";
       el.querySelector(".act").appendChild(a);
     },
-    share(file) {
+    share(file, live = false) {
       const b = document.createElement("button");
       b.className = "dl";
       b.type = "button";
-      b.textContent = T("btn.save");
+      b.textContent = T(live ? "btn.savestill" : "btn.save");
       b.addEventListener("click", async () => {
         try { await navigator.share({ files: [file] }); }
         catch (e) { if (e.name !== "AbortError") b.textContent = T("btn.blocked"); }
@@ -98,9 +144,14 @@ async function handleFile(file) {
   try {
     ui.set(T("st.reading"));
     const bytes = new Uint8Array(await file.arrayBuffer());
+    if (/\.mov$/i.test(file.name) || file.type === "video/quicktime") {
+      await handleMovie(file, bytes, ui);
+      return;
+    }
     if (sniff(bytes) !== "heic") { ui.set(T("err.notheic"), "err"); return; }
 
     const d = discoverHeic(bytes);
+    const liveIdentifier = photoContentIdentifier(bytes);
     const sep = lang === "zh" ? "、" : ", ";
     let data, bits, suffix;
     if (d.stylesItem !== null) {
@@ -112,6 +163,8 @@ async function handleFile(file) {
       bits = [T("st.native"), T("st.texture")];
       suffix = "_TextureGrain.HEIC";
     } else {
+      // The CLI also requires an HDR gain map; do not suggest it for SDR files.
+      if (d.hdrGrid === null || !d.hdrTiles.length) { ui.set(T("err.nohdr"), "err"); return; }
       // No encoder in the browser, so a photo without a thumbnail needs the desktop tool.
       if (d.thumbnail === null) { ui.set(T("err.nothumb"), "err"); return; }
       const name = profileFor(profileIndex, d);
@@ -140,8 +193,14 @@ async function handleFile(file) {
     // On iPhone the share sheet lands the file straight in Photos; elsewhere a plain
     // download is the shorter route.
     const shareFile = new File([data], outName, { type: "image/heic" });
-    if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile);
+    if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile, !!liveIdentifier);
     ui.link(new Blob([data], { type: "image/heic" }), outName);
+    if (liveIdentifier) {
+      ui.note(T("live.waitmovie"));
+      const photo = { identifier: liveIdentifier, source: bytes, output: data, name: outName, ui };
+      livePhotos.push(photo);
+      attachMovie(photo);
+    }
   } catch (e) {
     // Past the format sniff, every remaining rejection means the same thing to a
     // visitor: this is a HEIC, but not one this build can handle. The real reason
@@ -155,19 +214,25 @@ async function handleFile(file) {
 async function handleFiles(files) {
   for (const f of files) await handleFile(f);
 }
+// Serialize separate picker/drop events so duplicate MOVs cannot race pairing.
+let fileQueue = Promise.resolve();
+const enqueueFiles = (files) => { fileQueue = fileQueue.then(() => handleFiles(files)); };
 
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", (e) => {
   e.preventDefault();
   drop.classList.remove("over");
-  handleFiles([...e.dataTransfer.files]);
+  enqueueFiles([...e.dataTransfer.files]);
 });
 drop.addEventListener("click", () => fileInput.click());
 drop.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
 });
-fileInput.addEventListener("change", () => handleFiles([...fileInput.files]));
+fileInput.addEventListener("change", () => {
+  enqueueFiles([...fileInput.files]);
+  fileInput.value = "";
+});
 
 $("lang").addEventListener("click", () => {
   lang = lang === "zh" ? "en" : "zh";

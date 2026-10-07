@@ -147,6 +147,7 @@
   .row .status.err::before { background: var(--err); }
   .row .act { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: .35rem; }
   .row .act:empty { display: none; }
+  .live-note { grid-column: 1 / -1; margin: .4rem 0 0; font-size: .85rem; color: var(--muted); }
   .dl {
     display: inline-flex; justify-content: center; align-items: center; padding: .4rem .85rem;
     border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff;
@@ -225,7 +226,9 @@
     <span data-i18n="drop.small"></span>
   </div>
   <input type="file" id="file" multiple
-         accept="image/heic,image/heif,.heic,.heif">
+         accept="image/heic,image/heif,video/quicktime,.heic,.heif,.mov">
+
+  <p class="sub" data-i18n="live.help"></p>
 
   <div class="tip" role="note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3Z"/></svg>

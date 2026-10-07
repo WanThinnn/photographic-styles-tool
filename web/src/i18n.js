@@ -47,8 +47,8 @@ export const STRINGS = {
     "app.lede": "Adds the Photographic Styles palette, introduced with iPhone 16, to HEIC "
       + "photos from earlier iPhones, plus the Texture and Grain controls on iOS 27. "
       + "Everything runs on this device; photos are never uploaded.",
-    "drop.big": "Choose HEIC photos, or drop them here",
-    "drop.small": "Original HEIC photos from iPhone · processed on this device",
+    "drop.big": "Choose HEIC photos and Live Photo MOVs, or drop them here",
+    "drop.small": "Original HEIC + optional matching MOV · processed on this device",
     "tip.title": "Choosing from Photo Library",
     "tip.body": "On iOS versions that support it, select your photos, then tap <b>•••</b> in the "
       + "bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the "
@@ -69,11 +69,22 @@ export const STRINGS = {
     "err.notheic": "Not a HEIC photo. iOS may have converted it; see Troubleshooting.",
     "err.unsupported": "This HEIC isn’t supported yet.",
     "err.hastexture": "This photo already has Texture and Grain. Nothing to do.",
+    "err.nohdr": "No supported HDR gain map was found. This HEIC is unsupported by both the web and command-line tool.",
     "err.nothumb": "No embedded thumbnail, which the browser can’t create. Use the "
       + "command-line tool for this photo.",
 
     "btn.save": "Save to Photos",
     "btn.download": "Download",
+    "btn.livezip": "Download Live Photo pair",
+    "btn.savestill": "Save still photo",
+    "live.help": "Live Photo: select the original HEIC and its MOV from Files, together or separately. Download the verified pair as a ZIP. Import both files with a Live Photo-aware importer; Save still photo saves only the image. Video frames are unchanged.",
+    "live.waitphoto": "Movie loaded. Waiting for a successfully processed HEIC with the same Live Photo identifier.",
+    "live.waitmovie": "Live Photo image detected. Add its original MOV to preserve the pair. Saving this HEIC alone saves a still photo.",
+    "live.paired": "Matching movie kept unchanged. Download the Live Photo pair, extract the ZIP and import both resources together with a Live Photo-aware importer. Saving the HEIC alone saves a still photo.",
+    "live.matched": "Matched to the processed photo. Movie kept unchanged in the pair download.",
+    "live.invalidmov": "This MOV has no readable Live Photo pairing metadata. Select the original Live Photo movie.",
+    "live.duplicate": "A movie with this Live Photo identifier is already loaded. Reload the page to replace it.",
+    "live.changed": "The output could not be verified as the same Live Photo. Pair export stopped; do not import it as a Live Photo.",
     "btn.blocked": "Couldn’t open sharing",
 
     "h.steps": "How to use",
@@ -99,9 +110,8 @@ export const STRINGS = {
     "g.5": "Soft Skin works when the original carries Apple’s own people data (face regions, "
       + "skin and Portrait masks), as Portrait-mode photos and iPhone 16+ photos of people do. "
       + "Faces are never detected, so other photos keep a Soft Skin that looks like Standard.",
-    "g.6": "The output HEIC does not include the Live Photo’s MOV video. To keep the "
-      + "motion, on a computer (PC or Mac) copy the original’s matching MOV and rename it to the "
-      + "new HEIC’s file name.",
+    "g.6": "For Live Photos, add the matching original MOV and download the verified file pair. "
+      + "Import both files with a Live Photo-aware importer. Saving only the HEIC saves a still photo; video frames are unchanged.",
 
     "h.trouble": "Troubleshooting",
     "t.1": "<b>“Not a HEIC photo”</b>: iOS converted the photo to JPEG while you picked it. "
@@ -127,8 +137,8 @@ export const STRINGS = {
     "n.2": "Apple 的 HEIC 文件只包含静态图像，请保留原图。",
     "app.lede": "为 iPhone 16 之前机型拍摄的 HEIC 照片加上 iPhone 16 引入的摄影风格调色板，"
       + "并在 iOS 27 上加上质感与颗粒控制。全部处理都在本设备上完成，照片不会上传。",
-    "drop.big": "选取 HEIC 照片，或拖放到此处",
-    "drop.small": "iPhone 拍摄的 HEIC 原图 · 在本设备上处理",
+    "drop.big": "选取 HEIC 照片及实况照片 MOV，或拖放到此处",
+    "drop.small": "HEIC 原图及可选的匹配 MOV · 在本设备上处理",
     "tip.title": "从“照片图库”选取时",
     "tip.body": "在支持的 iOS 版本中，勾选照片后点按左下角的 <b>•••</b> → <b>选项</b> → "
       + "<b>格式</b> → <b>当前</b>，即可上传 HEIC 原图，而不是转换后的 JPEG。若仍被拒绝，"
@@ -148,10 +158,21 @@ export const STRINGS = {
     "err.notheic": "不是 HEIC 照片。可能已被 iOS 转换，请参阅“遇到问题”。",
     "err.unsupported": "暂不支持此 HEIC 文件。",
     "err.hastexture": "此照片已带有质感与颗粒，无需处理。",
+    "err.nohdr": "未找到支持的 HDR 增益图。网页版和命令行工具均不支持此 HEIC 文件。",
     "err.nothumb": "没有内嵌缩略图，网页版无法生成。请改用命令行工具处理这张照片。",
 
     "btn.save": "存储到“照片”",
     "btn.download": "下载",
+    "btn.livezip": "下载实况照片文件对",
+    "btn.savestill": "存储静态照片",
+    "live.help": "实况照片：从“文件”选择原始 HEIC 及其 MOV，可一起或分开添加。下载验证后的 ZIP，解压后使用支持实况照片的工具同时导入两个文件。“存储静态照片”仅保存图片，视频帧保持不变。",
+    "live.waitphoto": "视频已载入，等待处理成功且实况照片标识相同的 HEIC。",
+    "live.waitmovie": "检测到实况照片图片，请添加其原始 MOV 以保留配对。单独保存 HEIC 只会保存静态照片。",
+    "live.paired": "已保留匹配的原始视频。下载并解压 ZIP，使用支持实况照片的工具同时导入两个文件。单独保存 HEIC 只会保存静态照片。",
+    "live.matched": "已匹配处理后的图片，视频原样包含在文件对下载中。",
+    "live.invalidmov": "无法读取此 MOV 的实况照片配对信息，请选择原始实况照片视频。",
+    "live.duplicate": "已载入具有相同实况照片标识的视频。请刷新页面后重新选择。",
+    "live.changed": "无法确认输出仍属于同一实况照片，已停止文件对导出，请勿将其作为实况照片导入。",
     "btn.blocked": "无法打开共享菜单",
 
     "h.steps": "使用步骤",
@@ -174,8 +195,8 @@ export const STRINGS = {
     "g.5": "原图本身带有 Apple 的人物数据（人脸区域、皮肤遮罩和人像遮罩）时，“柔肤”可以生效，"
       + "人像模式照片和 iPhone 16 及以后机型拍的人物照片都有这些数据。本工具不会自行检测人脸，"
       + "其他照片的“柔肤”仍与“标准”看起来一样。",
-    "g.6": "生成的 HEIC 不包含实况照片对应的 MOV 视频。若要保留动态画面，需在电脑（PC 或 Mac）"
-      + "上将原文件对应的 MOV 手动复制一份，并重命名为与新 HEIC 相同的文件名。",
+    "g.6": "实况照片请添加匹配的原始 MOV 并下载验证后的文件对，使用支持实况照片的工具同时导入两个文件。"
+      + "单独保存 HEIC 只会保存静态照片，视频帧保持不变。",
 
     "h.trouble": "遇到问题",
     "t.1": "<b>“不是 HEIC 照片”</b>：选取时 iOS 把照片转换成了 JPEG。请按上方“照片图库”提示操作，"

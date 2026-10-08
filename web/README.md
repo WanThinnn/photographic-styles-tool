@@ -76,15 +76,16 @@ npm pack libheif-js && tar -xzf libheif-js-*.tgz
 cp package/libheif/libheif.js package/libheif/libheif.wasm web/vendor/
 ```
 
-## Why there is no HEVC encoder
+## When the HEVC encoder is needed
 
 The Python tool re-encodes the linearthumbnail as 10-bit Main10 HEVC with ffmpeg. Browsers
 have no dependable HEVC encoder, so a faithful port would have had to ship ffmpeg.wasm at
 25–30 MB.
 
-That turned out to be unnecessary. Reusing the photo's own embedded thumbnail as the
-linearthumbnail — `--linear-thumb reuse-thumbnail` in the Python tool — was validated
-on-device, so this build uses it unconditionally and needs no encoder at all.
+Reusing the photo's own embedded thumbnail as the linearthumbnail was validated on-device,
+so ordinary HEIC ports use it when present. Missing thumbnails and raster imports use the
+optional encoder. Its verified assets are prepared automatically after browser setup and
+cached when available, without keeping an unused encoder instance in memory.
 
 ## iPhone notes
 
@@ -213,7 +214,7 @@ and Styles fields from readable constants; it does not copy another photo's pixe
 or face masks. Main tiles use a platform HEVC encoder when available, with the
 verified FFmpeg.wasm encoder as a fallback. The independent P3-linear Main10
 thumbnail always uses WASM. The same on-demand encoder cache and isolation
-requirements described below apply; reload once after first installation.
+requirements described below apply; the first-visit setup performs the required navigation automatically.
 
 Dimensions are preserved within the 48 primary / 12 auxiliary tile budget; larger
 photos and extreme panoramas are reduced without stretching. The output is SDR:
@@ -237,13 +238,37 @@ asset date independently: this web app cannot set PhotoKit's `creationDate` dire
 
 ## HEIC compatibility
 
+An iPhone 16/17 export may retain depth while losing its native Styles resources
+and HDR gain map after editing/export. In that state, the browser explains the limitation
+before offering **Create new Styles (experimental)**. This per-file warning is only
+shown when the camera Model identifies an iPhone 16/17 and native Styles are absent;
+older iPhones, other cameras and missing camera metadata do not trigger it.
+This action rebuilds Styles; it
+cannot recover the selected native style, missing HDR, or guarantee aperture/Portrait
+Lighting editing. Choose an unmodified original HEIC from Files, add Texture first, and
+then reapply edits in Photos. Files that still contain native Styles use the existing
+`add-texture` route and preserve their original payloads.
+
 The standard mode requires an HDR gain map and known StyleDeltaMap dimensions. A missing
 thumbnail is generated locally using libheif decoding and FFmpeg.wasm x265
-Main10 encoding. The official pinned encoder is downloaded on demand (about 32 MB),
+Main10 encoding. The official pinned encoder is prepared automatically (about 32 MB),
 verified by SHA-256 and cached when storage is available. It requires cross-origin
-isolation supplied by the service worker, including on GitHub Pages. After the worker installs,
-reload once before generating thumbnails. Failures stop export rather than substituting
+isolation supplied by the service worker, including on GitHub Pages. On a fresh visit,
+photo selection waits for setup and one automatic navigation, so no manual reload or
+reselection is required. Conversion waits for unfinished downloads; preparation and
+conversion share in-flight asset downloads. Failures stop export rather than substituting
 another photo's thumbnail. Primary image tiles, HDR and depth payloads are kept unchanged.
+
+HEIC reading, graph rebuilding, statistics and payload checks run in a module Web Worker.
+DOM-based decoding still runs in the page and returns sampled RGB to the worker.
+**Clear processing history** is available once processing finishes. It removes result
+rows, revokes download URLs, clears Live Photo pairing data, disposes bokeh previews and
+releases converter workers. It does not delete downloaded files or originals.
+
+AI can be enabled before selecting a photo or after a result is ready. Eligible
+existing results are queued when the switch is enabled; native Styles/depth sources
+show a visible skip message. Original save/download buttons stay in place while the
+AI preview appears and are labelled as the unblurred Styles result.
 
 **Experimental support for SDR and resized HEIC photos** is selected automatically
 when the file needs it; there is no checkbox to enable. Native style photos retain

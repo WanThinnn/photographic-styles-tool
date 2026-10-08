@@ -32,6 +32,10 @@ async function verifiedAsset(asset, onProgress) {
   }
   return bytes;
 }
+export async function prepareHevcAssets() {
+  for (const asset of FFMPEG_ASSETS) await verifiedAsset(asset);
+}
+
 export async function ensureHevcEncoder(onProgress) {
   if (!ready) ready = (async () => {
     if (!globalThis.crossOriginIsolated || !globalThis.SharedArrayBuffer)

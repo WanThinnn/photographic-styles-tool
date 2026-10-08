@@ -128,7 +128,7 @@ Numbers refer to the item reference in §2.3.
 |---|---|---|
 | **Style palette** | #1 MakerNote `0x54`, #2 styles item, #3 linear thumbnail with a matching `hvcC`, #4 delta map, #5 HDR/`tmap` structure | No `0x54` → no palette. Mismatched linear-thumbnail `hvcC` → palette appears but edits do nothing. |
 | **People layers** (people and background styled separately) | #8 the photo's own mattes with sidecars, #9 `PersonMasksValidHint = 1.0` | People and background are styled as one layer |
-| **Portrait** | #6 depth map + #7 its XMP sidecar | Portrait is not offered, or is offered but does nothing |
+| **Portrait** | #6 depth map + #7 its XMP sidecar; necessary in tested cases, not sufficient to guarantee aperture/lighting editing for every exported copy (§10) | Portrait is not offered, or is offered but does nothing; menu visibility alone does not prove full editing support |
 | **Texture and Grain** (iOS 27) | #10 `texture_styles` + all twelve #11 2026 mattes (with #12 sidecars) | #10 without #11 **removes the whole palette** |
 | **Soft Skin** (iOS 27) | #10 with per-face people data + #13 person instances + real skin v2, face skin and person mattes in #11 | Missing any one of them, Soft Skin looks the same as Standard (§7) |
 
@@ -403,7 +403,10 @@ only #10–#12 are inserted:
 ### 5.5 Photos without a thumbnail
 Some copies re-saved by iOS have no thumbnail and no `tmap`. Since v0.5 the port encodes a
 thumbnail from the primary (416×312, 8-bit HEVC Main, stored orientation, its own `hvcC`).
-✅ The browser build cannot do this, because it has no HEVC encoder.
+✅ This was previously unavailable in the browser. The current web app can generate a missing
+thumbnail locally using the optional HEVC encoder (`web/src/linear-thumbnail.js`), requiring
+cross-origin isolation and an encoder download on first use. Native `add-texture` does not
+need this encoder.
 
 ---
 
@@ -546,3 +549,143 @@ captures (same scene, one setting changed) might. New tile layouts seen in nativ
 - **Not yet isolated:** whether each classic matte is needed; whether the 2026 sidecars are
   needed on their own; whether styles keys `6`/`7` can be dropped; what `0x54` members `4`/`6`
   mean; how the two planes of the coefficient lattice are read. 🔍
+
+## 10. Portrait editing gap reported on iPhone 16 Pro (2026-10-08) 🔍
+
+The earlier Portrait results do not establish compatibility for every capture/export state.
+Distinguish three observations: the viewing menu offers Portrait; blur can be toggled;
+and Edit offers aperture (`ƒ`) and Portrait Lighting. Preserving depth and its sidecar
+does not by itself prove the third observation.
+
+Private case: original `IMG_0548.HEIC` and processed `IMG_0692.HEIC`, a front TrueDepth
+capture from an iPhone 16 Pro (Exif software 18.5). The user confirms the original still
+offers aperture and Portrait Lighting on the same phone. The processed copy loses those
+controls. Its depth, calibration, simulated aperture 4.5, rendering parameters and
+Portrait Lighting strength remain present. All 64 original external payloads other than
+Exif, original references and original property bytes were preserved. MakerNote `0x54`
+is the only MakerNote tag whose value changed.
+
+User-reported device results for controlled variants:
+
+| Variant | Result |
+|---|---|
+| Processed copy with byte-identical original Exif restored | Styles and Texture/Grain work; viewing menu offers Portrait, but Edit has no `ƒ`; colour changes on entering Edit |
+| Styles graph without Texture, original Exif restored (A) | Styles absent; `ƒ` and Portrait Lighting still absent; colour normal |
+| Original graph plus the Texture set, original Exif preserved (B) | User reports Styles and Texture available, but `ƒ` absent |
+
+Variant B contains no 2023 `metadata:styles` item at file level. Its reported controls
+must not be interpreted as proof that the documented 2023 palette requirements changed.
+The exact control type and behaviour remain to be reconciled. These variants rule out
+restoring Exif alone as a sufficient fix for this case; they do not identify the cause.
+
+With the processed copy's styles plist, linear-thumbnail sample/configuration and marker
+as inputs, Python `graft_style_graph` reconstructs `IMG_0692` byte for byte: 1,936,059 bytes,
+SHA-256 `ac329e6d8431069bcd8b46b18f87279d746fb8fa822c5b679c67895bd3e430e6`.
+Reproduce using `tools/portrait-python-parity.py ORIGINAL EXPORTED`. This verifies the
+graph writer only; decoding, thumbnail generation and Styles statistics were reused
+from the export rather than independently recomputed.
+
+An independent default Python CLI run on `IMG_0548` also completed, generating its own
+linear thumbnail and target scene statistics, with flat light maps and Texture enabled.
+The private output `IMG_0548_PythonDefault.HEIC` is 1,693,272 bytes, SHA-256
+`3766f8fab865a2aff0f64b9892d347fc7aaddb01e5cef0056797c888e6b5b957`.
+All 67 non-Exif source payloads (external and idat), original references and original
+property bytes are preserved. The user also tested this independent CLI output: aperture
+editing remains unavailable and Styles produce strong colours. Replacing the browser
+graph writer with Python therefore does not resolve this case.
+
+The colour change on entering Edit is also unresolved. Sections 4.1, 5.1, 8 and 9
+describe renderer inputs that can affect appearance; none is established as the cause
+for this specific photo. Do not replace native style curves or invent Portrait metadata
+based only on this report.
+
+### 10.1 Native versus edited exports: IMG_0714 / IMG_0714-1
+
+Further private samples supplied on the same date isolate an input-state difference:
+
+| File | 2023 Styles / linear thumbnail / delta map | HDR gain map | Route / result |
+|---|---|---|---|
+| `IMG_0714.HEIC` | All present | Present | Native `add-texture`; user identifies the chosen style as Vibrant |
+| `IMG_0714-1.HEIC` | All absent | Absent | Full port / experimental route; depth and a six-key style marker remain |
+| `IMG_0715.HEIC` | Newly generated | Absent | User-reported output of `0714-1`: aperture unavailable, strong colours, style reset |
+| `IMG_0716.HEIC` | Present | Present | Preserved native Styles plist, all 15 HDR tiles and depth payload match `0714` |
+
+The 49 primary tile payloads in `0714-1` and `0715` are byte-identical. HDR was already
+missing in `0714-1`, before conversion. Its source marker has pad values approximately
+(-0.30, 0.33), member `4 = 8`, and member `5 = 0`; the full port replaces it with the
+neutral eight-key marker (`1 = 2 = 0`, `4 = 1`, `5 = 1`, `6 = 4`). Member meanings must
+not be inferred solely from these numbers. The native `0714` marker instead has
+(-0.5, 0.5), `4 = 16`, `5 = 1`, `6 = 4`. These observations demonstrate rebuilding
+Styles rather than preserving native edit resources; changing a preset label alone
+cannot recover the missing curves, delta map or HDR gain map.
+
+The user subsequently re-imported the standalone files into Photos, independently of
+the pre-existing library asset: `0714-1` has neither Styles editing nor Portrait editing;
+`0715` offers Styles but still has no Portrait editing. Thus, for this specific pair,
+the exported source already lacks standalone editing capability before the tool runs.
+The Styles in `0715` are newly constructed rather than preserved native edit resources.
+Depth presence alone does not reproduce the original library asset's Portrait editor.
+
+The browser now checks the camera model before automatically porting a file that lacks
+native Styles. For camera metadata identifying iPhone 16/17, it explains the limitation and
+offers an explicit **Create new Styles (experimental)** action. This detects missing
+data, not whether a particular edit caused the loss. The native `add-texture` route and
+older-camera porting remain unchanged. It is a safeguard, not a Portrait reconstruction
+fix. Use the unmodified resource for adding Texture, then reapply edits in Photos.
+
+A new private native output, `IMG_0714_PreserveNative_TextureGrain.HEIC`, was generated
+directly from `0714` using Python `add-texture`. All 118 original external payloads,
+including complete Exif and the native Styles plist, were verified byte-identical.
+SHA-256: `ebcb1a2de49b047f42b9bb07d9f5e871822b1b1adf9e5015d16b11d2305f4148`.
+The browser preservation regression additionally checks all original idat payloads,
+property bytes and references on this native fixture. Photos UI remains an on-device check.
+
+### 10.2 Browser preparation and cleanup (2026-10-08)
+
+The missing-native-Styles notice is informational (blue with an information icon),
+and only triggered for camera metadata identifying iPhone 16/17. Other cameras,
+older iPhones and absent Model metadata retain their normal conversion route.
+
+The first browser visit installs/claims the service worker and automatically navigates
+once to apply isolation headers, before enabling photo selection. Verified encoder
+assets are prepared in the background without retaining an idle WASM encoder heap.
+Preparation and conversion share in-flight downloads. A platform HEVC encoder that
+reports support but fails during actual encoding now falls back to software encoding.
+
+HEIC reading, graph rebuilding, statistics and payload checks run in a module worker;
+DOM-dependent decoding still runs in the page and supplies sampled RGB through messages.
+Worker Texture output and analyzed full-port output were compared byte for byte against
+the existing functions. This is an execution-location optimization, not a colour change.
+
+Clearing history is available while the processing queue is idle. It revokes result URLs,
+removes rows, clears retained Live Photo sources/outputs/movies, disposes bokeh previews,
+and releases HEIC/encoder workers. Originals and already downloaded files are unaffected.
+Fresh-profile desktop Chrome checks passed for automatic preparation, first PNG conversion,
+notice placement, URL cleanup, and native HEIC processing after clearing history.
+This does not substitute for an iPhone Safari/Photos test.
+
+### 10.3 Colour research boundary
+
+Review of §4.1, §8 and §9 still leaves the native coefficients/tone curve and donor-derived
+`highKey`, `i.Gain`, `i.OriginalRangeMin/Max`, `4`, `5` and `j` without a validated reconstruction
+rule for edited exports. `h = i.Gain / 4` gives no independent estimate of Gain.
+Neither changing the Texture preset label nor keeping the old pad marker restores the
+missing native style graph. No speculative change to these values was shipped.
+Further colour optimization requires controlled captures and Photos save/reopen/re-edit
+comparisons; compare those fields while changing one setting at a time and keep the
+native add-texture path untouched.
+
+### 10.4 AI opt-in and stable result actions
+
+Enabling AI after conversion previously only changed the switch/hint. The app now
+keeps file-backed candidates and schedules eligible results when AI is enabled,
+as well as running AI when it was enabled before photo selection. Active/completed
+jobs are not started twice. The preparation status and native Styles/depth skip
+message are visible in the result row. Clearing history also releases these candidates.
+
+The original Styles save/download pair stays in place while AI finishes, with an
+unblurred-result label; it is no longer moved into collapsed details. A sole output
+group spans the result width so the pair does not initially occupy half a desktop row.
+Real WebGPU inference in fresh-profile desktop Chrome produced bokeh previews when
+AI was enabled after PNG conversion and before JPEG conversion. Button x positions
+and widths were equal before/after AI completion. iPhone Safari remains untested here.

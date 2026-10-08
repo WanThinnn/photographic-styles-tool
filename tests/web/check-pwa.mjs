@@ -11,6 +11,7 @@ const manifest = JSON.parse(readFileSync(join(WEB, "manifest.webmanifest"), "utf
 const html = readFileSync(join(WEB, "index.html"), "utf8");
 const app = readFileSync(join(WEB, "app.js"), "utf8");
 const worker = readFileSync(join(WEB, "sw.js"), "utf8");
+const startup = readFileSync(join(WEB, 'src/startup.js'), 'utf8');
 const errors = [];
 
 try {
@@ -28,7 +29,7 @@ if (manifest.start_url !== "./" || manifest.scope !== "./") {
 if (!html.includes('rel="manifest" href="manifest.webmanifest"')) {
   errors.push("index.html does not link the web app manifest");
 }
-if (!app.includes('serviceWorker.register("./sw.js"')) {
+if (!startup.includes("serviceWorker?.register('./sw.js'") || !app.includes('await prepareBrowser()')) {
   errors.push("app.js does not register the service worker with a relative URL");
 }
 

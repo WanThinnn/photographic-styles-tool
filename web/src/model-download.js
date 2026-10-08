@@ -22,7 +22,25 @@ export function withModelTimeout(promise, timeoutMs, dispose = () => {}) {
   return Promise.race([operation, timeout]).finally(() => clearTimeout(timer));
 }
 
-export async function downloadModelBytes(url, {
+const inFlight = new Map();
+export function downloadModelBytes(url, options = {}) {
+  // Preparation and conversion share downloads, then release the byte buffers.
+  if (options.cacheStorage !== undefined) return downloadModelBytesOnce(url, options);
+  let call = inFlight.get(url);
+  if (!call) {
+    call = {listeners: new Set(), last: null};
+    inFlight.set(url, call);
+    call.promise = downloadModelBytesOnce(url, {...options, onProgress: progress => {
+      call.last = progress;
+      for (const listener of call.listeners) listener(progress);
+    }}).finally(() => inFlight.delete(url));
+  }
+  const listener = options.onProgress;
+  if (listener) { call.listeners.add(listener); if (call.last) listener(call.last); }
+  return call.promise.finally(() => { if (listener) call.listeners.delete(listener); });
+}
+
+async function downloadModelBytesOnce(url, {
   onProgress = () => {}, stallTimeoutMs = 30000, cacheStorage = globalThis.caches,
 } = {}) {
   let cache = null;

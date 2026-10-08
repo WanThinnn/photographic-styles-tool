@@ -8,9 +8,11 @@ Object.assign(AI_STRINGS.vi,{normalLabel:'Styles',depthLabel:'Depth thử nghi�
 Object.assign(AI_STRINGS.en,{normalLabel:'Styles',depthLabel:'Depth test · unblurred image',ready:'AI depth added. This keeps the unblurred photo; Photos Portrait recognition failed in the device test.',flat:'Download blurred preview',hint:'Blur in the browser. Experimental HEIC depth is not yet recognised as Portrait by Photos. Native Styles/depth are preserved.'});
 Object.assign(AI_STRINGS.zh,{normalLabel:'风格',depthLabel:'深度测试 · 未虚化图像',ready:'已添加 AI 深度，保留未虚化图像。设备测试中照片 App 未识别人像。',flat:'下载虚化预览',hint:'在网页中虚化。HEIC 深度尚未被照片 App 识别为人像，保留原生风格和深度。'});
 
-Object.assign(AI_STRINGS.vi,{hint:'Chỉnh bokeh và lấy nét trên web, xuất HEIC có Styles. Bỏ qua ảnh có Styles/depth gốc.',preview:'Bokeh & lấy nét',focus:'Khoảng lấy nét · xa → gần',flat:'Tạo HEIC với bokeh & Styles',save:'Lưu vào Ảnh',download:'Tải HEIC',encoding:'Đang xuất HEIC chất lượng cao…',ready:'Chỉnh bokeh bên dưới rồi tạo HEIC. Hiệu ứng được lưu vào ảnh; Photos chưa hỗ trợ chỉnh lại Portrait.',done:'Đã tạo HEIC có bokeh và Styles.',resized:'Ảnh được giảm kích thước theo giới hạn xuất HEIC.',exportFailed:'Không xuất được HEIC. Hãy thử lại.',changed:'Đã đổi thiết lập — tạo lại HEIC để lưu.'});
+Object.assign(AI_STRINGS.vi,{hint:'Chỉnh bokeh và lấy nét trên web, xuất HEIC có Styles. Bật trước hoặc sau khi xử lý ảnh đều được. Bỏ qua ảnh có Styles/depth gốc.',preview:'Bokeh & lấy nét',focus:'Khoảng lấy nét · xa → gần',flat:'Tạo HEIC với bokeh & Styles',save:'Lưu vào Ảnh',download:'Tải HEIC',encoding:'Đang xuất HEIC chất lượng cao…',ready:'Chỉnh bokeh bên dưới rồi tạo HEIC. Hiệu ứng được lưu vào ảnh; Photos chưa hỗ trợ chỉnh lại Portrait.',done:'Đã tạo HEIC có bokeh và Styles.',resized:'Ảnh được giảm kích thước theo giới hạn xuất HEIC.',exportFailed:'Không xuất được HEIC. Hãy thử lại.',changed:'Đã đổi thiết lập — tạo lại HEIC để lưu.'});
 Object.assign(AI_STRINGS.en,{hint:'Adjust bokeh and focus in the browser; export HEIC with Styles. Skips native Styles/depth.',preview:'Bokeh & focus',focus:'Focus distance · far → near',flat:'Create HEIC with bokeh & Styles',save:'Save to Photos',download:'Download HEIC',encoding:'Exporting high-quality HEIC…',ready:'Adjust bokeh below, then create HEIC. The effect is baked into the image; Photos Portrait editing is unavailable.',done:'HEIC with bokeh and Styles is ready.',resized:'Image resized to fit the HEIC export limit.',exportFailed:'HEIC export failed. Try again.',changed:'Settings changed — create HEIC again to save.'});
 Object.assign(AI_STRINGS.zh,{hint:'在网页调整散景和焦点，导出含风格的 HEIC。跳过原生风格和深度。',preview:'散景与焦点',focus:'焦距 · 远 → 近',flat:'生成散景与风格 HEIC',save:'保存到照片',download:'下载 HEIC',encoding:'正在导出高质量 HEIC…',ready:'在下方调整散景后生成 HEIC。效果写入图像，照片 App 尚不支持再次编辑人像。',done:'含散景和风格的 HEIC 已生成。',resized:'图像已缩小以符合 HEIC 导出限制。',exportFailed:'HEIC 导出失败，请重试。',changed:'设置已更改，请重新生成 HEIC。'});
+Object.assign(AI_STRINGS.en,{hint:'Adjust bokeh and focus in the browser; export HEIC with Styles. Enable before or after conversion. Skips native Styles/depth.'});
+Object.assign(AI_STRINGS.zh,{hint:'在网页调整散景和焦点，导出含风格的 HEIC。可在转换前后开启；跳过原生风格和深度。'});
 
 export function blurPreview(result,host,strings,exportImage) {
   const {width:w,height:h,gray,previewRgb:rgb,orientation:{angle,mirror}}=result;
@@ -64,4 +66,11 @@ export function blurPreview(result,host,strings,exportImage) {
   });
   const actions=document.createElement('div');actions.className='bokeh-actions';actions.append(save,status,output);
   host.append(view,label,focusLabel,actions);draw();
+  return () => {
+    if (pending !== null) cancelAnimationFrame(pending);
+    if (outputUrl) URL.revokeObjectURL(outputUrl);
+    outputUrl = null;
+    source.width = source.height = view.width = view.height = 0;
+    host.replaceChildren();
+  };
 }

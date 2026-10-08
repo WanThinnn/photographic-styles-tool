@@ -40,14 +40,14 @@
   </section>
 
   <div class="workspace">
-  <div id="drop" role="button" tabindex="0">
+  <div id="drop" role="button" tabindex="0" aria-disabled="true">
     <div class="drop-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>
     </div>
     <strong data-i18n="drop.big"></strong>
     <span data-i18n="drop.small"></span>
   </div>
-  <input type="file" id="file" multiple
+  <input type="file" id="file" multiple disabled
          accept="image/heic,image/heif,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,image/x-adobe-dng,video/quicktime,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.dng,.mov">
 
   <div class="options-grid">
@@ -63,6 +63,7 @@
   <p id="ai-portrait-hint" class="ai-hint" hidden></p>
   </div>
 
+  <div class="history-actions"><button id="clear-history" class="dl alt" type="button" data-i18n="btn.clearhistory" hidden></button></div>
   <div id="list" aria-live="polite"></div>
   <p id="boot"></p>
 
@@ -71,6 +72,7 @@
     <div class="help-content">
       <section><h2 data-i18n="h.steps"></h2><p data-i18n="help.steps"></p><p data-i18n="tip.body"></p></section>
       <section><h2 data-i18n="h.formats"></h2><p data-i18n="help.formats"></p><p data-i18n="help.original"></p><p data-i18n="help.live"></p></section>
+      <section><h2 data-i18n="h.editlimits"></h2><p data-i18n="help.editlimits"></p><p data-i18n="help.portraitlimits"></p></section>
       <section><h2 data-i18n="h.trouble"></h2><p data-i18n="help.slow"></p><p data-i18n="t.date"></p></section>
       <section><p data-i18n="n.1"></p><p data-i18n="help.language"></p></section>
     </div>

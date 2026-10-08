@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v50`;
+const CACHE_NAME = `${CACHE_PREFIX}v54`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -35,6 +35,10 @@ const APP_SHELL = [
   "./src/bplist.js",
   "./src/decode.js",
   "./src/exif.js",
+  "./src/style-preservation.js",
+  "./src/startup.js",
+  "./src/heic-worker.js",
+  "./src/heic-processing.js",
   "./src/ffmpeg-assets.js",
   "./src/ffmpeg-hevc.js",
   "./src/ffmpeg-worker.js",

@@ -17,7 +17,7 @@ const usedInHtml = new Set([...html.matchAll(/data-i18n="([^"]+)"/g)].map((m) =>
 // Keys reach T() through ternaries and variables as well as literal calls, so match
 // any quoted token shaped like a key rather than only T("...").
 const usedInJs = new Set(
-  [...app.matchAll(/"([a-z]+\.[A-Za-z0-9]+)"/g)].map((m) => m[1])
+  [...app.matchAll(/["']([a-z]+\.[A-Za-z0-9]+)["']/g)].map((m) => m[1])
     .filter((k) => k in STRINGS.en));
 const used = new Set([...usedInHtml, ...usedInJs]);
 

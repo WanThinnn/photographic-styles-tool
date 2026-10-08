@@ -44,6 +44,18 @@ function hvccBox(description) {
 
 export async function encodeCanvases(width, height, count, draw, bitrate, progress, onProgress) {
   const config = await supportedHevcConfig(width, height, bitrate);
+  if (!config) return encodeCanvasesUsing(width, height, count, draw, bitrate, progress, onProgress, null);
+  try {
+    return await encodeCanvasesUsing(width, height, count, draw, bitrate, progress, onProgress, config);
+  } catch (error) {
+    // isConfigSupported can succeed even when the OS encoder fails to start.
+    // Retry from the original canvases with the verified software encoder.
+    console.warn('Platform HEVC encoding failed; retrying with software encoder', error);
+    return encodeCanvasesUsing(width, height, count, draw, bitrate, progress, onProgress, null);
+  }
+}
+
+async function encodeCanvasesUsing(width, height, count, draw, bitrate, progress, onProgress, config) {
   if (!config) {
     const canvas = document.createElement('canvas'); canvas.width=width; canvas.height=height;
     const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace:'srgb'});
@@ -115,7 +127,7 @@ export async function encodeCanvases(width, height, count, draw, bitrate, progre
       progress?.(i + 1, count);
     }
     await encoder.flush();
-  } finally { encoder.close(); }
+  } finally { if (encoder.state !== 'closed') encoder.close(); }
   if (encoderError) throw encoderError;
   if (!description || chunks.length !== count)
     throw new Error(`HEVC encoder returned ${chunks.length}/${count} raster frames`);

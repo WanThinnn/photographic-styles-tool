@@ -16,6 +16,31 @@ const tiffBytes = (value, n, little) => {
   return little ? b.reverse() : b;
 };
 
+/** Camera model from the root TIFF IFD; missing/malformed metadata is unknown. */
+export function exifCameraModel(exifPayload) {
+  if (!exifPayload || exifPayload.length < 12) return null;
+  const start = tiffU(exifPayload, 0, 4, false) + 4;
+  const tiff = exifPayload.subarray(start);
+  const order = String.fromCharCode(...tiff.subarray(0, 2));
+  if (tiff.length < 8 || !['II', 'MM'].includes(order)) return null;
+  const little = order === 'II';
+  if (tiffU(tiff, 2, 2, little) !== 42) return null;
+  const offset = tiffU(tiff, 4, 4, little);
+  if (offset < 8 || offset + 2 > tiff.length) return null;
+  const count = tiffU(tiff, offset, 2, little);
+  if (offset + 2 + count * 12 + 4 > tiff.length) return null;
+  for (let i = 0; i < count; i++) {
+    const entry = offset + 2 + i * 12;
+    if (tiffU(tiff, entry, 2, little) !== 0x0110) continue;
+    if (tiffU(tiff, entry + 2, 2, little) !== 2) return null;
+    const size = tiffU(tiff, entry + 4, 4, little);
+    const at = size <= 4 ? entry + 8 : tiffU(tiff, entry + 8, 4, little);
+    if (size < 1 || size > 128 || at + size > tiff.length) return null;
+    return new TextDecoder().decode(tiff.subarray(at, at + size)).replace(/\0.*$/s, '');
+  }
+  return null;
+}
+
 function locateExifMakerNoteEntry(exifPayload) {
   // The Exif item payload starts with a 4-byte offset to the TIFF header.
   const tiffStart = tiffU(exifPayload, 0, 4, false) + 4;

@@ -69,8 +69,9 @@ test('AI appends auxiliary data without changing any existing image, HDR, Styles
   for(const type of ['irot','imir'])assert.deepEqual(propertyBoxBytes(output,after.props,depth,type),propertyBoxBytes(input,before.props,before.primary,type));
 });
 
-test('stable iPhone 16 core and raster converter remain byte-identical to the deployed commit',()=>{
-  for(const file of ['web/src/texture.js','web/src/port.js','web/src/graft.js','web/src/decode.js','web/src/raster/raster-import.js']){
+test('native iPhone 16 style algorithms remain byte-identical to the deployed commit',()=>{
+  // Raster encoder fallback changed intentionally; its behavior is checked separately.
+  for(const file of ['web/src/texture.js','web/src/port.js','web/src/graft.js','web/src/decode.js']){
     const head=execFileSync('rtk',['proxy','git','show',`693cdc891e67778c2fb879b9a9d34d9d9a8a7eb1:${file}`],{maxBuffer:2e6});
     assert.ok(head.equals(readFileSync(file)),`${file} changed`);
   }

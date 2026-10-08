@@ -724,3 +724,43 @@ were consolidated; native Texture/Styles algorithms remain unchanged.
 
 CI now checks copy, PWA assets and behavior, including a portable synthetic native Texture
 preservation fixture. Tests requiring private device photos remain explicitly optional.
+
+### 10.6 Legacy native Texture tone-curve compatibility fix (2026-10-09)
+
+The user reports Soft Skin/Glow/Film work on IMG_0754 and IMG_0762, but Glow/Film blacken
+IMG_0757 (source IMG_4850) and IMG_0766 (source IMG_4137). All four are iPhone 16 Pro front
+captures. Exif Software is 26.2 for both working captures and 18.2 for both failing ones.
+Working native Styles have `0=131087`, a 516-byte `3` tone curve, and `k=false`; failing
+sources have `0=14`, no `3`, and no `k`. Initial comparison identified this correlation.
+
+Both failing sources contain two XMP faces, skin and Portrait mattes; both exports contain
+two generated people entries and instances. The skin/person codec configurations match
+the working examples. Missing face detection does not explain these two failures on its
+own. Before the compatibility fix, web and Python `add_texture_bytes` outputs were byte-identical for each supplied source;
+the IMG_4850 output also matches the supplied IMG_0757 byte for byte. IMG_0766 differs from
+the current source's regenerated output in Exif/XMP, but original image/Styles/mask payloads
+are preserved. Nothing demonstrates that the renderer works merely because bytes match.
+
+`tools/texture-compatibility.py` creates private device diagnostics: A reserializes unchanged
+Styles values (control); B omits added people data and uses empty 2026 mattes; C adds only an
+identity tone curve; D adds that curve plus the observed newer version and k flag. All
+original payloads except the deliberately rewritten Styles, codec/property bytes and refs
+are checked unchanged. The user reports C and D offer all Texture effects, while A and B
+blacken under Glow and have no Soft Skin effect; C and D have equal colour/brightness.
+The browser therefore adopts only C: native version-14 Styles without key `3` receive
+the computed 516-byte identity curve. Existing curves are left byte-identical; version,
+k flag, coefficients, statistics and other values are retained. Other versions are
+outside this tested fix. The parser preserves real-number types during this serialization.
+
+The native writer deliberately replaces only that Styles payload and does not shift its
+new offset again when shifting untouched original extents. Its self-check validates all
+original payloads except that extension and every new/replaced item. Previously exported
+Texture files can be repaired by appending only the extended Styles and updating its
+extent; no Texture/matte duplication occurs. Outputs are named `_TextureFixed.HEIC`.
+New exports and repairs of both supplied sources passed preservation tests and browser
+Worker downloads; parsed Styles match the device-tested C variant. This is a web fix;
+the author's Python source remains unchanged as the diagnostic reference.
+
+The separate user-reported case where Soft Skin has no visible effect has not yet been
+matched to a supplied fixture; missing face regions or either source matte disables it by
+design, and generated landmarks/statistics remain approximate as described in section 7.

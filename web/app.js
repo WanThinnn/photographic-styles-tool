@@ -13,7 +13,7 @@ import { AI_STRINGS, blurPreview } from "./src/ai-portrait-ui.js";
 import {prepareBrowser} from './src/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
-import {readImageFile, addTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/heic-processing.js';
+import {readImageFile, addTextureInWorker, repairTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/heic-processing.js';
 import {formatBytes} from './src/result-metadata.js';
 
 const $ = (id) => document.getElementById(id);
@@ -392,11 +392,17 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
     if (d.stylesItem !== null) {
       // A native iPhone 16/17 style photo is never re-ported (that would replace its real
       // style data); it only gets the iOS 27 Texture/Grain set added.
-      if (hasTexture(d.infos)) { ui.set(T("err.hastexture"), "err"); return; }
       ui.set(T("st.working"));
-      ({ data } = await addTextureInWorker(bytes));
-      bits = [T("st.native"), T("st.texture")];
-      suffix = "_TextureGrain.HEIC";
+      if (hasTexture(d.infos)) {
+        ({data} = await repairTextureInWorker(bytes));
+        if (!data) { ui.set(T('err.hastexture'), 'err'); return; }
+        bits = [T('st.native'), T('st.texturerepaired')];
+        suffix = '_TextureFixed.HEIC';
+      } else {
+        ({ data } = await addTextureInWorker(bytes));
+        bits = [T("st.native"), T("st.texture")];
+        suffix = "_TextureGrain.HEIC";
+      }
     } else {
       const needsExperimental = d.hdrGrid === null
         || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));

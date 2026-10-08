@@ -4,7 +4,7 @@
 
 import { u, be, concat } from "./box.js";
 
-export function parseBplist(d) {
+export function parseBplist(d, {preserveReals = false} = {}) {
   if (String.fromCharCode(...d.subarray(0, 6)) !== "bplist")
     throw new Error("Not a binary plist");
   const trailer = d.length - 32;
@@ -52,8 +52,10 @@ export function parseBplist(d) {
         }
         return u(d, p + 1, n);
       }
-      case 0x20: // real
-        return lo === 2 ? view.getFloat32(p + 1) : view.getFloat64(p + 1);
+      case 0x20: { // real
+        const value = lo === 2 ? view.getFloat32(p + 1) : view.getFloat64(p + 1);
+        return preserveReals ? new BplistReal(value) : value;
+      }
       case 0x40: { // data
         const [count, q] = readSized(p);
         return d.subarray(q, q + count);

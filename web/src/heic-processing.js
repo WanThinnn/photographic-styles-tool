@@ -35,6 +35,7 @@ function run(job, decode) {
 }
 export const readImageFile = file => run({operation: 'read', file});
 export const addTextureInWorker = data => run({operation: 'texture', data});
+export const repairTextureInWorker = data => run({operation:'repair-texture',data});
 export const describeInWorker = data => run({operation: 'metadata', data});
 export function patchInWorker(data, profile, opts = {}) {
   const {decode, ...settings} = opts;

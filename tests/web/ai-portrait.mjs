@@ -79,9 +79,9 @@ test('portable native Texture regression preserves every original image payload'
   const metadata=await executeJob({operation:'metadata',data:output});
   assert.equal(metadata.bytes,output.byteLength);assert.ok(metadata.width>0&&metadata.height>0);
 });
-test('native iPhone 16 style algorithms remain byte-identical to the deployed commit',()=>{
-  // Raster encoder fallback changed intentionally; its behavior is checked separately.
-  const hashes={texture:'c84e1a9eee4100b22eebdc0c1decf8aebb60a6823946a62190c8a8f25383f7cd',port:'d427b78271aa46081977a759a1c9926dff4d080b9827bde1d518535ea7e0aa9d',graft:'8288599e2929a360b260c1c3c2734e2768d837375a1c923c64124d7a0eb4ce04'};
+test('native full-port style algorithms remain byte-identical to the deployed commit',()=>{
+  // Native Texture's missing-curve compatibility fix has its own preservation tests.
+  const hashes={port:'d427b78271aa46081977a759a1c9926dff4d080b9827bde1d518535ea7e0aa9d',graft:'8288599e2929a360b260c1c3c2734e2768d837375a1c923c64124d7a0eb4ce04'};
   for(const [file,hash] of Object.entries(hashes)){
     assert.equal(createHash('sha256').update(readFileSync(new URL(`../../web/src/${file}.js`,import.meta.url))).digest('hex'),hash,`${file} changed`);
   }

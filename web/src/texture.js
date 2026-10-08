@@ -5,13 +5,14 @@
 // AND iOS 27's twelve 2026 semantic mattes; the item without the mattes removes the whole
 // style palette. For a scene with no people every matte is the same empty 768x576 frame.
 
-import { topBox, metaChildren, findChild, be, concat } from "./box.js";
+import { topBox, metaChildren, findChild, be, concat, box } from "./box.js";
 import {
   discoverHeic, parseIloc, parseIinf, parseIpcoIpma, extractItem, propertyForItem,
   auxUriForItem, findItemsByType, appendIpcoProperty, addItems, auxcBox,
   propertyBoxBytes, dimensionsForItem, irotAngleForItem, MATTE_URIS,
 } from "./heif.js";
 import { buildBplist, BplistReal } from "./bplist.js";
+import {ensureLegacyTextureToneCurve} from './texture-compatibility.js';
 
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const hex = (s) => Uint8Array.from(s.match(/../g), (h) => parseInt(h, 16));
@@ -371,7 +372,8 @@ export function addTextureItems(meta, primary, people = null, grainSeed = null) 
 
 /**
  * Native iPhone 16/17 style photo -> the same photo plus Texture/Grain. Nothing is ported:
- * existing payloads stay byte-identical, meta grows and every extent offset moves with it,
+ * existing image payloads stay byte-identical; legacy v14 Styles missing a tone curve
+ * receive only a neutral curve. Meta grows and every extent offset moves with it,
  * and the new payloads go into one mdat appended at the end.
  */
 export function addTexture(data) {
@@ -393,6 +395,8 @@ export function addTexture(data) {
 
   const [newMeta, newPayloads, summary] = addTextureItems(data.slice(mo, mo + ms), d.primary,
     softSkinPeople(data, d), filmGrainSeed(data, d));
+  const toneCurve = ensureLegacyTextureToneCurve(extractItem(data, iloc, d.stylesItem));
+  if (toneCurve.added) newPayloads.set(d.stylesItem, toneCurve.data);
   const delta = newMeta.length - ms;
   const metaOut = newMeta.slice();
   const niloc = parseIloc(metaOut, topBox(metaOut, "meta"));
@@ -409,21 +413,46 @@ export function addTexture(data) {
   }
   if (cursor + extraLen >= 2 ** 32) throw new Error("file too large for 32-bit offsets");
   for (const [iid, it] of niloc.items)
-    if (external.has(iid))
+    if (external.has(iid) && !newPayloads.has(iid))
       for (const e of it.extents) metaOut.set(be(e.offset + delta, 4), e.offsetPos);
   const result = concat([
     data.subarray(0, mo), metaOut, tail,
     be(8 + extraLen, 4), new Uint8Array([0x6d, 0x64, 0x61, 0x74]), ...extra,
   ]);
 
-  // Self-check: every original payload byte-identical, every new one readable.
+  // Self-check: original payloads unchanged except the validated Styles extension;
+  // every new/replaced payload must be readable at its final offset.
   const check = discoverHeic(result);
   const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
   for (const iid of external.keys())
-    if (!same(extractItem(result, check.iloc, iid), extractItem(data, iloc, iid)))
+    if (!newPayloads.has(iid) && !same(extractItem(result, check.iloc, iid), extractItem(data, iloc, iid)))
       throw new Error(`self-check failed: item ${iid} changed`);
   for (const [iid, blob] of newPayloads)
     if (!same(extractItem(result, check.iloc, iid), blob))
       throw new Error(`self-check failed: new item ${iid} unreadable`);
-  return { data: result, report: { mode: "add-texture", texture: summary, metaGrowth: delta } };
+  return { data: result, report: { mode: "add-texture", texture: summary, metaGrowth: delta, toneCurveAdded: toneCurve.added } };
+}
+
+/** Repair a previously exported legacy file without adding duplicate Texture/mattes. */
+export function repairTextureCurve(data) {
+  const d = discoverHeic(data);
+  if (d.stylesItem === null || !hasTexture(d.infos)) return {data:null};
+  const curve = ensureLegacyTextureToneCurve(extractItem(data,d.iloc,d.stylesItem));
+  if (!curve.added) return {data:null};
+  const item = d.iloc.items.get(d.stylesItem);
+  if (d.iloc.offsetSize!==4 || d.iloc.lengthSize!==4 || d.iloc.baseOffsetSize!==0
+      || item.constructionMethod!==0 || item.extents.length!==1)
+    throw Error('Unsupported Styles layout for Texture repair');
+  if(data.length+8+curve.data.length>=2**32)throw Error('file too large for 32-bit offsets');
+  const result=concat([data,box('mdat',curve.data)]),extent=item.extents[0];
+  result.set(be(data.length+8,4),extent.offsetPos);
+  result.set(be(curve.data.length,4),extent.lengthPos);
+  const after=discoverHeic(result);
+  const same=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
+  for(const [id,entry] of d.iloc.items){
+    if(id===d.stylesItem || entry.constructionMethod!==0)continue;
+    if(!same(extractItem(data,d.iloc,id),extractItem(result,after.iloc,id)))throw Error(`Texture repair changed item ${id}`);
+  }
+  if(!same(extractItem(result,after.iloc,d.stylesItem),curve.data))throw Error('Texture repair self-check failed');
+  return {data:result,report:{mode:'repair-texture',toneCurveAdded:true}};
 }

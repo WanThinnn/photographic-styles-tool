@@ -249,7 +249,16 @@ This action rebuilds Styles; it
 cannot recover the selected native style, missing HDR, or guarantee aperture/Portrait
 Lighting editing. Choose an unmodified original HEIC from Files, add Texture first, and
 then reapply edits in Photos. Files that still contain native Styles use the existing
-`add-texture` route and preserve their original payloads.
+`add-texture` route and preserve their original image payloads.
+
+Legacy native Styles version 14 without a tone curve need one extra compatibility step:
+the app adds a neutral 516-byte curve to fix black Glow/Film rendering and inactive
+Soft Skin observed in device testing. It retains every other Styles value, including
+the native version, coefficients and statistics; existing curves are unchanged.
+HDR, depth, original masks and Exif remain byte-identical. A previously processed file
+with Texture and the same missing curve is repaired without duplicate Texture data;
+its download is named `_TextureFixed.HEIC`. Other already compatible Texture files
+still need no processing. This does not supply missing face regions or semantic masks.
 
 The standard mode requires an HDR gain map and known StyleDeltaMap dimensions. A missing
 thumbnail is generated locally using libheif decoding and FFmpeg.wasm x265

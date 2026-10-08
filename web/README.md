@@ -9,6 +9,55 @@ top-level README. It sends no photo data and no identifiers. The counter namespa
 so treat the number as a rough signal — anyone who knows the URL can increment it.
 Decoder and encoder libraries are also downloaded as described below; photos remain local.
 
+## AI Soft Skin supplementation
+
+Soft Skin supplementation is automatic, with no switch. After Styles/Texture conversion, a file that
+already has people entries, skin/person mattes and person instances skips AI. Otherwise,
+the browser runs the pinned BlazeFace, Face Landmarker and SelfieMulticlass ONNX models
+adapted from `ref/Elio-backup`. The runtime/models total about 34 MB on first use and are
+SHA-256 checked and cached. Requests download model files; no photograph is uploaded.
+Files already carrying the required data skip vision downloads/inference.
+
+The primary image supplies detection, 478 landmarks and six-class segmentation. The output
+contains 76 Apple-layout landmarks per face, skin/person masks, instance references and
+per-face statistics. Grayscale mattes use FFmpeg/x265, so a platform HEVC VideoEncoder is
+not required for supplementation. ONNX's worker is released before encoding to bound memory;
+HEIF insertion and preservation checks run in the existing processing worker. Source-native
+masks and native Styles remain untouched; generated masks can replace empty conversion slots.
+Model failure/no suitable face keeps the original converted result downloadable and records a
+localized explanation. Phone testing on IMG_0783 confirmed Soft Skin is active, but the user
+reports weaker smoothing than native iPhone 16/17 photos. Detection is not the smoothing
+algorithm: Photos renders the effect from our approximate masks and per-face metadata.
+SelfieMulticlass first segments the entire image at 256x256, then runs a square, padded
+256x256 crop for each detected face (up to five). Crop confidence is mapped back to its
+original position and softly blended inside the face contour, excluding eyes/lips/brows.
+The global pass remains the fallback for an empty or failed crop; confidence is not boosted.
+Native skin masks skip refinement. Crops run sequentially and transient canvases are released.
+SkinSmoothFaceRoughness now uses local-detail residual variance: the user found variant D
+smoother than A/B/C/E/F/G on IMG_0783, with Glow/Film working. Eye statistics still use the
+previous face-wide variance; all colour fields remain unchanged. This result is device-tested
+on one photo, not a reconstruction of Apple's private measurement or proof of native parity.
+
+A private A/B test compared existing HEIC colour metadata against generated neutral gain,
+range and high-key values, with identical AI data. The user found both equally too strong.
+The neutral override is retained only as a research helper and is not used by the website;
+the default HEIC metadata and raster profile were restored. Native Styles are never
+recalibrated. Earlier rejected thumbnail/light-map variants were not adopted either.
+
+The private G colour experiment changed only AI person/skin statistics: ToneMapped
+blocks use linear-light samples and LinearImage blocks use the existing scene factor 0.166.
+On IMG_0754/0762 this convention fits native person/skin percentiles better than the old
+encoded/unscaled AI estimates, but the model's masks differ from Apple's, and these two
+files are insufficient for calibration. Phone testing found G still too strong, just like
+the other variants; E/F (P3-linear thumbnail and neutral-gain combination) turned skin red
+at maximum Styles strength. All three colour experiments are rejected for the default
+conversion. Styles intensity on reconstructed photos remains unresolved.
+
+Run `node --test tests/web/soft-skin.mjs tests/web/face-refinement.mjs` for portable
+graph/preservation, crop-placement, confidence fallback and lighting-gradient tests. Real model fixtures
+can be downloaded with `node tools/download-soft-skin-fixtures.mjs`; private photographs and
+test outputs remain under ignored test directories and are never part of the deploy root.
+
 This directory is the deploy root and contains only site files. The Claude Artifact bundle
 lives in `../artifact/` and the Node tests in `../tests/web/` — neither is served, and
 nothing here depends on either.

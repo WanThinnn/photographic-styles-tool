@@ -37,6 +37,7 @@ export const readImageFile = file => run({operation: 'read', file});
 export const addTextureInWorker = data => run({operation: 'texture', data});
 export const repairTextureInWorker = data => run({operation:'repair-texture',data});
 export const describeInWorker = data => run({operation: 'metadata', data});
+export const installSoftSkinInWorker = (data,people,opts) => run({operation:'soft-skin',data,people,opts});
 export function patchInWorker(data, profile, opts = {}) {
   const {decode, ...settings} = opts;
   return run({operation: 'patch', data, profile, opts: {...settings, decode: Boolean(decode)}},

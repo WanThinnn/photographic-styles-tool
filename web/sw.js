@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v59`;
+const CACHE_NAME = `${CACHE_PREFIX}v63`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -59,6 +59,19 @@ const APP_SHELL = [
   "./src/styles.js",
   "./src/texture.js",
   "./src/texture-compatibility.js",
+  "./src/generated-style-metadata.js",
+  "./src/soft-skin.js",
+  "./src/soft-skin-container.js",
+  "./src/vision/face-mattes.js",
+  "./src/vision/face-refinement.js",
+  "./src/vision/face-canonical.js",
+  "./src/vision/matte-encoder.js",
+  "./src/vision/source.js",
+  "./src/vision/model-download.js",
+  "./src/vision/ort-assets.js",
+  "./src/vision/ort-vision.js",
+  "./src/vision/ort-vision-math.js",
+  "./src/vision/ort-inference-worker.js",
   "./src/raster/box.js",
   "./src/raster/bplist.js",
   "./src/raster/exif.js",

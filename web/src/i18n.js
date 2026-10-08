@@ -37,6 +37,13 @@
 
 export const STRINGS = {
   vi: {
+    "hint.softskin": "Tự bổ sung Soft Skin khi ảnh còn thiếu dữ liệu. Ảnh luôn được xử lý trên máy.",
+    "st.softskinworking": "Đang chuẩn bị Soft Skin…",
+    "st.softskindetect": "Đang nhận diện khuôn mặt…",
+    "st.softskinsegment": "Đang phân vùng da và người…",
+    "st.softskinadded": "Đã bổ sung dữ liệu Soft Skin bằng AI; kiểm tra hiệu ứng trong Ảnh.",
+    "st.softskinnoface": "AI chưa tìm thấy khuôn mặt phù hợp cho Soft Skin.",
+    "st.softskinunavailable": "Chưa bổ sung được Soft Skin. Hãy kiểm tra kết nối và thử lại; bản Styles vẫn dùng được.",
     "h.history": "Lịch sử xử lý",
     "btn.clearhistory": "Xóa lịch sử",
     "btn.retry": "Thử lại",
@@ -136,6 +143,13 @@ export const STRINGS = {
     "p.version": "Phiên bản",
   },
   en: {
+    "hint.softskin": "Missing Soft Skin data is added automatically. Photos are always processed on your device.",
+    "st.softskinworking": "Preparing Soft Skin…",
+    "st.softskindetect": "Detecting faces…",
+    "st.softskinsegment": "Segmenting skin and people…",
+    "st.softskinadded": "AI Soft Skin data added; check the effect in Photos.",
+    "st.softskinnoface": "AI found no suitable face for Soft Skin.",
+    "st.softskinunavailable": "Soft Skin could not be added. Check your connection and retry; the Styles copy is still usable.",
     "h.history": "Processing history",
     "btn.clearhistory": "Clear history",
     "btn.retry": "Try again",
@@ -261,6 +275,13 @@ export const STRINGS = {
   },
 
   zh: {
+    "hint.softskin": "自动补充缺失的柔肤数据。照片始终在本机处理。",
+    "st.softskinworking": "正在准备柔肤…",
+    "st.softskindetect": "正在识别人脸…",
+    "st.softskinsegment": "正在分割皮肤和人物…",
+    "st.softskinadded": "已添加 AI 柔肤数据；请在“照片”中检查效果。",
+    "st.softskinnoface": "AI 未找到适合柔肤的人脸。",
+    "st.softskinunavailable": "无法添加柔肤。请检查网络后重试；摄影风格副本仍可使用。",
     "h.history": "处理记录",
     "btn.clearhistory": "清空记录",
     "btn.retry": "重试",

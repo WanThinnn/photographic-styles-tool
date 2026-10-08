@@ -3,6 +3,7 @@ import {imageFormat} from './image-format.js';
 import {addTexture,repairTextureCurve} from './texture.js';
 import {patch} from './port.js';
 import {describeHeic} from './result-metadata.js';
+import {installSoftSkin} from './soft-skin-container.js';
 
 export async function executeJob(job, decode) {
   if (job.operation === 'read') {
@@ -13,6 +14,7 @@ export async function executeJob(job, decode) {
   if (job.operation === 'texture') return addTexture(job.data);
   if (job.operation === 'repair-texture') return repairTextureCurve(job.data);
   if (job.operation === 'metadata') return describeHeic(job.data);
+  if (job.operation === 'soft-skin') return {data:installSoftSkin(job.data,job.people,job.opts)};
   if (job.operation === 'patch') {
     const opts = {...job.opts};
     if (opts.decode) opts.decode = (_data, options) => decode(options);

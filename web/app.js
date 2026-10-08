@@ -15,6 +15,7 @@ import {prepareHevcAssets, releaseHevcEncoder} from './src/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
 import {readImageFile, addTextureInWorker, repairTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/heic-processing.js';
 import {formatBytes} from './src/result-metadata.js';
+import {hasSoftSkinData} from './src/soft-skin-container.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
@@ -67,6 +68,25 @@ for (const ev of ["pointerdown", "dragenter", "focus"]) drop.addEventListener(ev
 
 let lang = pickLanguage();
 const T = (key) => t(lang, key);
+async function addMissingSoftSkin(data,file,ui,options={}) {
+  if(hasSoftSkinData(data)) return data;
+  ui.set(T('st.softskinworking'));
+  try {
+    const {completeSoftSkin}=await import('./src/soft-skin.js');
+    const result=await completeSoftSkin(data,file,{...options,onProgress:progress=>{
+      if(progress.stage==='modelDownload') ui.set(`${T('st.softskinworking')} ${(progress.loaded/1048576).toFixed(1)} MB`);
+      else if(progress.stage==='detect') ui.set(T('st.softskindetect'));
+      else if(progress.stage==='segment') ui.set(T('st.softskinsegment'));
+      else ui.set(T('st.softskinworking'));
+    }});
+    ui.note(T(result.state==='generated'?'st.softskinadded':'st.softskinnoface'),'soft-skin');
+    return result.data;
+  } catch(error) {
+    console.warn('Soft Skin supplementation unavailable',error);
+    ui.note(T('st.softskinunavailable'),'soft-skin');
+    return data;
+  }
+}
 
 let profileIndex = null;
 const profileCache = new Map();
@@ -361,6 +381,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
         return;
       }
       const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
+      result.data=await addMissingSoftSkin(result.data,file,ui);
       const date = photoCaptureDate(result.data);
       const output = new File([result.data], outName, {type: "image/heic",
         ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {})});
@@ -395,9 +416,10 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       ui.set(T("st.working"));
       if (hasTexture(d.infos)) {
         ({data} = await repairTextureInWorker(bytes));
-        if (!data) { ui.set(T('err.hastexture'), 'err'); return; }
-        bits = [T('st.native'), T('st.texturerepaired')];
-        suffix = '_TextureFixed.HEIC';
+        if (!data && hasSoftSkinData(bytes)) { ui.set(T('err.hastexture'), 'err'); return; }
+        bits = data ? [T('st.native'), T('st.texturerepaired')] : [T('st.native'),T('st.texture')];
+        suffix = data ? '_TextureFixed.HEIC' : '_SoftSkin.HEIC';
+        data ||= bytes;
       } else {
         ({ data } = await addTextureInWorker(bytes));
         bits = [T("st.native"), T("st.texture")];
@@ -444,6 +466,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       if (needsExperimental) bits.push(T("st.experimental"));
       suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
     }
+    data=await addMissingSoftSkin(data,file,ui,{nativeStyles:d.stylesItem!==null,sourceBytes:bytes});
     ui.set(`${T("st.ready")} — ${bits.join(sep)}`, "ok");
 
     const outName = file.name.replace(/\.[^.]+$/, "") + suffix;

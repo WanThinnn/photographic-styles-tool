@@ -100,7 +100,7 @@ function moveItemToIdat(meta, iid, payload) {
   return out;
 }
 
-function rebuildHeic(data, d, ftyp, meta, payloads) {
+export function rebuildHeic(data, d, ftyp, meta, payloads) {
   const ft = topBox(data, "ftyp");
   const mo = d.meta.off, ms = d.meta.size;
   if (ft.off !== 0 || mo < ft.size) throw new Error("Expected ftyp first and meta after it");
@@ -222,7 +222,8 @@ export async function graftPatch(targetData, profile, opts = {}) {
     ispe: propertyBoxBytes(targetData, td.props, thumb, "ispe"),
     pixi: propertyBoxBytes(targetData, td.props, thumb, "pixi"),
   };
-  let blob = profile.retained.get(Number(manifest.donor_styles_item));
+  let blob = opts.stylesBlob || profile.retained.get(Number(manifest.donor_styles_item));
+  report.styleMetadata = opts.stylesBlob ? 'generated-neutral' : 'profile';
 
   const measure = async (req) => {
     const rgb = await opts.decode(targetData, req);

@@ -507,8 +507,9 @@ Up to v0.5.1, Soft Skin looked the same as Standard on every port and every `add
 - Values are rounded to 1e-6 and written by the same bplist layout in Python and the browser,
   so both builds produce identical bytes.
 
-Photos without face regions or either matte are left exactly as v0.5.1 wrote them: nothing is
-detected or invented. 🔍 Open: turned faces (the template is frontal), measured `instanceROI`,
+The upstream Python path leaves photos without face regions or either matte as v0.5.1 wrote
+them: nothing is detected or invented. The browser now offers AI supplementation (§10.7).
+🔍 Open: turned faces (the template is frontal), measured `instanceROI`,
 and whether the colour statistics matter; a measured `instanceROI` was not needed.
 
 ---
@@ -761,6 +762,116 @@ New exports and repairs of both supplied sources passed preservation tests and b
 Worker downloads; parsed Styles match the device-tested C variant. This is a web fix;
 the author's Python source remains unchanged as the diagnostic reference.
 
-The separate user-reported case where Soft Skin has no visible effect has not yet been
-matched to a supplied fixture; missing face regions or either source matte disables it by
-design, and generated landmarks/statistics remain approximate as described in section 7.
+The separate older-iPhone case is now represented by IMG_0783 (§10.7). Upstream Soft Skin
+still requires source faces and both masks; the browser can generate missing data using AI.
+
+### 10.7 AI supplementation and generated Styles baseline (2026-10-09)
+
+IMG_0783's actual Exif reports iPhone 11 Pro Max, 2020-10-25 10:34:22 +07:00, 4032×3024.
+The supplied file has a 768×576 depth auxiliary and its disparity/blur sidecar, but no MWG
+face regions, skin matte, Portrait effect matte, native Styles or separate HDR gain map.
+Portrait depth alone therefore cannot enable the source-only `softSkinPeople` path.
+
+The browser adapts Elio-backup's pinned ONNX BlazeFace/478-point landmarker/SelfieMulticlass
+pipeline. It runs automatically, without a user switch, when Texture lacks people entries,
+skin/person mattes or instances. Original primary/HDR/depth/Exif resources are kept; native
+Styles and masks are not recalibrated. Generated masks can replace empty conversion slots.
+Face entries retain 76 Apple-layout landmarks, real-number types and distinct per-face IDs;
+instance XMP keys match their entries. Inference resources are released before software
+grayscale HEVC encoding; item insertion/self-checks run in the HEIC worker. No face or model
+failure keeps the converted file usable. Models total about 34 MB, use pinned SHA-256 and
+persistent cache, and no photo is uploaded. ONNX produces approximations of private Apple
+data, not reconstructed capture metadata.
+
+Real desktop Chrome inference found two faces in IMG_0783, generated masks/people/instances,
+and the website processed/downloaded an enriched HEIC through its normal UI. Portable
+tests verify native Styles and every untouched payload/property/reference, idempotence,
+no-face behavior, real-number types and matching instance keys. The user's phone test
+confirmed Soft Skin is active in both A and B, but reported less smoothing than native
+iPhone 16/17 photos. Physical Safari memory behavior still requires phone tests.
+
+Two private IMG_0783 outputs use the same AI data: A keeps prior colour metadata; B uses a
+generated identity/neutral baseline with Gain=1, h=0.25, range [0,1] and adjusted high-key.
+Original pixels and gain map are unchanged. The user reports A and B are equally too strong.
+This experiment did not fix colour. Its default website override and raster h change were
+reverted; the neutral helper remains research-only. The saved Web_SoftSkin fixture was
+generated before this rollback and equals B, not the current default output. Earlier
+rejected linear-thumbnail/light-map variants were not adopted. Native Styles are excluded
+from colour experiments. Real browser checks also passed for JPEG supplementation, PNG
+with no suitable face, and failed model downloads retaining the Styles download.
+
+Soft Skin strength has not been calibrated against Apple's renderer. The current detector
+found both faces. The initial SelfieMulticlass whole-image pass has 256x256 output; §10.8
+adds per-face refinement. Low resolution can limit detail on small faces but does not prove
+the cause of weaker smoothing. SkinSmoothFaceRoughness initially used face luminance variance,
+not a validated Apple roughness estimator, and eye statistics reuse face-wide measurements.
+These approximations and mask coverage should be isolated in controlled tests before
+attributing the difference to model capacity or increasing effect strength.
+
+### 10.8 Per-face segmentation and isolated rendering experiments (2026-10-09)
+
+The browser now runs one padded square segmentation crop for each detected face, sequentially
+and with no user switch. The existing model sees each crop at 256x256 rather than the whole
+photograph. Confidence is reprojected into the original image and softly blended only inside
+that face's skin contour (eyes, lips and eyebrows excluded). Failed/empty crops preserve the
+whole-image fallback. No confidence multiplier is applied. Native skin masks and complete
+native Soft Skin data remain protected. Transient crop/detection/statistics canvases are released.
+
+Real Chrome inference on IMG_0783 refined both faces, with mean crop confidence 0.809 and
+0.893. This confirms pipeline operation, not equivalent smoothing to Apple. At this stage,
+the normal web download was byte-identical to experiment B; §10.9 switches it to D.
+All seven experiment outputs retain every
+source item payload except the expected MakerNote Exif update; primary/depth are unchanged.
+The new local-detail roughness proxy rejects a broad illumination gradient in portable tests.
+Its numerical scale is not calibrated to Apple; it became the default after device testing (§10.9).
+
+Private outputs live under ignored `tests/private-fixtures/IMG_0783_Refinement/`:
+
+| Variant | Isolated change |
+| --- | --- |
+| A_GlobalMasks | Original whole-image skin/face-skin masks; same metadata/person instances as B |
+| B_FaceCrops | Per-face skin/face-skin masks; face-wide variance; previous website default |
+| C_FaceCrops_NativeMedian | B, only SkinSmoothFaceRoughness replaced with upstream native median 0.0121 |
+| D_FaceCrops_LocalDetail | B, only SkinSmoothFaceRoughness replaced with a local-detail residual variance; current website default |
+| E_FaceCrops_LinearP3 | B, genuine P3-linear Main10 thumbnail |
+| F_FaceCrops_LinearP3_Neutral | E, generated neutral colour metadata |
+| G_FaceCrops_LinearPersonStats | B, only Styles person/skin statistics changed to linear-light conventions |
+
+C/D differ from B only in the Texture plist, one roughness scalar per face. G differs from
+B only in the Styles plist, using linear samples for ToneMapped person/skin blocks, scaling
+LinearImage person/skin samples by 0.166, and linearizing the skin RGB channel percentiles.
+Capture gain/high-key, masks, roughness, original pixels and all other item payloads are held
+constant. E/F/G remain experiments and are not selected by normal website conversion.
+
+A diagnostic comparison on native IMG_0754/0762 reused whole-image AI masks to estimate
+the same regions. Across p10/p25/p50/p75/p98, ToneMapped encoded estimates had MAE
+0.224–0.342 versus 0.057–0.112 with linear estimates; unscaled LinearImage estimates had
+MAE 0.325–0.385 versus 0.010–0.017 with factor 0.166. This supports a metadata-convention
+hypothesis, not a proven colour fix: two samples and approximate masks are insufficient
+for full calibration, and it cannot explain pre-AI colour complaints on its own. Apple Photos
+comparison was subsequently reported (§10.9), rejecting this hypothesis as a colour fix.
+
+### 10.9 Device-selected Soft Skin default; colour experiments rejected (2026-10-09)
+
+On the same IMG_0783 phone comparison the user found D's skin visibly smoother than A, B,
+C, E, F and G. Glow/Film worked. The website now selects exactly D: face-crop masks with
+SkinSmoothFaceRoughness calculated from local-detail residual variance. Only that smoothing
+scalar changes; face colour, eye statistics, Styles metadata, thumbnails and mask encodings
+are retained from B. Existing complete/native Soft Skin data continues to skip AI.
+
+The user separately confirmed ALL variants still have excessively strong Styles colour.
+E/F additionally turned skin red at maximum strength. G's closer numerical fit to two native
+files did not translate into a visual improvement. E/F/G are therefore rejected for default
+conversion. This evidence does not establish the renderer's cause; colour intensity on
+reconstructed Styles remains unresolved. No new colour calibration is enabled by adopting D.
+
+The native-equivalence claim remains unproven; D's observed improvement is one tested photo,
+not a general calibration of Apple's roughness estimator. The preserved A–G fixtures record
+the experiment as originally tested and must not be regenerated with new defaults.
+
+Normal-browser verification after adoption produced an IMG_0783 download byte-identical to
+the preserved D fixture (SHA-256 5d6ca75de9b94258451a958f9bb7eb6e92805b4e77b232196c3c44bce4c6c1e3).
+The JPEG path also generated local-detail roughness for both faces while retaining the old
+eye variance. Portable regression checks: 47 passed, 10 optional-fixture skips, no failures;
+i18n, syntax and PWA/offline checks passed. This does not extend the physical phone result
+to untested photographs or claim a colour fix.

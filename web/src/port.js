@@ -340,7 +340,8 @@ export async function patch(targetData, profile, opts = {}) {
   // Styles plist edits.
   const donorStyles = Number(manifest.donor_styles_item);
   if (payloads.has(donorStyles)) {
-    let blob = payloads.get(donorStyles);
+    let blob = opts.stylesBlob || payloads.get(donorStyles);
+    report.styleMetadata = opts.stylesBlob ? 'generated-neutral' : 'profile';
     // Measuring the photo is an enhancement, never a requirement. A decoder that is
     // missing, blocked or simply broken must cost quality, not the whole port - so
     // failures here fall back to the donor values rather than propagating.

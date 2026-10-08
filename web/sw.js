@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v56`;
+const CACHE_NAME = `${CACHE_PREFIX}v58`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -9,6 +9,9 @@ const APP_SHELL = [
   "./styles.css",
   "./app.js",
   "./src/ai-portrait.js",
+  "./src/ai-inference.js",
+  "./src/ai-inference-worker.js",
+  "./src/libheif-lifecycle.js",
   "./src/ai-portrait-container.js",
   "./src/ai-portrait-ui.js",
   "./src/ai-portrait-blur.js",
@@ -39,6 +42,7 @@ const APP_SHELL = [
   "./src/startup.js",
   "./src/heic-worker.js",
   "./src/heic-processing.js",
+  "./src/result-metadata.js",
   "./src/ffmpeg-assets.js",
   "./src/ffmpeg-hevc.js",
   "./src/ffmpeg-worker.js",
@@ -82,6 +86,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL))
+      .catch(error => console.warn('Offline cache unavailable:', error))
       .then(() => self.skipWaiting())
   );
 });
@@ -96,6 +101,7 @@ self.addEventListener("activate", (event) => {
       ))
       // Remove temporary photo copies made by the retired download experiment.
       .then(() => caches.delete('psport-local-downloads-v1'))
+      .catch(error => console.warn('Cache cleanup unavailable:', error))
       .then(() => self.clients.claim())
   );
 });
@@ -110,17 +116,19 @@ function isolated(response) {
 
 
 async function networkFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
+  let cache;
+  try { cache = await caches.open(CACHE_NAME); } catch {}
   try {
     // Revalidate instead of trusting the HTTP cache (GitHub Pages allows 10 minutes), so a
     // freshly deployed page never runs with stale scripts or copy. Unchanged files cost a 304.
     // A navigation Request cannot be re-initialised, so it is refetched by URL.
     const response = await fetch(request.mode === "navigate" ? request.url : request,
                                  { cache: "no-cache" });
-    if (response.ok) await cache.put(request, response.clone());
+    if (response.ok && cache) try { await cache.put(request, response.clone()); } catch {}
     return isolated(response);
   } catch (error) {
-    const cached = await cache.match(request, { ignoreSearch: true });
+    let cached;
+    try { cached = await cache?.match(request, { ignoreSearch: true }); } catch {}
     if (cached) return isolated(cached);
     throw error;
   }
@@ -152,8 +160,9 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       networkFirst(request).catch(async () => {
-        const cached = await caches.match("./index.html");
-        return isolated(cached);
+        let cached;
+        try { cached = await caches.match("./index.html"); } catch {}
+        return isolated(cached || new Response('Offline. Please reconnect and retry.', {status:503}));
       })
     );
     return;

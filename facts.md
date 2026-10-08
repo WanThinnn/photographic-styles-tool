@@ -687,7 +687,9 @@ and properties were checked unchanged. The user reports both render too strongly
 Styles, with B stronger than A. Thus this thumbnail replacement did not improve this
 case and was not adopted as a runtime fix. It does not prove thumbnail data is irrelevant
 or identify the cause. Follow-up C changes only the two main scene-statistics blocks to
-donor values; D changes only c/d maps to donor flat maps. Device results are pending.
+donor values; D changes only c/d maps to donor flat maps. The user reports A/C are
+equivalent and B/D are equivalent. These variants did not improve the reported colour;
+the user stopped this research. None was adopted in the runtime.
 
 ### 10.4 AI opt-in and stable result actions
 
@@ -703,3 +705,22 @@ group spans the result width so the pair does not initially occupy half a deskto
 Real WebGPU inference in fresh-profile desktop Chrome produced bokeh previews when
 AI was enabled after PNG conversion and before JPEG conversion. Button x positions
 and widths were equal before/after AI completion. iPhone Safari remains untested here.
+
+### 10.5 Reliability and compact results (2026-10-08)
+
+Result headings now show filename above the success dot and outcome, wrapping naturally on
+small screens. Details report camera, dimensions, source/output sizes, capture time and
+HDR/depth resources, without promising Photos Portrait controls. Metadata failures are
+informational and cannot remove download buttons. Worker transfer lists only include
+typed image buffers, not the numeric metadata file size. Shared icons have rounded corners.
+
+SW installation/activation tolerate unavailable Cache Storage, and successful network
+responses survive cache quota failures. AI inference runs in a terminable WebGPU worker;
+the switch and per-result stop button cancel it, with a two-minute deadline. Desktop Chrome
+produced previews before/after JPEG/PNG conversion. Worker WebGPU on physical iPhone Safari
+still requires validation. libheif releases every returned image handle and its native
+decoder context; decode failures are per image. Only identical raster box/HEVC tag helpers
+were consolidated; native Texture/Styles algorithms remain unchanged.
+
+CI now checks copy, PWA assets and behavior, including a portable synthetic native Texture
+preservation fixture. Tests requiring private device photos remain explicitly optional.

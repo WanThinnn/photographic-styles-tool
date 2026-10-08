@@ -14,6 +14,10 @@ Object.assign(AI_STRINGS.zh,{hint:'在网页调整散景和焦点，导出含风
 Object.assign(AI_STRINGS.en,{hint:'Adjust bokeh and focus in the browser; export HEIC with Styles. Enable before or after conversion. Skips native Styles/depth.'});
 Object.assign(AI_STRINGS.zh,{hint:'在网页调整散景和焦点，导出含风格的 HEIC。可在转换前后开启；跳过原生风格和深度。'});
 
+Object.assign(AI_STRINGS.vi,{cancel:'Dừng AI',cancelled:'Đã dừng AI. Ảnh Styles vẫn có thể tải.',timeout:'AI mất quá lâu. Bạn có thể thử lại; ảnh Styles vẫn có thể tải.'});
+Object.assign(AI_STRINGS.en,{cancel:'Stop AI',cancelled:'AI stopped. Your Styles photo is still available.',timeout:'AI took too long. Retry, or download your Styles photo.'});
+Object.assign(AI_STRINGS.zh,{cancel:'停止 AI',cancelled:'AI 已停止，风格照片仍可下载。',timeout:'AI 处理超时。可重试或下载风格照片。'});
+
 export function blurPreview(result,host,strings,exportImage) {
   const {width:w,height:h,gray,previewRgb:rgb,orientation:{angle,mirror}}=result;
   const source=document.createElement('canvas');source.width=w;source.height=h;

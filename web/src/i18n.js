@@ -380,6 +380,9 @@ export const STRINGS = {
 };
 
 const STORE_KEY = "psport.lang";
+Object.assign(STRINGS.vi, {'meta.camera':'Máy ảnh', 'meta.dimensions':'Kích thước', 'meta.size':'Dung lượng', 'meta.resources':'Dữ liệu ảnh', 'meta.depth':'Depth gốc', 'meta.capture':'Chụp lúc'});
+Object.assign(STRINGS.en, {'meta.camera':'Camera', 'meta.dimensions':'Dimensions', 'meta.size':'File size', 'meta.resources':'Image data', 'meta.depth':'Source depth', 'meta.capture':'Captured'});
+Object.assign(STRINGS.zh, {'meta.camera':'相机', 'meta.dimensions':'尺寸', 'meta.size':'文件大小', 'meta.resources':'图像数据', 'meta.depth':'原始深度', 'meta.capture':'拍摄时间'});
 STRINGS.vi['ai.download'] = 'Tải bản depth';
 STRINGS.en['ai.download'] = 'Download depth test';
 STRINGS.zh['ai.download'] = '下载深度测试';

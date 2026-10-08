@@ -2,6 +2,7 @@ import {discoverHeic} from './heif.js';
 import {imageFormat} from './image-format.js';
 import {addTexture} from './texture.js';
 import {patch} from './port.js';
+import {describeHeic} from './result-metadata.js';
 
 export async function executeJob(job, decode) {
   if (job.operation === 'read') {
@@ -10,6 +11,7 @@ export async function executeJob(job, decode) {
     return {bytes, format, discovery: format === 'heic' ? discoverHeic(bytes) : null};
   }
   if (job.operation === 'texture') return addTexture(job.data);
+  if (job.operation === 'metadata') return describeHeic(job.data);
   if (job.operation === 'patch') {
     const opts = {...job.opts};
     if (opts.decode) opts.decode = (_data, options) => decode(options);
@@ -38,7 +40,7 @@ if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
     try {
       const result = await executeJob(message, decode);
       const bytes = result.data || result.bytes;
-      self.postMessage({id: message.id, result}, bytes ? [bytes.buffer] : []);
+      self.postMessage({id: message.id, result}, bytes instanceof Uint8Array ? [bytes.buffer] : []);
     } catch (error) {
       self.postMessage({id: message.id, error: error.message});
     }

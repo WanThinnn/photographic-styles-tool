@@ -272,6 +272,18 @@ existing results are queued when the switch is enabled; native Styles/depth sour
 show a visible skip message. Original save/download buttons stay in place while the
 AI preview appears and are labelled as the unblurred Styles result.
 
+AI inference runs in a dedicated WebGPU worker. **Stop AI** and turning the switch off
+terminate active inference; a two-minute deadline stops stalled jobs. Styles downloads
+remain available. GPU support in a worker is required; physical iPhone Safari validation
+is still pending. Decoder image handles and native contexts are released after sampling,
+and one failed photo does not disable analysis for subsequent photos.
+
+Result headings show the filename above the success dot and short outcome. Expanded details
+show camera, dimensions, file size, capture time and available HDR/depth resources.
+These resource labels do not guarantee Portrait editing in Photos. Cache storage failures
+do not discard valid network responses or prevent online startup. Regression checks run
+in CI, including a synthetic native Texture fixture that requires no personal photos.
+
 **Experimental support for SDR and resized HEIC photos** is selected automatically
 when the file needs it; there is no checkbox to enable. Native style photos retain
 their original route. This mode adds Styles metadata to the original photo graph, with an estimated

@@ -57,6 +57,7 @@ const mod = typeof raw === "function" ? raw() : raw;
 const resolved = mod && typeof mod.then === "function" ? await mod : mod;
 if (resolved?.ready?.then) await resolved.ready;
 check("calling the factory yields HeifDecoder", typeof resolved?.HeifDecoder === "function");
+check("native context cleanup is exported", typeof resolved?.heif_context_free === "function");
 
 // Typed arrays must come from the sandbox realm; emscripten uses instanceof.
 const intoSandbox = (buf) => {

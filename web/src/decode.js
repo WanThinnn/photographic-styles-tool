@@ -6,6 +6,7 @@
 // Python reference byte for byte.
 
 import { discoverHeic, extractItem } from "./heif.js";
+import {releaseLibheif} from './libheif-lifecycle.js';
 
 const LIBHEIF_URL = "https://cdn.jsdelivr.net/npm/libheif-js@1.18.2/libheif/libheif.js";
 
@@ -68,6 +69,7 @@ function orientationTransform(ctx, w, h, angle, mirror) {
 }
 
 let cache = new WeakMap();
+export function releaseDecodeCache() { cache = new WeakMap(); }
 
 const be = (v, n) => { const b = new Uint8Array(n); for (let i = n - 1; i >= 0; i--) { b[i] = v & 0xff; v = Math.floor(v / 256); } return b; };
 const cat = (parts) => {
@@ -123,7 +125,9 @@ async function decodeFull(bytes) {
   try { source = thumbnailHeic(bytes); } catch { source = null; }
   const stored = source !== null;
   const decoder = new libheif.HeifDecoder();
-  const images = decoder.decode(source || bytes);
+  let images;
+  try {
+  images = decoder.decode(source || bytes);
   if (!images || !images.length) throw new Error("libheif decoded no image");
   const image = images[0];
   const w = image.get_width(), h = image.get_height();
@@ -139,6 +143,7 @@ async function decodeFull(bytes) {
   const result = { canvas, w, h, stored };
   cache.set(bytes, result);
   return result;
+  } finally { releaseLibheif(libheif, decoder, images); }
 }
 
 /**
@@ -171,5 +176,7 @@ export async function decodeToRgb(bytes, { width, height, angle = 0, mirror = nu
   for (let i = 0, p = 0; p < data.length; i += 3, p += 4) {
     rgb[i] = data[p]; rgb[i + 1] = data[p + 1]; rgb[i + 2] = data[p + 2];
   }
+  small.width = small.height = 0;
+  if (canvas !== decoded) canvas.width = canvas.height = 0;
   return rgb;
 }

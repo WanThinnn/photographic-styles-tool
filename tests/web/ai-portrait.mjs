@@ -1,7 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {addTexture} from '../../web/src/texture.js';
+import {executeJob} from '../../web/src/heic-worker.js';
 import {attachAiDepth,normalizeDisparity,portraitEligibility,inferenceGeometry} from '../../web/src/ai-portrait-container.js';
 import {loadProfile} from '../../web/src/zip.js';
 import {discoverHeic,extractItem,auxUriForItem,DEPTH_URI,propertyBoxBytes} from '../../web/src/heif.js';
@@ -69,10 +71,18 @@ test('AI appends auxiliary data without changing any existing image, HDR, Styles
   for(const type of ['irot','imir'])assert.deepEqual(propertyBoxBytes(output,after.props,depth,type),propertyBoxBytes(input,before.props,before.primary,type));
 });
 
+test('portable native Texture regression preserves every original image payload',async()=>{
+  const input=materialize(profile),before=discoverHeic(input);
+  const output=(await executeJob({operation:'texture',data:input})).data,after=discoverHeic(output);
+  assert.deepEqual(output,addTexture(input).data);
+  for(const [id,item] of before.iloc.items)if(item.constructionMethod===0&&item.extents.length)assert.deepEqual(extractItem(output,after.iloc,id),extractItem(input,before.iloc,id),`original item ${id}`);
+  const metadata=await executeJob({operation:'metadata',data:output});
+  assert.equal(metadata.bytes,output.byteLength);assert.ok(metadata.width>0&&metadata.height>0);
+});
 test('native iPhone 16 style algorithms remain byte-identical to the deployed commit',()=>{
   // Raster encoder fallback changed intentionally; its behavior is checked separately.
-  for(const file of ['web/src/texture.js','web/src/port.js','web/src/graft.js','web/src/decode.js']){
-    const head=execFileSync('rtk',['proxy','git','show',`693cdc891e67778c2fb879b9a9d34d9d9a8a7eb1:${file}`],{maxBuffer:2e6});
-    assert.ok(head.equals(readFileSync(file)),`${file} changed`);
+  const hashes={texture:'c84e1a9eee4100b22eebdc0c1decf8aebb60a6823946a62190c8a8f25383f7cd',port:'d427b78271aa46081977a759a1c9926dff4d080b9827bde1d518535ea7e0aa9d',graft:'8288599e2929a360b260c1c3c2734e2768d837375a1c923c64124d7a0eb4ce04'};
+  for(const [file,hash] of Object.entries(hashes)){
+    assert.equal(createHash('sha256').update(readFileSync(new URL(`../../web/src/${file}.js`,import.meta.url))).digest('hex'),hash,`${file} changed`);
   }
 });

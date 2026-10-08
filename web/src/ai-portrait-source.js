@@ -1,11 +1,12 @@
 import {loadLibheif} from './decode.js';
+import {releaseLibheif} from './libheif-lifecycle.js';
 
 // Independent of the stable thumbnail decoder used for Styles statistics.
 // Always sample the primary photo; release the full-resolution surface before
 // allocating the GPU model. Returned canvas is in the HEIC's stored orientation.
 export async function aiSourceCanvas(data,{width,height,angle=0,mirror=null},sourceFile){
   const blob=sourceFile||new Blob([data],{type:'image/heic'});
-  let bitmap,image,decoder,full;
+  let bitmap,image,decoder,full,libheif,images;
   const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
   const ctx=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'});
   ctx.imageSmoothingQuality='high';
@@ -17,8 +18,8 @@ export async function aiSourceCanvas(data,{width,height,angle=0,mirror=null},sou
       if(mirror===0)ctx.scale(-1,1);else if(mirror===1)ctx.scale(1,-1);
       ctx.drawImage(bitmap,-sw/2,-sh/2,sw,sh);
     }else{
-      const libheif=await loadLibheif();decoder=new libheif.HeifDecoder();
-      const images=decoder.decode(sourceFile?new Uint8Array(await sourceFile.arrayBuffer()):data);
+      libheif=await loadLibheif();decoder=new libheif.HeifDecoder();
+      images=decoder.decode(sourceFile?new Uint8Array(await sourceFile.arrayBuffer()):data);
       if(!images?.length)throw Error('AI primary photo decode failed');
       image=images[0];full=document.createElement('canvas');
       full.width=image.get_width();full.height=image.get_height();
@@ -35,7 +36,7 @@ export async function aiSourceCanvas(data,{width,height,angle=0,mirror=null},sou
     }
     ctx.resetTransform();return canvas;
   }catch(error){canvas.width=canvas.height=0;throw error;}
-  finally{bitmap?.close();if(full)full.width=full.height=0;image?.free?.();decoder?.free?.();}
+  finally{bitmap?.close();if(full)full.width=full.height=0;releaseLibheif(libheif,decoder,images);}
 }
 
 export function rgbSample(canvas,width,height){

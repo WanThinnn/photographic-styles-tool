@@ -3,7 +3,7 @@ import { profileFor, VERSION, UNSUPPORTED } from "./src/port.js";
 import { dimensionsForItem } from "./src/heif.js";
 import { styleDeltaSize } from "./src/graft.js";
 import { hasTexture } from "./src/texture.js";
-import { decodeToRgb, loadLibheif } from "./src/decode.js";
+import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/decode.js";
 import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js";
 import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
 import { RASTER_MIMES } from "./src/image-format.js";
@@ -13,7 +13,8 @@ import { AI_STRINGS, blurPreview } from "./src/ai-portrait-ui.js";
 import {prepareBrowser} from './src/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
-import {readImageFile, addTextureInWorker, patchInWorker, releaseHeicProcessor} from './src/heic-processing.js';
+import {readImageFile, addTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/heic-processing.js';
+import {formatBytes} from './src/result-metadata.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
@@ -38,7 +39,7 @@ clearHistory.addEventListener('click', () => {
   resultCleanups.clear();
   for (const url of resultUrls) URL.revokeObjectURL(url);
   resultUrls.clear(); livePhotos.length = 0; liveMovies.clear(); aiCandidates.length = 0;
-  list.replaceChildren(); fileInput.value = ''; decodeAvailable = null;
+  list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
   releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor(); refreshHistoryButton();
 });
 const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
@@ -49,6 +50,7 @@ function translateAi() {
 }
 aiPortrait.addEventListener('change', () => {
   translateAi();
+  if (!aiPortrait.checked) for (const candidate of aiCandidates) candidate.controller?.abort();
   if (aiPortrait.checked) {
     for (const candidate of aiCandidates) {
       if (['new', 'failed'].includes(candidate.state)) queueTask(() => runAiCandidate(candidate));
@@ -117,24 +119,21 @@ async function getProfile(name) {
 // Probe with a real decode of a real photo. Checking only that the script loaded
 // says nothing about whether it can actually decode, and a decoder that loads but
 // cannot decode is the failure mode that is hardest to notice.
-let decodeAvailable = null;
 async function ensureDecode(bytes) {
-  if (decodeAvailable !== null) return decodeAvailable;
   try {
     await loadLibheif();
     await decodeToRgb(bytes, { width: 8, height: 8 });
-    decodeAvailable = true;
+    return true;
   } catch (e) {
     console.warn("image analysis unavailable, using neutral settings:", e);
-    decodeAvailable = false;
+    return false;
   }
-  return decodeAvailable;
 }
 
 function row(name) {
   const el = document.createElement("div");
   el.className = "row";
-  el.innerHTML = `<div class="name"></div><div class="status"></div><div class="act"></div>`;
+  el.innerHTML = `<div class="result-header"><div class="name"></div><div class="status"></div></div><div class="act"></div>`;
   el.querySelector(".name").textContent = name;
   el.querySelector(".name").title = name;
   list.appendChild(el);
@@ -156,10 +155,35 @@ function row(name) {
     return host;
   }
   return {
+    async metadata(data, inputSize, {raster = false, raw = false} = {}) {
+      let m;
+      try { m = await describeInWorker(data); }
+      catch (error) { console.warn('Metadata unavailable:', error); return; }
+      const values = [['meta.camera', m.camera], ['meta.dimensions', `${m.width} × ${m.height}`],
+        ['meta.size', `${formatBytes(inputSize)} → ${formatBytes(m.bytes)}`],
+        ['meta.resources', [raster ? 'SDR' : m.hdr ? 'HDR' : 'SDR', ...(m.depth ? [T('meta.depth')] : []), ...(raw ? ['RAW → HEIC'] : [])].join(' · ')]];
+      if (m.capture) values.push(['meta.capture', `${m.capture.date}${m.capture.subsec ? '.' + m.capture.subsec : ''}${m.capture.offset ? ' ' + m.capture.offset : ''}`]);
+      // Reuse the compact native details control; metadata never includes GPS or face regions.
+      this.note('', 'metadata');
+      const note = el.querySelector('[data-note="metadata"]');
+      const grid = document.createElement('dl'); grid.className = 'result-metadata';
+      for (const [key, value] of values) {
+        if (!value) continue;
+        const field = document.createElement('div'), label = document.createElement('dt'), content = document.createElement('dd');
+        label.dataset.i18n = key; label.textContent = T(key); content.textContent = value;
+        field.append(label, content); grid.append(field);
+      }
+      note.replaceWith(grid);
+    },
     aiState(text) {
       let state=el.querySelector('.ai-status');
       if(!state){state=document.createElement('p');state.className='ai-status';el.append(state);}
       state.textContent=text;
+    },
+    cancelAi(controller) {
+      const button=document.createElement('button');button.type='button';button.className='dl alt ai-cancel';button.textContent=aiText().cancel;
+      button.addEventListener('click',()=>controller.abort());el.append(button);
+      return ()=>button.remove();
     },
     preview(result,name) {
       const details = document.createElement('details');
@@ -191,12 +215,21 @@ function row(name) {
     set(text, cls) {
       const s = el.querySelector(".status");
       s.textContent = cls === 'ok' ? T("st.ready") : text;
+      delete s.dataset.i18n;
+      el.classList.toggle('is-ready', cls === 'ok');
+      if (cls !== 'ok') el.querySelector('.result-notice')?.remove();
       if (cls === 'info') {
         const icon = document.createElement('span');
         icon.className = 'status-info-icon'; icon.textContent = 'i'; icon.setAttribute('aria-hidden', 'true');
         s.prepend(icon);
       }
-      if (cls === 'ok') this.note(text, 'processing');
+      if (cls === 'ok') {
+        const label = document.createElement('span');
+        label.dataset.i18n = 'st.ready'; label.textContent = T('st.ready');
+        const notice = document.createElement('span'); notice.className = 'result-notice';
+        notice.textContent = ' — ' + text.replace(`${T('st.ready')} — `, '');
+        s.replaceChildren(label, notice);
+      }
       s.className = `status ${cls || ""}`;
     },
     note(text, kind = "live") {
@@ -266,21 +299,25 @@ async function runAiCandidate(candidate) {
   const {ui, name, sourceFile} = candidate;
   if (candidate.skip) { candidate.state = 'skipped'; ui.aiState(aiText().skip); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
+  const controller=new AbortController();candidate.controller=controller;
+  const removeCancel=ui.cancelAi(controller);
+  const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),120000);
   try {
     const {createAiPortrait} = await import('./src/ai-portrait.js');
     const data = new Uint8Array(await candidate.outputFile.arrayBuffer());
-    const result = await createAiPortrait(data,stage => ui.aiState(aiText()[stage] || stage),sourceFile);
+    const result = await createAiPortrait(data,stage => ui.aiState(aiText()[stage] || stage),sourceFile,{signal:controller.signal});
     candidate.state = 'done';
     ui.preview(result,name);ui.aiState('');ui.note(aiText().ready,'ai');
   } catch(error) {
-    candidate.state = 'failed';
+    candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
-    ui.aiState(error.message==='WEBGPU'?aiText().gpu:aiText().failed);
-  }
+    ui.aiState(error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+  } finally {clearTimeout(deadline);removeCancel();candidate.controller=null;}
 }
 
 async function handleFile(file, {allowStyleRebuild = false, existingUi = null} = {}) {
   const ui = existingUi || row(file.name);
+  const inputSize = file.size;
   try {
     ui.set(T("st.reading"));
     const input = await readImageFile(file);
@@ -332,6 +369,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       showCaptureDate(ui, date);
       if (navigator.canShare?.({files: [output]})) ui.share(output);
       ui.link(output, outName);
+      await ui.metadata(result.data, inputSize, {raster: true, raw: input.format === 'dng'});
       await tryAiPortrait(null,output,ui,file.name,file);
       return;
     }
@@ -411,6 +449,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
     showCaptureDate(ui, date);
     if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile, !!liveIdentifier);
     ui.link(new Blob([data], { type: "image/heic" }), outName);
+    await ui.metadata(data, inputSize);
     if (liveIdentifier) {
       ui.note(T("live.waitmovie"));
       const photo = { identifier: liveIdentifier, source: bytes, output: data, name: outName, ui };
@@ -429,8 +468,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
 }
 
 function showCaptureDate(ui, date) {
-  ui.note(date ? `${T("date.kept")} ${date.date}${date.subsec ? '.' + date.subsec : ''}${date.offset ? ' ' + date.offset : ''}`
-    : T("date.missing"), "date");
+  if (!date) ui.note(T('date.missing'), 'date');
 }
 
 async function handleFiles(files) {

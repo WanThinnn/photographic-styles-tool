@@ -63,7 +63,13 @@
   <p id="ai-portrait-hint" class="ai-hint" hidden></p>
   </div>
 
-  <div class="history-actions"><button id="clear-history" class="dl alt" type="button" data-i18n="btn.clearhistory" hidden></button></div>
+  <div class="history-actions">
+    <h2 data-i18n="h.history"></h2>
+    <button id="clear-history" class="history-clear" type="button" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7"/></svg>
+      <span data-i18n="btn.clearhistory"></span>
+    </button>
+  </div>
   <div id="list" aria-live="polite"></div>
   <p id="boot"></p>
 

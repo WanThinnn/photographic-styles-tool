@@ -83,7 +83,13 @@ body{background:radial-gradient(ellipse at 8% 5%,#0894ff20,transparent 48%),radi
 .output-actions:not(:has(>.dl~.dl))>.dl{grid-column:1/-1;justify-self:center;min-width:min(240px,100%)}
 .row .act>.rebuild-style{grid-column:1/-1;justify-self:center;max-width:100%;white-space:normal;text-align:center;padding-inline:24px}
 .dl.alt{border:1.5px solid var(--muted)}
-.history-actions{display:flex;justify-content:center}.history-actions:has(button[hidden]){display:none}
+.history-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 4px 0;margin-bottom:-8px}.history-actions:has(button[hidden]){display:none}
+.history-actions h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--fg)}
+.history-clear{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:none;min-height:44px;padding:8px 10px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--muted);font:500 12px var(--sans);transition:background .15s,color .15s,border-color .15s}
+.history-clear svg{width:16px;height:16px;flex:none}
+.history-clear:disabled{opacity:.45;cursor:wait}
+@media(hover:hover){.history-clear:hover:not(:disabled){background:var(--surface);border-color:var(--line);color:var(--fg)}}
+.history-clear:active:not(:disabled){background:var(--surface);color:var(--fg)}
 [hidden]{display:none!important}
 #drop[aria-disabled="true"]{cursor:wait;opacity:.65}
 #boot{text-align:center;color:var(--muted)}#boot.err{color:var(--err)}

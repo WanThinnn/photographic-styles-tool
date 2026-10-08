@@ -37,7 +37,8 @@
 
 export const STRINGS = {
   vi: {
-    "btn.clearhistory": "Xóa lịch sử xử lý",
+    "h.history": "Lịch sử xử lý",
+    "btn.clearhistory": "Xóa lịch sử",
     "btn.retry": "Thử lại",
     "st.preparing": "Đang chuẩn bị công cụ cho lần sử dụng đầu tiên…",
     "err.setup": "Chưa chuẩn bị được công cụ. Hãy kiểm tra kết nối và mở trang bằng HTTPS, rồi thử lại.",
@@ -97,7 +98,7 @@ export const STRINGS = {
     "err.notheic": "Định dạng ảnh không được hỗ trợ. Chọn HEIC, JPG, PNG, WebP, GIF, BMP hoặc AVIF.",
     "err.unsupported": "Chưa hỗ trợ file HEIC này.",
     "err.hastexture": "Ảnh đã có Kết cấu và Hạt, không cần xử lý thêm.",
-    "err.stylesmissing": "File này thiếu dữ liệu Styles gốc của iPhone. Hãy thêm Texture vào HEIC gốc chưa chỉnh từ Tệp, rồi chỉnh lại trong Ảnh. Chuyển đổi bản này sẽ tạo Styles mới; không khôi phục HDR đã thiếu, màu có thể đổi và nút ƒ có thể mất.",
+    "err.stylesmissing": "Ảnh thiếu Styles gốc. Tạo Styles mới có thể đổi màu và không khôi phục HDR hoặc chỉnh ƒ. Nên dùng HEIC gốc chưa chỉnh.",
     "btn.rebuildstyle": "Tạo Styles mới (thử nghiệm)",
     "warn.stylerebuild": "Bạn đã chọn tạo Styles mới từ bản thiếu dữ liệu Styles gốc. Kết quả không khôi phục Styles đã chỉnh hoặc HDR đã thiếu; màu có thể thay đổi, chỉnh khẩu độ ƒ và Ánh sáng chân dung có thể không còn trong Ảnh.",
     "err.nohdr": "Không tìm thấy bản đồ tăng sáng HDR được hỗ trợ. Web và công cụ dòng lệnh đều chưa hỗ trợ HEIC này.",
@@ -135,7 +136,8 @@ export const STRINGS = {
     "p.version": "Phiên bản",
   },
   en: {
-    "btn.clearhistory": "Clear processing history",
+    "h.history": "Processing history",
+    "btn.clearhistory": "Clear history",
     "btn.retry": "Try again",
     "st.preparing": "Preparing the tool for first use…",
     "err.setup": "Could not prepare the tool. Check your connection and open the page over HTTPS, then try again.",
@@ -200,7 +202,7 @@ export const STRINGS = {
     "err.notheic": "Unsupported image format. Choose HEIC, JPG, PNG, WebP, GIF, BMP or AVIF.",
     "err.unsupported": "This HEIC isn’t supported yet.",
     "err.hastexture": "This photo already has Texture and Grain. Nothing to do.",
-    "err.stylesmissing": "This file is missing the iPhone's native Styles data. Add Texture to the unmodified original HEIC from Files, then reapply your edits in Photos. Converting this copy creates new Styles; it cannot restore missing HDR, colours may change and aperture ƒ may disappear.",
+    "err.stylesmissing": "Native Styles are missing. New Styles may change colours and won’t restore HDR or ƒ editing. Use an unedited original HEIC if possible.",
     "btn.rebuildstyle": "Create new Styles (experimental)",
     "warn.stylerebuild": "You chose to create new Styles from a copy missing native Styles data. The result cannot restore edited Styles or missing HDR; colours may change, and aperture ƒ and Portrait Lighting editing may be unavailable in Photos.",
     "err.nohdr": "No supported HDR gain map was found. This HEIC is unsupported by both the web and command-line tool.",
@@ -259,7 +261,8 @@ export const STRINGS = {
   },
 
   zh: {
-    "btn.clearhistory": "清空处理记录",
+    "h.history": "处理记录",
+    "btn.clearhistory": "清空记录",
     "btn.retry": "重试",
     "st.preparing": "正在准备首次使用…",
     "err.setup": "无法准备工具。请检查网络连接，并通过 HTTPS 打开网页后重试。",
@@ -323,7 +326,7 @@ export const STRINGS = {
     "err.notheic": "不是 HEIC 照片。可能已被 iOS 转换，请参阅“遇到问题”。",
     "err.unsupported": "暂不支持此 HEIC 文件。",
     "err.hastexture": "此照片已带有质感与颗粒，无需处理。",
-    "err.stylesmissing": "此文件缺少 iPhone 原生摄影风格数据。请从“文件”选取未经编辑的原始 HEIC，添加质感后再在“照片”中重新编辑。转换此副本会创建新风格；无法恢复丢失的 HDR，颜色可能改变，光圈 ƒ 控件可能消失。",
+    "err.stylesmissing": "照片缺少原生风格数据。新风格可能改变颜色，无法恢复 HDR 或 ƒ 编辑。建议使用未经编辑的原始 HEIC。",
     "btn.rebuildstyle": "创建新风格（实验性）",
     "warn.stylerebuild": "你已选择为缺少原生摄影风格数据的副本创建新风格。结果无法恢复已编辑的风格或丢失的 HDR；颜色可能改变，“照片”中的光圈 ƒ 和人像光效编辑可能不可用。",
     "err.nohdr": "未找到支持的 HDR 增益图。网页版和命令行工具均不支持此 HEIC 文件。",

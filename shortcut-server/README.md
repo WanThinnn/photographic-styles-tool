@@ -9,6 +9,11 @@ The server runs the unmodified `photographic_style_port.py`, so results are iden
 command-line tool, including the default encoder mode the iPhone cannot run on its own.
 Photos are processed in a temporary folder and deleted as soon as they are sent back.
 
+The server receives the file supplied by Shortcuts, not the complete Photos asset or
+its edit history. An edited export may lack native Styles/HDR or aperture/Portrait
+Lighting editing resources; the Python route cannot restore missing resources. Results
+remain dependent on the input file, as described in [facts.md §10](../facts.md).
+
 > [!CAUTION]
 > **Only use a shortcut server you run yourself, on your own computer.**
 >

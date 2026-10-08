@@ -6,8 +6,10 @@ WebGPU stops the experiment without falling back to CPU inference.
 
 Sources already containing native Styles or a HEVC depth auxiliary bypass AI.
 The existing Styles/Texture export is produced first and remains available even
-if AI fails. `port.js`, `graft.js`, `texture.js`, `decode.js` and the raster
-converter are unchanged from 693cdc8.
+if AI fails. `port.js`, `graft.js`, `texture.js` and `decode.js` are unchanged
+from 693cdc8; the raster converter now retries failed platform encoding with the
+software encoder. AI can be enabled before selection or after conversion; existing
+eligible results are queued, and skipped sources show a visible explanation.
 
 The editor provides blur amount and relative far-to-near focus sliders, plus
 tap-to-focus. Both preview and export use a WebGL2 disk-aperture bokeh shader
@@ -24,8 +26,8 @@ then generates a fresh HEIC with Styles and Texture/Grain. It never scales up
 the preview to make the export. Changing focus/blur invalidates the generated
 file until the user creates it again. Encoding work is serialized with imports.
 PNG is used only as an internal lossless bridge; there is no PNG preview download
-or unblurred depth-test download. The original Styles export remains in details
-as a fallback. Pixel changes require HEVC re-encoding; the AI output is SDR sRGB,
+or unblurred depth-test download. The original Styles save/download controls stay
+in place and are labelled as the unblurred result. Pixel changes require HEVC re-encoding; the AI output is SDR sRGB,
 and does not preserve native HDR or enable editable Apple Portrait controls.
 
 The initial model/runtime download is approximately 120 MB. The FP32 network

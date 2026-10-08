@@ -88,12 +88,18 @@ uv run photographic_style_port.py add-texture IN.HEIC OUT.HEIC   # native style 
 
 Use `inspect` before patching when diagnosing why a photo behaves unexpectedly.
 
+For edited iPhone 16/17 exports, inspect native Styles, HDR and depth separately.
+Missing native Styles causes `patch` to build new Styles, not preserve the user's
+previous edit. Neither Python nor the browser can recover resources absent from the
+input. Depth/sidecar preservation alone does not guarantee aperture ƒ or Portrait
+Lighting editing in Photos; see the project root `facts.md` §10.
+
 ## Rules
 
 - **Never write the output over the input**, and never patch a file in place. These are
   irreplaceable photos and the tool is experimental.
 - **Do not delete or move the user's originals**, including after a successful patch.
-- Tell the user that transferring the result to an iPhone must be done **as a file**. Going
-  through the Photo Library converts HEIC to JPEG and discards everything this tool adds.
+- Transfer the result to an iPhone **as a file** to avoid conversion. Some Photo Library
+  picking/sharing routes convert formats or export rendered copies that lose edit resources.
 - Results are not validated by Apple and vary by photo. Report what the tool did; do not
   promise that the palette will appear.

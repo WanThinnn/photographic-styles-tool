@@ -69,7 +69,7 @@ understood or not yet in its final form.
 | Ordinary thumbnail | The photo's own, or encoded from the primary if missing | Photo's own / map | ✅ | – |
 | Exif, Make/Model unchanged | The photo's own | Photo's own | ✅ | – |
 | Orientation `irot` / `imir` | The photo's own | Photo's own | ✅ | – |
-| Item graph (IDs, `iref`, `ipma`, `ipco`, grids) | The photo's own, plus the style items (v0.6.2, §3); donor template only for sizes without a known StyleDeltaMap | Photo's own / format | ✅ | 48 MP photos (640-pixel delta tiles) not handled |
+| Item graph (IDs, `iref`, `ipma`, `ipco`, grids) | The photo's own, plus the style items (v0.6.2, §3); donor template only for sizes without a known StyleDeltaMap | Photo's own / format | ✅ | Standard full port does not reconstruct 48 MP / 640-pixel delta tiles; native add-texture keeps existing ones (§3) |
 | `mdat` and `iloc` offsets | Rebuilt | Format | ✅ | – |
 
 **Style palette**
@@ -212,7 +212,10 @@ Sorted by the five kinds in §1. The donor row is the open issue in §8.
 | 3088×2316 (front) | 2240×1680 | 5×4 |
 | portrait-stored | the same, swapped | |
 
-8064×6048 (48 MP) natives use 640-pixel delta tiles and are not handled yet.
+8064×6048 (48 MP) natives use 640-pixel delta tiles; reconstructing that layout is not
+handled by the standard full-port route. Native `add-texture` preserves an existing
+delta map rather than reconstructing it. The browser's estimated experimental geometry
+is a separate, unvalidated route, not support for reproducing that native layout.
 
 **Phone A/B** (v0.6.2): 48/12 photos with and without an encoder, a Portrait photo with a face
 (Portrait, people layers, Soft Skin), and 24 MP / 12 MP re-saved photos without thumbnail or
@@ -319,7 +322,9 @@ work.
   encode Main10 with libx265, then move the sample and its `hvcC` in together. ✅
 - **`reuse-thumbnail`** (v0.4.4): reuse the photo's own 8-bit thumbnail, which needs no encoder.
   Its `pixi` is shared with other items, so a new one is appended and only the linear thumbnail
-  points to it. This is the only mode the browser build uses. ✅
+  points to it. The browser reuses a present thumbnail; when absent, it generates a
+  Main10 linear thumbnail locally with libheif and FFmpeg.wasm. ✅ for the tested reuse path;
+  browser generation remains subject to device verification.
 - With neutral coefficients, flat light maps and a neutral delta map, the linear thumbnail is
   the renderer's **only spatially varying input**. A misoriented one is therefore the main
   possible source of blocky or patchy results.
@@ -674,6 +679,15 @@ missing native style graph. No speculative change to these values was shipped.
 Further colour optimization requires controlled captures and Photos save/reopen/re-edit
 comparisons; compare those fields while changing one setting at a time and keep the
 native add-texture path untouched.
+
+Private colour test on iPhone 7 source `IMG_2132` (2026-10-08): variant A used the
+current browser output; B replaced only its linear-thumbnail auxiliary with explicitly
+P3-linear Main10 samples, preserving A's Styles plist and Exif. Original image payloads
+and properties were checked unchanged. The user reports both render too strongly under
+Styles, with B stronger than A. Thus this thumbnail replacement did not improve this
+case and was not adopted as a runtime fix. It does not prove thumbnail data is irrelevant
+or identify the cause. Follow-up C changes only the two main scene-statistics blocks to
+donor values; D changes only c/d maps to donor flat maps. Device results are pending.
 
 ### 10.4 AI opt-in and stable result actions
 

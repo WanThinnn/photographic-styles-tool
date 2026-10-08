@@ -3,10 +3,11 @@
 The static site published to GitHub Pages. Everything runs in the visitor's browser; photos
 are never uploaded.
 
-`countVisit()` in `app.js` is the site's only outbound request: a fire-and-forget ping to
+`countVisit()` in `app.js` is the site's visit-counter request: a fire-and-forget ping to
 `abacus.jasoncameron.dev` on load, once per browser session, feeding the visits badge in the
 top-level README. It sends no photo data and no identifiers. The counter namespace is public,
 so treat the number as a rough signal — anyone who knows the URL can increment it.
+Decoder and encoder libraries are also downloaded as described below; photos remain local.
 
 This directory is the deploy root and contains only site files. The Claude Artifact bundle
 lives in `../artifact/` and the Node tests in `../tests/web/` — neither is served, and
@@ -16,7 +17,7 @@ nothing here depends on either.
 
 `.github/workflows/pages.yml` publishes this directory on every push that touches it. Enable
 it once under **Settings → Pages → Source → GitHub Actions**. There is no build step; the
-workflow checks three things before uploading:
+workflow downloads and verifies the pinned AI assets, then checks three things before uploading:
 
 - no `.heic`/`.heif` anywhere under `web/` — a guard against publishing a personal photo
 - the two donor profiles are present and non-empty
@@ -39,9 +40,9 @@ all first-party JavaScript. Paths stay relative so the same files work at the ro
 domain or under a GitHub Pages project subpath.
 
 The cache uses the network first when available, then falls back to its saved copy. This
-keeps the deployed app current without giving up offline use. The optional libheif decoder
-and visit counter are third-party requests and are deliberately not persisted by the service
-worker; without the decoder, photo analysis falls back to the tested donor-statistics path.
+keeps the deployed app current without giving up offline use. Encoder and AI downloads
+use their own verified asset caches when storage is available. The visit counter is not
+cached. Without the HEIC decoder, tone analysis falls back to donor statistics.
 
 After changing runtime files or the manifest, check that the offline asset list is complete:
 
@@ -53,16 +54,18 @@ node tests/web/check-pwa.mjs
 
 | | |
 |---|---|
-| Size | ~140 KB total, including both donor profiles |
-| Requests | `index.html`, `app.js`, seven modules, one profile per photo layout |
-| External | one optional script — see below |
-| Headers | none needed; nothing uses `SharedArrayBuffer` |
+| Processing | Local JavaScript, module workers and WASM; both donor profiles are bundled |
+| Encoder | About 32 MB of verified assets, prepared automatically |
+| AI | Optional model/runtime downloads; see `AI-PORTRAIT.md` |
+| Isolation | HTTPS or localhost; the service worker supplies isolation headers for WASM |
 
-## The one external dependency
+## Downloaded libraries
 
 Measuring a photo's own tone and light needs a HEIC decoder, and browsers other than Safari
-do not have one. `src/decode.js` loads libheif from jsDelivr for that, lazily — only when the
-analysis option is on, and only on the first photo.
+do not have one. `src/decode.js` loads libheif from jsDelivr when decoding is needed.
+FFmpeg encoder assets are prepared during startup; DNG imports also load LibRaw.
+AI assets are prepared when AI is enabled. See the source URLs and integrity hashes
+in the corresponding loader modules for the pinned versions.
 
 Nothing is uploaded to it; it is a script fetch. If it fails, or if you switch it off, the
 port still runs and falls back to donor statistics and flat light maps — which is exactly the
@@ -91,20 +94,19 @@ cached when available, without keeping an unused encoder instance in memory.
 
 Two iOS behaviours are handled explicitly:
 
-- **Picking from the Photo Library gives you a JPEG.** iOS transcodes on the way in and
-  throws away everything the port needs. The file input therefore sets no `accept`
-  attribute, so **Browse** is offered and files chosen from Files arrive untouched. Uploads
-  are sniffed by magic bytes and a transcoded one is named as such rather than failing
-  obscurely.
+- **Picking from the Photo Library may return a rendered or converted copy.** It can
+  omit native Styles, HDR or Portrait editing resources even when the file remains HEIC.
+  Prefer an unmodified original from Files when preserving these features. The picker
+  accepts supported image/video formats; uploads are identified by their contents.
 - **Getting the result back into Photos.** Where the browser supports sharing files, a
   **Save to Photos** button hands the finished `.heic` to the native share sheet, so
   **Save Image** puts it straight in the library. A normal download sits alongside it.
 
 ## Editing the copy
 
-Every word the page shows, in both languages, is in `src/i18n.js`. `index.html` has no text
-of its own — elements carry `data-i18n` keys and are filled in at load and when the language
-button is pressed.
+The main interface translations are in `src/i18n.js`; AI preview translations are in
+`src/ai-portrait-ui.js`. Vietnamese, English and Simplified Chinese are supported.
+Elements with `data-i18n` keys are filled in at load and when the language selector changes.
 
 ```bash
 python -m http.server -d web 8000   # then edit src/i18n.js and reload
@@ -112,11 +114,11 @@ node tests/web/check-i18n.mjs       # after editing
 ```
 
 The checker catches the two mistakes that are otherwise invisible until someone switches
-language: a key added to one language but not the other, and a key `index.html` asks for that
+language: a key missing from a language, and a key `index.html` asks for that
 no longer exists.
 
-Adding a third language means adding a block to `STRINGS` with the same keys; the button
-cycles between exactly two, so more than that needs a small change to the switch in `app.js`.
+Adding a language requires matching translation keys in both translation modules and
+an option in the language selector. Run the checker after changing the copy.
 
 ## Correctness
 

@@ -44,9 +44,12 @@ patched one back. It runs entirely on your machine; nothing is uploaded.
 
 **https://nathanatgit.github.io/Shalielie/**
 
-The browser build includes Texture/Grain and native-photo mode. The one thing it cannot do is
-patch a photo without an embedded thumbnail, because the browser has no HEVC encoder to create
-one; use the command-line tool for those.
+The browser build in this repository includes Texture/Grain, native-photo mode, JPG/PNG and
+other raster imports, DNG development, Live Photo resource pairing and optional AI bokeh.
+It can generate missing HEIC thumbnails locally with a verified WASM encoder. First-visit
+setup prepares the browser automatically; see [web/README.md](web/README.md) for requirements.
+Raster/DNG and AI bokeh exports are newly encoded SDR images, unlike the HEIC metadata-only
+route. AI requires WebGPU and does not enable editable Apple Portrait controls.
 
 It runs the same porting logic as the Python tool, checked against it item by item (byte for byte where the plist packing allows) — see
 [`web/README.md`](web/README.md) for how that is verified, and for the two iPhone quirks it
@@ -118,8 +121,8 @@ uv run photographic_style_port.py patch INPUT.HEIC OUTPUT.HEIC
 ```
 
 Copy the output to your iPhone and open it in Photos — Edit should now offer the style palette,
-with Texture/Grain on iOS 27. Send it as a **file**, not through the Photo Library, which
-re-encodes HEIC to JPEG and strips everything this tool adds.
+with Texture/Grain on iOS 27. Transfer it as a **file** to avoid conversion. Some Photos
+sharing/picking paths export rendered copies or convert formats, losing editing resources.
 
 `patch` chooses what to do from the photo:
 
@@ -196,8 +199,12 @@ device — is documented in **[facts.md](facts.md)**.
 - **Supported sizes: 12 MP, 24 MP and front-camera photos**, in any tile layout. The style data
   is added to the photo's own file structure, which needs the size of the style's delta map;
   48 MP photos (and any other size) fall back to the two built-in layouts (48/12 and 45/15).
-- **Photos without an embedded thumbnail** need the default (encoder) mode, not the browser or
-  no-encoder mode.
+- **Photos without an embedded thumbnail** need an encoder: the default CLI mode or the
+  browser's automatic thumbnail generation. CLI no-encoder mode cannot handle them.
+- **Edited Photos exports may lack native Styles/HDR and full Portrait editing resources.**
+  Keeping depth does not guarantee aperture ƒ or Portrait Lighting. The browser explains
+  missing native Styles on iPhone 16/17 exports before rebuilding; Python cannot restore
+  resources absent from its input either. See [facts.md §10](facts.md).
 - **Texture/Grain needs iOS 27** on the phone that opens the photo.
 - **A normal photo cannot be turned into a "people" photo.** Portrait data is only ever copied
   from the photo itself, never invented.

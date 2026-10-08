@@ -134,8 +134,11 @@ function row(name) {
       b.type = "button";
       b.textContent = T(live ? "btn.savestill" : "btn.save");
       b.addEventListener("click", async () => {
+        if (b.disabled) return;
+        b.disabled = true;
         try { await navigator.share({ files: [file] }); }
         catch (e) { if (e.name !== "AbortError") b.textContent = T("btn.blocked"); }
+        finally { b.disabled = false; }
       });
       el.querySelector(".act").appendChild(b);
     },

@@ -377,7 +377,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
           }, {analyze: quality.checked});
       } catch (error) {
         console.error("Raster conversion failed", file.name, error);
-        ui.set(T(/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
+        ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
         return;
       }
       const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
@@ -386,11 +386,11 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       const output = new File([result.data], outName, {type: "image/heic",
         ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {})});
       ui.set(`${T("st.ready")} — ${T("st.rasterready")}`, "ok");
-      ui.note(result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
+      ui.note(result.hdr?T('raster.hdr'):result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
       showCaptureDate(ui, date);
       if (navigator.canShare?.({files: [output]})) ui.share(output);
       ui.link(output, outName);
-      await ui.metadata(result.data, inputSize, {raster: true, raw: input.format === 'dng'});
+      await ui.metadata(result.data, inputSize, {raster: !result.hdr, raw: input.format === 'dng'});
       await tryAiPortrait(null,output,ui,file.name,file);
       return;
     }

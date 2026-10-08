@@ -37,6 +37,8 @@
 
 export const STRINGS = {
   vi: {
+    "raster.hdr": "Đã chuyển dữ liệu HDR từ JPEG gốc. Hãy kiểm tra bản sao trong Ảnh.",
+    "err.hdrjpeg": "Chưa chuyển được HDR của JPEG này. Chưa tạo bản HEIC để tránh mất HDR; hãy giữ ảnh gốc.",
     "hint.softskin": "Tự bổ sung Soft Skin khi ảnh còn thiếu dữ liệu. Ảnh luôn được xử lý trên máy.",
     "st.softskinworking": "Đang chuẩn bị Soft Skin…",
     "st.softskindetect": "Đang nhận diện khuôn mặt…",
@@ -143,6 +145,8 @@ export const STRINGS = {
     "p.version": "Phiên bản",
   },
   en: {
+    "raster.hdr": "HDR data transferred from the original JPEG. Check the copy in Photos.",
+    "err.hdrjpeg": "Could not transfer this JPEG's HDR. No HEIC was created to avoid losing HDR; keep the original.",
     "hint.softskin": "Missing Soft Skin data is added automatically. Photos are always processed on your device.",
     "st.softskinworking": "Preparing Soft Skin…",
     "st.softskindetect": "Detecting faces…",
@@ -275,6 +279,8 @@ export const STRINGS = {
   },
 
   zh: {
+    "raster.hdr": "已转移原始 JPEG 的 HDR 数据。请在“照片”中检查副本。",
+    "err.hdrjpeg": "无法转移此 JPEG 的 HDR。为避免丢失 HDR，未创建 HEIC；请保留原图。",
     "hint.softskin": "自动补充缺失的柔肤数据。照片始终在本机处理。",
     "st.softskinworking": "正在准备柔肤…",
     "st.softskindetect": "正在识别人脸…",

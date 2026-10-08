@@ -214,7 +214,7 @@ export function extractRasterExif(data) {
 }
 
 /** Minimal Apple Exif for newly encoded raster pixels (stored Orientation=6). */
-export function buildAppleStyleExif(mn54, makerType = 7) {
+export function buildAppleStyleExif(mn54, makerType = 7, orientation = 6) {
   const bytes = text => new TextEncoder().encode(text);
   const maker = concat([
     bytes('Apple iOS'), new Uint8Array([0, 0, 1]), bytes('MM'), be(1, 2),
@@ -223,7 +223,7 @@ export function buildAppleStyleExif(mn54, makerType = 7) {
   ]);
   const tiff = concat([
     bytes('MM'), be(42, 2), be(8, 4), be(2, 2),
-    be(0x0112, 2), be(3, 2), be(1, 4), be(6, 2), be(0, 2),
+    be(0x0112, 2), be(3, 2), be(1, 4), be(orientation, 2), be(0, 2),
     be(0x8769, 2), be(4, 2), be(1, 4), be(38, 4), be(0, 4),
     be(1, 2), be(0x927c, 2), be(7, 2), be(maker.length, 4), be(56, 4),
     be(0, 4), maker,
@@ -238,12 +238,12 @@ export function ensureAppleStyleExif(sourceExif, mn54, makerType = 7) {
 }
 
 /** Keep source camera/GPS/date fields; use the newly encoded raster geometry. */
-export function preserveRasterExif(sourceExif, styleExif, {width, height} = {}) {
-  return preserveExifWithStyleMarker(sourceExif, styleExif, {width, height});
+export function preserveRasterExif(sourceExif, styleExif, {width, height, orientation = 6} = {}) {
+  return preserveExifWithStyleMarker(sourceExif, styleExif, {width, height, orientation});
 }
 
 // Append IFD tables so all original TIFF-relative value offsets remain valid.
-function preserveExifWithStyleMarker(sourceExif, styleExif, {width, height, keepImageMetadata = false} = {}) {
+function preserveExifWithStyleMarker(sourceExif, styleExif, {width, height, orientation = 6, keepImageMetadata = false} = {}) {
   const parse = payload => {
     if (payload.length < 4) throw Error('Truncated source Exif');
     const start = tiffU(payload, 0, 4, false) + 4, tiff = payload.subarray(start);
@@ -293,7 +293,7 @@ function preserveExifWithStyleMarker(sourceExif, styleExif, {width, height, keep
     // the active MakerNote must contain Apple's 0x54 marker for style editing.
     exif.set(0x927c, entry(0x927c, 7, maker.length, off));
   }
-  if (!keepImageMetadata) root.set(0x0112, entry(0x0112, 3, 1, 6));
+  if (!keepImageMetadata) root.set(0x0112, entry(0x0112, 3, 1, orientation));
   for (const [value, rootTag, exifTag] of [[width, 0x0100, 0xa002], [height, 0x0101, 0xa003]]) {
     if (!Number.isInteger(value) || value < 1 || value > 0xffffffff) continue;
     if (root.has(rootTag)) root.set(rootTag, entry(rootTag, 4, 1, value));

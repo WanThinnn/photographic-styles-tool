@@ -18,6 +18,15 @@ adapted from `ref/Elio-backup`. The runtime/models total about 34 MB on first us
 SHA-256 checked and cached. Requests download model files; no photograph is uploaded.
 Files already carrying the required data skip vision downloads/inference.
 
+For files still needing supplementation, BlazeFace checks for face candidates first. The
+landmark model is loaded only after the detector finds a candidate, and segmentation/refinement
+and mask encoding are skipped if no valid face is found. A fresh browser test with a blank
+PNG requested only runtime/detector assets, not landmark (~4.9 MB) or segmentation (~16.5 MB)
+weights; a subsequent photo with faces still downloaded to the exact device-tested D result.
+Absent face metadata is not a reliable negative signal for arbitrary JPEG/PNG/HEIC files, so
+this path still requires a lightweight detector and its ONNX runtime. No face differs from no
+person (e.g. an obscured face); Soft Skin supplementation here is specifically face-based.
+
 The primary image supplies detection, 478 landmarks and six-class segmentation. The output
 contains 76 Apple-layout landmarks per face, skin/person masks, instance references and
 per-face statistics. Grayscale mattes use FFmpeg/x265, so a platform HEVC VideoEncoder is
@@ -52,6 +61,15 @@ files are insufficient for calibration. Phone testing found G still too strong, 
 the other variants; E/F (P3-linear thumbnail and neutral-gain combination) turned skin red
 at maximum Styles strength. All three colour experiments are rejected for the default
 conversion. Styles intensity on reconstructed photos remains unresolved.
+
+A subsequent same-pixel isolation on native IMG_0754 found identity coefficients (Styles
+key `1`) increased Styles intensity, while identity tone curve alone did not visibly change
+it. This identifies a contributor on that reference, not a general calibrated fix. The
+coefficient lattice remains identity in reconstructed outputs until a source-specific
+replacement is established; native coefficients always remain preserved. Research-only
+IMG_0783 variants now transfer coefficients from two schema-matched native v14 references.
+Newer `0x2000f` arrays were excluded from this v14 experiment by a version guard. Copying
+an unrelated photo's array into every output is not adopted as a colour correction.
 
 Run `node --test tests/web/soft-skin.mjs tests/web/face-refinement.mjs` for portable
 graph/preservation, crop-placement, confidence fallback and lighting-gradient tests. Real model fixtures
@@ -268,9 +286,50 @@ thumbnail always uses WASM. The same on-demand encoder cache and isolation
 requirements described below apply; the first-visit setup performs the required navigation automatically.
 
 Dimensions are preserved within the 48 primary / 12 auxiliary tile budget; larger
-photos and extreme panoramas are reduced without stretching. The output is SDR:
-this route does not recreate HDR gain maps, Portrait depth or Live Photo motion
-from JPEG/PNG input. Apple Photos rendering still needs device verification.
+SDR photos and extreme panoramas are reduced without stretching. Ordinary raster
+input produces SDR and does not invent HDR, Portrait depth or Live Photo motion.
+Apple Adaptive HDR JPEGs have a separate route described below. Apple Photos
+rendering still needs device verification.
+
+### HDR JPEG input
+
+Apple's MPF JPEG export can contain a separate gain-map image, not just an SDR
+JPEG. The previous raster route decoded only the base and created a black neutral
+auxiliary; this discarded real HDR in the supplied IDG_20251020_121945_809.JPEG.
+The browser now extracts the MPF base/gain images, reads Adaptive HDR XMP channel
+parameters and keeps the source base ICC and alternate HDR ICC. Raw JPEG decoding
+in FFmpeg bypasses browser ICC conversion and HDR tone mapping for these numerical
+samples. The base and gain map become separate full-range HEVC tile grids through
+lossless x265 encoding of decoded 4:2:0 samples; their original compressed JPEG
+bitstreams are not retained. ICC conversion is still used for the display thumbnail
+and analysis, not for the main image/gain-map samples.
+
+The output includes the original HDR XMP, an ISO 21496-1 `tmap` payload containing
+the source per-channel ranges/gamma/offsets and headrooms, plus a preferred HDR
+alternative group. Styles/Exif/thumbnail/auxiliary references include that rendition.
+Base and alternate colour primaries must match in the supported sRGB/Display P3
+profile forms. JPEG Exif orientation is applied to both sets of planes and normalized
+in the output. Recognized unsupported/corrupt HDR (including currently unsupported
+ISO-only or other XMP dialects), unsupported profiles and HDR images over the
+48/12 tile budget stop with a localized message; they do not silently export SDR.
+HDR images are not reduced to fit the tile budget. This is scoped support, not a
+promise to import every JPEG HDR format.
+
+On the real supplied file, desktop Chrome's normal UI exported 3024x4032 HEIC with
+12 distinct gain-map tiles, a 142-byte three-channel `tmap`, matching ICC/XMP and
+capture date. First-tile base/gain raw Y/U/V readback checked 786,432 samples with
+zero mismatches. The output is approximately 8.4 MiB versus the source's 2.5 MiB
+because decoded planes are encoded losslessly. The user accepted this output on iPhone
+after the requested HDR/Styles/Texture comparison. This validates the supplied case,
+not quantitative HDR equivalence or every supported input. Physical Safari conversion
+memory/performance still requires validation; the accepted file was generated on desktop.
+
+The container syntax follows the primary
+[libavif tmap writer](https://github.com/AOMediaCodec/libavif/blob/main/src/write.c).
+Apple describes HDR gain maps in JPEG and HEIF in
+[WWDC24](https://developer.apple.com/videos/play/wwdc2024/10177/).
+Run `node --test tests/web/jpeg-hdr.mjs tests/web/raster-import.mjs` for extraction,
+malformed/unsupported HDR, per-channel metadata, tiled samples and container checks.
 
 Run `node --test tests/web/raster-import.mjs` for container, geometry and colour checks.
 

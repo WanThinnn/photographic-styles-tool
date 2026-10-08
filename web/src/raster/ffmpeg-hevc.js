@@ -118,6 +118,27 @@ export function encodeHevcPixels(pixels, {width, height, pixelFormat = 'yuv420p1
   serial = task; return task;
 }
 
+/** JPEG gain maps are data, not display images: bypass ICC conversion and HDR
+ * tone mapping. MJPEG decoder -> full-range 4:2:0 samples; x265 keeps these samples. */
+export function decodeJpegYuv(jpeg, {width,height,orientation=1}, onProgress) {
+  const filters={1:[],2:['hflip'],3:['hflip','vflip'],4:['vflip'],
+    5:['transpose=clock','hflip'],6:['transpose=clock'],7:['transpose=clock','vflip'],8:['transpose=cclock']};
+  if(!filters[orientation]||![width,height].every(n=>Number.isInteger(n)&&n>=2&&n<=8192&&n%2===0))
+    throw Error('Invalid HDR JPEG decode geometry');
+  const task=serial.catch(()=>{}).then(async()=>{
+    await ensureHevcEncoder(onProgress);
+    onProgress?.({stage:'codec',operation:'decode',source:'FFmpeg.wasm / JPEG HDR samples'});
+    const input=jpeg.slice();
+    const args=['-hide_banner','-threads','1','-filter_threads','1','-noautorotate','-f','mjpeg','-i','input.raw',
+      '-frames:v','1','-an',...(filters[orientation].length?['-vf',filters[orientation].join(',')]:[]),
+      '-pix_fmt','yuvj420p','-f','rawvideo','output.raw'];
+    const output=await request({operation:'decode',pixels:input,args},[input.buffer]);
+    if(output.length!==width*height*1.5)throw Error('JPEG HDR decode dimensions disagree');
+    return {bytes:output,width:orientation>=5?height:width,height:orientation>=5?width:height};
+  });
+  serial=task;return task;
+}
+
 // Copy HEVC NAL units to Annex B without touching sample values or colour tags.
 export function hevcAnnexB(record, payload) {
   if (record.length < 23 || record[0] !== 1) throw Error('Invalid HEVC decode configuration');
@@ -162,4 +183,20 @@ export function decodeHevcLuma(record, payload, {width, height}, onProgress) {
     return {bytes: output, width, height};
   });
   serial = task; return task;
+}
+
+/** Full-range raw-plane readback for JPEG HDR preservation checks. No ICC/RGB
+ * conversion: compare the encoder's decoded Y/U/V samples to its raw input. */
+export function decodeHevcYuv(record,payload,{width,height},onProgress) {
+  const task=serial.catch(()=>{}).then(async()=>{
+    if(![width,height].every(n=>Number.isInteger(n)&&n>=2&&n<=8192&&n%2===0))throw Error('Invalid HEVC YUV geometry');
+    const input=hevcAnnexB(record,payload);
+    await ensureHevcEncoder(onProgress);
+    const args=['-hide_banner','-threads','1','-filter_threads','1','-f','hevc','-i','input.raw',
+      '-frames:v','1','-an','-pix_fmt','yuvj420p','-f','rawvideo','output.raw'];
+    const output=await request({operation:'decode',pixels:input,args},[input.buffer]);
+    if(output.length!==width*height*1.5)throw Error('HEVC YUV dimensions disagree');
+    return output;
+  });
+  serial=task;return task;
 }

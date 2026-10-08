@@ -79,7 +79,7 @@ understood or not yet in its final form.
 | MakerNote `0x54` | Fixed 8-key record, neutral pad | Format | ✅ | Members `1`/`2` vary with capture (likely the Tone/Color pad, §8); `4`, `6` vary too; the rest unknown |
 | Styles item (`metadata:styles`) | New item | Format | ✅ | – |
 | Styles `0` (schema), `e`/`f`, `g`, key `3` header | Fixed values | Format | ✅ | – |
-| Styles `1` coefficients | Identity | Neutral | ✅ | Native values not reproduced (affects the look, §9) |
+| Styles `1` coefficients | Identity | Neutral approximation | ✅ | Identity intensifies Styles on native IMG_0754 in device isolation (§10.11); native values not reconstructed |
 | Styles `3` tone curve | Identity | Neutral | ✅ | Native values not reproduced (affects the look, §9) |
 | Styles `c`/`d` light maps, flat (default) | Constants | Neutral | ✅ | – |
 | Styles `c`/`d` light maps, `--light-maps target` | Calculated from the photo | Map | ✅ | Stored orientation, no flip (fixed in v0.6.2, §4.1) |
@@ -550,8 +550,9 @@ captures (same scene, one setting changed) might. New tile layouts seen in nativ
 
 ## 9. Other open metadata questions
 
-- **Why the look differs from a native photo.** Likely causes: the neutral defaults (identity
-  coefficients and tone curve, flat light maps) and the donor values in §8. 🔍
+- **Why the look differs from a native photo.** Identity coefficients visibly contribute to
+  stronger Styles on native IMG_0754 (§10.11). Identity tone curve did not visibly change
+  that comparison. Flat light maps and donor values in §8 remain unresolved hypotheses. 🔍
 - **Not yet isolated:** whether each classic matte is needed; whether the 2026 sidecars are
   needed on their own; whether styles keys `6`/`7` can be dropped; what `0x54` members `4`/`6`
   mean; how the two planes of the coefficient lattice are read. 🔍
@@ -875,3 +876,139 @@ The JPEG path also generated local-detail roughness for both faces while retaini
 eye variance. Portable regression checks: 47 passed, 10 optional-fixture skips, no failures;
 i18n, syntax and PWA/offline checks passed. This does not extend the physical phone result
 to untested photographs or claim a colour fix.
+
+### 10.10 No-face gating and next colour isolation (2026-10-09)
+
+Apple's [WWDC19 segmentation-matte presentation](https://developer.apple.com/videos/play/wwdc2019/260/)
+states that when there are no people in the scene, capture will not provide the Portrait/semantic
+segmentation mattes (reported dimensions are zero). This documents capture/API behaviour,
+not an official specification of Photos' Soft Skin rendering algorithm. The project's §7
+requires per-face people entries and masks together. Upstream Python does not invent missing
+people information. Elio-backup's face pipeline still calls the segmenter when no face is found
+and native masks are missing; it also eagerly loads both detector and landmark models.
+
+Our browser already returned before segmentation/encoding when it found no valid face. It now
+also loads the landmark model only when BlazeFace produces a candidate. With no candidates,
+only runtime plus the ~0.4 MB detector are needed; landmark (~4.9 MB) and segmentation (~16.5 MB)
+weights/sessions are skipped. Detector false positives can still require landmark validation.
+Missing XMP regions/mattes alone are NOT a trustworthy no-person signal on arbitrary uploads.
+This is face-based gating: a person without a visible/detected face does not require generated
+Soft Skin in the current pipeline. The ONNX runtime/detector are still necessary to inspect
+such a file. This does not affect separately enabled AI background blur.
+
+A fresh browser test of a blank PNG verified no landmark/segmenter network requests, successful
+Styles download and the no-face detail note. The following IMG_0783 still matched the preserved
+D byte for byte; JPEG supplementation retained both faces and the selected D roughness.
+
+After gain/range, thumbnail, scene maps and person-statistics experiments failed to improve
+colour, the next unisolated hypothesis is Styles key `1` coefficients and key `3` tone curve.
+The author normalizes both to identity when preparing the conversion profile. Native values
+are scene-dependent (§4.1/§9), so copying them from an unrelated photo is not a proven fix.
+
+Private `tests/private-fixtures/NativeColour_Isolation/` now contains four IMG_0754 variants:
+A is the exact reference file; B changes only coefficients to identity; C changes only tone
+curve points to identity while retaining its header; D combines B/C. All other Styles values,
+every non-Styles item payload, every source property and reference were checked unchanged.
+This compares the same pixels on the same native graph and can isolate whether either
+normalization contributes to the observed colour intensity. It is a cause-finding experiment,
+not an implemented correction for older-iPhone images. The phone result is recorded in §10.11.
+
+### 10.11 Identity coefficients isolated as a contributor; older-photo transfer test (2026-10-09)
+
+The user reports IMG_0754 B (identity coefficients) and D (identity coefficients + identity
+curve) are more intense than A; C (identity curve only) looks like A. Since the same pixels,
+graph, other Styles fields, masks and Texture data were held constant, this isolates key `1`
+normalization as a visible contributor on this native reference. It does NOT establish that
+coefficients alone explain all older-iPhone intensity complaints, nor that tone curves never
+matter in other scenes or rendering paths.
+
+IMG_0754/0762 use Styles schema `0x2000f` (131087), whereas reconstructed IMG_0783 uses `14`.
+A cross-schema coefficient transfer was rejected by the experimental script's version guard.
+Instead, two native iPhone 16 references from this session, IMG_4850 and IMG_4137, both have
+schema 14 and 51,840-byte coefficient arrays, matching the target's layout.
+
+Private `tests/private-fixtures/IMG_0783_Coefficients/` contains A (byte-identical to the
+device-selected Soft Skin D), B (only key `1` from IMG_4850) and C (only key `1` from IMG_4137).
+Every other Styles value, every non-Styles item payload, every source property and reference
+was checked unchanged. No cross-scene coefficients are installed by the website. Such a transfer
+is a cause-finding experiment: coefficients depend on capture/scene and their plane interpretation
+is not validated, so a successful transfer still would not justify a fixed donor array for all
+photos. Standard colour/brightness and spatial artifacts must be compared alongside Styles.
+The user tested Standard with ALL THREE controls at maximum and reports A/B/C look nearly
+identical: skin is strongly red/orange and colour remains too intense. Transferring either
+same-schema native coefficient array therefore did not improve this tested condition and
+is rejected as a default correction. This does not negate the isolated native IMG_0754
+result above or establish that coefficients are ignored by the renderer; their interaction
+with the reconstructed graph and other metadata remains unknown. The controls were changed
+together, so this report does not isolate an individual control's response. The user also
+reports original iPhone 16/17 captures do not exhibit this problem at those settings; the
+same-schema native coefficient isolation is reported below. Do not claim native colour
+parity, enable donor coefficients, or overwrite the tested fixtures. Soft Skin D
+remains the default; there is still no validated colour correction for reconstructed Styles.
+
+The next isolated pair, `tests/private-fixtures/NativeV14_Coefficients/`, uses the known
+working IMG_0757_TextureFixed (device-selected C compatibility repair). A is its exact
+copy; B changes only key `1` to identity. All other Styles values, non-Styles payloads,
+properties, associations, item infos and references pass preservation assertions. This
+tests the coefficient effect on native schema 14 at the reported Standard/max settings,
+without transferring another scene's coefficients onto IMG_0783. A difference from the
+earlier native pair cannot be attributed to schema alone because the scenes also differ.
+The user reports B is slightly pinker, fresher in colour and brighter than A with all three
+controls at maximum in Standard. This confirms a visible coefficient effect in the native
+v14 reference too, but the reported shift is mild, unlike the severe red/orange IMG_0783
+result. It is not evidence of a quantitative response curve or proof that coefficients
+are irrelevant on reconstructed Styles. Together with the unsuccessful IMG_0783 transfers,
+it rejects a coefficient-only transplant as the demonstrated fix. Remaining interactions
+with capture-dependent fields, scene statistics and other rendering resources are not
+isolated. This pair does not change the website's colour or Soft Skin; no colour fix is
+claimed, and no additional donor values are adopted on this evidence.
+
+The user subsequently chose to stop investigating skin colour. Keep this research
+deferred; do not generate further colour variants or change the selected Soft Skin D
+as part of the separate HDR issue below.
+
+### 10.12 Real Adaptive HDR JPEG dropped by the SDR raster route (2026-10-09)
+
+The supplied `IDG_20251020_121945_809.JPEG` is 2,612,099 bytes, Exif iPhone 16 Pro,
+2025-10-20 12:19:45.809 +07:00. MPF identifies a 3024x4032 base JPEG and a
+1512x2016 three-channel gain-map JPEG (starts at byte 2,201,336). The base ICC is
+Display P3; the auxiliary's ICC describes the alternate Display P3/PQ rendition.
+Adaptive HDR XMP has base headroom 0, alternate headroom 3.832890, gamma 1 per
+channel, SDR/HDR offsets 0.015625; min gains are [-0.275635,-0.288086,-1.159180],
+max gains [3.812500,3.816406,3.810547]. These are measured source fields, not donor
+parameters. The reported `IMG_0816.HEIC` is 1,579,869 bytes with a neutral gain grid
+and no HDR XMP/tmap. The previous `importRaster` always created a black compatibility
+auxiliary, so this is confirmed loss of real JPEG HDR, not inferred from file size.
+
+The browser now separates MPF images, validates their Adaptive HDR metadata and
+supported matching colour primaries, decodes raw full-range YUV through FFmpeg
+(without browser HDR/ICC rendering), and encodes independent base/gain HEVC tiles
+losslessly from decoded 4:2:0 planes. Source ICCs and HDR XMP are retained; original
+compressed JPEG streams are transcoded. The ISO tmap has all three source channels
+and a preferred HDR alternative group; Style/Exif/thumbnail/auxiliary refs also
+describe the alternative. Both JPEG planes use the same Exif orientation transform;
+output item transforms and Exif orientation are upright. The existing SDR route,
+native HEIC resource preservation and Soft Skin D are kept. Recognized unsupported
+or malformed HDR stops before an SDR export, with VI/EN/ZH information. Supported
+HDR over the existing 48/12 tile budget also stops rather than resizing the maps.
+
+Normal Chrome UI exported private `IDG_20251020_HDR_Fixed.HEIC`, 8,851,220 bytes,
+3024x4032, 12 distinct gain tiles, exact base/alternate ICCs and HDR XMP, the source
+capture time and a 142-byte tmap carrying the parsed source values. Decoded HEVC
+Y/U/V of the first base and first gain tile matches their JPEG-decoded 4:2:0 input
+in all 786,432 tested sample values. This is not full-image RGB byte equivalence.
+The larger output follows lossless HEVC encoding of JPEG-decoded planes; size is
+not an HDR validity criterion. After being asked to compare HDR against the source
+JPEG and check Styles/Texture, the user confirmed this supplied HEIC works ("ok rồi").
+This is device acceptance of this one output, not a quantitative HDR equivalence
+measurement or validation of other JPEG HDR dialects. Physical Safari conversion
+memory/performance still needs validation; this file was generated in desktop Chrome.
+The change remains local and has not been deployed.
+
+Portable regression suite: 52 passed, 10 optional fixture skips, no failures; five
+new HDR tests cover endian MPF offsets, signed three-channel tmap values, unsupported
+HDR rejection, Y/U/V tile placement and original metadata/container relationships.
+VI/EN/ZH (115 keys) and PWA/offline checks passed; cache version is v65.
+References: [Apple WWDC24 HDR](https://developer.apple.com/videos/play/wwdc2024/10177/),
+[libavif tmap writer](https://github.com/AOMediaCodec/libavif/blob/main/src/write.c),
+[Ultra HDR metadata conversion](https://github.com/google/libultrahdr/blob/main/lib/src/gainmapmetadata.cpp).

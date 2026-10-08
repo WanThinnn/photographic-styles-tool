@@ -15,12 +15,13 @@ import {
   buildLightMaps, applyLightMaps,
 } from "./styles.js";
 import {installPortraitMatte} from './portrait-matte.js';
-import { extractRasterExif, preserveRasterExif, buildAppleStyleExif } from "./exif.js";
+import { extractRasterExif, preserveRasterExif, buildAppleStyleExif, readExifOrientation } from "./exif.js";
 import { rasterFrame, rasterColr, rasterVideoColorSpace, checkEncodedColorSpace, resolveEncodedColorSpace } from "./raster-color.js";
 import {blackWhiteI420, measureHevcRange, hevcOutputColor} from './hevc-color.js';
 import { encodeSelectedLinearThumbnail as encodeLinearThumbnail, linearGeometry } from "./linear-thumbnail.js";
 import { supportedHevcConfig } from "./hevc-encoder.js";
-import {ensureHevcEncoder, encodeHevcPixels} from './ffmpeg-hevc.js';
+import {ensureHevcEncoder, encodeHevcPixels,decodeJpegYuv} from './ffmpeg-hevc.js';
+import {extractJpegHdr,encodeTmapMetadata,iccColr,yuv420Tile,hdrJpegError} from './jpeg-hdr.js';
 import {rgbaToI420} from './raster-color.js';
 import {generateSyntheticHevc} from './synthetic-hevc.js';
 
@@ -261,9 +262,9 @@ export function sampleRasterLuma(image, width = 256, height = 192) {
 
 /** Minimal Apple Exif containing Orientation=6 and only MakerNote tag 0x54. */
 export function buildRasterExif(mn54, makerType = 7, sourceExif = null, geometry = null) {
-  const minimal = buildAppleStyleExif(mn54, makerType);
+  const minimal = buildAppleStyleExif(mn54, makerType,geometry?.exifOrientation??6);
   return sourceExif ? preserveRasterExif(sourceExif, minimal, {
-    width: geometry?.storedWidth, height: geometry?.storedHeight,
+    width: geometry?.storedWidth, height: geometry?.storedHeight,orientation:geometry?.exifOrientation??6,
   }) : minimal;
 }
 
@@ -441,7 +442,8 @@ export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult 
   primarySlots.forEach((iid, i) => payloads.set(iid, encoded.main[i]));
   payloads.set(Number(manifest.donor_thumbnail_item), encoded.thumb);
   payloads.set(Number(manifest.donor_linear_thumb_item), encoded.linearThumbnail?.payload || encoded.thumb);
-  hdrSlots.forEach((iid) => payloads.set(iid, encoded.hdr));
+  if(encoded.hdrChunks&&encoded.hdrChunks.length!==hdrSlots.length)throw Error('HDR tiles do not match gain-map geometry');
+  hdrSlots.forEach((iid,i) => payloads.set(iid, encoded.hdrChunks?.[i]??encoded.hdr));
   const makerType = Number(manifest.smartstyle_makernote_type ?? 7);
   const exif = buildRasterExif(profile.mn54, makerType, encoded.sourceExif, geometry);
   payloads.set(Number(manifest.donor_exif_item), exif);
@@ -525,6 +527,28 @@ export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult 
   if (encoded.texture !== false) [styles] = upgradeStylesV16(styles);
   payloads.set(stylesId, styles);
 
+  if(encoded.hdrMetadata){
+    if(!encoded.hdrChunks||!encoded.hdrXmp||!encoded.hdrAlternateColr)throw Error('HDR metadata/resources incomplete');
+    let ids;
+    [meta,ids]=addItems(meta,[{key:'jpeg-hdr-tmap',itemType:'tmap',refType:'dimg',refTo:[primary,hdrGrid],
+      boxes:[ispeBox(geometry.storedWidth,geometry.storedHeight),encoded.hdrAlternateColr,
+        box('pixi',new Uint8Array([0,0,0,0,3,16,16,16]))]},
+      {key:'jpeg-hdr-xmp',itemType:'mime',contentType:'application/rdf+xml',refType:'cdsc',refTo:[hdrGrid]}]);
+    const tmap=ids.get('jpeg-hdr-tmap');
+    payloads.set(tmap,encodeTmapMetadata(encoded.hdrMetadata));
+    payloads.set(ids.get('jpeg-hdr-xmp'),encoded.hdrXmp);
+    // Preferred HDR alternative, with the SDR primary as the compatible fallback.
+    const altr=box('altr',concat([new Uint8Array(4),be(1,4),be(2,4),be(tmap,4),be(primary,4)]));
+    const m=topBox(meta,'meta');
+    meta=box('meta',concat([meta.subarray(m.off+m.hdr,m.off+m.hdr+4),
+      ...metaChildren(meta,m).map(b=>meta.subarray(b.off,b.off+b.size)),box('grpl',altr)]));
+    // Photos can choose the HDR alternative. Its Styles/Exif/thumbnail and
+    // auxiliaries must describe that rendition as well as the SDR primary.
+    for(const ref of discoverHeic(meta).refs)
+      if(['auxl','cdsc','thmb'].includes(ref.type)&&ref.to.includes(primary)&&!ref.to.includes(tmap))
+        meta=setItemReference(meta,ref.type,ref.from,[...ref.to,tmap]);
+  }
+
   // A compatibility re-encode rebuilds the main/HDR graph, but Portrait depth is an
   // independent HEVC auxiliary. Keep its original bitstream, codec properties,
   // orientation, auxiliary relationship, and blur-parameter XMP sidecar intact.
@@ -574,8 +598,11 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
   // Independent Main10 auxiliary/masks always require the verified WASM encoder.
   let opened, stored;
   try {
+    const sourceBytes=new Uint8Array(await file.arrayBuffer());
+    const sourceHdr=extractJpegHdr(sourceBytes);
+    if(sourceHdr)return await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze});
     await ensureHevcEncoder(onProgress);
-    const sourceExif = extractRasterExif(new Uint8Array(await file.arrayBuffer()));
+    const sourceExif = extractRasterExif(sourceBytes);
     opened = await openBrowserImage(file, onProgress);
     const image = opened.image;
     if (!image.width || !image.height) throw Error('Raster image decode failed: empty image');
@@ -614,4 +641,52 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
     if (stored) stored.width = stored.height = 0;
     releaseHevcEncoder();
   }
+}
+
+async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze}) {
+  let opened;
+  try {
+    const sourceExif=extractRasterExif(sourceBytes),orientation=readExifOrientation(sourceExif??new Uint8Array())||1;
+    const swap=orientation>=5,width=swap?hdr.height:hdr.width,height=swap?hdr.width:hdr.height;
+    const gainWidth=swap?hdr.gainHeight:hdr.gainWidth,gainHeight=swap?hdr.gainWidth:hdr.gainHeight;
+    const geometry={...targetGeometry({width:height,height:width}),
+      displayWidth:width,displayHeight:height,sourceWidth:width,sourceHeight:height,storedWidth:width,storedHeight:height,
+      hdrWidth:gainWidth,hdrHeight:gainHeight,hdrColumns:Math.ceil(gainWidth/TILE),hdrRows:Math.ceil(gainHeight/TILE),
+      exifOrientation:1,resized:false};
+    geometry.primaryColumns=Math.ceil(width/TILE);geometry.primaryRows=Math.ceil(height/TILE);
+    geometry.primaryTiles=geometry.primaryColumns*geometry.primaryRows;
+    if(geometry.primaryTiles>48||geometry.hdrColumns*geometry.hdrRows>12)throw hdrJpegError('HDR JPEG exceeds the preserved-image tile budget');
+    await ensureHevcEncoder(onProgress);
+    const assets=await generateSyntheticHevc(onProgress),profile=buildGeneratedProfile('48-12',assets);
+    // The dedicated JPEG route encodes normalized upright planes, not the SDR
+    // canvas route's 270-degree stored image. All template items share this irot.
+    const pd=discoverHeic(profile.meta);
+    for(const property of pd.props.properties)if(property.type==='irot')profile.meta[property.box.off+property.box.hdr]=0;
+    opened=await openBrowserImage(new File([hdr.base],'base.jpeg',{type:'image/jpeg'}),onProgress);
+    const linearThumbnail=await encodeLinearThumbnail(opened.image,{angle:0},onProgress);
+    const thumb=await encodeCanvases(geometry.thumbWidth,geometry.thumbHeight,1,
+      ctx=>ctx.drawImage(opened.image,0,0,geometry.thumbWidth,geometry.thumbHeight),800_000,undefined,onProgress);
+    const color={primaries:hdr.primaries,transfer:'iec61966-2-1',matrix:'smpte170m',fullRange:true};
+    async function tiles(jpeg,w,h,columns,rows,stage){
+      const decoded=await decodeJpegYuv(jpeg,{width:w,height:h,orientation},onProgress),chunks=[];let hvcc;
+      for(let i=0;i<columns*rows;i++){
+        const tile=yuv420Tile(decoded.bytes,decoded.width,decoded.height,i%columns,Math.floor(i/columns));
+        const encoded=await encodeHevcPixels(tile,{width:TILE,height:TILE,pixelFormat:'yuv420p',...color},onProgress);
+        if(hvcc&&!same(hvcc,encoded.hvcc))throw Error('HDR JPEG tile configurations disagree');
+        hvcc=encoded.hvcc;chunks.push(encoded.payload);onProgress?.({stage,done:i+1,total:columns*rows});
+      }
+      return {chunks,hvcc};
+    }
+    const main=await tiles(hdr.base,hdr.width,hdr.height,geometry.primaryColumns,geometry.primaryRows,'main');
+    const gain=await tiles(hdr.gain,hdr.gainWidth,hdr.gainHeight,geometry.hdrColumns,geometry.hdrRows,'auxiliary');
+    const data=buildRasterHeic(profile,{main:main.chunks,mainHvcc:main.hvcc,
+      mainColr:hdr.baseIcc?iccColr(hdr.baseIcc):rasterColr(color),
+      thumb:thumb.chunks[0],thumbHvcc:thumb.hvcc,thumbColr:thumb.colr,linearThumbnail,
+      hdrChunks:gain.chunks,hdrHvcc:gain.hvcc,hdrColr:rasterColr(color),
+      hdrMetadata:hdr.metadata,hdrXmp:hdr.xmp,hdrAlternateColr:iccColr(hdr.alternateIcc),sourceExif,
+      lightMaps:analyze?buildLightMaps(sampleRasterLuma(opened.image,32,32)):null,
+    },analyze?Array.from(sampleRasterLuma(opened.image)).sort((a,b)=>a-b):null,null,geometry);
+    return {data,geometry,hdr:true};
+  }catch(error){if(!error.code)error.code='err.hdrjpeg';throw error;}
+  finally{opened?.close();}
 }

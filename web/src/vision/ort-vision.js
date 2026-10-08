@@ -93,14 +93,17 @@ function disposeOutputs(outputs){for(const value of Object.values(outputs))value
 
 export async function loadOrtLandmarker(options={}) {
   if(!facePromise)facePromise=(async()=>{
-    const ort=await runtime(options);let detector,landmarks;
-    try{detector=await session(ORT_ASSETS[3],options);landmarks=await session(ORT_ASSETS[4],options);}
-    catch(error){await detector?.release();throw error;}
+    const ort=await runtime(options),detector=await session(ORT_ASSETS[3],options);
+    let landmarksPromise;
     return {async detect(source){
       const detected=await run(ort,detector,source,128,{detector:true});let rois;
       try{const values=Object.values(detected),reg=values.find(t=>t.data.length===896*16),scores=values.find(t=>t.data.length===896);
         if(!reg||!scores)throw Error('Unexpected ONNX Runtime detector tensors');rois=decodeFaceDetections(reg.data,scores.data,source.width,source.height);}
       finally{disposeOutputs(detected);}
+      // No candidate means no landmark model download/session/inference. Keep
+      // the small detector for the remaining overlapping group-photo passes.
+      if(rois.length && !landmarksPromise) landmarksPromise=session(ORT_ASSETS[4],options);
+      const landmarks=rois.length?await landmarksPromise:null;
       const faceLandmarks=[],facialTransformationMatrixes=[];
       for(const roi of rois){const out=await run(ort,landmarks,source,256,{roi});
         try{if(!out.Identity||!out.Identity_1)throw Error('Unexpected ONNX Runtime landmark tensors');
@@ -109,7 +112,7 @@ export async function loadOrtLandmarker(options={}) {
           faceLandmarks.push(points);facialTransformationMatrixes.push({data:ortFacePoseMatrix(points,source.width,source.height)});
         }finally{disposeOutputs(out);}}
       return {faceLandmarks,facialTransformationMatrixes};
-    },async close(){await detector.release();await landmarks.release();}};
+    },async close(){await detector.release();const landmarks=await landmarksPromise?.catch(()=>null);await landmarks?.release();}};
   })().catch(error=>{facePromise=null;throw error;});
   return facePromise;
 }

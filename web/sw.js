@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v34`;
+const CACHE_NAME = `${CACHE_PREFIX}v50`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -8,6 +8,21 @@ const APP_SHELL = [
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./src/ai-portrait.js",
+  "./src/ai-portrait-container.js",
+  "./src/ai-portrait-ui.js",
+  "./src/ai-portrait-blur.js",
+  "./src/ai-portrait-source.js",
+  "./src/ai-bokeh.js",
+  "./src/ai-bokeh-export.js",
+  "./src/dng/dng-import.js",
+  "./src/dng/dng-tiff.js",
+  "./src/dng/dng-tiles.js",
+  "./src/dng/dng-worker.js",
+  "./src/dng/dng-decode.js",
+  "./src/dng/dng-assets.js",
+  "./src/dng/dng-inspection.js",
+  "./src/dng/model-download.js",
   "./manifest.webmanifest",
   "./icons/photographic-styles.svg",
   "./icons/icon-180.png",
@@ -115,6 +130,19 @@ self.addEventListener("fetch", (event) => {
   // Third-party requests (the optional decoder and anonymous visit counter)
   // retain their existing failure behavior and are never persisted here.
   if (url.origin !== self.location.origin) return;
+
+  if (url.pathname.includes('/vendor/ai-portrait/')) {
+    // Opt-in assets are immutable for this app version. Cache once, and tolerate
+    // storage quota/private-mode failures instead of discarding a valid response.
+    event.respondWith((async () => {
+      let cache;
+      try {cache=await caches.open(`${CACHE_NAME}-ai`);const hit=await cache.match(request);if(hit)return isolated(hit);} catch {}
+      const response=await fetch(request);
+      if(response.ok&&cache)try{await cache.put(request,response.clone());}catch{}
+      return isolated(response);
+    })());
+    return;
+  }
 
 
   if (request.mode === "navigate") {

@@ -1,5 +1,7 @@
+import {isDng} from './dng/dng-tiff.js';
 /** Container signatures, independent of filename/MIME supplied by a photo picker. */
 export function imageFormat(b) {
+  if(b.length>=8&&((b[0]===73&&b[1]===73)||(b[0]===77&&b[1]===77))&&isDng(b))return 'dng';
   const ascii = (offset, length) => String.fromCharCode(...b.subarray(offset, offset + length));
   if (b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return 'jpeg';
   if (b.length >= 8 && [137,80,78,71,13,10,26,10].every((n,i) => b[i] === n)) return 'png';

@@ -41,7 +41,7 @@ export const STRINGS = {
     "h.help": "Hướng dẫn & thông tin",
     "app.hero": "Một sắc thái mới.",
     "help.steps": "Chọn ảnh, chờ xử lý xong rồi lưu bản sao. Mở ảnh trong ứng dụng Ảnh trên iPhone → Sửa để điều chỉnh Phong cách nhiếp ảnh. Kết cấu và Hạt cần iOS 27.",
-    "help.formats": "Hỗ trợ HEIC, JPG, PNG, WebP, GIF, BMP và AVIF. Các định dạng khác được chuyển thành HEIC mới; ảnh động chỉ dùng một khung hình.",
+    "help.formats": "Hỗ trợ HEIC, JPG, PNG, DNG, WebP, GIF, BMP và AVIF. DNG được giải mã sang sRGB và xuất HEIC, không còn RAW. Ảnh động chỉ dùng một khung hình.",
     "help.original": "Hãy giữ ảnh gốc. Dữ liệu Chân dung sẵn có được bảo toàn; chuyển đổi ảnh thông thường không tạo thêm HDR hay dữ liệu Chân dung.",
     "help.live": "Lưu vào Ảnh chỉ lưu ảnh tĩnh. Xuất cặp Live Photo cần video MOV gốc tương ứng và công cụ nhập tương thích.",
     "help.slow": "Lần chuyển đổi đầu tiên cần tải bộ mã hóa. Nếu trang chạy chậm, hãy tắt tùy chọn khớp sắc độ rồi thử lại.",
@@ -59,7 +59,7 @@ export const STRINGS = {
     "n.2": "File HEIC của Apple chỉ chứa ảnh tĩnh. Hãy giữ ảnh gốc.",
     "app.lede": "Thêm Phong cách, Kết cấu và Hạt. Xử lý riêng tư trên thiết bị của bạn.",
     "drop.big": "Chọn ảnh",
-    "drop.small": "HEIC, JPG, PNG & nhiều định dạng khác · hoặc kéo thả vào đây",
+    "drop.small": "HEIC, JPG, PNG, DNG · hoặc kéo thả vào đây",
     "raster.help": "JPG/PNG và các định dạng được hỗ trợ, kể cả ảnh Android, được chuyển thành HEIC mới có Phong cách, Kết cấu và Hạt. Ảnh động chỉ dùng một khung hình. Lần đầu cần tải bộ mã hóa; ảnh luôn được xử lý trên thiết bị này.",
     "st.rasterworking": "Đang chuyển ảnh sang HEIC có Phong cách…",
     "st.rastertiles": "Đang mã hóa các phần ảnh:",
@@ -131,7 +131,7 @@ export const STRINGS = {
     "h.help": "Help & information",
     "app.hero": "A new mood.",
     "help.steps": "Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.",
-    "help.formats": "HEIC, JPG, PNG, WebP, GIF, BMP and AVIF are supported. Other formats become a new HEIC; animated images use one frame.",
+    "help.formats": "HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.",
     "help.original": "Keep your originals. Portrait data is retained when present; converting a regular image does not create HDR or Portrait data.",
     "help.live": "Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.",
     "help.slow": "The first conversion downloads an encoder. If the page is slow, turn off tone matching and try again.",
@@ -148,7 +148,7 @@ export const STRINGS = {
     "n.2": "An Apple HEIC holds only the still image. Keep your original photos.",
     "app.lede": "Add Styles, Texture and Grain. Privately, on your device.",
     "drop.big": "Choose photos",
-    "drop.small": "HEIC, JPG, PNG & more · or drop here",
+    "drop.small": "HEIC, JPG, PNG, DNG · or drop here",
     "raster.help": "JPG/PNG and other supported images, including Android photos, are converted to a new HEIC with Styles and Texture/Grain. Animated images use one frame. The first conversion downloads an encoder; all photo processing stays on this device.",
     "st.rasterworking": "Converting image to Styles HEIC…",
     "st.rastertiles": "Encoding image tiles:",
@@ -245,7 +245,7 @@ export const STRINGS = {
     "h.help": "帮助与说明",
     "app.hero": "新的色调。",
     "help.steps": "选取照片，等待完成后保存副本。在 iPhone 照片中打开并点击编辑，即可调整摄影风格。质感与颗粒需要 iOS 27。",
-    "help.formats": "支持 HEIC、JPG、PNG、WebP、GIF、BMP 与 AVIF。其他格式将转换为新的 HEIC；动态图像仅使用一帧。",
+    "help.formats": "支持 HEIC、JPG、PNG、DNG、WebP、GIF、BMP 与 AVIF。DNG 转换为 sRGB 并导出 HEIC，不再保留 RAW；动态图像仅使用一帧。",
     "help.original": "请保留原图。已有的人像数据会保留；转换普通图片不会创建 HDR 或人像数据。",
     "help.live": "存储到照片仅保存静态图像。实况照片导出需要匹配的原始 MOV 和兼容的导入工具。",
     "help.slow": "首次转换会下载编码器。如果页面运行缓慢，请关闭影调匹配后重试。",
@@ -272,7 +272,7 @@ export const STRINGS = {
     "n.2": "Apple 的 HEIC 文件只包含静态图像，请保留原图。",
     "app.lede": "添加风格、质感与颗粒。照片仅在本设备上处理。",
     "drop.big": "选取照片",
-    "drop.small": "HEIC、JPG、PNG 等 · 或拖放到此处",
+    "drop.small": "HEIC、JPG、PNG、DNG · 或拖放到此处",
     "tip.title": "从“照片图库”选取时",
     "tip.body": "在支持的 iOS 版本中，勾选照片后点按左下角的 <b>•••</b> → <b>选项</b> → "
       + "<b>格式</b> → <b>当前</b>，即可上传 HEIC 原图，而不是转换后的 JPEG。若仍被拒绝，"
@@ -347,6 +347,12 @@ export const STRINGS = {
 };
 
 const STORE_KEY = "psport.lang";
+STRINGS.vi['ai.download'] = 'Tải bản depth';
+STRINGS.en['ai.download'] = 'Download depth test';
+STRINGS.zh['ai.download'] = '下载深度测试';
+STRINGS.vi['ai.save'] = 'Lưu bản depth';
+STRINGS.en['ai.save'] = 'Save depth test';
+STRINGS.zh['ai.save'] = '保存深度测试';
 
 function savedLanguage() {
   try { const saved = localStorage.getItem(STORE_KEY); return STRINGS[saved] ? saved : null; }

@@ -8,9 +8,18 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js"
 import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
 import { imageFormat, RASTER_MIMES } from "./src/image-format.js";
 import { photoCaptureDate } from "./src/photo-date.js";
+import { AI_STRINGS, blurPreview } from "./src/ai-portrait-ui.js";
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
+const aiPortrait = $("ai-portrait");
+const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
+function translateAi() {
+  $("ai-portrait-label").textContent = aiText().toggle;
+  $("ai-portrait-hint").textContent = aiText().hint;
+  $("ai-portrait-hint").hidden = !aiPortrait.checked;
+}
+aiPortrait.addEventListener('change',translateAi);
 
 // Fetch the decoder while the visitor is still choosing a photo (or switches analysis on),
 // so the first photo does not wait for the download, and someone just reading the page
@@ -94,7 +103,55 @@ function row(name) {
   el.querySelector(".name").textContent = name;
   el.querySelector(".name").title = name;
   list.appendChild(el);
+  function actions(group) {
+    let host=el.querySelector(`.output-actions[data-output="${group}"]`);
+    if(!host){
+      host=document.createElement('div');host.className='output-actions';host.dataset.output=group;
+      el.querySelector('.act').append(host);
+    }
+    if(group==='depth'&&!host.querySelector('.output-label')){
+      const label=document.createElement('span');label.className='output-label';label.textContent=aiText().depthLabel;
+      host.append(label);
+      const normal=el.querySelector('.output-actions[data-output="normal"]');
+      if(normal&&!normal.querySelector('.output-label')){
+        const text=document.createElement('span');text.className='output-label';text.textContent=aiText().normalLabel;normal.prepend(text);
+      }
+    }
+    return host;
+  }
   return {
+    aiState(text) {
+      let state=el.querySelector('.ai-status');
+      if(!state){state=document.createElement('p');state.className='ai-status';el.append(state);}
+      state.textContent=text;
+    },
+    preview(result,name) {
+      const details = document.createElement('details');
+      details.className = 'ai-details';details.open=true;
+      const summary = document.createElement('summary');summary.textContent = aiText().preview;
+      details.append(summary);el.append(details);
+      // The main save buttons would otherwise save the unblurred Styles result.
+      // Keep that fallback in details while the bokeh editor owns its export.
+      const baseActions=el.querySelector('.act'),conversionDetails=el.querySelector('.result-details');
+      if(baseActions&&conversionDetails){conversionDetails.append(baseActions);baseActions.classList.add('bokeh-fallback');}
+      if(baseActions){
+        const group=baseActions.querySelector('.output-actions');
+        if(group&&!group.querySelector('.output-label')){
+          const label=document.createElement('span');label.className='output-label';
+          label.textContent=lang==='vi'?'Styles chưa xóa phông':lang==='zh'?'未虚化风格':'Styles without bokeh';group.prepend(label);
+        }
+      }
+      blurPreview(result, details, aiText(),async settings=>{
+        const task=async()=>{
+          const {exportBokehStyles}=await import('./src/ai-bokeh-export.js');
+          const output=await exportBokehStyles(result,settings,()=>{},quality.checked);
+          const date=photoCaptureDate(output.data);
+          return {file:new File([output.data],name.replace(/\.[^.]+$/,'')+'_Bokeh_Styles.HEIC',{
+            type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})}),resized:output.resized};
+        };
+        const pending=fileQueue.catch(()=>{}).then(task);fileQueue=pending.catch(()=>{});return pending;
+      });
+    },
     set(text, cls) {
       const s = el.querySelector(".status");
       s.textContent = cls === 'ok' ? T("st.ready") : text;
@@ -120,19 +177,19 @@ function row(name) {
       }
       note.textContent = text;
     },
-    link(blob, filename, key = "btn.download") {
+    link(blob, filename, key = "btn.download", group = 'normal') {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
       a.textContent = T(key);
-      a.className = el.querySelector(".act").children.length ? "dl alt" : "dl";
-      el.querySelector(".act").appendChild(a);
+      a.className = "dl alt";
+      actions(group).appendChild(a);
     },
-    share(file, live = false) {
+    share(file, live = false, label = null, group = 'normal') {
       const b = document.createElement("button");
       b.className = "dl";
       b.type = "button";
-      b.textContent = T(live ? "btn.savestill" : "btn.save");
+      b.textContent = T(label || (live ? "btn.savestill" : "btn.save"));
       b.addEventListener("click", async () => {
         if (b.disabled) return;
         b.disabled = true;
@@ -140,21 +197,53 @@ function row(name) {
         catch (e) { if (e.name !== "AbortError") b.textContent = T("btn.blocked"); }
         finally { b.disabled = false; }
       });
-      el.querySelector(".act").appendChild(b);
+      actions(group).prepend(b);
     },
   };
+}
+
+// Add a separate opt-in result after the stable converter finishes. AI failure
+// cannot replace or suppress the normal export, and native sources bypass it.
+async function tryAiPortrait(source, data, ui, name,sourceFile=null) {
+  if (!aiPortrait.checked) return;
+  try {
+    const {portraitEligibility} = await import('./src/ai-portrait-container.js');
+    if (source && portraitEligibility(source)) {ui.note(aiText().skip,'ai');return;}
+    const {createAiPortrait} = await import('./src/ai-portrait.js');
+    const result = await createAiPortrait(data,stage => ui.aiState(aiText()[stage] || stage),sourceFile);
+    ui.preview(result,name);ui.aiState('');ui.note(aiText().ready,'ai');
+  } catch(error) {
+    console.warn('Optional AI Portrait failed',error);
+    ui.aiState(error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+  }
 }
 
 async function handleFile(file) {
   const ui = row(file.name);
   try {
     ui.set(T("st.reading"));
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes = new Uint8Array(await file.arrayBuffer());
     if (/\.mov$/i.test(file.name) || file.type === "video/quicktime") {
       await handleMovie(file, bytes, ui);
       return;
     }
-    const format = imageFormat(bytes);
+    let format = imageFormat(bytes);
+    if(format==='dng'){
+      if(!globalThis.crossOriginIsolated){ui.set(T('err.reloadencoder'),'err');return;}
+      ui.set(lang==='vi'?'Đang giải mã DNG…':lang==='zh'?'正在解码 DNG…':'Developing DNG…');
+      const {importDngFile}=await import('./src/dng/dng-import.js');
+      try {file=await importDngFile(bytes,file.name,progress=>{
+        const label=lang==='vi'?'Giải mã RAW':lang==='zh'?'解码 RAW':'Developing RAW';
+        ui.set(progress.total&&progress.done?`${label} ${progress.done}/${progress.total}`:label);
+      });}catch(error){
+        console.warn('DNG import failed',error);
+        const reason=/JPEG XL/.test(error.message)?'JPEG XL':/large RAW/.test(error.message)?'oversized RAW':'decode';
+        const messages={vi:{'JPEG XL':'DNG nén JPEG XL chưa được hỗ trợ.','oversized RAW':'Ảnh RAW này quá lớn cho cấu trúc hiện tại. Hãy xuất JPG/PNG để xử lý.','decode':'Không giải mã được DNG này. Hãy thử bản JPG/PNG.'},en:{'JPEG XL':'JPEG XL compressed DNG is not supported.','oversized RAW':'This RAW layout is too large. Export JPG/PNG to process it.','decode':'Could not decode this DNG. Try a JPG/PNG export.'}};
+        ui.set((messages[lang]||messages.en)[reason],'err');return;
+      }
+      bytes=new Uint8Array(await file.arrayBuffer());format='png';
+      ui.note(lang==='vi'?'DNG được giải mã thành ảnh sRGB để thêm Styles; bản xuất là HEIC, không còn RAW.':lang==='zh'?'DNG 转换为 sRGB 图像以添加风格；导出 HEIC，不保留 RAW。':'DNG is developed to sRGB for Styles; the HEIC output is no longer RAW.','raw');
+    }
     if (RASTER_MIMES[format]) {
       if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
       const { importRaster } = await import("./src/raster/raster-import.js");
@@ -181,6 +270,7 @@ async function handleFile(file) {
       showCaptureDate(ui, date);
       if (navigator.canShare?.({files: [output]})) ui.share(output);
       ui.link(output, outName);
+      await tryAiPortrait(null,result.data,ui,file.name,file);
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
@@ -255,6 +345,7 @@ async function handleFile(file) {
       livePhotos.push(photo);
       attachMovie(photo);
     }
+    await tryAiPortrait(bytes,data,ui,file.name,file);
   } catch (e) {
     // Past the format sniff, every remaining rejection means the same thing to a
     // visitor: this is a HEIC, but not one this build can handle. The real reason
@@ -297,6 +388,7 @@ $("lang").addEventListener("change", () => {
   lang = $("lang").value;
   rememberLanguage(lang);
   applyLanguage(lang);
+  translateAi();
 });
 
 // Visit counter behind the README badge. The only request this site makes to a
@@ -317,6 +409,7 @@ function countVisit() {
 
 (async () => {
   applyLanguage(lang);
+  translateAi();
   $("version").textContent = VERSION;
   countVisit();
   try {

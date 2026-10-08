@@ -45,8 +45,42 @@ body{background:radial-gradient(ellipse at 8% 5%,#0894ff20,transparent 48%),radi
 .drop-icon{background:var(--ai-blue);box-shadow:0 6px 18px #0894ff26}
 .dl{background:var(--button-gradient);color:#fff}.dl.alt{background:transparent;color:var(--accent-text)}
 #quality:checked{background:var(--ai-blue)}
+#ai-portrait{appearance:none;-webkit-appearance:none;width:42px;height:26px;border-radius:999px;position:relative;background:#8885;flex:none;margin:0;cursor:pointer}
+#ai-portrait::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0002;transition:transform .2s}
+#ai-portrait:checked{background:var(--ai-blue)}#ai-portrait:checked::after{transform:translateX(16px)}
+.ai-hint{font-size:12px;color:var(--muted);margin:0 13px 8px;line-height:1.5}
+.ai-details{grid-column:1/-1;padding-top:12px}.ai-details summary{cursor:pointer;color:var(--muted)}
+.ai-preview{display:block;max-width:100%;max-height:420px;width:auto;height:auto;border-radius:14px;margin:12px auto;cursor:crosshair}
+.ai-details label{display:flex;align-items:center;gap:12px;margin:12px 0}.ai-details input{flex:1}
+.ai-status{grid-column:1/-1;font-size:12px;color:var(--muted);margin:8px 0 0}.ai-status:empty{display:none}
+.bokeh-output{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.bokeh-output:empty{display:none}
+.bokeh-actions{display:flex;flex-direction:column;align-items:center;margin-top:16px;gap:0}
+.bokeh-actions>.dl{max-width:100%;white-space:normal;text-align:center}
+.bokeh-actions .ai-status{text-align:center;width:100%}
+.bokeh-actions .bokeh-output{justify-content:center}
+.row .act.bokeh-fallback{grid-template-columns:minmax(0,1fr)}
 .logo{border-radius:10px}
 
 /* Comfortable touch targets and an explicit pending share state. */
 .opts label{min-height:44px;display:flex;align-items:center}
 .dl:disabled{cursor:wait;opacity:.65;filter:none}
+
+/* Settings stay together on phones and share a row on wider/landscape screens. */
+.options-grid{display:grid;gap:0;padding:8px 12px 2px}
+.options-grid .opts{padding:2px 0;gap:12px;min-height:48px}
+.options-grid .opts label{min-height:44px}
+@media(min-width:640px){.options-grid{grid-template-columns:1fr 1fr;gap:20px}}
+@media(orientation:landscape) and (min-width:560px){.options-grid{grid-template-columns:1fr 1fr;gap:16px}}
+
+/* Each output owns its save/download pair; a fourth button never spans the row. */
+.row .act{grid-column:1/-1;grid-row:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:8px;align-items:stretch}
+.output-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px;align-items:center;min-width:0}
+.output-actions .output-label{grid-column:1/-1;min-height:28px;display:flex;align-items:flex-end;font-size:11px;color:var(--muted);line-height:1.3;order:-1}
+.output-actions .dl{padding:10px 8px;min-width:0;white-space:normal;text-align:center}
+.row .act .output-actions .dl{flex:0 1 auto}
+.row .act .dl{flex:0 1 auto}
+.row .act .output-actions+.output-actions{border-left:1px solid var(--line);padding-left:14px}
+@media(max-width:540px){.row .act{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+ .output-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}
+ .output-actions .output-label{grid-column:1/-1}.output-actions .dl{padding:10px 8px;min-width:0;white-space:normal;text-align:center}
+ .row .act .output-actions+.output-actions{border-left:0;border-top:1px solid var(--line);padding:12px 0 0;margin:0}}

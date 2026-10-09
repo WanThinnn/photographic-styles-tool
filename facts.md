@@ -2244,7 +2244,7 @@ Portrait graph from the photo's own resources and a tested metadata reference;
 that is a specific adapter, not universal conversion of future Apple formats.
 
 The new compatibility guard checks actual Styles contracts: 13, 14, 16 and the
-accepted flag-bearing value 131087. Unknown schemas retain their native additive
+accepted flag-bearing values 131087 and 131088. Unknown schemas retain their native additive
 Texture path and Styles payload, while added Soft Skin and AI Portrait are skipped
 with an informational message. A second guard in the pure Portrait builder
 prevents callers from bypassing this check. Unknown keys inside supported Styles
@@ -2260,3 +2260,36 @@ Even a known schema cannot guarantee unchanged interpretation by a future Photos
 renderer. MakerNote/calibration replacement remains limited to the current tested
 Portrait adapter; this guard is not comprehensive version negotiation or a way to
 defeat a future Apple restriction.
+
+### 10.41 Live Photo still eligibility and focus UI (2026-10-09)
+
+The reported IMG_0471 from the user's private ZIP has a Live Photo identifier
+and native Styles declaration 131088. The preceding guard omitted this variant,
+although the earlier accepted Bright photo IMG_0932 also used it. Live Photo
+identity itself was never an AI exclusion. Add this observed contract explicitly,
+without masking arbitrary future flags or rewriting the native declaration.
+The opt-in AI route exports a still HEIC without requiring a MOV. Existing depth
+still takes precedence. Unsupported contract info is shown once, rather than
+both as Soft Skin compatibility and AI status text.
+
+Regression verifies the declaration, complete Styles payload, selected preset
+and all primary/delta/HDR tiles on the actual private IMG_0471. A Chrome mobile
+integration run uses the real WebGPU depth model, real HEVC encoding and assembly
+worker on this photo, with only optional Soft Skin face analysis substituted by
+a no-face result to isolate the Portrait route. It produces 2,373,500 bytes,
+retains the native imagery/HDR/Styles, and passes no-intermediate-output, focus,
+reset, toggle restoration and row-disposal checks with no page exceptions.
+These checks do not replace physical-device Photos import/edit validation.
+
+The focus marker is now a thin yellow square with midpoint ticks, centred on the
+selected focus coordinate; it is not automatic face detection. Browser geometry
+and colour checks pass. Processing releases cached decoded samples in `finally`
+after each serialized file; inference remains WebGPU with 1036/770/518 resource
+budgets and no whole-model CPU fallback, as requested.
+
+The Shortcuts serverless work is currently a proposal and OpenAPI contract in
+`docs/`, not an implemented processing endpoint. It defines always-on Styles
+and Texture with `portrait=true` opt-in, direct binary POST response, native
+preservation and explicit processing failures. A GPU container backend requires
+native codec/inference adapters and parity testing; no cloud deployment or paid
+resources have been created.

@@ -101,7 +101,8 @@ body{background:radial-gradient(ellipse at 8% 5%,#0894ff20,transparent 48%),radi
 .output-actions[aria-busy="true"] a,.act[aria-busy="true"] a{pointer-events:none;opacity:.55}
 .ai-preview-frame{display:block;position:relative;width:fit-content;max-width:100%;padding:0;margin:12px auto;border:0;background:transparent;border-radius:14px;cursor:crosshair;overflow:hidden;line-height:0}
 .ai-preview-frame .ai-preview{margin:0}
-.ai-focus-marker{position:absolute;width:28px;height:28px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #0009;transform:translate(-50%,-50%);pointer-events:none}
+.ai-focus-marker{position:absolute;width:clamp(48px,20%,80px);aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none}
+.ai-focus-marker svg{display:block;width:100%;height:100%;fill:none;stroke:#ffd60a;stroke-width:1.5;filter:drop-shadow(0 1px 1px #0005)}
 .ai-reset{min-height:44px;padding:8px 0;border:0;background:transparent;color:var(--accent-text);font:500 12px var(--sans)}
 .ai-preview-state{min-height:18px;margin:0;color:var(--muted);font-size:12px}.ai-preview-state:empty{display:none}
 .row .result-header .name{max-width:100%;white-space:normal;overflow-wrap:anywhere}

@@ -14,6 +14,7 @@ import {rebuildHeic} from '../../web/src/graft.js';
 import {topBox,concat,be,box} from '../../web/src/box.js';
 import {buildAppleStyleExif} from '../../web/src/raster/exif.js';
 import {styleCapabilities} from '../../web/src/style-capabilities.js';
+import {photoContentIdentifier} from '../../web/src/live-photo.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,o)=>{
@@ -63,6 +64,35 @@ test('unknown Styles contracts are preserved instead of silently downgraded into
   plist.set('0',14);
   const known=withStyles(base,buildBplist(plist)),output=buildAiPortrait(known,depth,template).data,after=discoverHeic(output);
   assert.deepEqual(extractItemData(output,after,after.stylesItem),extractItemData(known,discoverHeic(known),discoverHeic(known).stylesItem),'unknown keys in a supported opaque payload survive byte-exactly');
+});
+
+test('flag-bearing native v16 Styles remain eligible for still Portrait without a MOV',()=>{
+  const base=photo(900,600),d=discoverHeic(base),plist=parseBplist(extractItemData(base,d,d.stylesItem),{preserveReals:true});
+  plist.set('0',131088);
+  const source=withStyles(base,buildBplist(plist)),before=discoverHeic(source);
+  assert.deepEqual(styleCapabilities(source),{native:true,schema:131088,editable:true});
+  assert.equal(portraitEligibility(source),null);
+  const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+  assert.deepEqual(extractItemData(output,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+  assert.equal(parseBplist(extractItemData(output,after,after.stylesItem)).get('0'),131088);
+});
+
+const liveFixture=new URL('../private-fixtures/LivePhoto_0471/IMG_0471.HEIC',import.meta.url);
+test('reported iPhone 16 Pro Live Photo builds editable still Portrait with native colour and HDR intact',{
+  skip:!fs.existsSync(liveFixture),
+},()=>{
+  const source=new Uint8Array(fs.readFileSync(liveFixture)),saved=source.slice(),before=discoverHeic(source);
+  assert.ok(photoContentIdentifier(source));assert.equal(portraitEligibility(source),null);
+  const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+  assert.deepEqual(source,saved);
+  assert.deepEqual(extractItemData(output,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+  assert.deepEqual(selectedStyle(output),selectedStyle(source));
+  for(const [a,b]of[[before.primary,after.primary],[before.deltaGrid,after.deltaGrid],[before.hdrGrid,after.hdrGrid]]){
+    const aa=before.refs.find(r=>r.type==='dimg'&&r.from===a).to,bb=after.refs.find(r=>r.type==='dimg'&&r.from===b).to;
+    assert.equal(aa.length,bb.length);
+    aa.forEach((id,i)=>assert.deepEqual(extractItemData(output,after,bb[i]),extractItemData(source,before,id)));
+  }
+  assert.ok([...after.infos.keys()].some(id=>auxUriForItem(after.props,id)===DEPTH_URI));
 });
 test('editable Portrait keeps own primary, HDR, delta, thumbnails and Texture across geometries',()=>{
   for(const[w,h]of[[900,600],[3024,4032],[1200,1200],[8000,1000]]){

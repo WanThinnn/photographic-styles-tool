@@ -481,3 +481,16 @@ Safari sharing a HEIC saves a still image. A ZIP is only a package of Live Photo
 not a Photos asset. Creating a Live Photo in Photos requires a native importer that adds
 the `.photo` and `.pairedVideo` resources in one PhotoKit creation request. No such native
 importer is included in this browser build.
+
+Live Photo stills use the same AI eligibility checks as other HEIC images; MOV
+is not required for still Portrait export. Native Styles 131088 (the flag-bearing
+v16 variant in the tested IMG_0471 Live Photo and IMG_0932 Bright capture) is
+supported without changing its declaration or colour payload. Unknown contracts
+remain guarded. Compatibility information appears once in Details. Focus preview
+uses a yellow square with mid-edge ticks; it marks the selected point, not an
+automatically detected face box. Decode samples are released after each file.
+
+The separate [Shortcuts serverless proposal](../docs/shortcuts-serverless-api.md)
+and OpenAPI contract describe Styles/Texture with opt-in Portrait. These are
+design artifacts, not a live API; native server codec and GPU inference adapters
+still need implementation and parity testing before cloud deployment.

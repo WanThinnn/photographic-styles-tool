@@ -1,0 +1,52 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Photographic Styles Shortcuts API", "version": "0.1.0-proposal", "description": "Design contract only; backend not implemented. Styles and Texture always enabled; optional AI Portrait."},
+  "paths": {
+    "/v1/process": {
+      "post": {
+        "operationId": "processPhoto",
+        "summary": "Return a still HEIC with Styles and Texture",
+        "security": [{"personalToken": []}],
+        "parameters": [
+          {"name": "portrait", "in": "query", "schema": {"type": "boolean", "default": false}, "description": "Generate editable Portrait only when requested and no original depth exists."},
+          {"name": "focusX", "in": "query", "schema": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5}, "description": "Normalized display coordinate for new Portrait."},
+          {"name": "focusY", "in": "query", "schema": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5}, "description": "Normalized display coordinate for new Portrait."},
+          {"name": "aperture", "in": "query", "schema": {"type": "number", "minimum": 1, "maximum": 22, "default": 4.5}}
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Original file, maximum 20 MiB; format checked from bytes, not just MIME. Live Photo HEIC is processed as a still.",
+          "content": {
+            "image/heic": {"schema": {"type": "string", "format": "binary"}},
+            "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+            "image/png": {"schema": {"type": "string", "format": "binary"}},
+            "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete HEIC. Portrait starts off; enable in Photos. Existing native depth and Styles take precedence.",
+            "headers": {
+              "Content-Disposition": {"schema": {"type": "string"}},
+              "X-Portrait-Result": {"schema": {"type": "string", "enum": ["added", "preserved", "off"]}},
+              "X-Soft-Skin-Result": {"schema": {"type": "string", "enum": ["added", "preserved", "no-face", "unavailable"]}}
+            },
+            "content": {"image/heic": {"schema": {"type": "string", "format": "binary"}}}
+          },
+          "400": {"$ref": "#/components/responses/Error"},
+          "401": {"$ref": "#/components/responses/Error"},
+          "413": {"$ref": "#/components/responses/Error"},
+          "415": {"$ref": "#/components/responses/Error"},
+          "422": {"$ref": "#/components/responses/Error"},
+          "429": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Error"},
+          "504": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"personalToken": {"type": "http", "scheme": "bearer"}},
+    "responses": {"Error": {"description": "Processing failed; no silently degraded photo. Codes distinguish invalid input, authentication, limits, unsupported format, incompatible graph, HDR transfer, Portrait inference, rate limiting, unavailable runtime and timeout.", "content": {"application/json": {"schema": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}}}}}}}
+  }
+}

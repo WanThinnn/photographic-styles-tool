@@ -350,7 +350,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
   aiCandidates.push(candidate);
   if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
   else {
-    if(candidate.skip){candidate.state='skipped';ui.aiState(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip);}
+    if(candidate.skip){candidate.state='skipped';ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');}
     ui.output(outputFile);ui.aiBusy(false);
   }
 }
@@ -358,7 +358,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
 async function runAiCandidate(candidate) {
   if (!aiPortrait.checked || !['new', 'failed'].includes(candidate.state)) return;
   const {ui, name, sourceFile} = candidate;
-  if (candidate.skip) { candidate.state = 'skipped'; ui.aiState(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip);ui.aiBusy(false); return; }
+  if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
   ui.aiBusy(true);
   const controller=new AbortController();candidate.controller=controller;
@@ -559,6 +559,10 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
     // how a bug elsewhere would look.
     console.error("could not port", file.name, e);
     ui.set(T("err.unsupported"), "err");
+  } finally {
+    // Samples belong to this serialized processing operation, not its history
+    // row. Release them after export while retaining only the downloadable file.
+    releaseDecodeCache();
   }
 }
 

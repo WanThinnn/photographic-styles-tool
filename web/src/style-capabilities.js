@@ -9,8 +9,9 @@ export function styleCapabilities(data){
   try{
     const styles=parseBplist(extractItemData(data,d,d.stylesItem));
     const schema=styles instanceof Map?styles.get('0'):null;
-    // 131087 is the flag-bearing schema in the accepted Portrait reference;
-    // its value must not be mistaken for an iOS version or forced down to 14.
-    return {native:true,schema,editable:[13,14,16,131087].includes(schema)};
+    // Flag-bearing values are not iOS versions. 131087 is the accepted
+    // Portrait reference; 131088 is the native v16 variant in IMG_0932 and
+    // the reported Live Photo IMG_0471. Preserve these values verbatim.
+    return {native:true,schema,editable:[13,14,16,131087,131088].includes(schema)};
   }catch{return {native:true,schema:null,editable:false};}
 }

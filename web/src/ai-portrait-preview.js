@@ -17,7 +17,8 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   const view=document.createElement('canvas'),swap=angle===90||angle===270;
   view.width=swap?h:w;view.height=swap?w:h;view.className='ai-preview';
   const frame=document.createElement('button');frame.type='button';frame.className='ai-preview-frame';frame.setAttribute('aria-label',strings.focusKeyboard||strings.focus);
-  const marker=document.createElement('span');marker.className='ai-focus-marker';marker.hidden=true;marker.setAttribute('aria-hidden','true');frame.append(view,marker);
+  const marker=document.createElement('span');marker.className='ai-focus-marker';marker.hidden=true;marker.setAttribute('aria-hidden','true');
+  marker.innerHTML='<svg viewBox="0 0 100 100" aria-hidden="true"><path vector-effect="non-scaling-stroke" d="M1 1h98v98H1zM50 1v8M50 91v8M1 50h8M91 50h8"/></svg>';frame.append(view,marker);
   const blur=document.createElement('input');blur.type='range';blur.min='0';blur.max='20';blur.value='8';
   const label=document.createElement('label');label.textContent=strings.blur;label.append(blur);
   const instruction=document.createElement('p');instruction.className='live-note';instruction.textContent=strings.focus;

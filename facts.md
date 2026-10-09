@@ -2360,3 +2360,19 @@ at at most 518, real HEVC encoding and worker assembly on IMG_0471. It produces
 No intermediate download, rapid settings/reset, off/on restoration and row disposal
 checks pass with no page exceptions. This checks the new budget and paths, not
 the native Safari driver; physical Safari reload behavior still needs user testing.
+
+### 10.44 Moderate Safari GPU detail increase (2026-10-10)
+
+At the user's request, Safari/iOS inference now starts at maximum edge 630,
+with a GPU retry at 518 only on caught resource errors. Other browsers retain
+1036/770/518. The geometry validator accepts the new multiple-of-14 budget;
+primary-image guidance and saved depth still use maximum edge 1024. A process
+reload cannot execute this fallback, and native Safari stability remains unverified.
+
+Twenty-five targeted depth/export/import-path regressions pass. The real WebGPU
+integration probe on Chrome with Safari's user-agent starts at 630 and exports
+2,356,093 bytes on IMG_0471, preserving every primary/delta/HDR tile and the
+selected Styles. No intermediate download or page exceptions occur, and rapid
+settings/reset, toggle restoration and row disposal checks pass. This verifies
+the higher inference budget and export path, not an iPhone's memory tolerance.
+PWA validation passes; the shell cache advances to v83 without invalidating models.

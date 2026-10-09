@@ -473,8 +473,9 @@ the overall opt-in operation has a ten-minute ceiling. The first model download 
 about 120 MB and verified/cached independently of UI releases. Input starts at
 maximum edge 1036, with 770/518 fallbacks for resource failures. RGB-guided depth
 refinement and quantization run in the inference worker; saved depth has maximum
-edge 1024. Safari and iOS start at 518 rather than probing 1036/770: a browser
-process killed under GPU memory pressure cannot run a JavaScript fallback.
+edge 1024. Safari and iOS start at 630 rather than probing 1036/770, with a GPU
+fallback to 518 on caught resource errors. Physical-device stability still needs
+validation: a process killed under GPU memory pressure cannot run a JavaScript fallback.
 Guidance still samples the primary at up to 1024, and inference remains WebGPU.
 This improves the data Photos receives, not only the web preview.
 Preview shaders/textures are reused, with offscreen GPU suspension.

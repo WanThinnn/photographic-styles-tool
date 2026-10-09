@@ -54,7 +54,9 @@ by Git and fetched/verified by Pages CI. They are not installed with the PWA she
 Depth Anything V2 Small is Apache-2.0 and ONNX Runtime is MIT; both licenses ship
 with the assets. Model input starts at maximum edge 1036 (multiples of 14),
 with 770 and 518 resource-failure fallbacks outside Safari/iOS. Safari/iOS start
-at 518 to avoid a WebKit process reload before an allocation error can be caught.
+at 630, with a GPU fallback to 518 on caught resource errors. This moderate budget
+avoids probing 1036/770, but still needs validation on physical Safari devices:
+a WebKit process reload cannot run a JavaScript fallback.
 Inference remains GPU-only, with primary-image guidance and saved depth at up to
 1024. This is a browser memory precaution, not a guessed iPhone/GPU model;
 ray tracing does not determine WebGPU

@@ -1,10 +1,10 @@
 // Termination releases the worker and its GPU session, including hung inference.
 // A WebKit process termination bypasses catch/fallback entirely. Start within
-// the original mobile budget instead of probing larger allocations on Safari.
+// a moderate mobile budget instead of probing 1036/770 allocations on Safari.
 export function depthInputBudgets({userAgent='',platform='',maxTouchPoints=0}=globalThis.navigator||{}){
   const ios=/iPhone|iPad|iPod/i.test(userAgent)||(platform==='MacIntel'&&maxTouchPoints>1);
   const safari=/Safari/i.test(userAgent)&&!/Chrome|Chromium|Edg\/|OPR\/|Android|Firefox/i.test(userAgent);
-  return ios||safari?[518]:[1036,770,518];
+  return ios||safari?[630,518]:[1036,770,518];
 }
 export function awaitAiSource(create, signal) {
   if (!signal) return create();

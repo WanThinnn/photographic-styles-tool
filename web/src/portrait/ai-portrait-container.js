@@ -23,7 +23,7 @@ export function normalizeDisparity(values) {
 
 export function inferenceGeometry(width,height,maxEdge=1036) {
   if(!(width>0&&height>0))throw Error('Invalid source geometry');
-  if(![1036,770,518].includes(maxEdge))throw Error('Invalid AI quality budget');
+  if(![1036,770,630,518].includes(maxEdge))throw Error('Invalid AI quality budget');
   const scale=maxEdge/Math.max(width,height);
   return {width:Math.max(14,Math.round(width*scale/14)*14),height:Math.max(14,Math.round(height*scale/14)*14)};
 }

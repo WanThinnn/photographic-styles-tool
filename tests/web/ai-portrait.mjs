@@ -18,7 +18,7 @@ test('Safari and iOS avoid high-resolution probes that can terminate the page be
     {userAgent:'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 CriOS/140 Mobile Safari/604.1'},
     {userAgent:'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/27.0 Safari/605.1.15'},
     {userAgent:'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15',platform:'MacIntel',maxTouchPoints:5},
-  ])assert.deepEqual(depthInputBudgets(device),[518]);
+  ])assert.deepEqual(depthInputBudgets(device),[630,518]);
   assert.deepEqual(depthInputBudgets({userAgent:'Mozilla/5.0 AppleWebKit/537.36 Chrome/140.0 Safari/537.36'}),[1036,770,518]);
 });
 
@@ -67,7 +67,7 @@ test('background blur rejects nearer subject colours at the silhouette',()=>{
   for(let i=0;i<gray.length;i++)assert.deepEqual([...output.slice(i*4,i*4+4)],[...rgba.slice(i*4,i*4+4)]);
 });
 test('high detail GPU input and resource fallbacks keep aspect ratio within patch rounding',()=>{
-  for(const edge of [1036,770,518])for(const [w,h] of [[4032,3024],[3024,4032],[900,600],[8000,1000]]){
+  for(const edge of [1036,770,630,518])for(const [w,h] of [[4032,3024],[3024,4032],[900,600],[8000,1000]]){
     const input=inferenceGeometry(w,h,edge);assert.ok(Math.max(input.width,input.height)<=edge);
     assert.equal(input.width%14,0);assert.equal(input.height%14,0);
     const scale=edge/Math.max(w,h);

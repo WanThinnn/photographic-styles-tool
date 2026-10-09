@@ -20,8 +20,9 @@ Portrait. Implementation details and device experiment history are in
   worker and expose only the latest combined download.
 - Source is grouped by function, and obsolete A/B generators and unused exporters
   have been removed. License notices remain in distributed outputs.
-- Safari/iOS start GPU inference at maximum edge 518 instead of probing a larger
-  allocation that may kill the WebKit process before fallback can execute.
+- Safari/iOS start GPU inference at maximum edge 630, with 518 as a fallback on
+  caught resource errors, instead of probing 1036/770. Process termination can
+  still bypass fallback; the higher mobile budget needs physical-device validation.
   Primary-image guidance and exported depth remain at maximum edge 1024.
 
 ## Still needs device validation

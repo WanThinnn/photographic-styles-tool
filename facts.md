@@ -2467,3 +2467,38 @@ including translated copy, dismissal/reload persistence, desktop hiding and
 iPad detection with blocked storage. No horizontal overflow was observed.
 The web cannot select the native picker format for the user. Shell cache v87
 ships this notice and the current-output Live Photo ZIP fix.
+
+### 10.49 Compact picker hint and native Portrait capture follow-up (2026-10-10)
+
+The first-use picker hint now uses an unboxed inline row with its acknowledgement
+beside the copy, keeping a 44px touch target. Stop AI gains 6px top spacing. Native
+language-select tap highlighting and its inner rectangle are removed; keyboard
+focus remains visible around the surrounding pill. A private mobile browser
+probe checks light/dark, 320/430 widths, all three languages, pointer versus
+keyboard focus, dismissal persistence and the cancellation spacing. Shell v88.
+
+Private capture pairs identified by matching primary payloads: IMG_5204 (iPhone
+13 Pro Max) → IMG_1029, IMG_1031 → IMG_1032 and IMG_1031-1 → IMG_1033 (iPhone 16
+Pro). Depth payload hashes also match each pair. Both 1031 sources lack native
+Styles, delta map, linear thumbnail and HDR before conversion; their depth XMP
+contains disparity ranges but no RenderingParameters, SimulatedAperture or
+Portrait Lighting parameters. Capture type remains 10/11 through processing,
+whereas the independently verified complete 5129 resource has type 12 and MiPr.
+These correlations are not established requirements or a validated fix.
+
+The user initially reported originals remained editable after re-import, then
+corrected IMG_5204: export to Files and re-import already removes Portrait edits
+without the tool. That case therefore cannot be described as the converter
+dropping native editing resources. IMG_1031-1's fresh-import state still needs
+separate confirmation. Private NativePortrait_On_V1 trials isolate adding MiPr
+(A), then capture classification 12 (B), then the tested reference rendering
+parameters/aperture/lighting and flag 0x1f=1 (C). All retain exact photographic,
+depth, Styles, Texture and source property/reference data. C borrows rendering
+parameters for diagnosis; none of these changes is shipped pending actual
+Photos editing/effect validation. Original photos remain untouched.
+
+Apple documents downloading Unmodified Originals from iCloud.com separately
+from Highest Resolution / Most Compatible: https://support.apple.com/en-sg/111762.
+Its archive guide also describes Export Unmodified Original from Photos:
+https://support.apple.com/en-us/108306. Current selects a picker format; it is
+not a guarantee of an unmodified capture or complete Portrait edit resources.

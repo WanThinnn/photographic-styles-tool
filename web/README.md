@@ -533,7 +533,7 @@ not a Photos asset. Creating a Live Photo in Photos requires a native importer t
 the `.photo` and `.pairedVideo` resources in one PhotoKit creation request. No such native
 importer is included in this browser build.
 
-On first use on iPhone/iPad, a compact reminder below the photo picker shows
+On first use on iPhone/iPad, a compact inline reminder below the photo picker shows
 **Select photos → ••• → Options → Format → Current**. **Got it** dismisses it
 and remembers the choice locally; the complete instructions remain in Help.
 The reminder is rendered before converter modules load and supports all three

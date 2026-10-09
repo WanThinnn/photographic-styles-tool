@@ -70,7 +70,7 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   const title=document.createElement('h3');title.className='ai-preview-title';title.textContent=strings.preview;
   const progress=document.createElement('span');progress.className='ai-preview-progress';progress.hidden=true;progress.setAttribute('role','status');
   const spinner=document.createElement('span');spinner.className='ai-spinner';spinner.setAttribute('aria-hidden','true');
-  spinner.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'+Array.from({length:12},(_,i)=>`<path d="M12 3v3" transform="rotate(${i*30} 12 12)" opacity="${(i+1)/12}"/>`).join('')+'</svg>';
+  spinner.innerHTML='<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><circle cx="20" cy="20" r="15" opacity=".18"/><path d="M20 5a15 15 0 1 1-15 15" opacity=".75"/></svg>';
   const progressLabel=document.createElement('span');progressLabel.className='ai-accessible-text';progressLabel.textContent=strings.updating;
   progress.append(spinner,progressLabel);toolbar.append(progress,title,reset);
   const state=document.createElement('p');state.className='ai-preview-state';state.setAttribute('role','status');

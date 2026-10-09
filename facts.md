@@ -2318,3 +2318,8 @@ rotation/mirror checks retain correct focus mapping. Targeted lifecycle,
 language and Portrait export regressions pass 28/28, including native imagery,
 HDR and Styles preservation. Real WebGPU and HEVC integration on IMG_0471 also
 passes. Chrome automation does not replace a physical Safari interaction check.
+
+The follow-up progress design uses the same 44-pixel circular frame as reset,
+with a continuous rounded arc and a faint full-ring track inspired by the user's
+Camera reference. Rotation is linear instead of a stepped spoke animation;
+offscreen suspension, reduced motion and accessible status text are retained.

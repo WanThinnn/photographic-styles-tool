@@ -2376,3 +2376,34 @@ selected Styles. No intermediate download or page exceptions occur, and rapid
 settings/reset, toggle restoration and row disposal checks pass. This verifies
 the higher inference budget and export path, not an iPhone's memory tolerance.
 PWA validation passes; the shell cache advances to v83 without invalidating models.
+
+### 10.45 Edited HEIC without thumbnail and AI failure diagnostics (2026-10-10)
+
+The user subsequently confirms 630 can run and identifies the failure as
+"Adding Portrait" on IMG_1015.HEIC, an older-phone image edited previously.
+The exact file has primary 49, Styles 84, delta grid 83 and linear thumbnail 52,
+but no ordinary thumbnail. The former exporter rejected that graph before
+assembly. The ordinary thumbnail is now optional: if absent, its unused reference
+item is removed rather than copying an unrelated image or substituting the
+linear thumbnail. Styles, primary tiles, delta tiles and the source preset stay
+byte-exact. Missing Styles/delta/linear-thumbnail requirements remain enforced.
+
+The real WebGPU browser probe on Chrome with Safari UA processes this file at
+630, encodes depth and exports 2,551,808 bytes with no page exceptions. Its own
+primary/delta data and selected Styles are exact; the source has no HDR map.
+Rapid settings/reset, off/on restoration, row disposal and one final output pass.
+Portable no-thumbnail and optional private-file regressions cover the failure;
+31 targeted tests pass. PWA and language checks pass. Photos editing on the user's
+device is still the final validation of aperture/lighting for this new layout.
+
+Runtime/WASM failures may be thrown as numbers/strings. Worker error envelopes
+now preserve a nonempty message and step instead of becoming an undefined depth
+result. Caught inference failures can retry at the next smaller GPU input;
+cancellation, timeout, download/integrity failures and unavailable WebGPU are not
+retried this way. A browser integration probe injects code 17 at 630, verifies a
+real model run at 518, and retains native primary/delta/HDR/preset bytes. This is
+separate from the IMG_1015 assembly defect; it is not proof of that defect's cause.
+Final AI failures add the step and a bounded diagnostic to Details. Completed
+conversion encoder workers and decode samples are released before GPU inference
+to reduce simultaneous memory use. Safari's budget remains 630/518; v84 updates
+the shell while keeping model caches. Process termination still bypasses fallback.

@@ -75,7 +75,7 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   if(!styleCapabilities(source).editable)throw Error('Unsupported Styles schema for Portrait');
   const d=discoverHeic(source);
   if([...d.infos.keys()].some(id=>auxUriForItem(d.props,id)===DEPTH_URI))throw Error('Existing depth must not be replaced');
-  if(!d.stylesItem||!d.deltaGrid||!d.thumbnail||!d.linearThumb)throw Error('Portrait requires the completed Styles graph');
+  if(!d.stylesItem||!d.deltaGrid||!d.linearThumb)throw Error('Portrait requires the completed Styles graph');
   let meta=decode(template.meta),reference=discoverHeic(meta);
   const payloads=new Map(),mapping=new Map(),copied=new Map(),removed=new Set();
   const depthId=[...reference.infos.keys()].find(id=>auxUriForItem(reference.props,id)===DEPTH_URI);
@@ -120,7 +120,11 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   const hdrTiles=reference.refs.find(r=>r.type==='dimg'&&r.from===reference.hdrGrid).to;
   grid(d.hdrGrid,reference.hdrGrid,hdrTiles);
   grid(d.deltaGrid,reference.deltaGrid,reference.deltaTiles);
-  copy(d.thumbnail,reference.thumbnail);copy(d.linearThumb,reference.linearThumb);
+  // Edited exports may omit the ordinary thumbnail while retaining Styles
+  // and its linear thumbnail. Do not borrow the template's unrelated image.
+  if(d.thumbnail!==null&&d.thumbnail!==undefined)copy(d.thumbnail,reference.thumbnail);
+  else removed.add(reference.thumbnail);
+  copy(d.linearThumb,reference.linearThumb);
   copy(d.stylesItem,reference.stylesItem);copy(d.exifItem,reference.exifItem);
   const tmap=[...d.infos].find(([,i])=>i.type==='tmap')?.[0];
   const refTmap=[...reference.infos].find(([,i])=>i.type==='tmap')?.[0];

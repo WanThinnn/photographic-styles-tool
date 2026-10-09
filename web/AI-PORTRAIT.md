@@ -54,7 +54,7 @@ by Git and fetched/verified by Pages CI. They are not installed with the PWA she
 Depth Anything V2 Small is Apache-2.0 and ONNX Runtime is MIT; both licenses ship
 with the assets. Model input starts at maximum edge 1036 (multiples of 14),
 with 770 and 518 resource-failure fallbacks outside Safari/iOS. Safari/iOS start
-at 630, with a GPU fallback to 518 on caught resource errors. This moderate budget
+at 630, with a GPU fallback to 518 on caught inference or resource errors. This moderate budget
 avoids probing 1036/770, but still needs validation on physical Safari devices:
 a WebKit process reload cannot run a JavaScript fallback.
 Inference remains GPU-only, with primary-image guidance and saved depth at up to
@@ -66,6 +66,16 @@ boundaries; it cannot recover geometry absent from the model prediction.
 Complete model downloads are SHA-256 verified and cached by content hash;
 runtime caching uses its pinned dependency identity rather than the UI release.
 No image is sent to a server. Safari/device memory and latency vary.
+
+Completed conversion encoders are released before depth inference to avoid
+overlapping their WASM heaps with the GPU model. Runtime failures retain their
+step and message, including numeric throws; final failures show a short diagnostic
+inside the result's Details. Cancellation, timeout, download/integrity and
+unsupported WebGPU failures do not trigger an inference retry.
+
+Edited HEIC exports may omit the ordinary thumbnail. Portrait assembly accepts
+that layout when the Styles graph and linear thumbnail are present, removes the
+unused reference thumbnail and keeps the photo's own primary and Styles data.
 
 Compatibility is based on file contents, not the EXIF Software/iOS label.
 Native Styles schemas 13, 14, 16 and flag-bearing 131087/131088 are understood by the

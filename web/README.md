@@ -474,10 +474,15 @@ about 120 MB and verified/cached independently of UI releases. Input starts at
 maximum edge 1036, with 770/518 fallbacks for resource failures. RGB-guided depth
 refinement and quantization run in the inference worker; saved depth has maximum
 edge 1024. Safari and iOS start at 630 rather than probing 1036/770, with a GPU
-fallback to 518 on caught resource errors. Physical-device stability still needs
+fallback to 518 on caught inference or resource errors. Physical-device stability still needs
 validation: a process killed under GPU memory pressure cannot run a JavaScript fallback.
 Guidance still samples the primary at up to 1024, and inference remains WebGPU.
 This improves the data Photos receives, not only the web preview.
+
+The completed conversion encoders are released before GPU inference. On failure,
+Details shows the failed step and a short diagnostic while the normal Styles
+download remains available. Edited HEICs without an ordinary thumbnail can still
+receive Portrait when their Styles graph and linear thumbnail are intact.
 Preview shaders/textures are reused, with offscreen GPU suspension.
 The compact Portrait toolbar has an accessible circular reset button and an
 indeterminate progress icon. Its native aperture range has a decorative tick

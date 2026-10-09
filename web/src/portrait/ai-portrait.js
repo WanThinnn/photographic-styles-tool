@@ -3,7 +3,7 @@ import {refineDepth} from './ai-depth-refinement.js';
 import {discoverHeic,dimensionsForItem} from '../core/heif.js';
 import {itemOrientation} from '../raster/heif.js';
 import {aiSourceCanvas,rgbSample} from './ai-portrait-source.js';
-import {inferDepth,awaitAiSource,depthInputBudgets} from './ai-inference.js';
+import {inferDepth,awaitAiSource,depthInputBudgets,canRetryDepth} from './ai-inference.js';
 
 export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{signal}={}) {
   if (!navigator.gpu) throw Error('WEBGPU');
@@ -27,7 +27,7 @@ export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{s
       try{inferred=await inferDepth(rgbSample(source,used.width,used.height),used,{signal,onProgress,guidance:{rgb:previewRgb,width,height}});break;}
       catch(error){
         signal?.throwIfAborted();
-        if(edge===518||!/(out.of.memory|allocat|buffer.*(size|limit|failed)|device.*lost|AI worker failed)/i.test(error.message))throw error;
+        if(edge===budgets.at(-1)||!canRetryDepth(error))throw error;
         onProgress('qualityFallback');
       }
     }

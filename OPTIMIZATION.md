@@ -21,9 +21,12 @@ Portrait. Implementation details and device experiment history are in
 - Source is grouped by function, and obsolete A/B generators and unused exporters
   have been removed. License notices remain in distributed outputs.
 - Safari/iOS start GPU inference at maximum edge 630, with 518 as a fallback on
-  caught resource errors, instead of probing 1036/770. Process termination can
+  caught inference/resource errors, instead of probing 1036/770. Process termination can
   still bypass fallback; the higher mobile budget needs physical-device validation.
   Primary-image guidance and exported depth remain at maximum edge 1024.
+- Completed conversion encoder workers are terminated before GPU depth inference
+  so their WASM heaps do not overlap with the model. Error messages retain the
+  failed step, including numeric runtime failures, in the result's Details.
 
 ## Still needs device validation
 

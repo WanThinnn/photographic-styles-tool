@@ -6,7 +6,7 @@ import {portraitEligibility} from '../../web/src/portrait/ai-portrait-container.
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
-import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations} from '../../web/src/raster/heif.js';
+import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations,removeItems} from '../../web/src/raster/heif.js';
 import {hasTexture} from '../../web/src/raster/texture.js';
 import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel} from '../../web/src/core/exif.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
@@ -40,6 +40,18 @@ function photo(width,height,name='48-12'){
     thumb:payload,thumbHvcc:codec,hdr:payload,hdrHvcc:codec},null,null,g);
 }
 const depth={payload:assets.mask.payload,hvcc:assets.mask.hvcc,width:64,height:64};
+function withoutThumbnail(source){
+  const before=discoverHeic(source),ft=topBox(source,'ftyp'),ftyp=source.slice(ft.off,ft.off+ft.size);
+  const meta=removeItems(source.slice(before.meta.off,before.meta.off+before.meta.size),[before.thumbnail]);
+  const graph=discoverHeic(meta),chunks=[];let cursor=ftyp.length+meta.length+8;
+  for(const [id,item]of graph.iloc.items){
+    if(item.constructionMethod===1)continue;
+    const payload=extractItemData(source,before,id),extent=item.extents[0];
+    meta.set(be(cursor,graph.iloc.offsetSize),extent.offsetPos);meta.set(be(payload.length,graph.iloc.lengthSize),extent.lengthPos);
+    chunks.push(payload);cursor+=payload.length;
+  }
+  return concat([ftyp,meta,box('mdat',concat(chunks))]);
+}
 function withMarker(source,marker){
   const d=discoverHeic(source),ft=topBox(source,'ftyp');
   const exif=injectAppleMakerNoteTag(extractItemData(source,d,d.exifItem),marker);
@@ -116,6 +128,35 @@ test('editable Portrait keeps own primary, HDR, delta, thumbnails and Texture ac
     assert.deepEqual(flag.payload,Uint8Array.of(0,0,0,1));
     assert.equal(exifCameraModel(extractItemData(output,after,after.exifItem)),null,'no reference camera attribution');
     assert.throws(()=>buildAiPortrait(output,depth,template),/Existing depth/);
+  }
+});
+
+test('edited Styles images without ordinary thumbnails retain their own images in Portrait',()=>{
+  const source=withoutThumbnail(photo(4032,3024)),saved=source.slice(),before=discoverHeic(source);
+  assert.equal(before.thumbnail,null);
+  const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+  assert.deepEqual(source,saved);assert.equal(after.thumbnail,null);
+  assert.ok(!after.refs.some(ref=>ref.type==='thmb'),'no borrowed or dangling thumbnail');
+  for(const [from,to]of [[before.primary,after.primary],[before.hdrGrid,after.hdrGrid],[before.deltaGrid,after.deltaGrid],[before.linearThumb,after.linearThumb],[before.stylesItem,after.stylesItem]]){
+    assert.deepEqual(extractItemData(output,after,to),extractItemData(source,before,from));
+    const oldTiles=before.refs.find(ref=>ref.type==='dimg'&&ref.from===from)?.to||[];
+    const newTiles=after.refs.find(ref=>ref.type==='dimg'&&ref.from===to)?.to||[];
+    oldTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(output,after,newTiles[i])));
+  }
+  assert.deepEqual(selectedStyle(output),selectedStyle(source));assert.equal(portraitEligibility(output),'existing-depth');
+});
+
+const editedFixture=new URL('../private-fixtures/IMG_1015.HEIC',import.meta.url);
+test('reported edited IMG_1015 without thumbnail accepts Portrait and preserves Styles',{skip:!fs.existsSync(editedFixture)},()=>{
+  const source=new Uint8Array(fs.readFileSync(editedFixture)),before=discoverHeic(source);
+  assert.equal(before.thumbnail,null);
+  const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+  assert.equal(after.thumbnail,null);assert.equal(portraitEligibility(output),'existing-depth');
+  assert.deepEqual(selectedStyle(output),selectedStyle(source));
+  assert.deepEqual(extractItemData(output,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+  for(const [from,to]of [[before.primary,after.primary],[before.deltaGrid,after.deltaGrid]]){
+    const oldTiles=before.refs.find(ref=>ref.type==='dimg'&&ref.from===from).to,newTiles=after.refs.find(ref=>ref.type==='dimg'&&ref.from===to).to;
+    oldTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(output,after,newTiles[i])));
   }
 });
 

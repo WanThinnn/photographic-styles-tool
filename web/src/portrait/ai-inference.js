@@ -6,6 +6,14 @@ export function depthInputBudgets({userAgent='',platform='',maxTouchPoints=0}=gl
   const safari=/Safari/i.test(userAgent)&&!/Chrome|Chromium|Edg\/|OPR\/|Android|Firefox/i.test(userAgent);
   return ios||safari?[630,518]:[1036,770,518];
 }
+// Runtime/WASM failures can be numbers or strings, not only Error objects.
+export function depthWorkerFailure(error,stage){
+  return {error:String(error?.message??error??'AI worker failed')||'AI worker failed',errorName:error?.name||'Error',errorStage:stage};
+}
+export function canRetryDepth(error){
+  if(['AbortError','TimeoutError'].includes(error.name)||error.message==='WEBGPU')return false;
+  return error.stage==='inference'||/(out.of.memory|allocat|buffer.*(size|limit|failed)|device.*lost|AI worker failed)/i.test(error.message);
+}
 export function awaitAiSource(create, signal) {
   if (!signal) return create();
   return new Promise((resolve,reject) => {
@@ -22,16 +30,18 @@ export function awaitAiSource(create, signal) {
 export function inferDepth(rgb, input, {signal, guidance,timeoutMs = 120000, onProgress = () => {}, workerFactory = () => new Worker(new URL('./ai-inference-worker.js',import.meta.url),{type:'module'})} = {}) {
   return new Promise((resolve,reject) => {
     if(signal?.aborted){reject(signal.reason || new DOMException('Cancelled','AbortError'));return;}
-    const worker = workerFactory();let settled=false;
+    const worker = workerFactory();let settled=false,stage='modelLoading';
     const finish = (error,result) => { if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);worker.terminate();error?reject(error):resolve(result); };
     const abort = () => finish(signal.reason || new DOMException('Cancelled','AbortError'));
     let timer;
     const arm=()=>{clearTimeout(timer);timer=setTimeout(() => finish(new DOMException('AI timed out','TimeoutError')),timeoutMs);};arm();
     signal?.addEventListener('abort',abort,{once:true});
-    worker.onerror = () => finish(Error('AI worker failed'));
+    worker.onerror = () => finish(Object.assign(Error('AI worker failed'),{stage}));
     worker.onmessage = ({data}) => {
-      if(data.stage){if(data.stage==='download')clearTimeout(timer);else arm();onProgress(data.stage,data.progress);}
-      else finish(data.error?Error(data.error):null,data.result);
+      if(data.stage){stage=data.stage;if(stage==='download')clearTimeout(timer);else arm();onProgress(stage,data.progress);}
+      else if('error' in data)finish(Object.assign(Error(String(data.error??'AI worker failed')||'AI worker failed'),{name:data.errorName||'Error',stage:data.errorStage||stage}));
+      else if(data.result)finish(null,data.result);
+      else finish(Object.assign(Error('AI worker returned no depth'),{stage}));
     };
     try { worker.postMessage({rgb,input,guidance},[rgb.buffer]); } catch(error) {finish(error);}
   });

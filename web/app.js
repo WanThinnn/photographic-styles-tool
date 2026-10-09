@@ -58,7 +58,7 @@ aiPortrait.addEventListener('change', () => {
       candidate.ui.outputPending(false);
       candidate.ui.output(candidate.outputFile);
       candidate.ui.aiView(false);candidate.ui.aiBusy(false);
-      candidate.ui.aiState('');candidate.ui.note('', 'ai');
+      candidate.ui.aiState('');candidate.ui.note('', 'ai');candidate.ui.note('', 'ai-error');
     } else if (candidate.aiFile) {
       candidate.ui.outputPending(Boolean(candidate.ui.portraitPending));
       candidate.ui.output(candidate.aiFile);candidate.ui.note(aiText().ready, 'ai');
@@ -359,21 +359,27 @@ async function runAiCandidate(candidate) {
   const {ui, name, sourceFile} = candidate;
   if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
+  ui.note('', 'ai-error');
   ui.aiBusy(true);
   const controller=new AbortController();candidate.controller=controller;
   const removeCancel=ui.cancelAi(controller);
   // Downloads have a stall timeout; GPU phases have their own watchdog.
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
+  let lastStage='loading';
   try {
     const {createAiPortrait} = await import('./src/portrait/ai-portrait.js');
     const {exportAiPortrait} = await import('./src/portrait/ai-portrait-export.js');
     const data = new Uint8Array(await candidate.outputFile.arrayBuffer());
+    // These serialized conversion jobs are finished. Free their WASM heaps
+    // before loading the GPU model, especially after JPEG/PNG or thumbnails.
+    releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
     const result = await createAiPortrait(data,(stage,progress)=>{
+      lastStage=stage;
       if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
         ui.aiState(`${aiText().download}${percent} · ${formatBytes(progress.loaded)}`);
       }else ui.aiState(aiText()[stage]||aiText().loading);
     },sourceFile,{signal:controller.signal});
-    ui.aiState(aiText().encoding);
+    lastStage='encoding';ui.aiState(aiText().encoding);
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     ui.cleanup(output.dispose);
     controller.signal.throwIfAborted();
@@ -394,6 +400,7 @@ async function runAiCandidate(candidate) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
     ui.aiState(!aiPortrait.checked?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+    if(aiPortrait.checked&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
   } finally {
     clearTimeout(deadline);removeCancel();candidate.controller=null;
     // Publish the normal fallback only after AI failed/cancelled. Never expose

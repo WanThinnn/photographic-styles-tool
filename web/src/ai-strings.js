@@ -1,6 +1,6 @@
 export const AI_STRINGS={
   "vi": {
-    "toggle": "AI xoá phông",
+    "toggle": "Độ sâu thông minh · ML",
     "hint": "Thêm Portrait để chỉnh ƒ và ánh sáng trong Ảnh. Giữ depth gốc nếu đã có. AI chạy trên thiết bị.",
     "loading": "Đang tải AI · khoảng 120 MB lần đầu",
     "download": "Đang tải AI",
@@ -27,7 +27,7 @@ export const AI_STRINGS={
     "previewFailed": "Không hiển thị được preview. Bạn vẫn có thể chỉnh Portrait trong Ảnh."
   },
   "en": {
-    "toggle": "AI background blur",
+    "toggle": "Intelligent Depth · ML",
     "hint": "Add Portrait to edit aperture and lighting in Photos. Existing depth is preserved. AI runs on your device.",
     "loading": "Loading AI · about 120 MB initially",
     "download": "Downloading AI",
@@ -54,7 +54,7 @@ export const AI_STRINGS={
     "previewFailed": "Preview unavailable. You can still edit Portrait in Photos."
   },
   "zh": {
-    "toggle": "AI 背景虚化",
+    "toggle": "智能景深 · ML",
     "hint": "添加人像，在照片 App 中调整光圈和人像光效。保留原有深度，AI 在设备上运行。",
     "loading": "正在加载 AI · 首次约 120 MB",
     "download": "正在下载 AI",

@@ -1012,3 +1012,1027 @@ VI/EN/ZH (115 keys) and PWA/offline checks passed; cache version is v65.
 References: [Apple WWDC24 HDR](https://developer.apple.com/videos/play/wwdc2024/10177/),
 [libavif tmap writer](https://github.com/AOMediaCodec/libavif/blob/main/src/write.c),
 [Ultra HDR metadata conversion](https://github.com/google/libultrahdr/blob/main/lib/src/gainmapmetadata.cpp).
+
+### 10.13 Portrait baseline: two IMG_5129 exports (2026-10-09)
+
+The user supplied two private copies of the same iPhone 16 Pro capture (Exif iOS
+26.3, 2026-02-11 01:36:52). The first `IMG_5129.HEIC` is 965,408 bytes, SHA-256
+`2eff27e5b92fc598f289e6c2867254087a1fddca3de4a30453d20dcb5cc436ff`. It has a
+3024x4032 primary, 576x768 disparity, HDR/tmap, but no native Styles, linear
+thumbnail or style delta map. The user independently reimported this unprocessed
+file into Photos and reported that aperture editing was unavailable. Do not use
+this file as a known-good standalone Portrait baseline or attribute that failure
+to the website.
+
+The fuller `IMG_5129 (1).HEIC` is 2,080,206 bytes, SHA-256
+`e3f10fe03f5b9065432ebb7801c69ccc8dc2db0d7fa310fe9010cfd80de04382`. It has a
+4032x3024 primary, 768x576 disparity, native Styles, linear thumbnail, style
+delta map, HDR and tmap. The user describes its Portrait as available but Off,
+and subsequently confirmed the native A/B/C preservation batch supports both
+aperture and Portrait Lighting after import. Native-depth preservation is the
+accepted baseline; the open request is generating editable Portrait for photos
+that have no depth.
+Both depth sidecars declare relative accuracy, native hdis stored as 8-bit L008,
+float range 0.735840 to 1.607422, simulated aperture 4.5, calibration and blur
+rendering parameters. Their base64 RenderingParameters text hashes are identical.
+Both depth auxC properties carry the same 21-byte subtype data after the URI.
+Before the experiment below, `attachAiDepth` omitted that subtype and used minimal
+XMP without the measured Apple pixeldatainfo layout. These are format differences,
+not proven Portrait eligibility requirements. Native 8-bit
+storage and relative accuracy must not be diagnosed as inherently invalid.
+
+`tools/portrait-container-baseline.mjs` generated a frozen private A/B/C batch
+from the fuller source under `tests/private-fixtures/Portrait_5129_Full_Baseline`:
+A is byte-identical to the source; B reverses external payload order and rewrites
+iloc offsets without changing any payload, metadata properties or references;
+C uses the existing native add-Texture route. Assertions confirm all 104 source
+payloads, including Exif, depth, HDR, Styles and idat, preserved in all three,
+with original item infos, properties and associations. C adds no legacy tone
+curve on this source. The user's device acceptance above supplements these
+preservation assertions; it does not establish synthetic-depth support.
+
+### 10.14 Synthetic depth export: Apple metadata experiment (2026-10-09)
+
+The user explicitly requests optional AI depth after Styles/Texture on depthless
+photos, with Portrait On/Off, aperture and Portrait Lighting in Apple Photos.
+Existing native-depth preservation is already accepted and is not the target.
+
+`apple-depth-metadata.js` now writes the auxiliary disparity descriptor, including
+H.265 depth-representation SEI, and Apple pixeldatainfo quantization metadata.
+An independently decoded native descriptor is a golden test: 16 fraction bits,
+uniform disparity, min 0.73583984375 and max 1.607421875. The default synthetic map
+has relative range 0..1, 8-bit L008 storage, native hdis, relative accuracy and low
+quality. DepthDataVersion 65541 follows the supplied native file; its semantics
+are not established. No camera matrices, pixel size or capture-specific blur
+rendering parameters are fabricated. These fields are not proof of Photos
+Portrait eligibility.
+
+`exportAiDepth` encodes the actual Depth-Anything-V2-Small result as lossless
+monochrome full-range HEVC and attaches it without baking blur. Native depth is
+never replaced by this exporter. All source payloads, including idat, and unknown
+trailing top-level boxes are preserved. The auxC property precedes orientation
+properties as in the measured native graph. This experimental module is not
+connected to production save/download buttons; the existing bokeh feature still
+exports baked blur and makes no Photos aperture/lighting promise.
+
+Frozen private V2 batches were generated from real local browser inference:
+
+- `Portrait_AI_JPEG_V2`: A is the accepted depthless HDR JPEG conversion;
+  B adds AI disparity and Apple metadata; C uses the identical map and additionally
+  specifies initial aperture 4.5 and lighting strength 0.5. All 114 baseline item
+  payloads remain byte-identical, including HDR, Styles and Texture resources.
+  This is the relevant arbitrary-depthless-photo test, without native calibration.
+- `Portrait_AI_5129_V2`: source depth and its XMP are physically removed before
+  creating A; B/C add actual AI disparity as above. D uses the same AI map while
+  retaining this exact capture's own calibration/blur sidecar and quantization
+  range. All 127 baseline item payloads remain byte-identical. D isolates the
+  native sidecar's effect and is not a general solution for other photos. Native
+  capture Exif flags are preserved in this diagnostic cohort.
+
+Both cohorts contain one identical encoded AI map across their depth variants;
+V2 reports record geometry, source/map hashes, removed item IDs and preservation
+assertions. They have not yet been tested in Photos. A positive native-cohort D
+result alone would not establish support for arbitrary depthless JPEGs. Check
+fresh import, actual On/Off effect, aperture blur, lighting effect and persistence
+after save/reopen before promoting a variant into the website UI.
+
+The first real-inference/export integration completed but did not decode the
+exported depth. Subsequent investigation found the V2 codec error in section
+10.15; do not treat these V2 files as valid depth exports or a negative result
+for correctly encoded AI depth. Portable regressions at that point: 55 passed,
+10 optional fixture skips, no failures; PWA and 115-key VI/EN/ZH checks passed,
+cache v66. An old libheif decoder rejected the
+previously accepted HDR JPEG conversion's tmap/thumbnail graph; the JPEG batch
+uses the original JPEG for AI analysis, as the normal raster conversion flow does.
+This does not establish that re-uploading that generated HEIC is decodable by the
+old library, or validate physical Safari performance.
+
+Apple documents manual auxiliary depth creation via AVDepthData and ImageIO:
+[Creating auxiliary depth data manually](https://developer.apple.com/documentation/avfoundation/creating-auxiliary-depth-data-manually).
+That documentation does not guarantee Photos aperture/lighting controls for
+arbitrary synthesized maps. The descriptor bit layout was checked against
+[libheif v1.17.6 HEVC parsing](https://github.com/strukturag/libheif/blob/v1.17.6/libheif/hevc.cc).
+
+### 10.15 Failed Portrait tests; double-wrapped hvcC fixed (2026-10-09)
+
+The user reports all tested synthetic-depth files still have no aperture control.
+Inspection then found a concrete serialization defect: `encodeHevcPixels().hvcc`
+already contains the complete hvcC property box. The new exporter and private
+variant builder wrapped it again, producing a record starting with another box
+header instead of HEVCDecoderConfigurationRecord version 1. The V1/V2 trial
+codec property is malformed. Earlier preservation checks passed because they
+verified source resources, not the new depth's decodability; prior integration
+only completed inference/encoding and must not be called functional validation.
+
+Both call sites now pass the complete box once; `attachAiDepth` rejects double
+wrapping, raw records and invalid record versions. The portable container test
+checks the actual attached codec property and rejects double wrapping. Frozen V3
+batches rebuild the same A/B/C/D comparisons with the exact same model assets,
+AI map and payload, fixing only the codec serialization. V1/V2 remain frozen for
+forensics and should not be used for further device tests.
+
+Chrome readback from both V3 B HEICs passed: all 442,368 stored gray values per
+cohort match the AI map exactly (884,736 total), through FFmpeg's HEVC decoder
+without RGB/range conversion. B/C/D share the same codec and payload within each
+cohort. A second full run of real AI inference -> corrected `exportAiDepth` ->
+HEIC extraction -> decoder also matches all 442,368 pixels. HDR, Styles, Texture
+and every baseline item payload pass the original preservation assertions.
+These checks demonstrate valid encoded depth and preservation, not Photos
+Portrait eligibility. The user's V3 result is recorded in section 10.16 below.
+No experimental Portrait controls are exposed
+in the production UI, and no native calibration is adopted for unrelated photos.
+
+After this fix, the 9 depth/container regressions and 7 startup/lifecycle checks
+passed; PWA and 115-key VI/EN/ZH checks passed, cache v67. No colour investigation
+was resumed and no files have been deployed.
+
+### 10.16 V3 device result and isolated metadata trials (2026-10-09)
+
+The user imported the unpacked V3 cohort and reports only
+`Portrait_AI_5129_V3/D_AI_SamePhotoRendering.HEIC` has full depth and Styles in
+Edit. Native-cohort B/C show a depth icon when viewing but have no depth control
+in Edit. None of the JPEG cohort has the requested Portrait functionality.
+This is device acceptance of D's editing UI on this exact capture. Actual blur,
+lighting effect and save/reopen persistence were not separately reported.
+
+Native-cohort B/C/D have the same AI map, encoded payload, codec, image and graph.
+D additionally retains the capture's calibration and RenderingParameters, native
+float range and Quality high. Therefore the native sidecar/descriptor group has
+an observed eligibility effect; the result does not identify an individual field
+or establish support for arbitrary photos. In particular, it is not evidence
+that a larger AI model or 32-bit HEVC storage is necessary.
+
+The native RenderingParameters value decodes to 1,352 bytes, beginning with REND,
+version 7 and a little-endian size of 1,352. It is not a plist; the entries and
+their capture/focus dependencies have not been established. No serialized blob
+is adopted as a production donor preset.
+
+`tools/portrait-depth-sidecar-trials.mjs` generates frozen private
+`Portrait_Metadata_V4` from the V3 baselines and previously encoded AI assets:
+
+- A: remove only RenderingParameters from working D metadata.
+- B: remove only its nine camera-calibration fields, retaining render parameters.
+- C: change only quantization/auxC range to 0..1, with the identical gray samples.
+- D: change only Quality high to low, with the identical AI result.
+- E (JPEG): add only the native render blob to V3 C, without camera calibration.
+  This is a private cross-scene diagnostic. A positive result alone would not
+  validate its focus or blur settings on unrelated photos or justify a default.
+- F (JPEG): change only Quality low to high. This tests metadata eligibility;
+  it does not improve or measure the AI map's quality.
+
+The working reference D is reproduced byte-for-byte before trials are generated.
+All native/JPEG baseline payloads (127/114 items) and their properties/references
+remain exact; each cohort retains its V3-verified codec and depth payload. An
+independent Python XML parser verified valid XML and exactly the intended changed
+fields in all six trials. Physical V4 results are pending; prioritize A/B/E.
+Production Portrait behavior and colour defaults are unchanged.
+
+The user supplied two prose/Swift proposals for review. Apple's public method is
+`dictionaryRepresentation(forAuxiliaryDataType:)`, not the proposed
+`dictionaryForAuxiliaryDataType()`. The manual-depth guide specifies CFData bytes
+and a description containing pixel format, width, height and bytes per row; the
+proposal passes a CVPixelBuffer object as Data and omits those dimensions/stride.
+The guide/method support HEIF, JPEG and DNG, contradicting the HEIC-only claim.
+No verified public API guarantee was found that arbitrary MakerApple keys
+ApertureValue/FocusDistance/PortraitBlurEffect enable Photos aperture editing.
+The proposed kCGImagePropertyHEICSContinuousProfile constant was not located in
+the checked public documentation; it must not be treated as a supported Portrait
+switch. The cited WWDC21 10076 is Object Capture, not a specification for this
+switch. ImageMagick discussion 3892 remains an unanswered request, not a tested
+Portrait writer. The snippets recreate the main UIImage and add depth without
+explicitly preserving this tool's Styles/HDR resources, and require native APIs
+unavailable directly to Safari. None is adopted as a drop-in website fix.
+
+References: [manual auxiliary depth](https://developer.apple.com/documentation/avfoundation/creating-auxiliary-depth-data-manually),
+[dictionary representation](https://developer.apple.com/documentation/avfoundation/avdepthdata/dictionaryrepresentation(forauxiliarydatatype:)),
+[Object Capture session](https://developer.apple.com/videos/play/wwdc2021/10076/),
+[original ImageMagick discussion](https://github.com/ImageMagick/ImageMagick/discussions/3892).
+
+### 10.17 V4 device outcomes and estimated-calibration trial (2026-10-09)
+
+The user reports all 5129 A/B/C/D show the Portrait icon when viewing, but Edit
+differs. A (RenderingParameters removed) has no aperture; Portrait Lighting UI
+remains but renders black or has no effect. B (calibration group removed) and D
+(Quality low) have neither aperture nor lighting. C (range 0..1) has working
+aperture, lighting and Styles. JPEG E/F have Styles only, with no aperture or
+lighting. Thus viewing-time classification is not evidence of editing support.
+
+On this exact native graph and AI map, removing the render blob or calibration
+group, or declaring Quality low, each breaks editing relative to the working
+reference. This does not prove every calibration field is required, or that
+these three ingredients are sufficient on arbitrary inputs. The 0..1 range
+works on this capture; the donor's native min/max need not be used for that case.
+Changing Quality to high is an eligibility experiment, not a measured upgrade
+to the map or a substitute for the remaining metadata.
+
+`tools/portrait-calibration-trials.mjs` generates frozen private
+`Portrait_Calibration_V5`. All variants retain the verified 0..1 descriptor,
+relative accuracy, high Quality label and native render blob from working V4 C.
+Only calibration is replaced with a pinhole approximation. It is derived from
+the individual photo's EXIF actual focal length, 35mm equivalent focal length,
+stored dimensions and, in one probe, its digital zoom. Principal point is
+assumed centered, square pixels and no distortion are assumed, and extrinsics
+are identity. These are estimated modeling assumptions, not measured lens
+calibration. No unrelated camera's matrix/distortion, forced Portrait capture
+flags, or new model outputs are introduced.
+
+- A uses 5129's 6.764999866 mm actual focal length / 48 mm equivalent at
+  4032x3024; approximate focal pixels 5591.377978, pixel size 0.0012098985 mm.
+  It changes only calibration relative to the accepted V4 C.
+- B uses the JPEG's 15.659999847 mm actual / 120 mm equivalent at 3024x4032;
+  approximate focal pixels 13978.444945, pixel size 0.0011202963 mm.
+- C uses the same JPEG with its EXIF DigitalZoomRatio 2 as an additional
+  multiplier; approximate focal pixels 27956.889890, pixel size 0.0005601481 mm.
+  B/C isolate zoom interpretation. The source's crop/distortion/equivalence
+  conventions are not fully recovered from EXIF.
+
+Projection formula is f_px = f_35mm * hypot(width,height) / hypot(36,24), and
+pixelSize = actualFocalLength / f_px (with zoom multiplier in the C probe).
+CIPA defines equivalence using the image diagonal; Apple likewise describes
+nominal 35mm focal length as diagonal field of view. Applying this formula to
+the exported image is an approximation: crop, correction and metadata rounding
+can differ from camera calibration, so a positive control is required.
+
+An independent Python TIFF reader verified these source EXIF focal values.
+The builder preserves every baseline item payload (127 native / 114 JPEG),
+properties and references, including original EXIF/HDR/Styles/Texture. AI depth
+and codec hashes match the previously decoded V3 assets. A separate Python XML
+parser checks unchanged non-calibration metadata, matrix ordering/dimensions,
+zero distortion and independently recomputes every projection. ZIP CRC and HEIC
+hashes pass. Physical V5 outcomes are pending. The cross-scene render blob still
+has unknown focus/tuning dependencies and is not adopted as a website default;
+production UI, HDR, Soft Skin and colour behavior remain unchanged.
+
+Sources: [Apple camera calibration](https://developer.apple.com/documentation/avfoundation/avcameracalibrationdata),
+[Apple nominal focal length](https://developer.apple.com/documentation/avfoundation/avcapturedevice/nominalfocallengthin35mmfilm),
+[CIPA diagonal-equivalence definition](https://www.cipa.jp/std/documents/e/DCG-X001-2018_E.pdf).
+
+### 10.18 V5 device outcomes, actual depth readback and brand isolation (2026-10-09)
+
+The user reports V5 A has full editing support; V5 B/C have Styles only.
+Estimated pinhole calibration therefore works on this native 5129 graph with
+its retained capture metadata and same-scene rendering parameters. It does not
+establish a general Portrait exporter for photos originally without depth.
+Neither tested digital-zoom interpretation makes the JPEG graph editable.
+
+B/C do contain AI depth. Readback used the actual user-unpacked files under
+`tests/private-fixtures/Portrait_Calibration_V5_Test/Portrait_Calibration_V5`.
+Both contain hvc1 depth item 125, 576x768, a 61,703-byte payload with SHA256
+`66e4c0a7f6a71acf771059ec5f7f7a68b27598d7646d6e3990f80ce440b422ab`,
+auxl links to primary item 1 and tmap item 98, and the depth XMP sidecar.
+Decoding the depth HEVC from each actual HEIC reproduces all 442,368 AI gray
+samples exactly. Their map is neither missing nor blank. PNGs generated from
+those decoded samples and `readback.json` are in `Portrait_V5_Verification`.
+Photos not showing Portrait controls is not evidence of absent file depth.
+
+The accepted native graph declares compatible brands mif1, MiHB, MiHA, heix,
+MiHE, MiPr, heic, miaf and tmap. The generated JPEG graph declares only mif1 and
+heic; attachAiDepth currently preserves that ftyp. Both depth codecs use HEVC
+profile 4. These observations motivate a format-declaration probe; they do not
+prove that heix or MiPr enables Portrait, or that adding a brand establishes
+all its conformance requirements. The meaning of MiPr remains unverified.
+
+`tools/portrait-brand-trials.mjs` produces frozen `Portrait_Brands_V6` from V5 B:
+A adds only compatible heix; B only MiPr; C both. Major brand and minor version
+remain unchanged. No AI rerun, camera calibration, render parameters, capture
+flags, EXIF, HDR or Styles change. Each file preserves all 116 item payloads,
+every property and reference, and the exact depth payload. Only ftyp and the
+required absolute iloc offset shifts differ. Byte comparison after undoing
+those offsets verifies the entire original tail; an independent Python check
+verifies brand additions and unchanged non-meta top-level boxes. V6 device
+results are pending. These private diagnostic files, including the existing
+cross-scene render blob, are not production defaults or website output.
+
+### 10.19 V6 device outcome and capture-classification isolation (2026-10-09)
+
+The user reports all three V6 HEIC files still lack Portrait controls. Adding
+heix alone, MiPr alone or both is therefore insufficient on this exact JPEG
+conversion. This does not prove brands never matter in combination with other
+conditions. The tested outputs are already HEIC, not JPEG with a changed suffix;
+"JPEG cohort" describes the input's origin, not the output format.
+
+Depth payload/descriptor, sidecar references and property ordering were also
+compared between accepted V5 A and failed V5 B. Both use the same writer and
+valid single hvcC; their depth geometry/transforms differ with their source
+geometry. No missing depth item or sidecar was found. The remaining source
+metadata differs: native A has Apple MakerNote 0x14 value 12 and 0x1f value 1;
+the generated JPEG cohort lacks both tags. ExifTool's primary Apple.pm describes
+0x14 as ImageCaptureType (12 = Scene, 2 = Portrait), and 0x1f as
+PhotosAppFeatureFlags, set when a person/pet is detected. These descriptions
+do not establish a Photos aperture-enabling switch.
+
+`tools/portrait-capture-trials.mjs` generates frozen private
+`Portrait_Capture_V7`. A changes only 0x1f to zero on the accepted native V5 A,
+providing a negative-control probe. B adds only 0x1f=1 to failed V5 B; C adds
+only 0x14=12; D adds both. It does not force Portrait capture type 2, transplant
+camera data, identifiers or complete donor EXIF, or rerun AI. All non-EXIF item
+payloads (128 native / 115 JPEG), properties, references and original file bytes
+other than the EXIF locator remain exact. All unrelated MakerNote tag values
+are checked unchanged. The byte-blob injection helper's count is explicitly
+corrected in this private tool to ONE TIFF element for each int32 scalar.
+Capture flags are diagnostic declarations, not proven detection or production
+defaults. V7 device outcomes are pending.
+
+An independent Python HEIF/TIFF reader verifies both scalar tags have signed
+int32 type and count one, their requested values, unchanged root/EXIF fields
+outside MakerNote, and unchanged unrelated MakerNote values including 64-bit
+entries. ZIP CRC and all archived file hashes also pass.
+
+Reference: [ExifTool Apple MakerNote definitions](https://raw.githubusercontent.com/exiftool/exiftool/master/lib/Image/ExifTool/Apple.pm).
+
+### 10.20 V7 device outcome and EXIF-write controls (2026-10-09)
+
+The user reports V7 A can toggle Portrait and shows the aperture icon in Edit,
+but neither aperture nor lighting has a working effect. V7 B/C/D have no
+Portrait controls. Adding capture type 12 and/or feature flag 1 is insufficient
+on that JPEG-derived HEIC graph. No production classification flags are added.
+
+V7 A simultaneously changed the flag value and used the EXIF/MakerNote writer,
+so the failure cannot yet be attributed solely to the flag. V8 separates these
+variables: A rewrites accepted V5 A with flag 1 unchanged, using the same writer
+as V7; B sets flag 0 directly in accepted V5 A without rewriting EXIF; C restores
+flag 1 directly in failed V7 A, retaining its EXIF serialization. All remain
+native-graph controls with the same AI depth; none is a new arbitrary-photo fix.
+A/C have identical active EXIF bytes. All 128 non-EXIF items, properties and
+references are checked exact; B/C change only the four inline scalar bytes.
+V8 device results are pending.
+
+V8 A and C additionally have identical complete-file SHA256
+`db48c1d44571e7d31b60f0933809d197f07187a1a63aea1ebbd72f172a2e6adb`.
+Thus only A/B are packaged for device testing; C needs no separate import.
+The independent Python TIFF reader verifies unchanged non-MakerNote fields,
+unchanged other MakerNote values, and correct int32/count-one flag values.
+
+The actual original JPEG IDG_20251020_121945_809.JPEG has 1,106 bytes of EXIF
+and no MakerNote 0x927c. Thus there is no original Apple MakerNote to restore
+on this JPEG cohort. Its minimal Apple MakerNote is generated for Styles;
+absence of original capture metadata is not evidence that valid depth is absent.
+The Elio backup's portrait-matte code handles foreground segmentation; its
+depth code copies existing source depth/sidecars. No verified implementation
+that builds arbitrary editable Apple Photos Portrait metadata was found there.
+
+### 10.21 V8 results, Depth Sampler review and separate Focos/merged inputs (2026-10-09)
+
+The user confirms V8 A has working aperture and lighting. V8 B can toggle
+Portrait but cannot adjust aperture or lighting. For the tested native 5129
+graph, the EXIF-write path works and directly setting PhotosAppFeatureFlags
+to zero disables the editing effects. This establishes the effect of that
+field on this graph, not sufficiency of setting it to one on arbitrary photos.
+The user's objective remains all-camera ordinary photos with genuinely working
+Photos aperture/lighting after adding AI depth, not only native-graph controls.
+
+Reviewed shu223/iOS-Depth-Sampler at commit
+`ed5c96f9d753fce86a633f069defd3458e90a8c5`; 24 Swift files and associated
+Metal/docs were downloaded read-only into an ignored private reference snapshot.
+DepthImagePickableViewController filters existing depthEffectPhotos and loads
+their file representation. CGImageSource+Depth reads auxiliary dictionaries
+and constructs AVDepthData from existing data. PortraitMatteViewController uses
+CIBlendWithMask to display background removal inside its own app. VideoCapture
+uses AVCaptureDepthDataOutput and synchronization for camera-supplied depth.
+No CGImageDestination writer, Photos asset-creation/export path, synthetic
+depth model, or implementation enabling arbitrary Photos aperture editing was
+found in the reviewed Swift files. Its bundled JPEG examples have native depth
+metadata, DepthDataVersion 65538, high/relative quality and older REND version 2;
+they are readers' fixtures, not verified all-camera editable exports. They
+must not be represented as Focos references or as proof of working Photos ƒ.
+
+The user then supplied a new directory containing FC_20261009_0001.JPEG
+(3,161,062 bytes) and IMG_0897.HEIC (271,185 bytes), and explicitly confirmed
+they are TWO DIFFERENT photos. Both show Portrait when viewing but lack Edit
+aperture/lighting according to the user; neither is a known-good editing reference.
+The JPEG comes from Focos, is 3024x4032, has camera iPhone 16 Pro in EXIF,
+Apple capture type 10 and Photos feature flag 1. It embeds disparity metadata
+with high/relative quality, version 65541, range 0.492432..4.582031,
+calibration reference 3024x4032, aperture 2.8, lighting strength 0.5 and its
+own 1,352-byte REND version 7. That blob differs from 5129's; it is not replaced.
+Its second JPEG stream starts at byte 3,113,146 and decodes as a 576x768
+monochrome image; the first stream is 3024x4032 RGB. The separate auxiliary
+image is therefore present, not only an empty depth metadata declaration.
+
+The separate HEIC is 1200x900 with no root camera model, capture type 12 and
+feature flag 1. It contains depth hvc1 item 9 at 768x576, auxl to primary 7,
+and XMP item 10 describing high/relative depth version 65541, range
+0.007843..0.992188, calibration reference 4032x3024, aperture 2.8 and lighting
+strength 0.5 with a 1,352-byte REND version 7. The reference dimensions differ
+from stored pixels; the same aspect ratio alone is not proof of correct
+calibration/focus. Do not copy EXIF, calibration, rendering parameters or depth
+between these two unrelated inputs.
+
+`tools/portrait-file-classification.mjs` creates private Focos_Classification_V9:
+A changes only the Focos JPEG's existing int32 capture type 10 to 2;
+B changes only the separate HEIC's existing value 12 to 2. ExifTool describes
+2 as Portrait, but this is an isolated diagnostic declaration, not a production
+capture claim or proven solution. No HEIC conversion, model rerun, EXIF rebuild,
+or data transplantation occurs. File sizes stay exact; byte comparison verifies
+that only the inline four-byte scalar region differs (one actual changed byte
+in each). Depth, image pixels, render blobs, feature flags and all other file
+bytes stay exact. The user confirms both V9 files are recognized as Portrait
+when viewing, but neither has aperture or Portrait Lighting editing controls.
+Changing ImageCaptureType to Portrait is therefore insufficient for both of
+these inputs. Production UI is unchanged.
+An independent Python JPEG/HEIC TIFF parser verifies the count-one signed
+int32 tag changes and every other EXIF/MakerNote value; ZIP CRC/hashes pass.
+
+References: [Depth Sampler source](https://github.com/shu223/iOS-Depth-Sampler),
+[auxiliary data reader](https://github.com/shu223/iOS-Depth-Sampler/blob/master/iOS-Depth-Sampler/Utils/CGImageSource%2BDepth.swift),
+[matte demo](https://github.com/shu223/iOS-Depth-Sampler/blob/master/iOS-Depth-Sampler/Samples/Portrait-Matte/PortraitMatteViewController.swift).
+
+### 10.22 Review of supplied Portrait analysis and REND structure (2026-10-09)
+
+The supplied analysis usefully separates aperture from lighting and proposes
+investigating rendering parameters. Its proposed four "root causes" are not
+established diagnoses. V4/V5/V8 demonstrate changes on the native 5129 graph;
+they do not specify a general Apple Photos import contract for arbitrary photos.
+V9 now confirms that a Portrait capture declaration alone is insufficient.
+Successful pixel readback also does not prove all HEIF graph/metadata details
+are correct or rule out further container issues.
+
+Corrections checked against the current code and reference files:
+
+- Depth auxC uses `urn:mpeg:hevc:2015:auxid:2`, not the Apple disparity URI
+  proposed by the analysis. The auxl reference runs from auxiliary depth to
+  primary (and applicable tmap), not primary to depth.
+- The depth range descriptor uses the H.265 depth_representation SEI encoding,
+  not an Apple-specific floating-point format. Payload type 177 and prefix
+  SEI NAL unit type 39 are different identifiers.
+- RenderingParameters is in `http://ns.apple.com/depthBlurEffect/1.0/`, with
+  the observed prefix depthBlurEffect; it is not a depthData namespace field.
+- Apple MakerNote 0x0017 is described by ExifTool as LivePhotoVideoIndex, not
+  SubjectArea. Standard EXIF SubjectArea is 0x9214. Capture type 12 is labelled
+  Scene by ExifTool; a specific iPhone subject-detection meaning is unverified.
+- Apple's manual auxiliary-depth article writes auxiliary data using
+  CGImageDestinationAddAuxiliaryDataInfo. It documents creating/attaching depth
+  and supports JPEG, HEIF and DNG dictionaries; it does not promise that the
+  imported result enables Photos aperture/lighting editing. The cited public
+  API documentation is not evidence that face landmarks and a portrait matte
+  are mandatory/sufficient Photos import conditions. The report's
+  CIPortraitLighting link could not be verified as a public API reference.
+
+A read-only Base64/binary comparison of native 5129, the supplied Focos JPEG,
+and IMG_0897 finds all three REND version-7 blobs are 1,352 bytes. Each has a
+16-byte header followed by 167 eight-byte records, with the same unique
+16-bit key / 16-bit type-code sequence and four-byte values (149 type-code 1,
+18 type-code 2). This is an observed structural pattern, not decoded semantics:
+no key is yet proven to mean focus plane, falloff, aperture or circle of
+confusion. Against native 5129, Focos differs in 208 bytes / 64 value records;
+IMG_0897 differs in 202 bytes / the same 64 records. Both contain REND despite
+lacking working Edit controls, so REND presence alone is insufficient.
+
+The Depth Sampler's two older bundled JPEGs instead contain 320-byte REND
+version-2 blobs. The report's universal fixed 1,352-byte assertion is false;
+version-7 record parsing must not be applied to version 2.
+
+The next justified research direction is to identify specific rendering keys
+and validate image/depth/calibration transforms before synthesizing scene
+parameters, while testing aperture separately from lighting. Cross-scene REND
+transplantation and adding another segmentation model are not demonstrated
+solutions. No production metadata or GUI behavior changes were made for this
+review; editable Portrait for arbitrary photos remains unverified.
+
+References: [Apple manual auxiliary depth](https://developer.apple.com/documentation/avfoundation/creating-auxiliary-depth-data-manually),
+[ExifTool Apple definitions](https://raw.githubusercontent.com/exiftool/exiftool/master/lib/Image/ExifTool/Apple.pm),
+[ExifTool EXIF definitions](https://raw.githubusercontent.com/exiftool/exiftool/master/lib/Image/ExifTool/Exif.pm).
+
+### 10.23 Same-photo main-encoder/container isolation V10 (2026-10-09)
+
+The user authorized the staged plan: test re-encoding a known-good native photo
+first, then test another scene with its own depth only after the same-photo
+control is accepted. `tools/portrait-primary-reencode.mjs` creates the immutable
+private `Portrait_Primary_V10` batch from full IMG_5129 (1).HEIC:
+
+- A_Original_5129 is byte-identical to the accepted original, SHA256
+  `e3f10fe03f5b9065432ebb7801c69ccc8dc2db0d7fa310fe9010cfd80de04382`.
+- B_Lossless_Reencoded_Main re-encodes only the 48 primary 512x512 HEVC tiles,
+  preserving the 4032x3024 primary geometry, original grid and orientation.
+  It decodes directly to full-range 8-bit 4:2:0 samples, then uses the website's
+  FFmpeg.wasm/x265 encoder with lossless mode, primaries 12 (smpte432), transfer
+  1 (bt709), matrix 6 (smpte170m), and full range. No RGB/ICC conversion or
+  cropping occurs. Only primary tile payloads and their hvcC associations change;
+  new codec properties are appended without altering any original property.
+  All 56 remaining item payloads, including the same photo's depth, HDR, Styles,
+  EXIF and depth rendering sidecar, remain byte-exact.
+- C_Container_Control uses the same append-codec/repoint/repack writer as B,
+  but appends the original hvcC and keeps all 104 original item payloads exact.
+  It isolates this serialization path from the new encoded bitstreams.
+
+All original item IDs/infos, references, descriptive properties and other
+associations are asserted unchanged. Original idat and non-mdat top-level
+boxes are retained. Each new tile is decoded back and compared byte-for-byte
+with its own source Y/U/V samples. A second browser check decodes all 48 tiles
+from the FINAL assembled B HEIC and verifies their source-sample SHA256 values:
+18,874,368 decoded sample bytes match. An independent Python iloc/idat parser
+checks all 104 active payloads in every variant; only B's 48 primary payloads
+differ. ZIP CRC, contents and file hashes also pass.
+
+B is 8,942,556 bytes versus A's 2,080,206 and C's 2,080,777 because this probe
+uses lossless encoding; it is not a production size/performance target. Reports
+and Vietnamese import instructions accompany `Portrait_Primary_V10_Test.zip`.
+No source input or earlier test batch is overwritten. No production GUI,
+Portrait export behavior, model, or website deployment is changed.
+
+The user confirms all three V10 variants work normally with aperture and
+Portrait Lighting. Save/reopen persistence was not separately specified.
+On this exact same-photo input, both the re-encoded main and the new codec
+association/container path retain editing. This permits the next scene test;
+it does not rule out all encoder/container problems for other inputs or
+establish an arbitrary-photo solution. V10 intentionally keeps native Styles
+and does not add Texture; the user noticed its absence and this is expected.
+
+### 10.24 Depthless JPEG scene substituted into native reference, V11 (2026-10-09)
+
+After V10 acceptance, `tools/portrait-scene-trials.mjs` creates an immutable
+private `Portrait_Scene_V11` batch. The input is IMG_7454.JPEG, 214,098 bytes,
+896x1195, EXIF orientation 1, no camera model, one JPEG SOI stream and no
+Apple depth namespace/auxiliary disparity declaration. It is a clear face
+against a largely uniform background. All AI input is RGB from this JPEG;
+no native 5129 depth pixels are used for B/C.
+
+The source is fitted without aspect stretching into the reference's displayed
+3024x4032 extent (upscaling for this structural diagnostic), then rotated
+counterclockwise into stored 4032x3024 coordinates. Both the primary and AI
+map inherit the reference's irot=270 transform. Depth-Anything-V2-Small runs
+on the same stored scene, producing normalized relative disparity at 768x576.
+The actual encoded depth SHA256 is
+`cec3f2b37c3f44f046890bd382fe3babdcb8e7afa11f371cd90d13c6f01cb285`.
+Decoded scene/depth previews were visually checked for alignment and subject
+separation. Main tiles use P3 canvas samples converted to the signalled BT.709
+transfer and full-range SMPTE170M YUV, followed by lossless website x265.
+The normal thumbnail and P3-linear Main10 thumbnail are regenerated from the
+new scene, not left as 5129 previews.
+
+- A_Native_5129_Control is the original, byte-exact accepted native file.
+- B_JPEG_AI_NativeRange replaces 48 primary tiles, the depth, normal thumbnail
+  and linear thumbnail (51 payloads total). It retains native quantization
+  range, depth sidecar and auxC range descriptor.
+- C_JPEG_AI_UnitRange uses the exact same scene and depth as B, changing only
+  depth FloatMinValue/FloatMaxValue to 0/1 and the corresponding auxC descriptor.
+  Native REND, calibration, aperture and lighting settings otherwise stay exact.
+
+This is deliberately NOT a complete per-scene exporter. Native 5129 EXIF,
+camera/focus calibration, REND, HDR gain map, semantic mattes and Styles maps
+remain as diagnostic controls. They describe another capture and must not be
+promoted as correct generated metadata. Appearance/HDR/lighting can therefore
+be wrong; no colour/HDR fidelity claim follows from this batch. The reference
+still has no added Texture. A successful B/C only demonstrates an intermediate
+cross-scene eligibility path; all borrowed data would still need removal or
+reconstruction for the actual photo before production use.
+
+Assertions preserve original item IDs/infos, references, properties and
+unrelated associations. Final-file main readback verifies all 48 tiles against
+18,874,368 generated Y/U/V sample bytes. BOTH final B/C depth items decode
+exactly to all 442,368 generated gray pixels. An independent Python iloc/idat
+parser checks all 104 payloads; B keeps 53 native payloads exact, C keeps 52,
+and B/C differ only in the depth XMP payload plus its declared auxC property.
+It also verifies the unit sidecar differs only in the two range fields.
+ZIP CRC and archived hashes pass. Reports, previews and Vietnamese instructions
+are in `Portrait_Scene_V11_Test.zip`. No production UI/export or deployment
+changes were made. The user confirms B/C have functional depth/aperture and
+Portrait Lighting. Save/reopen persistence was not separately confirmed.
+This establishes an accepted cross-scene diagnostic with the JPEG's own AI
+depth, but still does not validate the borrowed capture/colour/HDR resources
+or establish a complete arbitrary-photo production exporter. Texture was
+intentionally absent. The stronger Styles colour remains a paused investigation
+at the user's explicit request.
+
+### 10.25 Portrait and Texture coexistence probe, V12 (2026-10-09)
+
+After V11 B/C device acceptance, `tools/portrait-texture-trials.mjs` creates
+the immutable private `Portrait_Texture_V12` batch from accepted V11 C:
+
+- A_V11_Accepted_Control is byte-identical to V11 C.
+- B_Portrait_Texture uses production addTexture, adding 12 empty 2026 matte
+  slots and Texture metadata. No tone curve is added; it has no human masks.
+- C_Portrait_Texture_AI_SoftSkin adds the existing per-face crop/local-detail
+  AI pipeline using the SAME JPEG and display/stored orientation as V11.
+  One face is found and refined. Texture people data, 2026 masks, semantic skin
+  and Portrait Effects Matte are added. Native Styles mode preserves the
+  entire Styles plist exactly; no colour/preset/statistics changes are made.
+
+The accepted V11/native 5129 graph has only a legacy semantic SKY matte, no
+semantic skin or Portrait Effects Matte. Its working Lighting is therefore
+a counterexample to treating those two masks as universally mandatory for
+Photos Lighting on this tested graph; it is not a general import specification.
+
+All 104 V11 item payloads remain byte-exact in A/B/C. The writer also verifies
+original item infos, references and associated property values. Independent
+Python iloc/idat parsing confirms all 104 payloads; final B/C depth readback
+matches every one of 442,368 source pixels. ZIP CRC and file hashes pass.
+Reports and Vietnamese instructions accompany Portrait_Texture_V12_Test.zip.
+
+The user accepts V12 C and confirms Soft Skin, Glow and Film all work; Soft Skin
+is relatively subtle and not sufficiently smooth. Save/reopen persistence was
+not separately confirmed. The scene still carries V11's borrowed EXIF/calibration/REND/HDR/Styles
+resources; this is a coexistence diagnostic, not a correct per-scene exporter.
+Production UI/export and deployment remain unchanged. Colour investigation
+remains paused; C's entire original Styles payload is byte-exact.
+
+### 10.26 Soft Skin roughness-only strength probe, V13 (2026-10-09)
+
+The accepted V12 C uses the device-selected face-crop/local-detail pipeline
+from section 10.9. Its one generated face has local-detail roughness
+0.0001650231649452065. The user reports active but relatively weak smoothing.
+This is not evidence of a weak model: mask coverage and Apple's interpretation
+of the uncalibrated roughness proxy remain separate possible causes.
+
+`tools/portrait-softness-trials.mjs` produces an immutable Portrait_Softness_V13
+batch: A is byte-identical to V12 C, B changes only that face's
+SkinSmoothFaceRoughness to one tenth, and C changes it to real-valued zero.
+These are isolated diagnostic values, not new production defaults or measured
+Apple-equivalent roughness. Previous IMG_0783 D acceptance motivates probing
+lower roughness, but does not establish a monotonic strength response or
+that zero is valid/effective in Apple's renderer.
+
+The only changed item payload is Texture item 130. Its other plist fields
+remain semantically exact with real/integer types retained by the JS writer.
+All 134 other payloads and every original item/info/reference/property remain
+exact, including skin/person masks, main pixels, Styles, depth and lighting
+sidecar. An independent Python iloc/idat parser checks all 135 items and
+plistlib confirms only the roughness scalar changes. ZIP CRC/hashes pass.
+The user reports V13 C (zero roughness) breaks Glow and Soft Skin, blackening
+the person. Reject this diagnostic boundary; do not adopt zero as a default.
+V13 B is temporarily usable but smoothing remains weak. The user also reports
+entering Edit selects Bright + Soft Skin, and manually selecting Standard
+darkens the image/skin. This is a newly reported Edit-state issue, not proof
+that B's roughness change caused it; its captured Styles marker is identical
+to V12 C and the original 5129 reference. No V13 variant is adopted.
+No AI inference is repeated, no model/masks
+are changed, no colour work is resumed and no production/deployment changes
+are made. This batch retains the diagnostic borrowed resources of V11/V12.
+
+### 10.27 Captured Styles state isolation after V13 rejection, V14 (2026-10-09)
+
+A read-only `tools/portrait-preset-audit.mjs` comparison finds the original
+5129, V12 C and V13 B share identical Styles and MakerNote 0x54 data. Their
+captured marker has fields 1=0.30386266112327576, 2=0.5, 4=16, whereas added
+Texture declares Preset=Standard. There is no explicit Bright/Soft Skin preset
+string in the inspected Texture plist. The non-neutral captured pad and
+borrowed colour/HDR resources are possible contributors, not established causes
+of the user's Edit transition. Field 4's semantic meaning remains unproven.
+
+`tools/portrait-capture-style-trials.mjs` freezes Portrait_CaptureStyle_V14:
+A is accepted V12 C, B changes only 0x54 fields 1/2 to real-valued zero, C
+additionally changes field 4 to integer 1, matching the upstream default
+8-field marker's value. This does not relabel/edit Texture or modify the
+Styles algorithm. Every variant retains V12's positive local-detail roughness;
+V13's zero/lower-roughness candidates are not used.
+
+All 134 non-EXIF item payloads, item infos, properties and references remain
+byte-exact, including Texture/person data, masks, main, depth, REND, Styles
+and HDR. Every other MakerNote tag remains exact; unchanged 0x54 fields and
+their real-vs-integer values are preserved. Independent Python iloc/idat,
+TIFF/MakerNote and plistlib checks confirm these constraints; ZIP CRC/hashes
+pass. The user reports B still selects Bright on entering Edit; C selects
+Standard and is preferable. Both retain working Soft Skin, Glow, Film,
+aperture and Portrait Lighting. Skin remains dark/dull after entering Edit,
+whereas the viewing image beforehand is bright with normal skin. Supplied
+JPEG examples show the AFTER-Edit appearance; the subsequent single image
+is explicitly V14 C. No before-Edit image was supplied for quantitative pairing.
+Save/reopen persistence is not separately confirmed. On this cohort, changing
+field 4 from 16 to 1 with the same zero pad changes the default selected style;
+this does not establish all possible preset ID meanings. The residual darkening
+is not solved by the captured-state correction. This is only a captured-state diagnostic
+with inherited borrowed resources. Production/deployment are unchanged,
+and broad Styles colour/strength investigation remains paused.
+
+### 10.28 Borrowed HDR isolation for the Edit darkening, V15 (2026-10-09)
+
+V11-V14 deliberately carried native 5129 HDR resources although their new main
+pixels came from SDR IMG_7454.JPEG. The user confirms viewing-to-Edit darkening
+persists at Standard in V14 C. The mismatched gain map/tmap is a separate
+candidate for that transition; no causal conclusion is made before device testing.
+
+`tools/portrait-borrowed-hdr-trials.mjs` restricts input by SHA256 to accepted
+V14 C and creates an immutable Portrait_BorrowedHDR_V15 batch. A is byte-exact
+V14 C. B removes ONLY the borrowed gain-map grid 62, its 12 tiles 50-61,
+gain-map XMP 100 and tmap 102. It retains the main grid 49 even though the
+removed tmap depends on it. References/property associations to removed items
+are pruned; surviving auxiliary resources still reference the main 49.
+C additionally sets MakerNote HDRHeadroom 0x21 and HDRGain 0x30 to signed
+rational 1/1, with correct TIFF element count 1. B retains the original EXIF
+to isolate graph removal from HDR marker values. These neutral values are
+diagnostic choices, not proof of complete SDR metadata reconstruction.
+
+B retains all 120 surviving item payloads exact. C changes only EXIF 104:
+its other MakerNote values including the accepted 0x54 selection remain exact.
+Both preserve main, thumbnails, Styles, Texture/roughness/masks, AI depth and
+REND byte-exact. All surviving item infos/property bytes/associations and
+the expected pruned references are asserted. Independent Python iloc/idat
+and TIFF/MakerNote parsing confirms the removed IDs, payload preservation
+and two intended rational changes. ZIP CRC/hash checks pass.
+
+The user reports BOTH V15 B/C remain dark/dull in Edit. Removing the borrowed
+HDR graph and neutralizing the two HDR marker values did not solve this
+transition on the tested scene. Portrait/Texture functioning and save/reopen
+persistence were not separately reconfirmed for V15 in that reply. Removing
+this borrowed graph is appropriate to test this SDR scene; no real source
+HDR is removed and no production HDR behavior changes. Remaining Styles,
+calibration, sky matte and rendering data are still diagnostic references.
+No broad colour/strength algorithm work is resumed and no production/deployment
+changes are made.
+
+### 10.29 ICC/encoded transfer mismatch isolation, V16 (2026-10-09)
+
+After V15 fails to resolve Edit darkening, a read-only colour-signalling audit
+finds V11-V15 main/grid/normal-thumbnail colr properties retain native 5129's
+P3 ICC. Its shared rTRC/gTRC/bTRC is parametric type 3 with fixed-point values
+matching the sRGB inverse curve: gamma 2.3999939, a 0.9478607, b 0.0521393,
+c 0.0773926, d 0.0404510. Encoded HEVC VUI instead declares P3 primaries 12,
+BT.709 transfer 1, SMPTE170M matrix 6 and full range. Crucially V11's generation
+actually applied srgbToBt709Rgba before YUV encoding. This generated sample
+convention therefore does not match its retained ICC curve. Native 5129 has
+the same ICC/VUI declarations, but VUI alone cannot establish Apple's actual
+pixel convention; do not conclude native files are intrinsically broken.
+
+`tools/portrait-transfer-trials.mjs` freezes Portrait_Transfer_V16 from V15 C:
+A is byte-exact. B replaces the main grid, 48 tiles and normal thumbnail colr
+association with P3/BT.709/SMPTE170M/full-range nclx matching the generated
+samples/VUI. C instead keeps a P3 ICC form and replaces ONLY its shared curve
+parameters with inverse BT.709 values (1/0.45, 1/1.099, 0.099/1.099, 1/4.5,
+0.081), recomputing the ICC v4 profile ID. Other ICC tags/matrix/white point
+and header bytes remain exact. The original profile description is inherited
+for this private diagnostic; it is not a new public profile definition.
+
+All 120 item payloads remain byte-exact, including HEVC codec/samples,
+Styles, Texture/roughness/masks, depth, EXIF, REND and thumbnails. Only the
+50 colr associations change; original ipco properties remain unmodified.
+Python independently checks all active payloads, added nclx values, ICC
+parameters, unchanged bytes and the profile MD5. LittleCMS independently opens
+both profiles and maps an encoded neutral sample (115,115,115) to approximately
+(115,115,115) with the inherited ICC versus (128,128,128) with the matched ICC.
+This verifies the interpretation difference, not that Photos uses that path.
+ZIP CRC/hash checks pass. The user reports BOTH V16 B/C still have dark/dull
+skin. The corrected transfer declarations do not resolve the Edit appearance
+on this scene and are not adopted. This rejects them as fixes; it does not
+identify Photos' actual colour-management path or eliminate other interactions.
+Portrait/Texture functioning and save/reopen persistence were not separately
+reconfirmed in this reply.
+
+A numerical illustration: an sRGB value 128/255 has linear value 0.2158605;
+after BT.709 encoding it is 0.4522843. The old sRGB ICC interprets that as
+0.1725033 linear, versus the matching BT.709 interpretation 0.2158605.
+This supports a specific transfer-mismatch hypothesis without fitting any
+Styles gain, coefficient or skin colour values. Broad colour/strength work
+remains paused; production/export/deployment are unchanged. Remaining borrowed
+Styles/calibration/REND still prevent a complete per-scene exporter claim.
+
+ICC curve form and profile-ID rules were checked against the
+[ICC v4 specification](https://www.color.org/icc1v42.pdf).
+
+### 10.30 Active Styles/Texture removal control, V17 (2026-10-09)
+
+After HDR and colour-signalling probes fail to fix the Edit transition, further
+colour/roughness parameter sweeps stop. `tools/portrait-without-styles-trials.mjs`
+restricts input by SHA256 to V15 C (the original profile, not rejected V16
+corrected-profile variants) and freezes Portrait_WithoutStyles_V17. A is
+byte-identical V15 C. B removes Styles plist 103, Texture plist 130, StyleDelta
+grid 97 and its 30 tiles 67-96 (33 items). It also removes the active MakerNote
+0x54 entry while preserving every other MakerNote payload, including real
+64-bit TIFF tag types checked independently in Python. Old unreferenced
+0x54 data bytes remain harmless; the MakerNote IFD/data-area offsets do not move.
+
+B retains 87 items: the only changed surviving payload is EXIF 104. Main HEVC
+samples/codecs/colour profile, regular and linear thumbnails, human/skin masks,
+AI depth and REND remain byte-exact. Texture-only matte resources intentionally
+remain to avoid confounding activation-data removal with mask removal. Style
+Delta, Styles and Texture metadata are no longer active/declared. References
+and associations to removed items are pruned, while original property values
+remain exact. Independent Python iloc/idat and full MakerNote parsing verifies
+every surviving payload and that only 0x54 disappears. ZIP CRC/hashes pass.
+
+The user confirms V17 B no longer darkens/dulls skin in Edit, and separately
+confirms BOTH aperture and Portrait Lighting still have working effects.
+Thus active Styles/Texture data is implicated on this exact generated graph,
+while the retained AI Portrait itself can render/edit without that darkening.
+The result does not separate Styles from Texture or identify a particular field,
+and it does not show pixels were baked darker: the main pixels are byte-exact.
+B's lack of Styles/Texture is intentional subsystem isolation, not a
+user-facing feature removal. Save/reopen persistence was not separately
+reported. This is not a complete
+per-scene Portrait exporter: borrowed calibration/REND still remain. No further
+colour fitting, model change, production feature removal or deployment occurs.
+
+### 10.31 Neutral StyleDeltaMap with active Styles/Texture, V18 (2026-10-09)
+
+V17 B proves that working Portrait without active Styles/Texture avoids this
+Edit darkening on the JPEG scene. The original V11-V16 active variants still
+borrow the 30-tile StyleDeltaMap from 5129. Section 4.2 already records that
+donor delta content makes editing follow donor scene regions. This motivates
+removing that specific cross-scene correction, not another arbitrary colour fit.
+
+`tools/portrait-neutral-delta-trials.mjs` restricts input to V15 C and freezes
+Portrait_NeutralDelta_V18. A is byte-exact V15 C. B keeps active Styles/Texture
+and changes ONLY StyleDelta tile payloads 67-96 plus their hvcC and the colr
+association of those tiles/grid 97. The neutral recipe is the existing production
+synthetic-hevc formula: 512x512 Main10, limited-range Y=504/U=512/V=512,
+Display P3 primaries 12, linear transfer 8, BT.709 matrix 1. It is generated
+locally by the website encoder in lossless mode, not copied from a photograph.
+
+All 90 other payloads remain byte-exact, including main pixels/codecs/profile,
+Styles plist/coefficients/light maps, Texture/roughness/masks, EXIF, depth,
+thumbnails and REND. Item infos/references and unrelated associations remain
+exact. Python independently checks all 120 payloads and confirms all 30 final
+delta payloads equal the generated asset. Independent native FFmpeg Main10
+readback matches all 393,216 input Y/U/V samples. ZIP CRC/hash checks pass.
+The existing calibration decoder supports only 8-bit readback; the private
+Main10 probe therefore uses independent FFmpeg instead, without production
+decoder changes.
+
+The user reports V18 B has all effects working and looks a few percent smoother
+than A, but skin still remains dark/dull. Thus neutralizing only the donor
+delta map does not solve the Edit darkening, despite retaining functioning
+Portrait/Texture. Smoothing magnitude is subjective, not a measured metric.
+Native 5129's Styles plist/calibration/REND still remain; B is not a complete
+exporter. No broad
+colour/strength fitting, Soft Skin changes, production or deployment occurs.
+
+### 10.32 Existing neutral Styles plist fields on accepted Portrait graph, V19 (2026-10-09)
+
+V18 retains functioning effects but still darkens skin. The Styles plist still
+describes 5129's capture, so `tools/portrait-neutral-plist-trials.mjs` creates
+the immutable Portrait_NeutralPlist_V19 batch from V18 B. A is byte-exact.
+B replaces ONLY polynomial coefficients key 1 with the existing generator's
+identity array. C additionally uses the existing generatedStyleMetadata neutral
+values for keys 3,4,5,6,7,c,d,h,i,j: identity curve points, flat light maps,
+neutral statistics and internally consistent SDR Gain=1/h=.25/range=[0,1].
+The native curve's first four header bytes, schema value 131087, original key
+set and all unlisted keys including k are preserved. No parameters are fitted
+to the screenshots and no scene's coefficient array is transplanted.
+
+Generated values originate in schema 14; keeping the native declaration does
+not prove their semantic compatibility with schema 131087. This is a diagnostic
+baseline, not a version upgrade or native-equivalent calibration. Older-photo
+colour tests in sections 10.7-10.11 did not establish improvements from such
+neutral values; V19 asks specifically about this depthless JPEG scene's default
+viewing-to-Edit transition on its working Portrait graph, not maximum Styles
+strength. Stronger or worse colour/texture remains a possible result.
+
+Only Styles item 103 changes in B/C; all 119 other active payloads and every
+item info/reference/property/association remain exact. Main pixels/profile,
+Texture/Soft Skin/masks, EXIF, AI depth, REND and V18 neutral delta are untouched.
+Independent Python iloc/idat and plistlib checks confirm all payloads, unchanged
+keys, schema, identity coefficient layout and the intended neutral baselines.
+ZIP CRC/hashes pass. Device comparison is pending; no model/roughness changes,
+production defaults or deployment are made. Borrowed calibration/REND still
+prevent an arbitrary-photo production exporter claim.
+
+### 10.33 Complex original HDR JPEG with the Portrait research graph, V20 (2026-10-09)
+
+The user corrected the new complex-scene input to
+`C:/Users/WanThinnn/Downloads/IDG_20251020_121945_809.JPEG`;
+IMG_0816.HEIC is an already processed output and must not be reused as original.
+Independent EXIF inspection identifies Apple/iPhone 16 Pro, orientation 1,
+3024x4032. This JPEG has Adaptive HDR but no Apple MakerNote 0x927c. A camera
+model string therefore does not imply native editable Styles/Portrait resources.
+The scene contains a seated person behind a cart/sign, a large umbrella and
+several object distances, rather than the earlier close-up face.
+
+`tools/portrait-complex-hdr-trials.mjs` freezes Portrait_ComplexHDR_V20:
+A is byte-exact IDG_20251020_HDR_Fixed.HEIC, the earlier accepted HDR/Styles/
+Texture export without AI depth. B is HDR + AI Portrait with active Styles/
+Texture removed. C retains those features. B/C use the native 5129 research
+graph but replace all 48 main tiles and 12 HDR gain tiles with raw JPEG YUV
+decoded without browser ICC/HDR tone mapping. Both planes rotate CCW to stored
+4032x3024 / 2016x1512 and retain the native 270-degree display transform.
+The source base ICC, alternative ICC, 3-channel tmap and exact source HDR XMP
+replace reference HDR. Gain samples remain numerical data. Missing source
+Apple headroom/gain flags are neutralized to 1/1, not copied from 5129.
+
+Depth Anything V2 Small runs on this scene; normalized disparity is encoded
+losslessly as 768x576 with unit-range depth metadata. Both thumbnails come
+from its base JPEG. The reference sky matte is replaced with an empty mask;
+this is not a measured sky segmentation. StyleDelta uses the existing neutral
+V18 asset. C keeps native Styles coefficients/REND/capture calibration and the
+V14 Standard capture marker. Other EXIF camera/date fields remain reference
+data; neither B nor C is a complete arbitrary-photo exporter.
+
+Face detection returns state=none, faces=0 on the complex image. The subsequent
+face-skin segmentation/refinement and people Texture metadata are skipped.
+This is a concrete missed-face case, not evidence that the scene has no person.
+Soft Skin cannot be assessed on this batch; it is not generated for C. No
+production model/gating change is made from one image.
+
+`tests/private-fixtures/package-complex-hdr-v20.py` independently parses iloc/
+idat/IPMA and true TIFF MakerNotes. It decodes the original JPEG/gain JPEG and
+all 60 final C HEVC tiles with native FFmpeg: all 23,592,960 YUV sample bytes
+match the source exactly, including padding. All 442,368 final depth pixels
+match the inferred map. Every B/C shared payload is exact except the EXIF
+Styles marker removal; HDR XMP/tmap/profiles are checked against source and
+the accepted baseline. ZIP CRC and content hashes pass. File sizes around
+9 MB reflect lossless research encoding. Fresh import, actual aperture/lighting
+effects, HDR display and viewing-to-Edit colour on iPhone remain pending.
+No website changes, general Styles-strength fitting or deployment occurs.
+
+V20 device feedback: the user confirms C has functioning aperture and Portrait
+Lighting, retained HDR, and working Glow/Film. C becomes slightly darker/duller
+when entering Edit. The user also confirms B, with active Styles/Texture and
+the captured Styles MakerNote marker removed, becomes similarly dark/dull.
+Thus active Styles/Texture alone cannot account for this complex HDR scene's
+transition. Do not label it normal Apple Styles behaviour or extrapolate the
+earlier SDR V17 result to this HDR input. Shared Portrait capture/REND/calibration
+and the HDR rendering path remain candidates, not proven causes. The user then
+confirms A also becomes dark/dull in Edit, while a fresh Photos import of the
+original JPEG keeps its colour/brightness. This establishes a reported display
+difference, not a proven pixel-colour corruption or a field-level cause. Later
+V21 feedback below distinguishes HDR/SDR display for this Project Indigo input.
+The transition is not solely introduced by AI Portrait, since A has none. B's actual
+aperture/lighting effects have not yet been reported.
+Soft Skin remains untested because face detection was empty. Original batches
+are immutable; this feedback does not authorize adopting them as production
+defaults or claim full exporter correctness.
+
+### 10.34 Image-only HDR versus SDR Edit isolation, V21 (2026-10-09)
+
+V20 A/B/C darken in Edit; the source JPEG does not. The next probe starts from
+the accepted V20 A, not a borrowed Portrait capture graph.
+`tools/hdr-edit-isolation-trials.mjs` freezes HDR_Edit_Isolation_V21 with no
+encoding, inference, colour coefficient changes or pixel brightness adjustment.
+A is byte-exact V20 A. B retains ONLY primary grid/48 tiles, ordinary thumbnail,
+EXIF and its original HDR grid/12 tiles/tmap/XMP. It removes active Styles,
+Texture, StyleDelta, linear thumbnail, all human/matte resources and metadata,
+and the whole synthetic Apple MakerNote 0x927c entry. TIFF data areas remain
+stationary; all other IFD entry offsets remain valid. B still has the preferred
+HDR alternative group [98,1]. C removes only B's HDR items and now-unnecessary
+alternative group, keeping every shared B/C payload exact, including EXIF.
+C is an intentional SDR control, not a proposed HDR-preserving fix.
+
+All surviving payloads/properties are checked by the generator. Independent
+Python iloc/idat/Exif/group verification checks A's 114 items, B's 66, C's 51,
+unchanged primary/thumbnail samples, exact surviving payloads except the
+declared MakerNote removal, no dangling alternative group targets, and exact
+B/C shared payloads. ZIP CRC/hashes pass. Since no codec data changes, the V20
+source YUV verification remains applicable.
+The comparison must distinguish C's potentially darker SDR appearance at VIEW
+from additional darkening specifically on entering EDIT. Neither result alone
+proves a field-level root cause. Production/deployment remain unchanged.
+
+V21 device feedback: the user identifies the source as a Project Indigo capture.
+B displays HDR while viewing, then becomes SDR/darker upon entering Edit; the
+user attributes this brightness change to HDR no longer being displayed and
+considers it normal for this Indigo image. C is stable on entering Edit. The
+user prefers B's colour with no Styles applied over C's. This is subjective
+device feedback; the exact viewing/Edit state of that colour preference is not
+specified. B/C retain identical base pixels, ICC, ordinary thumbnail and EXIF,
+so their different appearance implicates HDR rendition/display context rather
+than a changed base-image payload. Do not report HDR permanently erased merely
+from the Edit preview, assert universal Photos/Indigo behaviour, or compensate
+the base pixels by increasing brightness on this evidence.
+
+Use V21 B's no-Styles appearance as the user's preferred visual reference for
+this scene. It has no Portrait/Styles and is not a full-feature production fix.
+This feedback does not resolve the earlier SDR close-up's Styles-associated
+dark/dull skin or validate native-equivalent Styles calibration. No further
+colour-fitting or production changes are made from this result.
+
+
+### 10.35 Opt-in Portrait release (2026-10-09)
+
+The user explicitly accepts promoting the working Portrait/Lighting research
+branch and defers colour-strength work. The AI switch alone enables the new
+exporter; switch-off restores the normal result. Existing native depth is never
+replaced. Normal `port`, Texture and HDR conversion algorithms are unchanged.
+
+`ai-portrait-export.js` rebuilds the accepted capture structure using only the
+completed photo's imagery, HDR/XMP/ICC, thumbnails, delta and Texture/face data.
+A sanitized metadata-only template supplies numerical capture parameters,
+native-compatible Styles coefficients and calibration/REND. No reference photo
+payload, EXIF camera/date/GPS, capture time or UUID is published. The user's own
+camera/date/GPS is preserved. Reference camera calibration is estimated, never
+claimed as measured or physically correct AI depth. Source native Styles are
+kept byte-exact. General arbitrary-geometry Photos compatibility remains unverified.
+
+The user also requests a single workflow/download, tap-to-focus before saving,
+and Portrait initially off. The new UI replaces the old flattened-bokeh export:
+one output contains Styles + Texture + Portrait. Encoded depth is reused when
+focus/preview blur changes; only focus/aperture metadata and container offsets
+are rebuilt. The preview is approximate; its selected Focus region/aperture does
+not establish that opaque REND refocus behavior matches every scene. A short
+notice directs users to enable Portrait in Photos after saving. Image pixels are
+never darkened/brightened to compensate for Apple's HDR Edit display behavior.
+Colour fitting remains paused by instruction.
+
+Release testing caught a malformed 0x54 marker in IMG_0935: the rebuilt payload
+was 127 bytes but its TIFF element count still declared 115 bytes. The user
+reported Photos crashing on Edit. Correcting the serialized count preserves the
+complete binary-plist trailer; a private repaired file retains every non-Exif
+payload byte-exact. The exporter now validates its final marker before returning
+and compacts duplicate properties (387 to 41 on the reported file). Binary-plist
+readers reject malformed trailers before trusting allocation counts. This fixes
+the verified metadata defect; the user confirms the repaired file works in Photos.
+The browser UI smoke check uses deterministic depth inference with real HEVC
+encoding: one output pair, focus change without reinference, switch-off restoring
+the normal file, switch-on reuse and history cleanup pass with no page errors.
+
+The user then reports that captured Bright becomes Standard. IMG_0932 carries
+0x54 values 1=-0.5, 2=0.5 and 4=16; the neutral capture template uses 0/0/1.
+The earlier IMG_0935 repair fixed its count but retained that already-reset
+selection. The exporter now always copies the completed input's entire valid
+0x54 payload/type, independently of the native Styles coefficient route. This
+retains preset and Tone/Colour pad without guessing their private semantics.
+Source native Styles coefficients remain byte-exact. Focus/aperture rebuilds
+retain the same selection; a corrupt input marker fails rather than silently
+falling back to Standard. Freshly generated Styles still start at their own
+Standard defaults. This does not change the paused colour-strength algorithm.
+The private IMG_0932_Bright_PortraitFixed output reuses IMG_0935's accepted AI
+depth and checks the original image/HDR/Styles/pad bytes exactly. The user
+confirms this Bright-preserving output works. Browser verification uses the
+same original Bright capture and checks selection after focus and toggle changes.

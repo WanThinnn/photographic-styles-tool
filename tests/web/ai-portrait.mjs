@@ -5,8 +5,8 @@ import {addTexture} from '../../web/src/texture.js';
 import {executeJob} from '../../web/src/heic-worker.js';
 import {attachAiDepth,normalizeDisparity,portraitEligibility,inferenceGeometry} from '../../web/src/ai-portrait-container.js';
 import {loadProfile} from '../../web/src/zip.js';
-import {discoverHeic,extractItem,auxUriForItem,DEPTH_URI,propertyBoxBytes} from '../../web/src/heif.js';
-import {concat,box,be} from '../../web/src/box.js';
+import {discoverHeic,extractItem,auxUriForItem,DEPTH_URI,propertyBoxBytes,idatItemBytes} from '../../web/src/heif.js';
+import {concat,box,be,boxes} from '../../web/src/box.js';
 import {renderDepthBlur} from '../../web/src/ai-portrait-blur.js';
 
 test('portable preview blur softens background, preserves foreground and avoids dark borders',()=>{
@@ -57,15 +57,26 @@ function materialize(profile){
   }return concat([profile.ftyp,meta,box('mdat',concat(chunks))]);
 }
 test('AI appends auxiliary data without changing any existing image, HDR, Styles or Exif payload',()=>{
-  const input=materialize(profile),before=discoverHeic(input);
-  assert.equal(portraitEligibility(input),'native-styles');
+  const footer=box('free',new Uint8Array([1,2,3,4]));
+  const input=concat([materialize(profile),footer]),before=discoverHeic(input);
+  assert.equal(portraitEligibility(input),null);
   const fixture=JSON.parse(readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
   const codec=Uint8Array.from(fixture.assets.mask.hvcc),payload=Uint8Array.from(fixture.assets.mask.payload);
+  assert.throws(()=>attachAiDepth(input,{payload,hvcc:box('hvcC',codec),width:64,height:64}),/expected one hvcC box/);
+  assert.throws(()=>attachAiDepth(input,{payload,hvcc:codec.subarray(8),width:64,height:64}));
   const output=attachAiDepth(input,{payload,hvcc:codec,width:64,height:64}),after=discoverHeic(output);
   for(const [id,item] of before.iloc.items)if(item.constructionMethod===0&&item.extents.length)assert.ok(Buffer.from(extractItem(input,before.iloc,id)).equals(Buffer.from(extractItem(output,after.iloc,id))),`original item ${id}`);
+  for(const [id,item] of before.iloc.items)if(item.constructionMethod===1)assert.deepEqual(idatItemBytes(output,id,after.meta),idatItemBytes(input,id,before.meta));
+  const free=[...boxes(output,0,output.length)].find(b=>b.type==='free');
+  assert.deepEqual(output.slice(free.off,free.off+free.size),footer);
   const depth=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);assert.ok(depth);
+  assert.deepEqual(propertyBoxBytes(output,after.props,depth,'hvcC'),codec,'codec box is not wrapped twice');
   assert.ok(after.refs.some(ref=>ref.type==='auxl'&&ref.from===depth&&ref.to.includes(after.primary)));
   assert.ok(after.refs.some(ref=>ref.type==='cdsc'&&ref.to.includes(depth)));
+  const associations=after.props.associations.get(depth).map(a=>after.props.properties[a.index-1].type);
+  assert.ok(associations.indexOf('auxC')<associations.indexOf('irot'));
+  const sidecar=after.refs.find(ref=>ref.type==='cdsc'&&ref.to.includes(depth)).from;
+  assert.ok(new TextDecoder().decode(extractItem(output,after.iloc,sidecar)).includes('http://ns.apple.com/pixeldatainfo/1.0/'));
   assert.throws(()=>attachAiDepth(output,{payload,hvcc:codec,width:64,height:64}),/Existing depth/);
   for(const type of ['irot','imir'])assert.deepEqual(propertyBoxBytes(output,after.props,depth,type),propertyBoxBytes(input,before.props,before.primary,type));
 });

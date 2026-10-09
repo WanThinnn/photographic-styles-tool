@@ -5,6 +5,7 @@
 import { u, be, concat } from "./box.js";
 
 export function parseBplist(d, {preserveReals = false} = {}) {
+  if(d.length<40)throw new Error('Truncated binary plist');
   if (String.fromCharCode(...d.subarray(0, 6)) !== "bplist")
     throw new Error("Not a binary plist");
   const trailer = d.length - 32;
@@ -13,9 +14,16 @@ export function parseBplist(d, {preserveReals = false} = {}) {
   const numObjects = u(d, trailer + 8, 8);
   const topObject = u(d, trailer + 16, 8);
   const offsetTableStart = u(d, trailer + 24, 8);
+  if(![1,2,4,8].includes(offsetSize)||![1,2,4,8].includes(refSize)
+    ||!Number.isSafeInteger(numObjects)||numObjects<1||numObjects>d.length
+    ||!Number.isSafeInteger(topObject)||topObject>=numObjects
+    ||!Number.isSafeInteger(offsetTableStart)||offsetTableStart<8
+    ||offsetTableStart+numObjects*offsetSize>trailer)
+    throw new Error('Invalid binary plist trailer');
   const offsets = [];
   for (let i = 0; i < numObjects; i++)
-    offsets.push(u(d, offsetTableStart + i * offsetSize, offsetSize));
+    {const off=u(d, offsetTableStart + i * offsetSize, offsetSize);
+      if(off<8||off>=offsetTableStart)throw new Error('Invalid binary plist object offset');offsets.push(off);}
 
   const view = new DataView(d.buffer, d.byteOffset, d.byteLength);
 

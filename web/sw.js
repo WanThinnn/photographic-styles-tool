@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v65`;
+const CACHE_NAME = `${CACHE_PREFIX}v70`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -13,6 +13,11 @@ const APP_SHELL = [
   "./src/ai-inference-worker.js",
   "./src/libheif-lifecycle.js",
   "./src/ai-portrait-container.js",
+  "./src/apple-depth-metadata.js",
+  "./src/ai-depth-export.js",
+  "./src/ai-portrait-export.js",
+  "./src/ai-portrait-preview.js",
+  "./src/portrait-template.json",
   "./src/ai-portrait-ui.js",
   "./src/ai-portrait-blur.js",
   "./src/ai-portrait-source.js",

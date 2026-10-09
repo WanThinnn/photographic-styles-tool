@@ -9,7 +9,7 @@ import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "
 import { RASTER_MIMES } from "./src/image-format.js";
 import { photoCaptureDate } from "./src/photo-date.js";
 import { styleReconstructionRisk } from "./src/style-preservation.js";
-import { AI_STRINGS, blurPreview } from "./src/ai-portrait-ui.js";
+import { AI_STRINGS } from "./src/ai-portrait-ui.js";
 import {prepareBrowser} from './src/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
@@ -51,10 +51,17 @@ function translateAi() {
 }
 aiPortrait.addEventListener('change', () => {
   translateAi();
-  if (!aiPortrait.checked) for (const candidate of aiCandidates) candidate.controller?.abort();
-  if (aiPortrait.checked) {
-    for (const candidate of aiCandidates) {
-      if (['new', 'failed'].includes(candidate.state)) queueTask(() => runAiCandidate(candidate));
+  for (const candidate of aiCandidates) {
+    if (!aiPortrait.checked) {
+      candidate.controller?.abort();
+      if (candidate.aiFile) candidate.ui.output(candidate.outputFile);
+      candidate.ui.aiView(false);candidate.ui.aiBusy(false);
+      candidate.ui.aiState('');candidate.ui.note('', 'ai');
+    } else if (candidate.aiFile) {
+      candidate.ui.output(candidate.aiFile);candidate.ui.note(aiText().ready, 'ai');
+      candidate.ui.aiView(true);
+    } else if (['new', 'failed'].includes(candidate.state)) {
+      queueTask(() => runAiCandidate(candidate));
     }
   }
 });
@@ -175,15 +182,18 @@ function row(name) {
     return host;
   }
   return {
-    async metadata(data, inputSize, {raster = false, raw = false} = {}) {
+    async metadata(data, inputSize, {raster = false, raw = false, outputEpoch = null} = {}) {
+      if(outputEpoch===null){this.inputSize=inputSize;this.metadataOptions={raster,raw};}
       let m;
       try { m = await describeInWorker(data); }
       catch (error) { console.warn('Metadata unavailable:', error); return; }
+      if(outputEpoch!==null&&outputEpoch!==this.outputEpoch)return;
       const values = [['meta.camera', m.camera], ['meta.dimensions', `${m.width} × ${m.height}`],
         ['meta.size', `${formatBytes(inputSize)} → ${formatBytes(m.bytes)}`],
         ['meta.resources', [raster ? 'SDR' : m.hdr ? 'HDR' : 'SDR', ...(m.depth ? [T('meta.depth')] : []), ...(raw ? ['RAW → HEIC'] : [])].join(' · ')]];
       if (m.capture) values.push(['meta.capture', `${m.capture.date}${m.capture.subsec ? '.' + m.capture.subsec : ''}${m.capture.offset ? ' ' + m.capture.offset : ''}`]);
       // Reuse the compact native details control; metadata never includes GPS or face regions.
+      el.querySelector('.result-metadata')?.remove();
       this.note('', 'metadata');
       const note = el.querySelector('[data-note="metadata"]');
       const grid = document.createElement('dl'); grid.className = 'result-metadata';
@@ -205,32 +215,28 @@ function row(name) {
       button.addEventListener('click',()=>controller.abort());el.append(button);
       return ()=>button.remove();
     },
-    preview(result,name) {
-      const details = document.createElement('details');
-      details.className = 'ai-details';details.open=true;
-      const summary = document.createElement('summary');summary.textContent = aiText().preview;
-      details.append(summary);el.append(details);
-      // Keep the original save/download pair in place while AI finishes.
-      // Label its unblurred result instead of moving controls between sections.
-      const baseActions=el.querySelector('.act');
-      if(baseActions){
-        const group=baseActions.querySelector('.output-actions');
-        if(group&&!group.querySelector('.output-label')){
-          const label=document.createElement('span');label.className='output-label';
-          label.textContent=lang==='vi'?'Styles chưa xóa phông':lang==='zh'?'未虚化风格':'Styles without bokeh';group.prepend(label);
-        }
-      }
-      const dispose = blurPreview(result, details, aiText(),async settings=>{
-        const task=async()=>{
-          const {exportBokehStyles}=await import('./src/ai-bokeh-export.js');
-          const output=await exportBokehStyles(result,settings,()=>{},quality.checked);
-          const date=photoCaptureDate(output.data);
-          return {file:new File([output.data],name.replace(/\.[^.]+$/,'')+'_Bokeh_Styles.HEIC',{
-            type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})}),resized:output.resized};
-        };
-        return queueTask(task);
-      });
-      resultCleanups.add(dispose);
+    aiBusy(busy) {
+      el.querySelector('.act').style.display=busy?'none':'';
+      if(busy){this.readyNotice=el.querySelector('.status').textContent;this.set(aiText().loading);}
+      else if(this.readyNotice){this.set(this.readyNotice,'ok');this.readyNotice=null;}
+    },
+    aiView(visible) { const view=el.querySelector('.ai-details');if(view)view.style.display=visible?'':'none'; },
+    async portraitPreview(result,onSettings) {
+      const {portraitPreview}=await import('./src/ai-portrait-preview.js');
+      el.querySelector('.ai-details')?.remove();
+      const host=document.createElement('details');host.className='ai-details';host.open=true;
+      const summary=document.createElement('summary');summary.textContent=aiText().preview;host.append(summary);
+      el.insertBefore(host,el.querySelector('.act'));
+      resultCleanups.add(portraitPreview(result,host,aiText(),onSettings));
+    },
+    output(file) {
+      const host=actions('normal');
+      for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
+      host.replaceChildren();
+      if(navigator.canShare?.({files:[file]}))this.share(file);
+      this.link(file,file.name);
+      const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
+      file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);
     },
     set(text, cls) {
       const s = el.querySelector(".status");
@@ -304,11 +310,12 @@ function row(name) {
   };
 }
 
-// Add a separate opt-in result after the stable converter finishes. AI failure
-// cannot replace or suppress the normal export, and native sources bypass it.
+// Keep the normal result for toggle-off/cancellation. Only opt-in adds Portrait.
 async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
   const {portraitEligibility} = await import('./src/ai-portrait-container.js');
+  const {discoverHeic}=await import('./src/heif.js');
   const candidate = {outputFile, sourceFile, ui, name, state: 'new',
+    nativeStyles:source?discoverHeic(source).stylesItem!==null:false,
     skip: source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
   if (aiPortrait.checked) await runAiCandidate(candidate);
@@ -317,22 +324,38 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
 async function runAiCandidate(candidate) {
   if (!aiPortrait.checked || !['new', 'failed'].includes(candidate.state)) return;
   const {ui, name, sourceFile} = candidate;
-  if (candidate.skip) { candidate.state = 'skipped'; ui.aiState(aiText().skip); return; }
+  if (candidate.skip) { candidate.state = 'skipped'; ui.aiState(aiText().skip);ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
+  ui.aiBusy(true);
   const controller=new AbortController();candidate.controller=controller;
   const removeCancel=ui.cancelAi(controller);
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),120000);
   try {
     const {createAiPortrait} = await import('./src/ai-portrait.js');
+    const {exportAiPortrait} = await import('./src/ai-portrait-export.js');
     const data = new Uint8Array(await candidate.outputFile.arrayBuffer());
     const result = await createAiPortrait(data,stage => ui.aiState(aiText()[stage] || stage),sourceFile,{signal:controller.signal});
+    ui.aiState(aiText().encoding);
+    const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal,nativeStyles:candidate.nativeStyles});
+    controller.signal.throwIfAborted();
+    if(!aiPortrait.checked)throw new DOMException('AI disabled','AbortError');
+    const date=photoCaptureDate(output.data);
+    const publish=data=>{
+      candidate.aiFile=new File([data],name.replace(/\.[^.]+$/,'')+'_Portrait.HEIC',{
+        type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})});
+      if(aiPortrait.checked)ui.output(candidate.aiFile);
+    };
+    publish(output.data);
+    try{await ui.portraitPreview(result,settings=>publish(output.withSettings(settings).data));}
+    catch(error){console.warn('Portrait preview unavailable; edit focus in Photos',error);}
     candidate.state = 'done';
-    ui.preview(result,name);ui.aiState('');ui.note(aiText().ready,'ai');
+    ui.aiView(aiPortrait.checked);
+    if(aiPortrait.checked){ui.output(candidate.aiFile);ui.aiState('');ui.note(aiText().ready,'ai');}
   } catch(error) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
-    ui.aiState(error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
-  } finally {clearTimeout(deadline);removeCancel();candidate.controller=null;}
+    ui.aiState(!aiPortrait.checked?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+  } finally {clearTimeout(deadline);removeCancel();candidate.controller=null;ui.aiBusy(false);}
 }
 
 async function handleFile(file, {allowStyleRebuild = false, existingUi = null} = {}) {
@@ -416,7 +439,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       ui.set(T("st.working"));
       if (hasTexture(d.infos)) {
         ({data} = await repairTextureInWorker(bytes));
-        if (!data && hasSoftSkinData(bytes)) { ui.set(T('err.hastexture'), 'err'); return; }
+        // A complete Styles file can still be used as input for opt-in Portrait.
         bits = data ? [T('st.native'), T('st.texturerepaired')] : [T('st.native'),T('st.texture')];
         suffix = data ? '_TextureFixed.HEIC' : '_SoftSkin.HEIC';
         data ||= bytes;

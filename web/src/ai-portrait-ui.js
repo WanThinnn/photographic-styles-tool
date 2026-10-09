@@ -1,22 +1,57 @@
 import {renderBokeh} from './ai-bokeh.js';
 export const AI_STRINGS={
-  vi:{toggle:'Xóa phông AI · GPU (thử nghiệm)',hint:'Tạo depth cho ảnh thường. Photos có thể chưa cho chỉnh Portrait. Bỏ qua ảnh có Styles hoặc depth gốc.',loading:'Đang tải AI · khoảng 120 MB lần đầu',inference:'Đang tạo depth trên GPU',encoding:'Đang đóng gói depth HEIC',skip:'AI được bỏ qua để giữ Styles / Portrait gốc.',ready:'Depth AI đã thêm. Hãy kiểm tra công cụ Portrait trong Photos; chưa bảo đảm tương thích.',failed:'AI không chạy được; kết quả Styles thông thường vẫn có sẵn.',gpu:'Thiết bị / trình duyệt chưa cung cấp WebGPU. Không chuyển sang CPU.',export:'HEIC + depth AI',preview:'Xóa phông xem trước · chạm để lấy nét',blur:'Độ mờ',flat:'Lưu ảnh xóa phông (ảnh phẳng)'},
-  en:{toggle:'AI background blur · GPU (experimental)',hint:'Generate depth for ordinary photos. Photos Portrait editing may be unavailable. Skips native Styles and depth.',loading:'Loading AI · about 120 MB initially',inference:'Generating depth on GPU',encoding:'Packaging HEIC depth',skip:'AI skipped to preserve native Styles / Portrait.',ready:'AI depth added. Test Portrait controls in Photos; compatibility is unverified.',failed:'AI unavailable; the normal Styles result is still available.',gpu:'WebGPU is unavailable in this browser / device. No CPU fallback.',export:'HEIC + AI depth',preview:'Blur preview · tap to focus',blur:'Blur amount',flat:'Save blurred image (flattened)'},
-  zh:{toggle:'AI 背景虚化 · GPU（实验）',hint:'为普通照片生成深度。照片 App 未必支持人像编辑。跳过原生风格和深度。',loading:'正在加载 AI · 首次约 120 MB',inference:'GPU 正在生成深度',encoding:'正在封装 HEIC 深度',skip:'已跳过 AI，保留原生风格和人像。',ready:'已添加 AI 深度，请在照片 App 中测试人像编辑，兼容性尚未验证。',failed:'AI 不可用，普通风格结果仍可下载。',gpu:'当前浏览器或设备不支持 WebGPU，不回退到 CPU。',export:'HEIC + AI 深度',preview:'虚化预览 · 点击对焦',blur:'虚化程度',flat:'保存虚化照片（平面图像）'},
+  "vi": {
+    "toggle": "AI xoá phông · GPU (thử nghiệm)",
+    "hint": "Thêm Portrait để chỉnh ƒ và ánh sáng trong Ảnh. Giữ depth gốc nếu đã có. AI chạy trên thiết bị.",
+    "loading": "Đang tải AI · khoảng 120 MB lần đầu",
+    "inference": "Đang tạo độ sâu trên GPU",
+    "encoding": "Đang thêm Portrait vào HEIC",
+    "skip": "Đã giữ depth và Portrait gốc.",
+    "ready": "Portrait mặc định tắt. Sau khi lưu, mở ảnh trong Ảnh và bật Portrait để chỉnh ƒ và ánh sáng.",
+    "failed": "AI chưa xử lý được. Bản Styles bình thường vẫn có thể tải xuống.",
+    "gpu": "Trình duyệt chưa hỗ trợ WebGPU. Bản Styles bình thường vẫn có thể tải xuống.",
+    "cancel": "Dừng AI",
+    "cancelled": "Đã dừng AI. Bản Styles vẫn có thể tải xuống.",
+    "timeout": "AI mất quá lâu. Hãy thử lại hoặc tải bản Styles.",
+    "preview": "Xem trước xoá phông",
+    "focus": "Chạm vào ảnh để chọn điểm lấy nét.",
+    "blur": "Độ mờ xem trước"
+  },
+  "en": {
+    "toggle": "AI background blur · GPU (experimental)",
+    "hint": "Add Portrait to edit aperture and lighting in Photos. Existing depth is preserved. AI runs on your device.",
+    "loading": "Loading AI · about 120 MB initially",
+    "inference": "Generating depth on GPU",
+    "encoding": "Adding Portrait to HEIC",
+    "skip": "Original depth and Portrait preserved.",
+    "ready": "Portrait starts off. After saving, open the photo in Photos and turn on Portrait to adjust aperture and lighting.",
+    "failed": "AI could not finish. Your normal Styles photo is still available.",
+    "gpu": "WebGPU is unavailable. Your normal Styles photo is still available.",
+    "cancel": "Stop AI",
+    "cancelled": "AI stopped. Your Styles photo is still available.",
+    "timeout": "AI took too long. Retry, or download your Styles photo.",
+    "preview": "Background blur preview",
+    "focus": "Tap the photo to choose a focus point.",
+    "blur": "Preview blur"
+  },
+  "zh": {
+    "toggle": "AI 背景虚化 · GPU（实验）",
+    "hint": "添加人像，在照片 App 中调整光圈和人像光效。保留原有深度，AI 在设备上运行。",
+    "loading": "正在加载 AI · 首次约 120 MB",
+    "inference": "GPU 正在生成深度",
+    "encoding": "正在为 HEIC 添加人像",
+    "skip": "已保留原始深度和人像。",
+    "ready": "人像默认关闭。保存后在照片 App 中开启人像，调整光圈和人像光效。",
+    "failed": "AI 未能完成，仍可下载普通风格照片。",
+    "gpu": "浏览器不支持 WebGPU，仍可下载普通风格照片。",
+    "cancel": "停止 AI",
+    "cancelled": "AI 已停止，仍可下载风格照片。",
+    "timeout": "AI 处理超时，可重试或下载风格照片。",
+    "preview": "背景虚化预览",
+    "focus": "点击照片选择焦点。",
+    "blur": "预览虚化程度"
+  }
 };
-Object.assign(AI_STRINGS.vi,{normalLabel:'Styles',depthLabel:'Depth thử nghiệm · ảnh chưa xóa phông',ready:'Đã thêm depth AI. Bản này giữ ảnh chưa xóa phông; Photos chưa nhận Portrait trong lần thử của bạn.',flat:'Tải ảnh xem trước đã xóa phông',hint:'Xóa phông trong web. Bản thử depth HEIC chưa được Photos nhận là Portrait; giữ nguyên ảnh có Styles/depth gốc.'});
-Object.assign(AI_STRINGS.en,{normalLabel:'Styles',depthLabel:'Depth test · unblurred image',ready:'AI depth added. This keeps the unblurred photo; Photos Portrait recognition failed in the device test.',flat:'Download blurred preview',hint:'Blur in the browser. Experimental HEIC depth is not yet recognised as Portrait by Photos. Native Styles/depth are preserved.'});
-Object.assign(AI_STRINGS.zh,{normalLabel:'风格',depthLabel:'深度测试 · 未虚化图像',ready:'已添加 AI 深度，保留未虚化图像。设备测试中照片 App 未识别人像。',flat:'下载虚化预览',hint:'在网页中虚化。HEIC 深度尚未被照片 App 识别为人像，保留原生风格和深度。'});
-
-Object.assign(AI_STRINGS.vi,{hint:'Chỉnh bokeh và lấy nét trên web, xuất HEIC có Styles. Bật trước hoặc sau khi xử lý ảnh đều được. Bỏ qua ảnh có Styles/depth gốc.',preview:'Bokeh & lấy nét',focus:'Khoảng lấy nét · xa → gần',flat:'Tạo HEIC với bokeh & Styles',save:'Lưu vào Ảnh',download:'Tải HEIC',encoding:'Đang xuất HEIC chất lượng cao…',ready:'Chỉnh bokeh bên dưới rồi tạo HEIC. Hiệu ứng được lưu vào ảnh; Photos chưa hỗ trợ chỉnh lại Portrait.',done:'Đã tạo HEIC có bokeh và Styles.',resized:'Ảnh được giảm kích thước theo giới hạn xuất HEIC.',exportFailed:'Không xuất được HEIC. Hãy thử lại.',changed:'Đã đổi thiết lập — tạo lại HEIC để lưu.'});
-Object.assign(AI_STRINGS.en,{hint:'Adjust bokeh and focus in the browser; export HEIC with Styles. Skips native Styles/depth.',preview:'Bokeh & focus',focus:'Focus distance · far → near',flat:'Create HEIC with bokeh & Styles',save:'Save to Photos',download:'Download HEIC',encoding:'Exporting high-quality HEIC…',ready:'Adjust bokeh below, then create HEIC. The effect is baked into the image; Photos Portrait editing is unavailable.',done:'HEIC with bokeh and Styles is ready.',resized:'Image resized to fit the HEIC export limit.',exportFailed:'HEIC export failed. Try again.',changed:'Settings changed — create HEIC again to save.'});
-Object.assign(AI_STRINGS.zh,{hint:'在网页调整散景和焦点，导出含风格的 HEIC。跳过原生风格和深度。',preview:'散景与焦点',focus:'焦距 · 远 → 近',flat:'生成散景与风格 HEIC',save:'保存到照片',download:'下载 HEIC',encoding:'正在导出高质量 HEIC…',ready:'在下方调整散景后生成 HEIC。效果写入图像，照片 App 尚不支持再次编辑人像。',done:'含散景和风格的 HEIC 已生成。',resized:'图像已缩小以符合 HEIC 导出限制。',exportFailed:'HEIC 导出失败，请重试。',changed:'设置已更改，请重新生成 HEIC。'});
-Object.assign(AI_STRINGS.en,{hint:'Adjust bokeh and focus in the browser; export HEIC with Styles. Enable before or after conversion. Skips native Styles/depth.'});
-Object.assign(AI_STRINGS.zh,{hint:'在网页调整散景和焦点，导出含风格的 HEIC。可在转换前后开启；跳过原生风格和深度。'});
-
-Object.assign(AI_STRINGS.vi,{cancel:'Dừng AI',cancelled:'Đã dừng AI. Ảnh Styles vẫn có thể tải.',timeout:'AI mất quá lâu. Bạn có thể thử lại; ảnh Styles vẫn có thể tải.'});
-Object.assign(AI_STRINGS.en,{cancel:'Stop AI',cancelled:'AI stopped. Your Styles photo is still available.',timeout:'AI took too long. Retry, or download your Styles photo.'});
-Object.assign(AI_STRINGS.zh,{cancel:'停止 AI',cancelled:'AI 已停止，风格照片仍可下载。',timeout:'AI 处理超时。可重试或下载风格照片。'});
 
 export function blurPreview(result,host,strings,exportImage) {
   const {width:w,height:h,gray,previewRgb:rgb,orientation:{angle,mirror}}=result;

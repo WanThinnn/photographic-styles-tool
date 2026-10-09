@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {buildAiPortrait} from '../../web/src/ai-portrait-export.js';
+import {extractItemData} from '../../web/src/raster/heif.js';
 import {extractJpegHdr,parseAdaptiveHdrXmp,encodeTmapMetadata,yuv420Tile,iccColr} from '../../web/src/raster/jpeg-hdr.js';
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
@@ -109,4 +111,17 @@ test('HEIC carries distinct HDR tiles, original XMP/ICC, a tmap derivation and p
  assert.equal(altr.type,'altr');const view=new DataView(result.buffer,result.byteOffset+altr.off+altr.hdr);
  assert.equal(view.getUint32(12),tmap);assert.equal(view.getUint32(16),d.primary);
  assert.throws(()=>buildRasterHeic(profile,{main,mainHvcc:codec,thumb:Uint8Array.of(3),thumbHvcc:codec,hdrChunks:[],hdrHvcc:codec},null,null,geometry),/HDR tiles/);
+ const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait-template.json',import.meta.url)));
+ const portrait=buildAiPortrait(result,{payload:assets.mask.payload,hvcc:assets.mask.hvcc,width:64,height:64},template).data;
+ const p=discoverHeic(portrait),pt=[...p.infos].find(([,i])=>i.type==='tmap')[0];
+ assert.deepEqual(extractItemData(portrait,p,pt),encodeTmapMetadata(hdr.metadata));
+ assert.deepEqual(propertyBoxBytes(portrait,p.props,p.primary,'colr'),iccColr(hdr.baseIcc));
+ assert.deepEqual(propertyBoxBytes(portrait,p.props,pt,'colr'),iccColr(hdr.alternateIcc));
+ const gainTiles=p.refs.find(r=>r.type==='dimg'&&r.from===p.hdrGrid).to;
+ gainTiles.forEach((id,i)=>assert.deepEqual(extractItem(portrait,p.iloc,id),gain[i]));
+ const ps=p.refs.find(r=>r.type==='cdsc'&&r.to.includes(p.hdrGrid)).from;
+ assert.deepEqual(extractItem(portrait,p.iloc,ps),hdr.xmp);
+ const pg=findChild(metaChildren(portrait,topBox(portrait,'meta')),'grpl'),pa=[...boxes(portrait,pg.off+pg.hdr,pg.off+pg.size)][0];
+ const pv=new DataView(portrait.buffer,portrait.byteOffset+pa.off+pa.hdr);
+ assert.equal(pv.getUint32(12),pt);assert.equal(pv.getUint32(16),p.primary);
 });

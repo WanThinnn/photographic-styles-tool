@@ -56,6 +56,9 @@ jobs:
       - name: Check the PWA is internally consistent
         run: node tests/web/check-pwa.mjs
 
+      - name: Check Portrait export and photo preservation before publishing
+        run: node --test tests/web/ai-portrait-export.mjs tests/web/ai-portrait.mjs tests/web/apple-depth.mjs tests/web/jpeg-hdr.mjs tests/web/style-preservation.mjs tests/web/texture-compatibility.mjs
+
       # enablement turns Pages on if it is not already, so a fresh clone of this
       # repo deploys without anyone visiting the settings page first.
       - uses: actions/configure-pages@v5

@@ -384,16 +384,30 @@ DOM-based decoding still runs in the page and returns sampled RGB to the worker.
 rows, revokes download URLs, clears Live Photo pairing data, disposes bokeh previews and
 releases converter workers. It does not delete downloaded files or originals.
 
-AI can be enabled before selecting a photo or after a result is ready. Eligible
-existing results are queued when the switch is enabled; native Styles/depth sources
-show a visible skip message. Original save/download buttons stay in place while the
-AI preview appears and are labelled as the unblurred Styles result.
+AI can be enabled before selection or after processing. With AI enabled, the app
+finishes Styles, Texture and depth as one visible workflow, shows a tap-to-focus
+preview, and offers a single save/download pair for `_Portrait.HEIC`. There is no
+second Create HEIC step or separate flattened-bokeh download. Focus/blur changes
+reuse the encoded depth and update focus/aperture metadata, without another model
+inference or primary re-encode. The preview is illustrative; Portrait starts off.
+After importing the file, enable Portrait in Photos to adjust aperture/lighting.
+Existing native depth bypasses AI and stays intact. Turning AI off restores the
+normal Styles file. Cancellation/failure also leaves that file available.
 
-AI inference runs in a dedicated WebGPU worker. **Stop AI** and turning the switch off
-terminate active inference; a two-minute deadline stops stalled jobs. Styles downloads
-remain available. GPU support in a worker is required; physical iPhone Safari validation
-is still pending. Decoder image handles and native contexts are released after sampling,
-and one failed photo does not disable analysis for subsequent photos.
+The exporter promotes the accepted capture-graph research branch. Its public
+template contains structure, numerical Styles coefficients, calibration and REND;
+it contains no photographic bitstreams, source dates, GPS or capture UUIDs. All
+primary pixels, HDR, delta map, thumbnails and Texture/face resources come from
+the user's completed file. Source camera/date/GPS metadata stays with that file.
+Calibration/REND are compatibility estimates, not measured camera calibration or
+metric AI depth. The accepted test scenes support aperture/Portrait Lighting;
+other device/geometry combinations still need testing. Strong Styles colours
+on non-native inputs remain unresolved and colour fitting is paused.
+
+AI inference runs in a WebGPU worker. Stop AI or switch off to terminate active
+inference; a two-minute deadline stops stalled jobs. The first model download is
+about 120 MB. No CPU fallback or image upload is used. The low-level
+`exportAiDepth` attachment remains a research helper, not the production exporter.
 
 Result headings show the filename above the success dot and short outcome. Expanded details
 show camera, dimensions, file size, capture time and available HDR/depth resources.

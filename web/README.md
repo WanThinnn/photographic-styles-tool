@@ -523,6 +523,12 @@ These resource labels do not guarantee Portrait editing in Photos. Cache storage
 do not discard valid network responses or prevent online startup. Regression checks run
 in CI, including a synthetic native Texture fixture that requires no personal photos.
 
+HDR discovery also follows an ISO `tmap` derivation when the gain map lacks the older
+Apple auxiliary label. Supported Styles outputs register that existing map for the
+Photos editor without changing the image, gain-map tiles, tone-map parameters or selected
+Style. Private phone tests confirm HDR and aperture/lighting editing for the tested
+native Portrait export; stronger Style colours on reconstructed exports remain unresolved.
+
 **Experimental support for SDR and resized HEIC photos** is selected automatically
 when the file needs it; there is no checkbox to enable. Native style photos retain
 their original route. This mode adds Styles metadata to the original photo graph, with an estimated

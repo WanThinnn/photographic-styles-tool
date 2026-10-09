@@ -6,7 +6,7 @@ import {portraitEligibility,attachAiDepth} from '../../web/src/portrait/ai-portr
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
-import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations,removeItems} from '../../web/src/raster/heif.js';
+import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations,removeItems,addItems} from '../../web/src/raster/heif.js';
 import {hasTexture} from '../../web/src/raster/texture.js';
 import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel,getMakerNoteBlob} from '../../web/src/core/exif.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
@@ -16,6 +16,12 @@ import {buildAppleStyleExif} from '../../web/src/raster/exif.js';
 import {styleCapabilities} from '../../web/src/styles/style-capabilities.js';
 import {photoContentIdentifier} from '../../web/src/media/live-photo.js';
 import {patch} from '../../web/src/styles/port.js';
+import {discoverHeic as discoverCoreHeic} from '../../web/src/core/heif.js';
+import {describeHeic} from '../../web/src/ui/result-metadata.js';
+import {tmapGainMap} from '../../web/src/core/gain-map.js';
+import {encodeTmapMetadata} from '../../web/src/raster/jpeg-hdr.js';
+import {registerTmapHdr} from '../../web/src/styles/hdr-compatibility.js';
+import {executeJob} from '../../web/src/media/heic-worker.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,o)=>{
@@ -105,6 +111,51 @@ test('adding a missing Styles graph preserves an original six-key Bright selecti
   const output=await patch(source,originalProfile,{experimental:true});
   assert.deepEqual(selectedStyle(output.data),selectedStyle(source));
   assert.deepEqual(originalProfile.mn54,saved,'cached neutral profile must not inherit another photo selection');
+});
+
+test('ISO-only tmap gain maps are reported and preserved as HDR when adding Portrait',async()=>{
+  const base=photo(4032,3024,'45-15'),d=discoverHeic(base),ft=topBox(base,'ftyp');
+  assert.ok(d.hdrGrid!==null);
+  let meta=base.slice(d.meta.off,d.meta.off+d.meta.size);
+  let assigned;[meta,assigned]=addItems(meta,[{key:'iso-hdr',itemType:'tmap',refType:'dimg',refTo:[d.primary,d.hdrGrid],
+    reuse:d.props.associations.get(d.primary).filter(a=>d.props.properties[a.index-1].type==='ispe').map(a=>[a.index,a.essential])}]);
+  const tmap=assigned.get('iso-hdr'),metadata=encodeTmapMetadata({baseHeadroom:0,alternateHeadroom:2,useBaseColorSpace:true,
+    channels:[{min:0,max:2,gamma:1,baseOffset:0,alternateOffset:0}]});
+  const keep=d.props.associations.get(d.hdrGrid).filter(a=>d.props.properties[a.index-1].type!=='auxC').map(a=>[a.index,a.essential]);
+  meta=setItemPropertyAssociations(meta,d.hdrGrid,keep);
+  const source=rebuildHeic(base,d,base.slice(0,ft.size),meta,new Map([[tmap,metadata]])),before=discoverHeic(source);
+  assert.equal(auxUriForItem(before.props,before.hdrGrid),null);
+  assert.equal(before.hdrGrid,d.hdrGrid);assert.equal(discoverCoreHeic(source).hdrGrid,d.hdrGrid);
+  assert.equal(describeHeic(source).hdr,true);
+  const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+  assert.equal(describeHeic(output).hdr,true);
+  assert.equal(after.hdrTiles.length,before.hdrTiles.length);
+  before.hdrTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(output,after,after.hdrTiles[i])));
+  assert.deepEqual(propertyBoxBytes(output,after.props,after.hdrGrid,'colr'),propertyBoxBytes(source,before.props,before.hdrGrid,'colr'));
+  const newTmap=[...after.infos.keys()].find(id=>after.infos.get(id).type==='tmap');
+  assert.deepEqual(extractItemData(output,after,newTmap),extractItemData(source,before,tmap));
+  assert.deepEqual(after.refs.find(r=>r.from===newTmap&&r.type==='dimg').to,[after.primary,after.hdrGrid]);
+  const fixed=registerTmapHdr(output),final=discoverHeic(fixed);
+  assert.equal(auxUriForItem(final.props,final.hdrGrid),'urn:com:apple:photo:2020:aux:hdrgainmap');
+  assert.ok(final.refs.some(r=>r.type==='auxl'&&r.from===final.hdrGrid&&r.to.includes(final.primary)));
+  assert.deepEqual(selectedStyle(fixed),selectedStyle(output));
+  for(const id of after.infos.keys())assert.deepEqual(extractItemData(fixed,final,id),extractItemData(output,after,id));
+  assert.equal(registerTmapHdr(fixed),null,'registration is additive and idempotent');
+  const worker=await executeJob({operation:'texture',data:output});
+  assert.equal(worker.report.hdrCompatibility,'registered-existing-tmap');
+  const wd=discoverHeic(worker.data);
+  assert.equal(auxUriForItem(wd.props,wd.hdrGrid),'urn:com:apple:photo:2020:aux:hdrgainmap');
+  assert.deepEqual(selectedStyle(worker.data),selectedStyle(source));
+  after.hdrTiles.forEach((id,i)=>assert.deepEqual(extractItemData(worker.data,wd,wd.hdrTiles[i]),extractItemData(output,after,id)));
+});
+
+test('unrelated or ambiguous tmap dependencies do not invent an HDR role',()=>{
+  const infos=new Map([[1,{type:'grid'}],[2,{type:'hvc1'}],[3,{type:'tmap'}],[4,{type:'tmap'}],[5,{type:'hvc1'}]]);
+  assert.equal(tmapGainMap(infos,new Map([[3,[1,2]]]),1),2);
+  assert.equal(tmapGainMap(infos,new Map([[3,[2,1]]]),1),null);
+  assert.equal(tmapGainMap(infos,new Map([[3,[1,1]]]),1),null);
+  assert.equal(tmapGainMap(infos,new Map([[3,[1,99]]]),1),null);
+  assert.equal(tmapGainMap(infos,new Map([[3,[1,2]],[4,[1,5]]]),1),null);
 });
 
 test('unknown Styles contracts are preserved instead of silently downgraded into Portrait',()=>{

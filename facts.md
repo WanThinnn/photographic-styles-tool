@@ -2557,3 +2557,43 @@ matches both accepted V2 A files byte-for-byte. Portable regression tests cover
 legacy/on restoration, untouched off/unknown graphs, no duplicate repair, exact
 depth/primary/Styles retention and six-key Bright preservation. Private checks
 exercise the real worker job and originals; private photographs are not published.
+
+### 10.52 ISO-only HDR discovery and native Portrait V4 device result (2026-10-10)
+
+Correction to section 10.49: the IMG_1031 Portrait source exports do contain HDR.
+Their ISO tmap references the base image and a 12-tile gain map, without the older
+Apple hdrgainmap auxiliary label. The previous discovery code only recognized that
+label and incorrectly reported no HDR. Both HEIF readers now recognize an unambiguous
+tmap dependency pair; explicit auxiliary labels retain precedence. Ambiguous or
+unrelated graphs do not become HDR. Original tiles and tmap parameters are retained.
+
+The current private iCloud Photos (5) copies were paired by exact primary payloads:
+IMG_1051 matches IMG_1031-1 and IMG_1052 matches IMG_1031, regardless of the user's
+filename description. Both source exports lack the full Styles auxiliary graph;
+their original Bright selection is still present. Recreating that graph is distinct
+from preserving a complete native Styles calibration.
+
+NativePortrait_Bright_HDR_V4 variants A/B/C complete selected marker fields;
+D only registers the existing gain map with the older Apple auxC role and auxl
+reference, while E combines A and D. The user reports all variants have working
+Styles, aperture and Portrait Lighting; D/E also have HDR. All retain Bright and
+all still have stronger colour. D therefore supplies the confirmed HDR compatibility
+fix without changing the original selection fields or claiming to correct colour.
+The production helper matches D byte for byte on IMG_1052. It is additive,
+idempotent, guarded by the supported Styles contract and never replaces another
+declared auxiliary role. It runs after Styles patch/Texture repair, before export.
+
+The user recalls that Styles-first download/re-upload followed by AI Portrait
+previously avoided stronger colour. The existing AI assembler still preserves
+completed Styles and per-person statistics exactly; its one-step/re-upload
+regression passes. A private comparison using both current native Portrait source
+graphs and deterministic substitute face data also finds identical Styles and
+all payload bytes whether native restoration precedes or follows Soft Skin.
+Changing stage order is not supported as a colour fix by this evidence. This
+comparison is not a physical-device render test or real face inference.
+
+The misleading missing-Styles message no longer states that HDR or aperture
+editing cannot be preserved. The web still warns when original Styles editing
+data is absent, and asks users to check colours and Portrait editing. All 102
+workflow regression cases complete with 92 passes, 10 optional private-fixture
+skips and no failures; PWA and three-language consistency checks pass. Shell v90.

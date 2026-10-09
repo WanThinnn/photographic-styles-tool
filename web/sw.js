@@ -1,11 +1,13 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v89`;
+const CACHE_NAME = `${CACHE_PREFIX}v90`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
 // Warm the complete offline converter after startup. Only BOOT_SHELL below
 // gates installation, so first visits do not wait for the whole module graph.
 const APP_SHELL = [
+  "./src/core/gain-map.js",
+  "./src/styles/hdr-compatibility.js",
   "./",
   "./index.html",
   "./styles.css",

@@ -4,6 +4,7 @@
 import {
   boxes, topBox, metaChildren, findChild, u, be, box, concat, cstring, slice, bytesEqual,
 } from "./box.js";
+import {tmapGainMap} from './gain-map.js';
 
 export const URI_HDR_GAIN = "urn:com:apple:photo:2020:aux:hdrgainmap";
 export const URI_LINEAR_THUMB = "tag:apple.com,2023:photo:aux:linearthumbnail";
@@ -229,6 +230,7 @@ export function discoverHeic(d) {
     else if (uri === URI_LINEAR_THUMB) linearThumb = iid;
     else if (uri === URI_STYLE_DELTA) deltaGrid = iid;
   }
+  hdrGrid??=tmapGainMap(infos,dimg,primary);
   let stylesItem = null, exifItem = null;
   for (const [iid, info] of infos) {
     if (info.type === "uri " && info.uri === URI_STYLES) stylesItem = iid;

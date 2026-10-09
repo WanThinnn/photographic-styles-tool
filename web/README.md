@@ -417,10 +417,14 @@ selected before processing, the intermediate normal file is never published whil
 Portrait export is running; fallback output appears only after failure/cancellation.
 
 The exporter promotes the accepted capture-graph research branch. Its public
-template contains structure, numerical Styles coefficients, calibration and REND;
+template contains structure, numerical capture parameters, calibration and REND;
 it contains no photographic bitstreams, source dates, GPS or capture UUIDs. All
 primary pixels, HDR, delta map, thumbnails and Texture/face resources come from
-the user's completed file. Source camera/date/GPS metadata stays with that file.
+the user's completed file. Its complete Styles payload is also retained, including
+generated coefficients and per-photo skin/scene statistics. AI no longer replaces
+generated Styles with reference camera values: one-step export follows the same
+preservation path as downloading Styles and adding AI after re-upload.
+Source camera/date/GPS metadata stays with that file.
 Calibration/REND are compatibility estimates, not measured camera calibration or
 metric AI depth. The accepted test scenes support aperture/Portrait Lighting;
 other device/geometry combinations still need testing. Strong Styles colours

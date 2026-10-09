@@ -313,9 +313,7 @@ function row(name) {
 // Keep the normal result for toggle-off/cancellation. Only opt-in adds Portrait.
 async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
   const {portraitEligibility} = await import('./src/ai-portrait-container.js');
-  const {discoverHeic}=await import('./src/heif.js');
   const candidate = {outputFile, sourceFile, ui, name, state: 'new',
-    nativeStyles:source?discoverHeic(source).stylesItem!==null:false,
     skip: source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
   if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
@@ -340,7 +338,7 @@ async function runAiCandidate(candidate) {
     const data = new Uint8Array(await candidate.outputFile.arrayBuffer());
     const result = await createAiPortrait(data,stage => ui.aiState(aiText()[stage] || stage),sourceFile,{signal:controller.signal});
     ui.aiState(aiText().encoding);
-    const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal,nativeStyles:candidate.nativeStyles});
+    const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     controller.signal.throwIfAborted();
     if(!aiPortrait.checked)throw new DOMException('AI disabled','AbortError');
     const date=photoCaptureDate(output.data);

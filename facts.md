@@ -2092,3 +2092,49 @@ strength fitting remains paused as requested.
 Final local verification: 78 regression cases, 68 passed and 10 skipped because
 their optional private fixtures were unavailable; no failures. PWA asset-list
 and Vietnamese/English/Chinese copy checks also pass.
+
+### 10.37 Non-native one-step Portrait overwrote completed Styles (2026-10-09)
+
+The user confirms native iPhone 16+ depth/Styles works, but reports dark/dull
+skin on older-camera Styles plus Portrait. The user then isolates a successful
+workaround: generate Styles, download, re-upload and enable AI. IMG_0975 is the
+Styles-only input and IMG_0976 its Photos-exported Portrait result.
+
+Read-only inspection of iCloud Photos (3)/(4) identifies cameras iPhone 7 and
+iPhone 13 Pro Max. IMG_0962 and IMG_0975 carry schema-14 generated Styles and
+measured skin/person statistics. IMG_0969-1 retains the AI capture graph but
+has schema 131087 reference Styles, including zero person/skin statistics,
+despite carrying non-empty photo-specific masks and valid people ratios.
+IMG_0963, IMG_0969 and IMG_0976 are rendered Photos exports: their active Styles
+and delta are absent and the primary tiles have been re-encoded. They cannot
+serve as byte-exact pre-export Styles controls or reconstruct lost resources.
+
+The production code classified nativeStyles from the original upload, before
+the Styles stage. False replaced the completed Styles with the Portrait
+template's plist, retaining only keys 7,9,c,d. True (including re-uploaded
+generated Styles) preserved the complete plist. Thus the direct route discarded
+this photo's measured skin/scene statistics, coefficients, curve and gain/range
+metadata while preserving its face masks. This is a verified code-path defect
+consistent with the user's route isolation, not proof that each discarded field
+individually causes Photos' skin rendering.
+
+Portrait assembly now keeps the completed Styles payload byte-exact regardless
+of its origin. The original-upload classification and template substitution are
+removed. A final unconditional preservation check covers generated and captured
+Styles. The entire selected preset/pad, primary/HDR/delta/thumbnails and existing
+face masks remain preserved; capture calibration/REND and depth construction are
+unchanged. This does not fit colour coefficients or resume the paused general
+maximum-strength colour research. Regression covers generated/native schemas,
+non-zero skin statistics, focus updates and direct/re-upload route parity.
+Device confirmation of the combined effect after this change is still pending.
+
+Local verification: 79 regression cases, 69 passed and 10 optional-fixture skips,
+with no failures; PWA and three-language copy checks pass. The desktop browser
+smoke uses real HEVC encoding with deterministic depth inference and no-face
+Soft Skin inference substitutes. On real IMG_0962/IMG_0975 it verifies byte-exact
+completed Styles/skin statistics, primary payloads and existing face masks after
+Portrait export. Native 24 MP preset/Styles/HDR preservation and direct Indigo
+JPEG conversion also pass; the direct raster Portrait Styles payload equals its
+normal completed result exactly. No page errors or intermediate download flashes
+occur. These checks establish data preservation, not quantitative skin appearance
+or iPhone Photos controls; the user must confirm the new one-step output on-device.

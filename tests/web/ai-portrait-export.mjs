@@ -47,6 +47,10 @@ function selectedStyle(source){
   const d=discoverHeic(source);
   return extractAppleMakerNoteTag(extractItemData(source,d,d.exifItem));
 }
+function withStyles(source,blob){
+  const d=discoverHeic(source),ft=topBox(source,'ftyp');
+  return rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.stylesItem,blob]]));
+}
 test('editable Portrait keeps own primary, HDR, delta, thumbnails and Texture across geometries',()=>{
   for(const[w,h]of[[900,600],[3024,4032],[1200,1200],[8000,1000]]){
     const source=photo(w,h),before=discoverHeic(source);
@@ -87,13 +91,32 @@ test('larger native delta/HDR grids extend the Portrait graph without losing til
   assert.equal(b.refs.find(r=>r.type==='dimg'&&r.from===b.hdrGrid).to.length,15);
   assert.deepEqual(extractItemData(output,b,b.stylesItem),extractItemData(source,a,a.stylesItem));
 });
-test('native Styles payload is exact when opted into AI; normal input is immutable',()=>{
-  const source=photo(900,600),saved=source.slice(),before=discoverHeic(source);
-  const out=buildAiPortrait(source,depth,template,{nativeStyles:true}).data,after=discoverHeic(out);
-  assert.deepEqual(source,saved);
-  assert.deepEqual(extractItemData(out,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
-  assert.deepEqual(extractAppleMakerNoteTag(extractItemData(out,after,after.exifItem)),
-    extractAppleMakerNoteTag(extractItemData(source,before,before.exifItem)),'native selected Style marker retained');
+test('Portrait retains complete generated and native Styles, including per-photo skin statistics',()=>{
+  const base=photo(900,600),bd=discoverHeic(base);
+  for(const blob of [extractItemData(base,bd,bd.stylesItem),Uint8Array.from(Buffer.from(template.styles,'base64'))]){
+    const styles=parseBplist(blob,{preserveReals:true});
+    // A detected face's measured statistics must not be exchanged for the
+    // capture template's empty person/skin blocks while retaining its masks.
+    styles.get('6').set('ToneMappedImageSkinBased',new Map([['p50',new BplistReal(.4123)],['highKey',new BplistReal(1)]]));
+    const source=withStyles(base,buildBplist(styles)),saved=source.slice(),before=discoverHeic(source);
+    for(const settings of [{},{focusX:.2,focusY:.8,aperture:2}]){
+      const out=buildAiPortrait(source,depth,template,settings).data,after=discoverHeic(out);
+      assert.deepEqual(source,saved);
+      assert.deepEqual(extractItemData(out,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+      assert.deepEqual(selectedStyle(out),selectedStyle(source),'selected Style marker retained');
+    }
+  }
+});
+
+test('one-step generated Styles plus Portrait matches the successful re-upload route',()=>{
+  const source=photo(900,600),d=discoverHeic(source);
+  // Previously false replaced the completed Styles with reference camera
+  // coefficients, while true preserved them after download/re-upload.
+  const direct=buildAiPortrait(source,depth,template,{nativeStyles:false}).data;
+  const reuploaded=buildAiPortrait(source.slice(),depth,template,{nativeStyles:true}).data;
+  assert.deepEqual(direct,reuploaded);
+  const after=discoverHeic(direct);
+  assert.deepEqual(extractItemData(direct,after,after.stylesItem),extractItemData(source,d,d.stylesItem));
 });
 
 test('Bright preset and non-neutral Tone/Colour survive both AI routes and focus changes',()=>{

@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {refineDepth} from '../../web/src/ai-depth-refinement.js';
-import {portraitAssembler} from '../../web/src/ai-portrait-assembler.js';
-import {inferDepth} from '../../web/src/ai-inference.js';
+import {refineDepth} from '../../web/src/portrait/ai-depth-refinement.js';
+import {portraitAssembler} from '../../web/src/portrait/ai-portrait-assembler.js';
+import {inferDepth} from '../../web/src/portrait/ai-inference.js';
 
 test('RGB-guided depth keeps a true silhouette sharp while preserving near/far direction',()=>{
   const w=48,h=8,rgb=new Uint8Array(w*h*3);

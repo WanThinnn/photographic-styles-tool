@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {box,concat,be} from '../../web/src/box.js';
-import {photoContentIdentifier,moviePairingMetadata,validateLivePair,livePhotoPackage} from '../../web/src/live-photo.js';
-import {readZip} from '../../web/src/zip.js';
-import {addTexture} from '../../web/src/texture.js';
-import {discoverHeic, extractItem} from '../../web/src/heif.js';
+import {box,concat,be} from '../../web/src/core/box.js';
+import {photoContentIdentifier,moviePairingMetadata,validateLivePair,livePhotoPackage} from '../../web/src/media/live-photo.js';
+import {readZip} from '../../web/src/core/zip.js';
+import {addTexture} from '../../web/src/styles/texture.js';
+import {discoverHeic, extractItem} from '../../web/src/core/heif.js';
 const txt=s=>new TextEncoder().encode(s);
 const root='C:/Users/WanThinnn/Downloads/iCloud Photos (1)/iCloud Photos/';
 function movie(id,fullBox=true) {

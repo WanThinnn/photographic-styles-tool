@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {depthRepresentationSubtype,appleDepthAuxc,appleDepthXmp} from '../../web/src/apple-depth-metadata.js';
+import {depthRepresentationSubtype,appleDepthAuxc,appleDepthXmp} from '../../web/src/portrait/apple-depth-metadata.js';
 
 test('depth descriptor matches independently inspected native Apple disparity values',()=>{
   // IMG_5129 native auxC sample: dMin=0.73583984375, dMax=1.607421875.

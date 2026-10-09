@@ -1,1 +1,1 @@
-export * from '../hevc-linear-tags.js';
+export * from '../codecs/hevc-linear-tags.js';

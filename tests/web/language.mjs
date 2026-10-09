@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {preferredLanguage,STRINGS,t} from '../../web/src/i18n.js';
+import {preferredLanguage,STRINGS,t} from '../../web/src/ui/i18n.js';
 
 test('browser Vietnamese defaults to Vietnamese, with explicit choices taking priority',()=>{
   assert.equal(preferredLanguage({languages:['vi-VN','en-US']}),'vi');

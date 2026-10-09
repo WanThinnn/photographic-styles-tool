@@ -9,7 +9,7 @@ const quiet = () => {};
 const context = vm.createContext({console:{log:quiet,error:quiet,warn:quiet,info:quiet,debug:quiet},
   TextDecoder,TextEncoder,performance,setTimeout,clearTimeout,fetch});
 context.window=context; context.self=context; context.globalThis=context;
-vm.runInContext(fs.readFileSync(new URL('./.cache/libheif.js',import.meta.url),'utf8'),context);
+vm.runInContext(fs.readFileSync(new URL('.cache/libheif.js',import.meta.url),'utf8'),context);
 const factory = context.libheif;
 let heif = typeof factory === 'function' ? factory() : factory;
 if(heif?.then) heif=await heif;

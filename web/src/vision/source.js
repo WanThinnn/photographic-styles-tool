@@ -1,4 +1,4 @@
-import {aiSourceCanvas} from '../ai-portrait-source.js';
+import {aiSourceCanvas} from '../portrait/ai-portrait-source.js';
 import {discoverHeic, dimensionsForItem, displayDimensions, itemOrientation} from '../raster/heif.js';
 
 export async function decodeToDisplayCanvas(bytes) {

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {Worker} from 'node:worker_threads';
-import {addTexture} from '../../web/src/texture.js';
-import {patch} from '../../web/src/port.js';
-import {loadProfile} from '../../web/src/zip.js';
-import {discoverHeic, extractItem, propertyBoxBytes} from '../../web/src/heif.js';
+import {addTexture} from '../../web/src/styles/texture.js';
+import {patch} from '../../web/src/styles/port.js';
+import {loadProfile} from '../../web/src/core/zip.js';
+import {discoverHeic, extractItem, propertyBoxBytes} from '../../web/src/core/heif.js';
 const directory = 'C:/Users/WanThinnn/Downloads/iCloud Photos/iCloud Photos/';
-const moduleUrl = new URL('../../web/src/heic-worker.js', import.meta.url).href;
+const moduleUrl = new URL('../../web/src/media/heic-worker.js', import.meta.url).href;
 function job(payload) {
   const worker = new Worker(`const {parentPort}=require('node:worker_threads');
     parentPort.on('message',async job=>{try{const {executeJob}=await import(${JSON.stringify(moduleUrl)});

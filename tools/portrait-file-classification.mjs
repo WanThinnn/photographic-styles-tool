@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 import {extractRasterExif} from '../web/src/raster/exif.js';
-import {getMakerNoteBlob,extractAppleMakerNoteTag} from '../web/src/exif.js';
+import {getMakerNoteBlob,extractAppleMakerNoteTag} from '../web/src/core/exif.js';
 import {discoverHeic,extractItemData,auxUriForItem,DEPTH_URI} from '../web/src/raster/heif.js';
 
 const [jpeg,heic,output]=process.argv.slice(2);

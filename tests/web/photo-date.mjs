@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {exifDateFields, photoCaptureDate} from '../../web/src/photo-date.js';
+import {exifDateFields, photoCaptureDate} from '../../web/src/media/photo-date.js';
 import {buildRasterExif} from '../../web/src/raster/raster-import.js';
-import {concat,be} from '../../web/src/box.js';
+import {concat,be} from '../../web/src/core/box.js';
 import {buildAppleStyleExif,preserveRasterExif} from '../../web/src/raster/exif.js';
-import {discoverHeic,extractItem} from '../../web/src/heif.js';
+import {discoverHeic,extractItem} from '../../web/src/core/heif.js';
 
 function datedExif() {
   const le = (n,size) => be(n,size).reverse(), text = s => new TextEncoder().encode(s+'\0');

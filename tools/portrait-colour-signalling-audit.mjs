@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import {topBox} from '../web/src/box.js';
+import {topBox} from '../web/src/core/box.js';
 import {discoverHeic,propertyBoxBytes} from '../web/src/raster/heif.js';
 import {hevcSpsColor} from '../web/src/raster/hevc-color.js';
 for(const file of process.argv.slice(2)) {

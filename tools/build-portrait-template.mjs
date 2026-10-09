@@ -1,9 +1,9 @@
 // Local build input only. Publish metadata, never source photo/image payloads.
 import fs from 'node:fs';
 import {discoverHeic,extractItemData,parseIloc,DEPTH_URI,auxUriForItem} from '../web/src/raster/heif.js';
-import {getMakerNoteBlob} from '../web/src/exif.js';
-import {parseBplist,buildBplist,BplistReal} from '../web/src/bplist.js';
-import {topBox} from '../web/src/box.js';
+import {getMakerNoteBlob} from '../web/src/core/exif.js';
+import {parseBplist,buildBplist,BplistReal} from '../web/src/core/bplist.js';
+import {topBox} from '../web/src/core/box.js';
 const [input,output]=process.argv.slice(2);
 if(!input||!output)throw Error('Pass a local native Portrait HEIC and output JSON');
 const bytes=new Uint8Array(fs.readFileSync(input)),d=discoverHeic(bytes);

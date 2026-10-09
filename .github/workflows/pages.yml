@@ -56,6 +56,9 @@ jobs:
       - name: Check the PWA is internally consistent
         run: node tests/web/check-pwa.mjs
 
+      - name: Check browser module and worker paths
+        run: node --test tests/web/module-paths.mjs
+
       - name: Check Portrait export and photo preservation before publishing
         run: node --test tests/web/ai-portrait-export.mjs tests/web/ai-portrait.mjs tests/web/apple-depth.mjs tests/web/jpeg-hdr.mjs tests/web/style-preservation.mjs tests/web/texture-compatibility.mjs
 

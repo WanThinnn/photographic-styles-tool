@@ -1,7 +1,7 @@
 // Bounded-memory LinearRaw decoding: each JPEG tile becomes a small DNG for LibRaw.
 // Camera colour calibration and white balance are retained; previews are never used.
 import {findDngRaw} from './dng-tiff.js';
-import {TIFF_TYPE_SIZES} from '../heif.js';
+import {TIFF_TYPE_SIZES} from '../core/heif.js';
 
 export const DNG_MAX_PIXELS = 12_000_000;
 const colourTags = new Set([271, 272, 50706, 50707, 50708, 50710, 50712, 50713, 50714,

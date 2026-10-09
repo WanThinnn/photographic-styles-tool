@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {styleDeltaSize} from '../../web/src/graft.js';
-import {patch} from '../../web/src/port.js';
-import {loadProfile} from '../../web/src/zip.js';
-import {discoverHeic, extractItem, propertyBoxBytes, dimensionsForItem, auxUriForItem} from '../../web/src/heif.js';
-import {photoContentIdentifier} from '../../web/src/live-photo.js';
+import {styleDeltaSize} from '../../web/src/styles/graft.js';
+import {patch} from '../../web/src/styles/port.js';
+import {loadProfile} from '../../web/src/core/zip.js';
+import {discoverHeic, extractItem, propertyBoxBytes, dimensionsForItem, auxUriForItem} from '../../web/src/core/heif.js';
+import {photoContentIdentifier} from '../../web/src/media/live-photo.js';
 
 test('unknown geometries require opt-in and keep stored portrait axes',()=>{
   assert.equal(styleDeltaSize(2597,3462),null);

@@ -4,6 +4,10 @@
 
 当前版本：v0.6.2
 
+此分支由 **Elio（aka WanThinnn）** 维护，基于
+[nathanatgit 的 Shalielie](https://github.com/nathanatgit/Shalielie)。保留原作者的
+MIT 许可证及版权声明；此分支增加自动柔肤补充、可编辑 AI 人像、JPEG HDR 保留和多语言界面。
+
 注意这是一个实验性工具：它为 **iPhone 16 之前**的 iPhone（iPhone 15、14、13 …… 只要照片符合受支持的
 tile 布局即可）拍摄的 HEIC 照片补上 iPhone 16/17 照片所携带的元数据，让编辑照片时，呈现 **摄影风格**（即 Apple 官方所称的“调色板”）。
 
@@ -11,10 +15,6 @@ tile 布局即可）拍摄的 HEIC 照片补上 iPhone 16/17 照片所携带的�
 移植的照片会在移植时一并加上；原生的 iPhone 16/17 照片只添加这两个入口相关元数据，原有的图像数据逐字节不变。
 
 此工具不是 Apple 官方的格式转换器。它通过读取并改写照片文件的ISO-BMFF item 结构来工作，完全个人开发，由愤怒驱动，并 vibecoding 而来，与Apple没有任何关系。
-
-**请务必保留原图。**
-
-**请务必保留原图。**
 
 **请务必保留原图。**
 
@@ -28,15 +28,17 @@ tile 布局即可）拍摄的 HEIC 照片补上 iPhone 16/17 照片所携带的�
 
 ## 在浏览器中使用
 
-[![Web app visits](<https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fnathanatgit-shalielie%2Fweb&query=%24.value&label=web%20app%20visits&style=flat-square>)](https://nathanatgit.github.io/Shalielie/)
+[![Web app visits](<https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fnathanatgit-wanthinnn%2Fweb&query=%24.value&label=web%20app%20visits&style=flat-square>)](https://wanthinnn.github.io/photographic-styles-tool/)
 
 网页版为纯前端处理，支持 PWA ，可直接通过 Safari 分享按钮分享到主屏幕，无需安装、无需命令行。把照片拖如待放区，即可得到输出。它完全在你的设备上运行，不会上传任何内容。
 
-**https://nathanatgit.github.io/Shalielie/**
+**https://wanthinnn.github.io/photographic-styles-tool/**
 
 本仓库的网页版支持质感/颗粒、原生照片模式、JPG/PNG 等图像、DNG 解码、实况照片资源配对及可选 AI 散景。
 缺少 HEIC 缩略图时可用已校验的 WASM 编码器在本地生成，首次访问会自动准备环境，详见 [web/README.md](web/README.md)。
-普通图像、DNG 和 AI 散景会重新编码为 SDR；HEIC 元数据处理路径则保留原图像数据。AI 需要 WebGPU，不启用 Apple 可再次编辑的人像控制。
+普通图像和 DNG 转为 HEIC；支持的 JPEG HDR 增益图会转移，DNG 开发输出为 SDR。
+HEIC 路径保留原主图、HDR 和风格数据。可选 AI 人像需要 WebGPU，在已测试的“照片”版本中
+可编辑光圈 ƒ 和人像光效。人像默认为关闭，保存后在“照片”中开启；详见 [web/AI-PORTRAIT.md](web/AI-PORTRAIT.md)。
 
 网页版与 命令行/Python 工具使用同一套移植逻辑，见 [`web/README.md`](web/README.md)。
 批量处理或需要基于编码器，需要生成内嵌缩略图时请用 命令行/Python 版本。
@@ -83,8 +85,8 @@ photographic-style-port patch IN.HEIC OUT.HEIC \
 需要 **Python 3.12+**。推荐使用 [uv](https://docs.astral.sh/uv/)：
 
 ```bash
-git clone https://github.com/nathanatgit/Shalielie.git
-cd Shalielie
+git clone https://github.com/WanThinnn/photographic-styles-tool.git
+cd photographic-styles-tool
 uv sync
 ```
 
@@ -170,16 +172,17 @@ iOS 27 的 `texture_styles` 项，以及随之出现的 12 个 2026 语义遮罩
 
 ## 已知问题与限制
 
-- **“柔肤”需要照片里本身带有 Apple 的人物数据**：人脸区域、皮肤遮罩和人像遮罩（人像模式照片和 iPhone 16 及以后机型拍的人物照片都有）。本工具不会自行检测人脸，所以缺少这些数据的照片，“柔肤”仍与“标准”看起来一样。侧脸角度较大（约 30° 以上）时，生成的人脸数据会不太准确。
+- **CLI 的“柔肤”依赖已有 Apple 人物数据**：人脸区域、皮肤遮罩和人像遮罩。网页版可在本地自动检测人脸并补充缺失的数据，但效果仍可能不同于原生照片。
 - 有反馈声称，经过移植的照片用同样的调色板参数调整后，与原生机型自带的风格微调效果并不完全一致。也需要更多样本来进一步研究这个问题。
 - **支持 1200 万、2400 万像素和前置摄像头照片**，不限 tile 布局：风格数据直接加入照片自己的文件结构，
   只需要知道该尺寸的 delta map 大小。4800 万像素等其他尺寸仍回退到两种内置布局（48/12 和 45/15）。
    没有内嵌缩略图的照片需要默认 CLI 编码器模式或网页版自动生成缩略图；CLI 免编码器模式不支持。
 - **“照片”编辑后导出的文件可能缺少原生风格、HDR 和完整人像编辑资源。** 保留深度不保证能编辑光圈 ƒ 或人像光效。网页版会在重建缺少原生风格的 iPhone 16/17 副本前提示；Python 同样无法恢复输入中不存在的资源，详见 [facts.md §10](facts.md)。
 - **质感/颗粒需要打开照片的手机运行 iOS 27。**
-- **无法把普通照片变成“人像”照片。** 人像数据只会从照片本身复制，绝不会凭空生成。
+- CLI 只保留已有的人像数据；网页版开启 AI 人像后可为普通照片估计相对深度。
+  深度及相机标定为近似值，效果受照片内容和 iOS 版本影响。
 - **未经 Apple 验证，效果因照片而异。** 在放弃之前，可以请先试试上面的不同的运行参数。
-- swift-port 分支中的独立 iOS 应用仍在开发中，等到我的新 Mac 到货后才会推出。
+- 此分支提供网页版和 Python CLI，不包含独立 iOS 应用或已部署的无服务器快捷指令 API。
 
 未解决的元数据问题（仍来自 donor 的数值等）记录在 [facts.md](facts.md) 中。
 
@@ -290,7 +293,10 @@ Apple、iPhone、Apple Photos 和 Photographic Styles 是 Apple Inc. 的商标�
 
 ## 许可证
 
-[MIT](LICENSE)。许可证仅涵盖本项目自身的源代码，不对上文提到的任何第三方格式、商标或元数据结构主张权利。
+[MIT](LICENSE)，保留 **Copyright (c) 2026 nathanatgit** 及许可声明。此分支由
+**Elio（aka WanThinnn）** 维护，改动仍采用 MIT；维护者署名不替换原作者版权。
+发布的网页包含 [web/LICENSE.txt](web/LICENSE.txt)。AI 模型和 ONNX Runtime 的独立许可证
+保留在 [web/vendor/ai-portrait/](web/vendor/ai-portrait/)；其他依赖仍遵循各自许可证。
 
 ## Why Shalielie？
 

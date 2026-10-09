@@ -1,6 +1,6 @@
 import {decodeDng} from './dng-decode.js';
 import {dngReader} from './dng-tiff.js';
-import {concat,be} from '../box.js';
+import {concat,be} from '../core/box.js';
 
 function crc32(bytes){
   let crc=0xffffffff;

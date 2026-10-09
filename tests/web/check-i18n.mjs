@@ -1,4 +1,4 @@
-// Check the copy after editing web/src/i18n.js.
+// Check the copy after editing web/src/ui/i18n.js.
 //
 //   node tests/web/check-i18n.mjs
 //
@@ -7,7 +7,7 @@
 // index.html asks for that no longer exists.
 
 import { readFileSync } from "node:fs";
-import { STRINGS } from "../../web/src/i18n.js";
+import { STRINGS } from "../../web/src/ui/i18n.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const html = readFileSync(`${ROOT}web/index.html`, "utf8");

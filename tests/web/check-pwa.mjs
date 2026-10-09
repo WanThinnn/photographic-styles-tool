@@ -11,8 +11,15 @@ const manifest = JSON.parse(readFileSync(join(WEB, "manifest.webmanifest"), "utf
 const html = readFileSync(join(WEB, "index.html"), "utf8");
 const app = readFileSync(join(WEB, "app.js"), "utf8");
 const worker = readFileSync(join(WEB, "sw.js"), "utf8");
-const startup = readFileSync(join(WEB, 'src/startup.js'), 'utf8');
+const startup = readFileSync(join(WEB, 'src/ui/startup.js'), 'utf8');
 const errors = [];
+
+if (!existsSync(join(WEB, 'LICENSE.txt')) ||
+    readFileSync(join(WEB, 'LICENSE.txt'), 'utf8').replaceAll('\r\n','\n')
+      .replace(/^Maintained by [^\n]+\n\n/m, '') !==
+    readFileSync(join(ROOT, 'LICENSE'), 'utf8').replaceAll('\r\n','\n')) {
+  errors.push('browser distribution must retain the complete upstream MIT license');
+}
 
 try {
   new Function(worker);

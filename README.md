@@ -4,6 +4,12 @@
 
 Current version: v0.6.2
 
+This fork is maintained by **Elio (aka WanThinnn)**. It builds on
+[Shalielie by nathanatgit](https://github.com/nathanatgit/Shalielie), retaining the
+original MIT license and copyright. Elio's browser extensions include automatic
+Soft Skin supplementation, editable AI Portrait, JPEG HDR preservation and the
+Vietnamese/English/Chinese interface.
+
 This is an experimental tool that takes a HEIC from an iPhone **older than the iPhone 16**
 (iPhone 15, 14, 13 … — any model whose photos match a supported tile layout) and adds the
 metadata an iPhone 16/17 photo carries, so that Apple Photos offers the **Photographic Styles**
@@ -15,10 +21,6 @@ get only these controls, and their existing image data stays byte-identical.
 
 It is an independent HEIC interoperability tool, not an Apple-supported format converter. It
 works by reading and rewriting the ISO-BMFF item graph of photo files, and it is experimental.
-
-**Keep your originals.**
-
-**Keep your originals.**
 
 **Keep your originals.**
 
@@ -42,14 +44,18 @@ Fine-tuning comes next. Bringing the rendered look of styles, and the finer deta
 There is a browser build that needs no install and no command line — drop a photo in, get the
 patched one back. It runs entirely on your machine; nothing is uploaded.
 
-**https://nathanatgit.github.io/Shalielie/**
+**https://wanthinnn.github.io/photographic-styles-tool**
 
 The browser build in this repository includes Texture/Grain, native-photo mode, JPG/PNG and
 other raster imports, DNG development, Live Photo resource pairing and optional AI bokeh.
 It can generate missing HEIC thumbnails locally with a verified WASM encoder. First-visit
 setup prepares the browser automatically; see [web/README.md](web/README.md) for requirements.
-Raster/DNG and AI bokeh exports are newly encoded SDR images, unlike the HEIC metadata-only
-route. AI requires WebGPU and does not enable editable Apple Portrait controls.
+Raster/DNG inputs are encoded as HEIC; supported JPEG HDR gain maps are transferred,
+while DNG development produces SDR. Existing HEIC primary/HDR/Styles payloads are preserved.
+Optional AI Portrait requires WebGPU and adds editable aperture ƒ and Portrait Lighting
+on the tested Photos versions. Portrait starts off: enable it in Photos after saving.
+The website offers one combined output after focus/aperture adjustments. See
+[web/AI-PORTRAIT.md](web/AI-PORTRAIT.md) for compatibility and model limitations.
 
 It runs the same porting logic as the Python tool, checked against it item by item (byte for byte where the plist packing allows) — see
 [`web/README.md`](web/README.md) for how that is verified, and for the two iPhone quirks it
@@ -60,7 +66,7 @@ for batches or for the encoder-based linear thumbnail.
 
 [![Release downloads](<https://img.shields.io/github/downloads/nathanatgit/Shalielie/total?label=release%20downloads&style=flat-square>)](https://github.com/nathanatgit/Shalielie/releases)
 
-Each tagged release provides a Python-free command-line executable for Windows x86-64, Linux
+Upstream tagged releases provide a Python-free command-line executable for Windows x86-64, Linux
 x86-64, macOS x86-64 (Intel) and macOS arm64 (Apple silicon). Download the archive for your
 system from the [Releases page](https://github.com/nathanatgit/Shalielie/releases), extract it,
 and run:
@@ -91,8 +97,8 @@ handles original iPhone photos but not copies without an embedded thumbnail.
 Needs **Python 3.12+**. [uv](https://docs.astral.sh/uv/) is the shortest path:
 
 ```bash
-git clone https://github.com/nathanatgit/Shalielie.git
-cd Shalielie
+git clone https://github.com/WanThinnn/photographic-styles-tool.git
+cd photographic-styles-tool
 uv sync
 ```
 
@@ -189,10 +195,11 @@ device — is documented in **[facts.md](facts.md)**.
 
 ## Known issues and limits
 
-- **Soft Skin needs Apple's own people data in the photo:** face regions, a skin matte and a
+- **The CLI's Soft Skin needs Apple's own people data in the photo:** face regions, a skin matte and a
   Portrait matte, as in Portrait-mode shots and iPhone 16+ photos of people. Faces are never
   detected, so photos without that data keep a Soft Skin that looks like Standard. Strongly
-  turned faces (beyond ~30°) get less accurate face data.
+  turned faces (beyond ~30°) get less accurate face data. The browser can supplement
+  missing face/skin data automatically with local AI; its effect can differ from native captures.
 - **The look after editing is not identical to a native photo.** The port uses neutral defaults
   where Apple's capture-time values cannot be reproduced, and a few values still come from the
   donor profile. More native samples are needed.
@@ -206,12 +213,13 @@ device — is documented in **[facts.md](facts.md)**.
   missing native Styles on iPhone 16/17 exports before rebuilding; Python cannot restore
   resources absent from its input either. See [facts.md §10](facts.md).
 - **Texture/Grain needs iOS 27** on the phone that opens the photo.
-- **A normal photo cannot be turned into a "people" photo.** Portrait data is only ever copied
-  from the photo itself, never invented.
+- **The CLI preserves existing Portrait data.** The browser's optional AI Portrait can
+  generate relative depth for ordinary images; estimated depth and camera calibration
+  are approximations, and Photos results vary by image and iOS version.
 - **Not validated by Apple, and results vary by photo.** Try the flags above before concluding
   it does not work.
-- **The standalone iOS app** in the `swift-port` branch is under construction and not available
-  until my new Mac arrives.
+- This fork is a browser app and Python CLI; it does not ship a standalone iOS app
+  or a deployed serverless Shortcuts endpoint.
 
 Open metadata questions are tracked in [facts.md](facts.md) (donor-derived values).
 
@@ -225,7 +233,7 @@ Seeing the palette only means Photos recognized the file as stylable. A port wor
 4. Save, reopen and re-edit all work.
 5. There are no patches that follow another photo's regions.
 6. The main image is pixel-identical, with no block corruption.
-7. No unexpected options appear (for example Portrait on a photo without depth).
+7. Portrait is preserved from native data or added only when AI Portrait was selected.
 8. On people photos, people and background respond separately.
 9. On iOS 27, Texture/Grain is offered, and Portrait where the source had it.
 
@@ -335,16 +343,21 @@ can produce files that behave unpredictably in any photo application. Work on co
 
 ## License
 
-[MIT](LICENSE). The license covers this project's own source code; it makes no claim over any
-third-party format, trademark or metadata structure described above.
+[MIT](LICENSE), including the retained **Copyright (c) 2026 nathanatgit** notice.
+Keep the copyright and permission notice when redistributing copies or substantial
+parts of the source. Browser modifications are maintained by **Elio (aka WanThinnn)**
+under the same MIT license; this credit does not replace the upstream author's notice.
+The deployed browser build includes a copy at [web/LICENSE.txt](web/LICENSE.txt).
+Depth Anything V2 Small (Apache-2.0) and ONNX Runtime (MIT) retain their own license
+files in [web/vendor/ai-portrait/](web/vendor/ai-portrait/). Other downloaded
+dependencies remain subject to their own licenses. No rights over third-party
+formats, trademarks or metadata structures are claimed.
 
-## Why "Shalielie"?
+## Source layout
 
-Shalielie is the romanized pronunciation of a Chinese phrase, and it is my reply to Apple's
-"shareholders in spirit" — the fans who defend every Apple decision as if they owned the
-company. For example:
-
-> "Apple doesn't bring the Photographic Styles palette to older models because it wants to
-> provide a better, more consistent user experience."
->
-> "Shalielie 🙄."
+`web/` is the deployed browser app; [web/README.md](web/README.md) describes its
+module folders. `tests/` contains regression checks, `tools/` contains maintained
+inspection/build utilities, and `photographic_style_port.py` remains the CLI.
+Superseded Portrait A/B generators have been removed; their findings remain in
+[facts.md](facts.md) and earlier Git commits. Private photos and reference checkouts
+are local, ignored and excluded from website deployment.

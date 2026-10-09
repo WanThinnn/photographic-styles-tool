@@ -1,9 +1,9 @@
 // Localize where the JS output diverges from the Python reference.
 import { readFileSync } from "node:fs";
-import { loadProfile } from "../../web/src/zip.js";
-import { patch, selectProfile } from "../../web/src/port.js";
-import { discoverHeic, extractItem, parseIpcoIpma, auxUriForItem } from "../../web/src/heif.js";
-import { topBox } from "../../web/src/box.js";
+import { loadProfile } from "../../web/src/core/zip.js";
+import { patch, selectProfile } from "../../web/src/styles/port.js";
+import { discoverHeic, extractItem, parseIpcoIpma, auxUriForItem } from "../../web/src/core/heif.js";
+import { topBox } from "../../web/src/core/box.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const index = JSON.parse(readFileSync(`${ROOT}web/profiles/index.json`, "utf8"));

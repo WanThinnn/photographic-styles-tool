@@ -1,5 +1,5 @@
-import {be, concat} from '../../web/src/box.js';
-import {TIFF_TYPE_SIZES} from '../../web/src/heif.js';
+import {be, concat} from '../../web/src/core/box.js';
+import {TIFF_TYPE_SIZES} from '../../web/src/core/heif.js';
 import {dngReader} from '../../web/src/dng/dng-tiff.js';
 
 // Synthetic LinearRaw, not an embedded JPEG preview or a private camera photo.

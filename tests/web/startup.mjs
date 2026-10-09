@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {prepareBrowser} from '../../web/src/startup.js';
-import {downloadModelBytes} from '../../web/src/model-download.js';
+import {prepareBrowser} from '../../web/src/ui/startup.js';
+import {downloadModelBytes} from '../../web/src/core/model-download.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
@@ -56,7 +56,7 @@ test('the first screen has useful fallback copy before any converter module load
   for(const match of html.matchAll(/<([\w]+)\b[^>]*data-i18n="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/g))
     assert.ok(match[3].trim(),`empty first-visit copy: ${match[2]}`);
   assert.match(html,/id="ai-portrait-label">[^<]+</);
-  assert.match(html,/src="src\/page-bootstrap.js"/);
+  assert.match(html,/src="src\/ui\/page-bootstrap.js"/);
 });
 
 test('service worker activation does not wait for the full processing/offline graph',async()=>{
@@ -67,7 +67,7 @@ test('service worker activation does not wait for the full processing/offline gr
     fetch:()=>new Promise(()=>{}),self:{addEventListener:(name,fn)=>events[name]=fn,skipWaiting:async()=>{},clients:{claim:async()=>{claimed=true;}}},
   });
   events.install({waitUntil:p=>wait=p});await wait;
-  assert.ok(installed.includes('./src/page-bootstrap.js'));
+  assert.ok(installed.includes('./src/ui/page-bootstrap.js'));
   assert.ok(!installed.includes('./app.js')&&!installed.some(p=>p.includes('/dng/')));
   events.activate({waitUntil:p=>wait=p});await wait;assert.ok(claimed);
 });

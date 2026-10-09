@@ -1,5 +1,5 @@
 import {readFileSync} from 'node:fs';
-import {discoverHeic,auxUriForItem,dimensionsForItem,propertyBoxBytes,extractItem} from '../web/src/heif.js';
+import {discoverHeic,auxUriForItem,dimensionsForItem,propertyBoxBytes,extractItem} from '../web/src/core/heif.js';
 for(const path of process.argv.slice(2)){
  const data=new Uint8Array(readFileSync(path)),d=discoverHeic(data);
  const result={path,primary:d.primary,size:dimensionsForItem(d.props,d.primary),styles:d.stylesItem,auxiliaries:[],xmp:[]};

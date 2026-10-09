@@ -1530,7 +1530,7 @@ def add_items(meta: bytes, specs: List[dict]):
 
 
 def build_bplist(root) -> bytes:
-    """Binary plist, laid out exactly like web/src/bplist.js buildBplist so both builds write
+    """Binary plist, laid out exactly like web/src/core/bplist.js buildBplist so both builds write
     identical bytes: depth-first object order, strings deduplicated, nothing else. plistlib
     packs differently, which matters wherever JS and Python output are compared byte-wise."""
     objects, strings = [], {}

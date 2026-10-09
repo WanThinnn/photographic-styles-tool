@@ -53,8 +53,11 @@ The initial download is approximately 120 MB; model/runtime binaries are ignored
 by Git and fetched/verified by Pages CI. They are not installed with the PWA shell.
 Depth Anything V2 Small is Apache-2.0 and ONNX Runtime is MIT; both licenses ship
 with the assets. Model input starts at maximum edge 1036 (multiples of 14),
-with 770 and 518 resource-failure fallbacks. It is selected by actual allocation
-success, not a guessed iPhone/GPU model; ray tracing does not determine WebGPU
+with 770 and 518 resource-failure fallbacks outside Safari/iOS. Safari/iOS start
+at 518 to avoid a WebKit process reload before an allocation error can be caught.
+Inference remains GPU-only, with primary-image guidance and saved depth at up to
+1024. This is a browser memory precaution, not a guessed iPhone/GPU model;
+ray tracing does not determine WebGPU
 memory limits. Relative depth stays float until RGB-guided resampling to maximum
 edge 1024 and final 8-bit quantization. Colour guidance sharpens existing depth
 boundaries; it cannot recover geometry absent from the model prediction.
@@ -63,7 +66,7 @@ runtime caching uses its pinned dependency identity rather than the UI release.
 No image is sent to a server. Safari/device memory and latency vary.
 
 Compatibility is based on file contents, not the EXIF Software/iOS label.
-Native Styles schemas 13, 14, 16 and flag-bearing 131087 are understood by the
+Native Styles schemas 13, 14, 16 and flag-bearing 131087/131088 are understood by the
 current exporter. Unknown schemas retain the additive Texture route and their
 original Styles, but skip added Soft Skin and AI Portrait with an informational
 message. Extra keys inside supported Styles payloads remain byte-exact.

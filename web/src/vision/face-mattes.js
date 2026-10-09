@@ -5,7 +5,7 @@
 // person, and per-person mattes, rotated back to the HEIC's stored orientation, then encoded
 // as grayscale HEVC stills with FFmpeg/x265.
 
-import { concat } from "../box.js";
+import { concat } from "../core/box.js";
 import { encodeFaceMatte } from "./matte-encoder.js";
 import { decodeToDisplayCanvas } from "./source.js";
 import { displayPointToStored, itemOrientation,

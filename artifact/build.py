@@ -22,7 +22,7 @@ BUILD = HERE / "build"
 BUILD.mkdir(exist_ok=True)
 
 # Dependency order.
-MODULES = ["box.js", "bplist.js", "heif.js", "exif.js", "styles.js", "zip.js", "texture.js", "port.js"]
+MODULES = ["core/box.js", "core/bplist.js", "core/heif.js", "core/exif.js", "styles/styles.js", "core/zip.js", "styles/texture.js", "styles/port.js"]
 
 IMPORT_RE = re.compile(r'^import[\s\S]*?from\s+["\'][^"\']+["\'];?[ \t]*$', re.M)
 EXPORT_BLOCK_RE = re.compile(r'^export\s*\{[^}]*\};?[ \t]*$', re.M)
@@ -36,7 +36,8 @@ def strip_module(text: str) -> str:
     return text.strip()
 
 
-core = "\n\n".join(f"// ---- {m} ----\n{strip_module((WEB / 'src' / m).read_text(encoding='utf-8'))}"
+license_notice = "/*\n" + (HERE.parent / "LICENSE").read_text(encoding="utf-8").strip() + "\n*/\n"
+core = license_notice + "\n\n".join(f"// ---- {m} ----\n{strip_module((WEB / 'src' / m).read_text(encoding='utf-8'))}"
                    for m in MODULES)
 
 EXPORTS = "export { patch, selectProfile, loadProfile, discoverHeic, addTexture, VERSION };"

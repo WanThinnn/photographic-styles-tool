@@ -1,1 +1,1 @@
-export * from '../model-download.js';
+export * from '../core/model-download.js';

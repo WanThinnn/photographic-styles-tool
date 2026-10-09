@@ -5,10 +5,10 @@
 
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { loadProfile } from "../../web/src/zip.js";
-import { patch, selectProfile } from "../../web/src/port.js";
-import { discoverHeic, extractItem, auxUriForItem, idatItemBytes } from "../../web/src/heif.js";
-import { parseBplist } from "../../web/src/bplist.js";
+import { loadProfile } from "../../web/src/core/zip.js";
+import { patch, selectProfile } from "../../web/src/styles/port.js";
+import { discoverHeic, extractItem, auxUriForItem, idatItemBytes } from "../../web/src/core/heif.js";
+import { parseBplist } from "../../web/src/core/bplist.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const sha = (b) => createHash("sha256").update(b).digest("hex");
@@ -89,7 +89,7 @@ for (const name of cases) {
 }
 // Native iPhone 16/17 style photos: add-texture inserts items without porting, so the JS
 // result must be byte-identical to the Python one.
-const { addTexture } = await import("../../web/src/texture.js");
+const { addTexture } = await import("../../web/src/styles/texture.js");
 for (const name of ["IMG_5096", "IMG_5102", "IMG_5165", "IMG_5168"]) {
   const target = new Uint8Array(readFileSync(`${ROOT}Smartstyle/${name}.HEIC`));
   const { data: js } = addTexture(target);

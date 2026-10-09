@@ -4,9 +4,9 @@
 // both graph paths.
 
 import { readFileSync, existsSync } from "node:fs";
-import { loadProfile } from "../../web/src/zip.js";
-import { patch, profileFor } from "../../web/src/port.js";
-import { discoverHeic, auxUriForItem, DEPTH_URI, MATTE_URI_SET } from "../../web/src/heif.js";
+import { loadProfile } from "../../web/src/core/zip.js";
+import { patch, profileFor } from "../../web/src/styles/port.js";
+import { discoverHeic, auxUriForItem, DEPTH_URI, MATTE_URI_SET } from "../../web/src/core/heif.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const index = JSON.parse(readFileSync(`${ROOT}web/profiles/index.json`, "utf8"));

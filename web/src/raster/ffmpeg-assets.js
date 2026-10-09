@@ -1,1 +1,1 @@
-export * from '../ffmpeg-assets.js';
+export * from '../codecs/ffmpeg-assets.js';

@@ -1,1 +1,1 @@
-export * from '../box.js';
+export * from '../core/box.js';

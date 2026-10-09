@@ -338,7 +338,7 @@ work.
   it, Windows Photos (which renders through `tmap`) showed a black band under landscape ports.
   v0.4.1 copies the photo's `tmap` geometry, or derives it from the primary. ☑️
 - **90/270 inversion, fixed in v0.6.2** ✅: up to v0.6.1 `raw_orientation_filters` (and
-  `web/src/decode.js`) swapped irot 90 and 270, so linear thumbnails of those photos were
+  `web/src/media/decode.js`) swapped irot 90 and 270, so linear thumbnails of those photos were
   stored 180° off. An early A/B showed nothing, but a 24 MP photo at irot 270 with sky above
   trees got a glow in the sky and foliage with both the donor and the photo graph; the
   corrected rotation removed it, and a 12 MP irot-270 photo that had passed still passed. Checked against 30 native files: Apple's own linear
@@ -409,7 +409,7 @@ only #10–#12 are inserted:
 Some copies re-saved by iOS have no thumbnail and no `tmap`. Since v0.5 the port encodes a
 thumbnail from the primary (416×312, 8-bit HEVC Main, stored orientation, its own `hvcC`).
 ✅ This was previously unavailable in the browser. The current web app can generate a missing
-thumbnail locally using the optional HEVC encoder (`web/src/linear-thumbnail.js`), requiring
+thumbnail locally using the optional HEVC encoder (`web/src/codecs/linear-thumbnail.js`), requiring
 cross-origin isolation and an encoder download on first use. Native `add-texture` does not
 need this encoder.
 
@@ -2323,3 +2323,40 @@ The follow-up progress design uses the same 44-pixel circular frame as reset,
 with a continuous rounded arc and a faint full-ring track inspired by the user's
 Camera reference. Rotation is linear instead of a stepped spoke animation;
 offscreen suspension, reduced motion and accessible status text are retained.
+
+### 10.43 Cleanup, folder layout, attribution and Safari input budget (2026-10-09)
+
+The maintained source is grouped into core, styles, codecs, media, ui and portrait,
+alongside the existing raster, dng and vision folders. Import/export paths,
+module-relative worker/model URLs, bootstrap, the offline shell, diagnostic tools,
+artifact builder and tests follow the new layout. A portable module-path check
+now gates CI and Pages publishing. Twenty-one superseded standalone Portrait
+A/B generators and two unused baked-bokeh/depth-only exporters were removed;
+historical experiment references in this document refer to earlier Git commits.
+Maintained audit/build tools, regression tests, private originals and reference
+checkouts are retained. Disposable root/tools Python bytecode was deleted.
+
+README credits Elio (aka WanThinnn) as fork maintainer and nathanatgit as upstream
+author. Root LICENSE retains the original MIT copyright and permission text.
+The original notice is distributed and cached as web/LICENSE.txt, with an added
+maintainer credit; the artifact builder also includes the original notice in
+generated bundles. PWA validation allows the maintainer credit but checks the
+remaining license text against the root. Bundled Depth Anything/ORT licenses remain unchanged.
+Browser capability descriptions now distinguish current editable Portrait and
+JPEG HDR support from the unchanged upstream CLI's capabilities.
+
+The user reports Safari reloading during GPU inference. The former 1036-first
+retry sequence cannot recover if WebKit terminates the process before JavaScript
+gets an error. Safari and iOS therefore start at 518; other browsers keep the
+1036/770/518 sequence. This is a precaution for suspected memory pressure, not a
+confirmed crash diagnosis from a device log or a whole-model CPU fallback.
+Primary-image colour guidance and saved depth remain at maximum edge 1024.
+The input tensor is disposed after inference and on failure.
+
+Local regression passes 79/89 with ten missing optional-fixture skips. A Chrome
+integration run with Safari's user-agent profile executes the real WebGPU model
+at at most 518, real HEVC encoding and worker assembly on IMG_0471. It produces
+2,355,680 bytes and retains all primary/delta/HDR tiles and the selected Styles.
+No intermediate download, rapid settings/reset, off/on restoration and row disposal
+checks pass with no page exceptions. This checks the new budget and paths, not
+the native Safari driver; physical Safari reload behavior still needs user testing.

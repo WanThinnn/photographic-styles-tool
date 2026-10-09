@@ -1,6 +1,6 @@
 // DNG identification and compact Exif extraction. Never embed the RAW/preview payloads in Exif.
-import {concat, be} from '../box.js';
-import {TIFF_TYPE_SIZES} from '../heif.js';
+import {concat, be} from '../core/box.js';
+import {TIFF_TYPE_SIZES} from '../core/heif.js';
 
 export function dngReader(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

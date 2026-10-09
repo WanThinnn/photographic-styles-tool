@@ -5,7 +5,7 @@ import {isDng,inspectDng,extractDngExif} from '../../web/src/dng/dng-tiff.js';
 import {dngTilePlan} from '../../web/src/dng/dng-tiles.js';
 import {developedPngExif} from '../../web/src/dng/dng-import.js';
 import {decodeDng} from '../../web/src/dng/dng-decode.js';
-import {imageFormat} from '../../web/src/image-format.js';
+import {imageFormat} from '../../web/src/media/image-format.js';
 import {readExifOrientation,extractRasterExif} from '../../web/src/raster/exif.js';
 
 test('DNG signature checks real TIFF tags and preserves capture Exif in developed PNG',()=>{

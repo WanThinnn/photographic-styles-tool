@@ -14,10 +14,10 @@ import { createContext, runInContext } from "node:vm";
 const HERE = new URL(".", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
-// Keep in step with LIBHEIF_URL in web/src/decode.js.
-const decodeSrc = readFileSync(`${ROOT}web/src/decode.js`, "utf8");
+// Keep in step with LIBHEIF_URL in web/src/media/decode.js.
+const decodeSrc = readFileSync(`${ROOT}web/src/media/decode.js`, "utf8");
 const URL_IN_USE = decodeSrc.match(/const LIBHEIF_URL = "([^"]+)"/)?.[1];
-if (!URL_IN_USE) { console.log("could not find LIBHEIF_URL in web/src/decode.js"); process.exit(1); }
+if (!URL_IN_USE) { console.log("could not find LIBHEIF_URL in web/src/media/decode.js"); process.exit(1); }
 
 mkdirSync(`${HERE}.cache`, { recursive: true });
 const cached = `${HERE}.cache/${URL_IN_USE.split("/").pop()}`;
@@ -94,8 +94,8 @@ if (!existsSync(sample)) {
 // v0.6.2: analysis decodes the embedded thumbnail, wrapped by thumbnailHeic(), not the
 // 12-24 MP primary. It must decode with the real bundle, in the stored orientation (no irot
 // applied), at the thumbnail's size, and look like the full image.
-const { thumbnailHeic } = await import("../../web/src/decode.js");
-const { discoverHeic, dimensionsForItem, irotAngleForItem } = await import("../../web/src/heif.js");
+const { thumbnailHeic } = await import("../../web/src/media/decode.js");
+const { discoverHeic, dimensionsForItem, irotAngleForItem } = await import("../../web/src/core/heif.js");
 const decodeRgba = async (bytes) => {
   const t0 = performance.now();
   const image = new resolved.HeifDecoder().decode(intoSandbox(bytes))[0];

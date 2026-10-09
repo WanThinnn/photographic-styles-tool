@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {imageFormat} from '../../web/src/image-format.js';
+import {imageFormat} from '../../web/src/media/image-format.js';
 import {targetGeometry, buildRasterHeic, sampleRasterLuma} from '../../web/src/raster/raster-import.js';
 import {buildLightMaps} from '../../web/src/raster/styles.js';
 import {parseBplist} from '../../web/src/raster/bplist.js';

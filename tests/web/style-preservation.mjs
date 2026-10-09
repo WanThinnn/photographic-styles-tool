@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {be, concat} from '../../web/src/box.js';
-import {exifCameraModel} from '../../web/src/exif.js';
-import {styleReconstructionRisk} from '../../web/src/style-preservation.js';
-import {discoverHeic, extractItem, idatItemBytes, propertyBoxBytes} from '../../web/src/heif.js';
-import {addTexture} from '../../web/src/texture.js';
+import {be, concat} from '../../web/src/core/box.js';
+import {exifCameraModel} from '../../web/src/core/exif.js';
+import {styleReconstructionRisk} from '../../web/src/styles/style-preservation.js';
+import {discoverHeic, extractItem, idatItemBytes, propertyBoxBytes} from '../../web/src/core/heif.js';
+import {addTexture} from '../../web/src/styles/texture.js';
 
 function modelExif(model, little = false) {
   const number = (value, size) => little ? be(value, size).reverse() : be(value, size);

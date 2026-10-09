@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {buildAiPortrait} from '../../web/src/ai-portrait-export.js';
+import {buildAiPortrait} from '../../web/src/portrait/ai-portrait-export.js';
 import {extractItemData} from '../../web/src/raster/heif.js';
 import {extractJpegHdr,parseAdaptiveHdrXmp,encodeTmapMetadata,yuv420Tile,iccColr} from '../../web/src/raster/jpeg-hdr.js';
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
@@ -10,7 +10,7 @@ import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {box,concat,be,topBox,metaChildren,findChild,boxes} from '../../web/src/raster/box.js';
 import {discoverHeic,extractItem,propertyBoxBytes,dimensionsForItem} from '../../web/src/raster/heif.js';
 import {readExifOrientation} from '../../web/src/raster/exif.js';
-import {describeHeic} from '../../web/src/result-metadata.js';
+import {describeHeic} from '../../web/src/ui/result-metadata.js';
 const text=s=>new TextEncoder().encode(s);
 const segment=(marker,data)=>concat([Uint8Array.of(255,marker),be(data.length+2,2),data]);
 function icc(name){
@@ -140,7 +140,7 @@ test('HEIC carries distinct HDR tiles, original XMP/ICC, a tmap derivation and p
  assert.equal(altr.type,'altr');const view=new DataView(result.buffer,result.byteOffset+altr.off+altr.hdr);
  assert.equal(view.getUint32(12),tmap);assert.equal(view.getUint32(16),d.primary);
  assert.throws(()=>buildRasterHeic(profile,{main,mainHvcc:codec,thumb:Uint8Array.of(3),thumbHvcc:codec,hdrChunks:[],hdrHvcc:codec},null,null,geometry),/HDR tiles/);
- const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait-template.json',import.meta.url)));
+ const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait/portrait-template.json',import.meta.url)));
  const portrait=buildAiPortrait(result,{payload:assets.mask.payload,hvcc:assets.mask.hvcc,width:64,height:64},template).data;
  const p=discoverHeic(portrait),pt=[...p.infos].find(([,i])=>i.type==='tmap')[0];
  assert.deepEqual(extractItemData(portrait,p,pt),encodeTmapMetadata(hdr.metadata));

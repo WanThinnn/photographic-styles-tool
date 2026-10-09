@@ -6,9 +6,9 @@
 
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { loadProfile } from "../../web/src/zip.js";
-import { patch, selectProfile } from "../../web/src/port.js";
-import { discoverHeic } from "../../web/src/heif.js";
+import { loadProfile } from "../../web/src/core/zip.js";
+import { patch, selectProfile } from "../../web/src/styles/port.js";
+import { discoverHeic } from "../../web/src/core/heif.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const sha = (b) => createHash("sha256").update(b).digest("hex");

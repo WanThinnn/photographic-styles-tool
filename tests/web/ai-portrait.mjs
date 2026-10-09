@@ -1,15 +1,26 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {addTexture} from '../../web/src/texture.js';
-import {executeJob} from '../../web/src/heic-worker.js';
-import {attachAiDepth,normalizeDisparity,portraitEligibility,inferenceGeometry} from '../../web/src/ai-portrait-container.js';
-import {loadProfile} from '../../web/src/zip.js';
-import {discoverHeic,extractItem,auxUriForItem,DEPTH_URI,propertyBoxBytes,idatItemBytes} from '../../web/src/heif.js';
-import {concat,box,be,boxes} from '../../web/src/box.js';
-import {renderDepthBlur} from '../../web/src/ai-portrait-blur.js';
-import {displayToStoredTransform} from '../../web/src/ai-portrait-source.js';
+import {addTexture} from '../../web/src/styles/texture.js';
+import {executeJob} from '../../web/src/media/heic-worker.js';
+import {attachAiDepth,normalizeDisparity,portraitEligibility,inferenceGeometry} from '../../web/src/portrait/ai-portrait-container.js';
+import {loadProfile} from '../../web/src/core/zip.js';
+import {discoverHeic,extractItem,auxUriForItem,DEPTH_URI,propertyBoxBytes,idatItemBytes} from '../../web/src/core/heif.js';
+import {concat,box,be,boxes} from '../../web/src/core/box.js';
+import {renderDepthBlur} from '../../web/src/portrait/ai-portrait-blur.js';
+import {displayToStoredTransform} from '../../web/src/portrait/ai-portrait-source.js';
 import {itemOrientation} from '../../web/src/raster/heif.js';
+import {depthInputBudgets} from '../../web/src/portrait/ai-inference.js';
+
+test('Safari and iOS avoid high-resolution probes that can terminate the page before fallback',()=>{
+  for(const device of [
+    {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0) AppleWebKit/605.1.15 Version/27.0 Mobile Safari/604.1'},
+    {userAgent:'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 CriOS/140 Mobile Safari/604.1'},
+    {userAgent:'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/27.0 Safari/605.1.15'},
+    {userAgent:'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15',platform:'MacIntel',maxTouchPoints:5},
+  ])assert.deepEqual(depthInputBudgets(device),[518]);
+  assert.deepEqual(depthInputBudgets({userAgent:'Mozilla/5.0 AppleWebKit/537.36 Chrome/140.0 Safari/537.36'}),[1036,770,518]);
+});
 
 test('AI source mapping honors HEIF mirror axes and ordered rotation/mirror properties',()=>{
   const bytes=Uint8Array.of(0,0),point={x:.17,y:.63},w=3088,h=2320;

@@ -1,22 +1,22 @@
-import { loadProfile } from "./src/zip.js";
-import { profileFor, VERSION, UNSUPPORTED } from "./src/port.js";
-import { dimensionsForItem } from "./src/heif.js";
-import { styleDeltaSize } from "./src/graft.js";
-import { hasTexture } from "./src/texture.js";
-import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/decode.js";
-import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/i18n.js";
-import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/live-photo.js";
-import { RASTER_MIMES } from "./src/image-format.js";
-import { photoCaptureDate } from "./src/photo-date.js";
-import { styleReconstructionRisk } from "./src/style-preservation.js";
-import { AI_STRINGS } from "./src/ai-strings.js";
-import {prepareBrowser} from './src/startup.js';
-import {prepareHevcAssets, releaseHevcEncoder} from './src/ffmpeg-hevc.js';
+import { loadProfile } from "./src/core/zip.js";
+import { profileFor, VERSION, UNSUPPORTED } from "./src/styles/port.js";
+import { dimensionsForItem } from "./src/core/heif.js";
+import { styleDeltaSize } from "./src/styles/graft.js";
+import { hasTexture } from "./src/styles/texture.js";
+import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
+import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/ui/i18n.js";
+import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/media/live-photo.js";
+import { RASTER_MIMES } from "./src/media/image-format.js";
+import { photoCaptureDate } from "./src/media/photo-date.js";
+import { styleReconstructionRisk } from "./src/styles/style-preservation.js";
+import { AI_STRINGS } from "./src/ui/ai-strings.js";
+import {prepareBrowser} from './src/ui/startup.js';
+import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
-import {readImageFile, addTextureInWorker, repairTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/heic-processing.js';
-import {formatBytes} from './src/result-metadata.js';
-import {hasSoftSkinData} from './src/soft-skin-container.js';
-import {styleCapabilities} from './src/style-capabilities.js';
+import {readImageFile, addTextureInWorker, repairTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/media/heic-processing.js';
+import {formatBytes} from './src/ui/result-metadata.js';
+import {hasSoftSkinData} from './src/styles/soft-skin-container.js';
+import {styleCapabilities} from './src/styles/style-capabilities.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
@@ -82,7 +82,7 @@ async function addMissingSoftSkin(data,file,ui,options={}) {
   if(hasSoftSkinData(data)) return data;
   ui.set(T('st.softskinworking'));
   try {
-    const {completeSoftSkin}=await import('./src/soft-skin.js');
+    const {completeSoftSkin}=await import('./src/styles/soft-skin.js');
     const result=await completeSoftSkin(data,file,{...options,onProgress:progress=>{
       if(progress.stage==='modelDownload') ui.set(`${T('st.softskinworking')} ${(progress.loaded/1048576).toFixed(1)} MB`);
       else if(progress.stage==='detect') ui.set(T('st.softskindetect'));
@@ -240,7 +240,7 @@ function row(name) {
     },
     aiView(visible) { const view=el.querySelector('.ai-details');if(view)view.style.display=visible?'':'none'; },
     async portraitPreview(result,onSettings) {
-      const {portraitPreview}=await import('./src/ai-portrait-preview.js');
+      const {portraitPreview}=await import('./src/portrait/ai-portrait-preview.js');
       el.querySelector('.ai-details')?.remove();
       const host=document.createElement('section');host.className='ai-details';host.setAttribute('aria-label',aiText().preview);
       el.insertBefore(host,el.querySelector('.act'));
@@ -343,7 +343,7 @@ function row(name) {
 
 // Keep the normal result for toggle-off/cancellation. Only opt-in adds Portrait.
 async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
-  const {portraitEligibility} = await import('./src/ai-portrait-container.js');
+  const {portraitEligibility} = await import('./src/portrait/ai-portrait-container.js');
   const candidate = {outputFile, sourceFile, ui, name, state: 'new',
     skip: source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
@@ -365,8 +365,8 @@ async function runAiCandidate(candidate) {
   // Downloads have a stall timeout; GPU phases have their own watchdog.
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
   try {
-    const {createAiPortrait} = await import('./src/ai-portrait.js');
-    const {exportAiPortrait} = await import('./src/ai-portrait-export.js');
+    const {createAiPortrait} = await import('./src/portrait/ai-portrait.js');
+    const {exportAiPortrait} = await import('./src/portrait/ai-portrait-export.js');
     const data = new Uint8Array(await candidate.outputFile.arrayBuffer());
     const result = await createAiPortrait(data,(stage,progress)=>{
       if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
@@ -501,7 +501,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       let linearThumb = undefined;
       if (d.thumbnail === null) {
         if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
-        const { generateLinearThumbnail } = await import("./src/linear-thumbnail.js");
+        const { generateLinearThumbnail } = await import("./src/codecs/linear-thumbnail.js");
         try {
           linearThumb = await generateLinearThumbnail(bytes, progress => {
             if (progress.stage === "modelDownload")

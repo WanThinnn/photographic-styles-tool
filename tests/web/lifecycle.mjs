@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inferDepth,awaitAiSource} from '../../web/src/ai-inference.js';
-import {releaseLibheif} from '../../web/src/libheif-lifecycle.js';
+import {inferDepth,awaitAiSource} from '../../web/src/portrait/ai-inference.js';
+import {releaseLibheif} from '../../web/src/codecs/libheif-lifecycle.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 

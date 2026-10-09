@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {loadProfile} from '../../web/src/zip.js';
-import {discoverHeic,extractItem,idatItemBytes,auxUriForItem,propertyBoxBytes,propertyForItem,MATTE_URIS} from '../../web/src/heif.js';
-import {addTexture,URI_TEXTURE_STYLES} from '../../web/src/texture.js';
-import {parseBplist,buildBplist,BplistReal} from '../../web/src/bplist.js';
-import {be,box,concat} from '../../web/src/box.js';
+import {loadProfile} from '../../web/src/core/zip.js';
+import {discoverHeic,extractItem,idatItemBytes,auxUriForItem,propertyBoxBytes,propertyForItem,MATTE_URIS} from '../../web/src/core/heif.js';
+import {addTexture,URI_TEXTURE_STYLES} from '../../web/src/styles/texture.js';
+import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
+import {be,box,concat} from '../../web/src/core/box.js';
 import {MATTE_2026_URIS,URI_PERSON_INSTANCES} from '../../web/src/raster/texture.js';
 import {NATIVE_EMPTY_TEXTURE_MATTE as mask} from '../../web/src/raster/native-empty-texture.js';
-import {installSoftSkin,hasSoftSkinData} from '../../web/src/soft-skin-container.js';
+import {installSoftSkin,hasSoftSkinData} from '../../web/src/styles/soft-skin-container.js';
 import {peopleEntry} from '../../web/src/vision/face-mattes.js';
-import {generatedStyleMetadata} from '../../web/src/generated-style-metadata.js';
+import {generatedStyleMetadata} from '../../web/src/styles/generated-style-metadata.js';
 
 async function fixture(){
   const profile=await loadProfile(new Uint8Array(fs.readFileSync(new URL('../../web/profiles/48-12.zip',import.meta.url))));

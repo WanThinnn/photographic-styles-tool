@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {ensureLegacyTextureToneCurve} from '../../web/src/texture-compatibility.js';
-import {parseBplist,buildBplist,BplistReal} from '../../web/src/bplist.js';
-import {addTexture,repairTextureCurve,URI_TEXTURE_STYLES} from '../../web/src/texture.js';
-import {executeJob} from '../../web/src/heic-worker.js';
-import {discoverHeic,extractItem,idatItemBytes,propertyBoxBytes} from '../../web/src/heif.js';
-import {loadProfile} from '../../web/src/zip.js';
-import {be,box,concat} from '../../web/src/box.js';
+import {ensureLegacyTextureToneCurve} from '../../web/src/styles/texture-compatibility.js';
+import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
+import {addTexture,repairTextureCurve,URI_TEXTURE_STYLES} from '../../web/src/styles/texture.js';
+import {executeJob} from '../../web/src/media/heic-worker.js';
+import {discoverHeic,extractItem,idatItemBytes,propertyBoxBytes} from '../../web/src/core/heif.js';
+import {loadProfile} from '../../web/src/core/zip.js';
+import {be,box,concat} from '../../web/src/core/box.js';
 const directory='C:/Users/WanThinnn/Downloads/Error-Styles/iCloud Photos/';
 
 test('legacy missing curve gets identity samples while preserving native values and real types',()=>{

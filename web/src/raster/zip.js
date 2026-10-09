@@ -1,1 +1,1 @@
-export {writeZip} from '../zip.js';
+export {writeZip} from '../core/zip.js';

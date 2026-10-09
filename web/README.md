@@ -3,6 +3,30 @@
 The static site published to GitHub Pages. Everything runs in the visitor's browser; photos
 are never uploaded.
 
+Maintained by **Elio (aka WanThinnn)**, based on
+[Shalielie by nathanatgit](https://github.com/nathanatgit/Shalielie).
+The original MIT copyright and permission notice are retained in
+[LICENSE.txt](LICENSE.txt); bundled AI components keep their own licenses.
+
+## Source folders
+
+| Folder | Responsibility |
+| --- | --- |
+| `src/core/` | HEIF boxes, binary plists, EXIF, ZIP and shared downloads |
+| `src/styles/` | Styles/Texture metadata, preservation and Soft Skin integration |
+| `src/portrait/` | Depth inference, Portrait assembly/export and preview |
+| `src/codecs/` | FFmpeg/HEVC encoding, linear thumbnails and libheif lifecycle |
+| `src/media/` | Image decoding, HEIC workers, dates, format detection and Live Photo resources |
+| `src/ui/` | Startup, translations and result presentation |
+| `src/raster/` | JPEG/PNG and other raster imports, including JPEG HDR |
+| `src/dng/` | DNG inspection, development and workers |
+| `src/vision/` | Face detection, landmarks and skin segmentation |
+
+`app.js` coordinates these modules; `sw.js` lists the current paths for offline
+use. Workers and bundled model URLs resolve relative to their owning modules.
+
+## Network and privacy
+
 `countVisit()` in `app.js` is the site's visit-counter request: a fire-and-forget ping to
 `abacus.jasoncameron.dev` on load, once per browser session, feeding the visits badge in the
 top-level README. It sends no photo data and no identifiers. The counter namespace is public,
@@ -136,7 +160,7 @@ node tests/web/check-pwa.mjs
 ## Downloaded libraries
 
 Measuring a photo's own tone and light needs a HEIC decoder, and browsers other than Safari
-do not have one. `src/decode.js` loads libheif from jsDelivr when decoding is needed.
+do not have one. `src/media/decode.js` loads libheif from jsDelivr when decoding is needed.
 FFmpeg encoder assets are prepared during startup; DNG imports also load LibRaw.
 AI assets are prepared when AI is enabled. See the source URLs and integrity hashes
 in the corresponding loader modules for the pinned versions.
@@ -178,12 +202,12 @@ Two iOS behaviours are handled explicitly:
 
 ## Editing the copy
 
-The main interface translations are in `src/i18n.js`; AI preview translations are in
-`src/ai-portrait-ui.js`. Vietnamese, English and Simplified Chinese are supported.
+The main interface translations are in `src/ui/i18n.js`; AI preview translations are in
+`src/portrait/ai-portrait-ui.js`. Vietnamese, English and Simplified Chinese are supported.
 Elements with `data-i18n` keys are filled in at load and when the language selector changes.
 
 ```bash
-python -m http.server -d web 8000   # then edit src/i18n.js and reload
+python -m http.server -d web 8000   # then edit src/ui/i18n.js and reload
 node tests/web/check-i18n.mjs       # after editing
 ```
 
@@ -231,7 +255,7 @@ python photographic_style_port.py patch IN.HEIC tests/web/ref/NAME_ref.HEIC \
 python photographic_style_port.py add-texture Smartstyle/NAME.HEIC tests/web/ref/NAME_addtex_ref.HEIC
 ```
 
-The four `add-texture` cases cover v0.5's native-photo mode (`src/texture.js`): an iPhone 16/17
+The four `add-texture` cases cover v0.5's native-photo mode (`src/styles/texture.js`): an iPhone 16/17
 style photo gets only the iOS 27 Texture/Grain set, so its output must be byte-identical to
 Python's.
 
@@ -243,18 +267,18 @@ each raster result keeps its longer conversion notes behind an expandable summar
 
 | File | Role |
 |---|---|
-| `src/box.js` | ISO-BMFF box reading and writing |
-| `src/heif.js` | Item graph: `iloc`/`iinf`/`iref`/`ipma`/`ipco`, discovery, surgery |
-| `src/bplist.js` | Apple binary plist reader and writer |
-| `src/exif.js` | MakerNote `0x54` injection, preserving the target's Exif |
-| `src/styles.js` | Scene statistics, `c`/`d` light maps, person-mask hint |
-| `src/zip.js` | Donor profile reader, via `DecompressionStream` |
-| `src/port.js` | The patch pipeline |
-| `src/texture.js` | iOS 27 Texture/Grain set (texture_styles + 2026 mattes), and native-photo insertion |
-| `src/decode.js` | Optional libheif decoding, isolated behind one callback |
+| `src/core/box.js` | ISO-BMFF box reading and writing |
+| `src/core/heif.js` | Item graph: `iloc`/`iinf`/`iref`/`ipma`/`ipco`, discovery, surgery |
+| `src/core/bplist.js` | Apple binary plist reader and writer |
+| `src/core/exif.js` | MakerNote `0x54` injection, preserving the target's Exif |
+| `src/styles/styles.js` | Scene statistics, `c`/`d` light maps, person-mask hint |
+| `src/core/zip.js` | Donor profile reader, via `DecompressionStream` |
+| `src/styles/port.js` | The patch pipeline |
+| `src/styles/texture.js` | iOS 27 Texture/Grain set (texture_styles + 2026 mattes), and native-photo insertion |
+| `src/media/decode.js` | Optional libheif decoding, isolated behind one callback |
 | `profiles/` | The two donor profiles, exported from the Python build |
 
-`src/port.js` takes the decoder as a callback, so nothing but `decode.js` knows libheif
+`src/styles/port.js` takes the decoder as a callback, so nothing but `decode.js` knows libheif
 exists — which is also why `port.js` runs unchanged under Node for the comparison tests.
 
 ## Live Photo pairs
@@ -449,7 +473,10 @@ the overall opt-in operation has a ten-minute ceiling. The first model download 
 about 120 MB and verified/cached independently of UI releases. Input starts at
 maximum edge 1036, with 770/518 fallbacks for resource failures. RGB-guided depth
 refinement and quantization run in the inference worker; saved depth has maximum
-edge 1024. This improves the data Photos receives, not only the web preview.
+edge 1024. Safari and iOS start at 518 rather than probing 1036/770: a browser
+process killed under GPU memory pressure cannot run a JavaScript fallback.
+Guidance still samples the primary at up to 1024, and inference remains WebGPU.
+This improves the data Photos receives, not only the web preview.
 Preview shaders/textures are reused, with offscreen GPU suspension.
 The compact Portrait toolbar has an accessible circular reset button and an
 indeterminate progress icon. Its native aperture range has a decorative tick
@@ -458,8 +485,8 @@ The displayed ƒ value matches the exported aperture; reset restores ƒ 4.5.
 Touch and keyboard remain native, and reduced motion disables the transitions.
 Focus changes are debounced and assembled in a separate worker. The one download
 pair waits for the latest metadata; rapid edits cannot publish older settings.
-No CPU fallback or image upload is used. The low-level
-`exportAiDepth` attachment remains a research helper, not the production exporter.
+No CPU fallback or image upload is used. Superseded baked-bokeh and experimental
+depth-only exporters have been removed; the production exporter retains editable depth.
 
 An unknown native Styles schema retains its original additive Texture route,
 while AI Portrait and added Soft Skin are skipped with an info message.

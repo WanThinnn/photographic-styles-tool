@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {discoverHeic,extractItemData} from '../web/src/raster/heif.js';
-import {parseBplist} from '../web/src/bplist.js';
-import {extractAppleMakerNoteTag} from '../web/src/exif.js';
-import {URI_TEXTURE_STYLES} from '../web/src/texture.js';
+import {parseBplist} from '../web/src/core/bplist.js';
+import {extractAppleMakerNoteTag} from '../web/src/core/exif.js';
+import {URI_TEXTURE_STYLES} from '../web/src/styles/texture.js';
 const simplify=v=>v instanceof Map?Object.fromEntries([...v].map(([k,x])=>[k,simplify(x)])):
   v instanceof Uint8Array?{bytes:v.length,sha256:crypto.createHash('sha256').update(v).digest('hex')}:
   Array.isArray(v)?v.map(simplify):v;

@@ -2036,3 +2036,59 @@ The private IMG_0932_Bright_PortraitFixed output reuses IMG_0935's accepted AI
 depth and checks the original image/HDR/Styles/pad bytes exactly. The user
 confirms this Bright-preserving output works. Browser verification uses the
 same original Bright capture and checks selection after focus and toggle changes.
+
+### 10.36 Cold startup, one output, 24 MP Portrait and newer Indigo HDR (2026-10-09)
+
+The user reports an intermediate flat download flashing before the Portrait
+result, AI failure on IMG_0945.HEIC, HDR conversion failure on
+IDG_20261009_172734_866.jpg, and missing labels on a fresh Safari visit.
+Both originals were supplied from iCloud Photos (2); neither was modified.
+
+The normal result is now retained privately until the AI outcome is known.
+Success publishes one Portrait output pair; failure/cancellation publishes the
+normal fallback once. Existing depth still bypasses inference. Focus changes
+reuse encoded depth; switching off restores the normal file. Live Photo pairing
+and its still-image sharing notice remain separate from Portrait export.
+
+IMG_0945 is a native Styles capture with primary 5712x4284 (45 tiles), delta
+4096x3072 (48 tiles), and HDR 2856x2142 (15 tiles). The Portrait reference had
+only 12 HDR slots, causing export to reject the completed AI result. Grids now
+allocate additional item slots instead of rejecting valid larger layouts.
+Regression and real browser export check every primary/delta/HDR tile payload,
+its properties, selected preset marker and native Styles coefficients exactly.
+
+The newer Indigo JPEG uses MPF plus Adobe hdrgm RDF per-channel bounds, base
+ICC v2 Display P3 (ASCII desc), no alternate ICC, and headroom 3.863412.
+The earlier supported input used Apple ChannelMetadata and an alternate ICC.
+The JPEG reader now accepts Adobe scalar/RDF metadata, validates ranges/defaults
+and base-SDR rendition, and declares the derived HDR rendition as extended linear
+RGB in the base primaries. Source base ICC, gain samples, XMP and channel bounds
+are preserved. ISO-only and unrecognized HDR remain explicit failures.
+Indigo also repeats EXIF ColorSpace 0xa001 with identical values. Equal duplicate
+fields are collapsed in appended active IFDs by comparing type, count and value
+bytes; conflicting or unknown-size duplicates fail. Existing TIFF value areas
+remain untouched, and next-IFD offsets use the original serialized entry count.
+
+HTML now has complete fallback copy. A small bootstrap renders localization and
+the language selector before the converter module graph loads. Service-worker
+installation caches only the initial screen; complete offline assets warm after
+startup with bounded concurrency. Browser isolation setup gates photo selection,
+but libheif initialization no longer runs automatically during initial boot.
+Online operation does not require full background offline caching to finish.
+
+Desktop Chrome verification uses the actual two supplied originals and real
+JPEG decode/HEVC encoding. Depth inference is a deterministic substitute and
+Soft Skin detection is a no-face substitute for this UI/export smoke check;
+this does not validate model quality or every Safari device's memory limits.
+Both outputs retain their HDR/Styles graph, show one output pair with no visible
+intermediate download, and pass focus/toggle/history cleanup checks without page
+errors. The new Indigo normal HDR output is retained privately for device review.
+A separate fresh-browser check verifies visible Vietnamese labels and language
+switching before delayed converter loading, exactly one automatic isolation
+reload, and enabled photo selection/AI controls after setup. Physical iPhone
+HDR appearance and 24 MP Safari export still need user confirmation. Colour
+strength fitting remains paused as requested.
+
+Final local verification: 78 regression cases, 68 passed and 10 skipped because
+their optional private fixtures were unavailable; no failures. PWA asset-list
+and Vietnamese/English/Chinese copy checks also pass.

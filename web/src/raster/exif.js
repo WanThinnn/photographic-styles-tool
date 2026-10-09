@@ -260,7 +260,15 @@ function preserveExifWithStyleMarker(sourceExif, styleExif, {width, height, orie
         const tag = tiffU(raw, 0, 2, little), type = tiffU(raw, 2, 2, little), n = tiffU(raw, 4, 4, little);
         const size = (TIFF_TYPE_SIZES[type] ?? (type === 13 ? 4 : 0)) * n;
         if (size > 4) { const value = tiffU(raw, 8, 4, little); if (value + size > tiff.length) throw Error('Invalid source Exif value offset'); }
-        if (entries.has(tag)) throw Error('Duplicate source Exif tag');
+        if (entries.has(tag)) {
+          // Indigo repeats ColorSpace (0xa001) with identical values. Collapse
+          // equal fields only; conflicting fields still require an explicit fix.
+          const previous=entries.get(tag),oldType=tiffU(previous,2,2,little),oldCount=tiffU(previous,4,4,little);
+          const bytes=entry=>size<=4?entry.subarray(8,8+size):tiff.subarray(tiffU(entry,8,4,little),tiffU(entry,8,4,little)+size);
+          const a=bytes(previous),b=bytes(raw);
+          if(!size||type!==oldType||n!==oldCount||a.length!==b.length||a.some((value,i)=>value!==b[i]))throw Error('Conflicting source Exif tag');
+          continue;
+        }
         entries.set(tag, raw);
       }
       return entries;
@@ -268,7 +276,8 @@ function preserveExifWithStyleMarker(sourceExif, styleExif, {width, height, orie
     const root = readIfd(tiffU(tiff, 4, 4, little)), pointer = root.get(0x8769);
     if (pointer && (tiffU(pointer, 2, 2, little) !== 4 || tiffU(pointer, 4, 4, little) !== 1))
       throw Error('Invalid source ExifIFD pointer');
-    const rootNext = tiffU(tiff, tiffU(tiff, 4, 4, little) + 2 + root.size * 12, 4, little);
+    const rootOffset=tiffU(tiff,4,4,little);
+    const rootNext = tiffU(tiff, rootOffset + 2 + tiffU(tiff,rootOffset,2,little) * 12, 4, little);
     return {start, tiff, little, root, rootNext, exif: pointer ? readIfd(tiffU(pointer, 8, 4, little)) : new Map()};
   };
   let work = sourceExif, source = parse(work), nativeApple = false;

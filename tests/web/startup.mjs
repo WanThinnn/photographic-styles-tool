@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {prepareBrowser} from '../../web/src/startup.js';
 import {downloadModelBytes} from '../../web/src/model-download.js';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 
 test('fresh visit claims the page and reloads before photo selection', async () => {
   const listeners = new Set(); let reloads = 0;
@@ -47,4 +49,25 @@ test('preparation and conversion share a download; failure permits retry', async
     globalThis.fetch = async () => new Response(new Uint8Array([4]), {headers: {'content-length': '1'}});
     assert.deepEqual(await downloadModelBytes('https://test.invalid/retry'), new Uint8Array([4]));
   } finally { globalThis.fetch = oldFetch; }
+});
+
+test('the first screen has useful fallback copy before any converter module loads',()=>{
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  for(const match of html.matchAll(/<([\w]+)\b[^>]*data-i18n="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/g))
+    assert.ok(match[3].trim(),`empty first-visit copy: ${match[2]}`);
+  assert.match(html,/id="ai-portrait-label">[^<]+</);
+  assert.match(html,/src="src\/page-bootstrap.js"/);
+});
+
+test('service worker activation does not wait for the full processing/offline graph',async()=>{
+  const events={},installed=[];let claimed=false,wait;
+  const cache={addAll:async paths=>installed.push(...paths),match:async()=>null,put:async()=>{}};
+  runInNewContext(readFileSync(new URL('../../web/sw.js',import.meta.url),'utf8'),{
+    URL,Headers,Response,console,caches:{open:async()=>cache,keys:async()=>[],delete:async()=>{}},
+    fetch:()=>new Promise(()=>{}),self:{addEventListener:(name,fn)=>events[name]=fn,skipWaiting:async()=>{},clients:{claim:async()=>{claimed=true;}}},
+  });
+  events.install({waitUntil:p=>wait=p});await wait;
+  assert.ok(installed.includes('./src/page-bootstrap.js'));
+  assert.ok(!installed.includes('./app.js')&&!installed.some(p=>p.includes('/dng/')));
+  events.activate({waitUntil:p=>wait=p});await wait;assert.ok(claimed);
 });

@@ -1,8 +1,8 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v71`;
+const CACHE_NAME = `${CACHE_PREFIX}v72`;
 
-// Keep this list self-contained so a successful installation guarantees that
-// the converter and both supported donor profiles can run without a network.
+// Warm the complete offline converter after startup. Only BOOT_SHELL below
+// gates installation, so first visits do not wait for the whole module graph.
 const APP_SHELL = [
   "./",
   "./index.html",

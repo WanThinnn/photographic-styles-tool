@@ -102,9 +102,16 @@ works without configuration.
 ## PWA and offline use
 
 The site is installable as a Progressive Web App. `manifest.webmanifest` supplies its app
-identity and icons, while `sw.js` precaches the complete converter, both donor profiles, and
-all first-party JavaScript. Paths stay relative so the same files work at the root of a
-domain or under a GitHub Pages project subpath.
+identity and icons. `sw.js` caches the initial screen before activation, then warms the
+complete converter, both donor profiles and first-party JavaScript in the background
+after startup. Full offline processing requires that background caching and any needed
+encoder/model downloads to finish. Paths stay relative so the same files work at the
+root of a domain or under a GitHub Pages project subpath.
+
+The initial HTML contains fallback text. A small bootstrap applies the selected language
+before loading processing modules, so slow or failed downloads leave visible labels and
+a usable language menu. Photo selection waits for browser setup; decoder initialization
+starts on user interaction rather than blocking the initial screen.
 
 The cache uses the network first when available, then falls back to its saved copy. This
 keeps the deployed app current without giving up offline use. Encoder and AI downloads
@@ -296,8 +303,12 @@ rendering still needs device verification.
 Apple's MPF JPEG export can contain a separate gain-map image, not just an SDR
 JPEG. The previous raster route decoded only the base and created a black neutral
 auxiliary; this discarded real HDR in the supplied IDG_20251020_121945_809.JPEG.
-The browser now extracts the MPF base/gain images, reads Adaptive HDR XMP channel
-parameters and keeps the source base ICC and alternate HDR ICC. Raw JPEG decoding
+The browser now extracts the MPF base/gain images, reads Apple Adaptive HDR or
+Adobe/Ultra HDR XMP channel parameters and keeps the source base ICC. Adaptive HDR
+also retains the alternate HDR ICC. Adobe metadata accepts scalar and per-channel
+RDF values; its HDR output uses extended linear RGB with the base image's primaries
+when no alternate ICC is supplied. Both ICC v2 ASCII descriptions and v4 localized
+descriptions are recognized for supported sRGB/Display P3 profiles. Raw JPEG decoding
 in FFmpeg bypasses browser ICC conversion and HDR tone mapping for these numerical
 samples. The base and gain map become separate full-range HEVC tile grids through
 lossless x265 encoding of decoded 4:2:0 samples; their original compressed JPEG
@@ -310,7 +321,7 @@ alternative group. Styles/Exif/thumbnail/auxiliary references include that rendi
 Base and alternate colour primaries must match in the supported sRGB/Display P3
 profile forms. JPEG Exif orientation is applied to both sets of planes and normalized
 in the output. Recognized unsupported/corrupt HDR (including currently unsupported
-ISO-only or other XMP dialects), unsupported profiles and HDR images over the
+ISO-only or other unsupported XMP dialects), unsupported profiles and HDR images over the
 48/12 tile budget stop with a localized message; they do not silently export SDR.
 HDR images are not reduced to fit the tile budget. This is scoped support, not a
 promise to import every JPEG HDR format.
@@ -324,10 +335,19 @@ after the requested HDR/Styles/Texture comparison. This validates the supplied c
 not quantitative HDR equivalence or every supported input. Physical Safari conversion
 memory/performance still requires validation; the accepted file was generated on desktop.
 
+The newer IDG_20261009_172734_866.jpg uses Adobe per-channel metadata, an ICC v2
+Display P3 profile and no alternate ICC. Its real desktop-browser conversion now
+preserves the gain map, XMP and three-channel `tmap` with source headroom 3.863412.
+Identical repeated source EXIF fields (including Indigo's ColorSpace) are normalized
+in the active output IFD; conflicting duplicates remain errors. Original TIFF value
+areas remain intact. This case still needs an iPhone HDR appearance check.
+
 The container syntax follows the primary
 [libavif tmap writer](https://github.com/AOMediaCodec/libavif/blob/main/src/write.c).
 Apple describes HDR gain maps in JPEG and HEIF in
 [WWDC24](https://developer.apple.com/videos/play/wwdc2024/10177/).
+Adobe metadata interpretation follows the primary
+[Ultra HDR image format specification](https://developer.android.com/media/platform/hdr-image-format).
 Run `node --test tests/web/jpeg-hdr.mjs tests/web/raster-import.mjs` for extraction,
 malformed/unsupported HDR, per-channel metadata, tiled samples and container checks.
 
@@ -392,7 +412,9 @@ reuse the encoded depth and update focus/aperture metadata, without another mode
 inference or primary re-encode. The preview is illustrative; Portrait starts off.
 After importing the file, enable Portrait in Photos to adjust aperture/lighting.
 Existing native depth bypasses AI and stays intact. Turning AI off restores the
-normal Styles file. Cancellation/failure also leaves that file available.
+normal Styles file. Cancellation/failure also leaves that file available. With AI
+selected before processing, the intermediate normal file is never published while
+Portrait export is running; fallback output appears only after failure/cancellation.
 
 The exporter promotes the accepted capture-graph research branch. Its public
 template contains structure, numerical Styles coefficients, calibration and REND;
@@ -403,6 +425,9 @@ Calibration/REND are compatibility estimates, not measured camera calibration or
 metric AI depth. The accepted test scenes support aperture/Portrait Lighting;
 other device/geometry combinations still need testing. Strong Styles colours
 on non-native inputs remain unresolved and colour fitting is paused.
+Portrait grids grow beyond the reference template's tile counts when needed.
+The reported 24 MP IMG_0945 layout retains all 45 primary, 48 delta and 15 HDR
+tiles, their compressed payloads and properties, and the selected native Styles.
 
 AI inference runs in a WebGPU worker. Stop AI or switch off to terminate active
 inference; a two-minute deadline stops stalled jobs. The first model download is

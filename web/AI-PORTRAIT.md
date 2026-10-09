@@ -5,6 +5,8 @@ Styles/Texture pipeline. With it on, depth inference and Portrait export are par
 of one visible processing flow. One save/download pair exports Styles, Texture
 and AI Portrait together. The browser preview supports tap-to-focus and blur;
 changes reuse the same encoded depth, never rerun AI or re-encode the primary.
+The intermediate normal result stays hidden while opt-in AI processing runs.
+Cancellation or failure publishes that result once as a fallback.
 
 Portrait is initially off. Import the HEIC into Photos, enable Portrait, then
 adjust aperture and Portrait Lighting. The preview approximates bokeh; it is not
@@ -21,6 +23,8 @@ deadline; full-resolution decode surfaces are released before model allocation.
 The capture-template exporter follows accepted V11/V12/V18/V20 device experiments.
 It preserves this photo's compressed primary/HDR/thumbnail/delta payloads and
 Texture/face masks. It never bakes blur into the primary or converts HDR to SDR.
+Grid item slots are extended to fit the input, including 24 MP native captures
+with 45 primary, 48 delta and 15 HDR tiles; tile payloads and properties stay exact.
 The reference calibration and REND are compatibility estimates, not physical
 camera measurements. The template contains metadata only: no photo bitstreams,
 GPS, source dates, capture time or UUIDs. Numeric capture/Styles coefficients are

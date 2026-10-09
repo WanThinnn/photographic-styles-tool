@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {exifDateFields, photoCaptureDate} from '../../web/src/photo-date.js';
 import {buildRasterExif} from '../../web/src/raster/raster-import.js';
 import {concat,be} from '../../web/src/box.js';
+import {buildAppleStyleExif,preserveRasterExif} from '../../web/src/raster/exif.js';
 import {discoverHeic,extractItem} from '../../web/src/heif.js';
 
 function datedExif() {
@@ -50,6 +51,19 @@ for(const [original,processed] of [
 test('missing and malformed date metadata is not replaced with the current time',()=>{
   assert.deepEqual(exifDateFields(null),{});
   assert.deepEqual(exifDateFields(Uint8Array.of(1,2,3)),{});
+});
+
+test('identical duplicate raster Exif fields are normalized, conflicts remain errors',()=>{
+  // A source Exif IFD with Indigo's repeated ColorSpace and no MakerNote.
+  const field=value=>concat([be(0xa001,2),be(3,2),be(1,4),be(value,2),be(0,2)]);
+  const source=value=>concat([be(6,4),new TextEncoder().encode('Exif\0\0'),
+    Uint8Array.of(77,77,0,42),be(8,4),be(1,2),be(0x8769,2),be(4,2),be(1,4),be(26,4),be(0,4),
+    be(2,2),field(65535),field(value),be(0,4)]);
+  const style=buildAppleStyleExif(new TextEncoder().encode('test-marker'));
+  const original=source(65535),saved=original.slice();
+  const result=preserveRasterExif(original,style,{width:600,height:900});
+  assert.deepEqual(original,saved);assert.ok(result.length>original.length);
+  assert.throws(()=>preserveRasterExif(source(1),style,{width:600,height:900}),/Conflicting source Exif tag/);
 });
 
 const safariOriginal='C:/Users/WanThinnn/Downloads/iCloud Photos (24444)/iCloud Photos/IMG_0486.HEIC';

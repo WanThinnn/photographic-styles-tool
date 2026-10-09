@@ -49,7 +49,15 @@ function iccName(profile){
  for(let i=0;i<n;i++){
   const p=132+i*12,o=view.getUint32(p+4),size=view.getUint32(p+8);
   if(o+size>profile.length)fail('Truncated ICC tag');
-  if(text.decode(profile.subarray(p,p+4))==='desc'&&text.decode(profile.subarray(o,o+4))==='mluc'){
+  if(text.decode(profile.subarray(p,p+4))!=='desc')continue;
+  const type=text.decode(profile.subarray(o,o+4));
+  if(type==='desc'){
+   if(size<12)fail('Invalid ICC description');
+   const length=view.getUint32(o+8);
+   if(!length||12+length>size)fail('Invalid ICC description');
+   return text.decode(profile.subarray(o+12,o+12+length)).replace(/\0.*$/s,'');
+  }
+  if(type==='mluc'){
    if(size<28)fail('Invalid ICC description');
    const length=view.getUint32(o+20),offset=view.getUint32(o+24);
    if(offset+length>size)fail('Invalid ICC description');
@@ -89,7 +97,8 @@ export function parseAdaptiveHdrXmp(xml) {
  if(/<!DOCTYPE|<!ENTITY/i.test(xml))fail('Unsupported HDR XMP declarations');
  const declarations=[...xml.matchAll(/xmlns:([A-Za-z_][\w.-]*)\s*=\s*["']([^"']+)["']/g)];
  const prefix=declarations.find(([, ,uri])=>uri===HDR_NS)?.[1];
- if(!prefix||!xml.includes(prefix+':ChannelMetadata'))fail('Unsupported JPEG HDR metadata');
+ if(!prefix)fail('Unsupported JPEG HDR metadata');
+ if(!xml.includes(prefix+':ChannelMetadata'))return parseAdobeHdrXmp(xml,prefix,declarations);
  const name=escape(prefix);
  const number=(field,source=xml)=>{
   const value=new RegExp(`<${name}:${field}\\b[^>]*>\\s*([-+0-9.eE]+)\\s*</${name}:${field}\\s*>`).exec(source)?.[1]
@@ -112,6 +121,34 @@ export function parseAdaptiveHdrXmp(xml) {
  return {baseHeadroom,alternateHeadroom,channels,useBaseColorSpace:true};
 }
 
+// Adobe/Ultra HDR v1: per-channel RDF arrays or scalar attributes. Capacity,
+// min/max and gamma have the same logarithmic/encoding conventions as tmap.
+// https://developer.android.com/media/platform/hdr-image-format#hdr-gain-map-metadata
+function parseAdobeHdrXmp(xml,prefix,declarations){
+ const name=escape(prefix),rdf=escape(declarations.find(([, ,uri])=>uri==='http://www.w3.org/1999/02/22-rdf-syntax-ns#')?.[1]||'rdf');
+ const value=field=>new RegExp(`\\b${name}:${field}\\s*=\\s*["']([^"']*)["']`).exec(xml)?.[1]
+  ??new RegExp(`<${name}:${field}\\b[^>]*>([\\s\\S]*?)</${name}:${field}\\s*>`).exec(xml)?.[1];
+ if(value('Version')?.trim()!=='1.0')fail('Unsupported Adobe HDR version');
+ if(!['false','0'].includes((value('BaseRenditionIsHDR')??'False').trim().toLowerCase()))fail('Unsupported HDR base rendition');
+ const numbers=(field,fallback)=>{
+  const raw=value(field);if(raw===undefined){if(fallback===undefined)fail('Missing HDR '+field);return [fallback];}
+  const list=[...raw.matchAll(new RegExp(`<${rdf}:li\\b[^>]*>([^<]*)</${rdf}:li\\s*>`,'g'))].map(m=>m[1]);
+  const values=(list.length?list:[raw]).map(s=>{
+   if(!s.trim()||!/^[-+0-9.eE]+$/.test(s.trim())||!Number.isFinite(Number(s)))fail('Invalid HDR '+field);return Number(s);
+  });
+  if(![1,3].includes(values.length))fail('Invalid HDR channel count');return values;
+ };
+ const fields=[numbers('GainMapMin',0),numbers('GainMapMax'),numbers('Gamma',1),numbers('OffsetSDR',1/64),numbers('OffsetHDR',1/64)];
+ const channels=Array.from({length:Math.max(...fields.map(f=>f.length))},(_,i)=>{
+  const [min,max,gamma,baseOffset,alternateOffset]=fields.map(f=>f[f.length===1?0:i]);
+  if(min>max||Math.abs(min)>32||Math.abs(max)>32||gamma<=0||gamma>32||baseOffset<0||alternateOffset<0||baseOffset>16||alternateOffset>16)fail('Invalid HDR channel');
+  return {min,max,gamma,baseOffset,alternateOffset};
+ });
+ const lo=numbers('HDRCapacityMin',0),hi=numbers('HDRCapacityMax');
+ if(lo.length!==1||hi.length!==1||lo[0]<0||hi[0]<=lo[0]||hi[0]>32)fail('Invalid HDR headroom');
+ return {baseHeadroom:lo[0],alternateHeadroom:hi[0],channels,useBaseColorSpace:true};
+}
+
 /** Null for ordinary SDR JPEG; recognized unsupported/broken HDR must never fall back to SDR. */
 export function extractJpegHdr(bytes) {
  if(bytes[0]!==255||bytes[1]!==216)return null;
@@ -131,10 +168,11 @@ export function extractJpegHdr(bytes) {
  const gain=candidates[0],base=images[0];
  for(const image of [base,gain])if(image.precision!==8||![1,3].includes(image.components)||!image.width||!image.height
   ||image.width%2||image.height%2||image.width>8192||image.height>8192)fail('Unsupported HDR JPEG dimensions/channels');
- const metadata=parseAdaptiveHdrXmp(gain.xmp),baseIcc=iccProfile(base),alternateIcc=iccProfile(gain);
+ const adobe=!gain.xmp.includes(':ChannelMetadata');
+ const metadata=parseAdaptiveHdrXmp(gain.xmp),baseIcc=iccProfile(base),alternateIcc=adobe?null:iccProfile(gain);
  const baseName=iccName(baseIcc),alternateName=iccName(alternateIcc);
  const primaries=!baseIcc||/sRGB/i.test(baseName)?'bt709':/^Display P3$/.test(baseName)?'smpte432':null;
- if(!primaries||!alternateIcc||!(primaries==='smpte432'?/^Display P3;/.test(alternateName):/sRGB|Rec\. ?709/i.test(alternateName)))
+ if(!primaries||(!adobe&&(!alternateIcc||!(primaries==='smpte432'?/^Display P3;/.test(alternateName):/sRGB|Rec\. ?709/i.test(alternateName)))))
   fail('Unsupported HDR JPEG colour profiles');
  // Gain-map ICC describes the alternate HDR rendition (e.g. P3/PQ), not the
  // numerical gain samples. Decode samples without browser ICC/HDR tone mapping.
@@ -142,7 +180,7 @@ export function extractJpegHdr(bytes) {
  // decoders try to follow it and reject a base-only JPEG with an absent auxiliary.
  const baseOnly=concat([base.bytes.subarray(0,mpf.offset-4),base.bytes.subarray(mpf.offset+mpf.data.length)]);
  return {base:baseOnly,gain:gain.bytes,width:base.width,height:base.height,gainWidth:gain.width,gainHeight:gain.height,
-  baseIcc,alternateIcc,metadata,xmp:enc.encode(gain.xmp),primaries};
+  baseIcc,alternateIcc:adobe?null:alternateIcc,metadata,xmp:enc.encode(gain.xmp),primaries};
 }
 
 export const iccColr=profile=>box('colr',concat([enc.encode('prof'),profile]));

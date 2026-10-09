@@ -30,9 +30,9 @@ function xmp(prefix='HDRToneMap'){
     Object.entries({GainMapMin:min,GainMapMax:3.8125,Gamma:1,OffsetSDR:.015625,OffsetHDR:.015625}).map(([k,v])=>`<${prefix}:${k}>${v}</${prefix}:${k}>`).join('')+'</rdf:li>').join('')
   +`</rdf:Seq></${prefix}:ChannelMetadata></rdf:Description></rdf:RDF></x:xmpmeta>`;
 }
-function jpegFixture(little=false){
- const gain=concat([Uint8Array.of(255,216),segment(225,concat([text('http://ns.adobe.com/xap/1.0/\0'),text(xmp())])),iccSegment(alternateIcc),sof(1512,2016),Uint8Array.of(255,217)]);
- const pre=concat([Uint8Array.of(255,216),iccSegment(baseIcc),sof(3024,4032)]);
+function jpegFixture(little=false,{gainXml=xmp(),baseProfile=baseIcc,alternateProfile=alternateIcc}={}){
+ const gain=concat([Uint8Array.of(255,216),segment(225,concat([text('http://ns.adobe.com/xap/1.0/\0'),text(gainXml)])),...(alternateProfile?[iccSegment(alternateProfile)]:[]),sof(1512,2016),Uint8Array.of(255,217)]);
+ const pre=concat([Uint8Array.of(255,216),iccSegment(baseProfile),sof(3024,4032)]);
  const t=new Uint8Array(82),v=new DataView(t.buffer);t.set(text(little?'II':'MM'));v.setUint16(2,42,little);v.setUint32(4,8,little);v.setUint16(8,3,little);
  for(const [i,tag,type,count,value] of [[0,0xb000,7,4,0],[1,0xb001,4,1,2],[2,0xb002,7,32,50]]){
   const p=10+i*12;v.setUint16(p,tag,little);v.setUint16(p+2,type,little);v.setUint32(p+4,count,little);v.setUint32(p+8,value,little);
@@ -50,6 +50,35 @@ test('MPF big/little endian locate a real RGB HDR auxiliary and both colour prof
   assert.deepEqual(hdr.baseIcc,baseIcc);assert.deepEqual(hdr.alternateIcc,alternateIcc);
   assert.equal(hdr.metadata.channels.length,3);assert.equal(hdr.metadata.alternateHeadroom,3.83289);
  }
+});
+
+function adobeXmp(){
+ return `<rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:gm="http://ns.adobe.com/hdr-gain-map/1.0/" gm:Version="1.0" gm:BaseRenditionIsHDR="False" gm:Gamma="1" gm:HDRCapacityMax="3.863412">`
+  +`<gm:GainMapMin><rdf:Seq>${[-3.591797,-.02243,-.916016].map(n=>`<rdf:li>${n}</rdf:li>`).join('')}</rdf:Seq></gm:GainMapMin>`
+  +`<gm:GainMapMax><rdf:Seq>${[3.849609,3.837891,3.835938].map(n=>`<rdf:li>${n}</rdf:li>`).join('')}</rdf:Seq></gm:GainMapMax></rdf:Description>`;
+}
+test('Adobe RGB gain maps retain per-channel bounds, scalar defaults and capacity',()=>{
+ const metadata=parseAdaptiveHdrXmp(adobeXmp());
+ assert.deepEqual(metadata.channels.map(c=>c.min),[-3.591797,-.02243,-.916016]);
+ assert.deepEqual(metadata.channels.map(c=>c.max),[3.849609,3.837891,3.835938]);
+ assert.equal(metadata.baseHeadroom,0);assert.equal(metadata.alternateHeadroom,3.863412);
+ for(const c of metadata.channels){assert.equal(c.gamma,1);assert.equal(c.baseOffset,1/64);assert.equal(c.alternateOffset,1/64);}
+ assert.equal(encodeTmapMetadata(metadata).length,142);
+ const hdr=extractJpegHdr(jpegFixture(false,{gainXml:adobeXmp(),alternateProfile:null}));
+ assert.equal(hdr.primaries,'smpte432');assert.equal(hdr.alternateIcc,null);
+ assert.deepEqual(hdr.metadata,metadata);
+ assert.throws(()=>parseAdaptiveHdrXmp(adobeXmp().replace('IsHDR="False"','IsHDR="True"')),{code:'err.hdrjpeg'});
+ assert.throws(()=>parseAdaptiveHdrXmp(adobeXmp().replace('gm:Gamma="1"','gm:Gamma="0"')),{code:'err.hdrjpeg'});
+ assert.throws(()=>parseAdaptiveHdrXmp(adobeXmp().replace('<rdf:li>3.837891</rdf:li>','')),{code:'err.hdrjpeg'});
+});
+
+test('Indigo ICC v2 descriptions identify Display P3 without an alternate gain-map ICC',()=>{
+ const name=text('Display P3\0'),profile=new Uint8Array(160+name.length),v=new DataView(profile.buffer);
+ v.setUint32(0,profile.length);profile.set(text('acsp'),36);v.setUint32(128,1);
+ profile.set(text('desc'),132);v.setUint32(136,148);v.setUint32(140,12+name.length);
+ profile.set(text('desc'),148);v.setUint32(156,name.length);profile.set(name,160);
+ const hdr=extractJpegHdr(jpegFixture(true,{gainXml:adobeXmp(),baseProfile:profile,alternateProfile:null}));
+ assert.deepEqual(hdr.baseIcc,profile);assert.equal(hdr.primaries,'smpte432');
 });
 test('ordinary JPEG is SDR; recognized truncated or unsupported HDR never silently becomes SDR',()=>{
  const sdr=concat([Uint8Array.of(255,216),sof(20,20),Uint8Array.of(255,217)]);

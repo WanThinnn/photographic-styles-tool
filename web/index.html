@@ -25,7 +25,7 @@
     <img class="logo" src="icons/photographic-styles.svg" width="36" height="36" alt="" aria-hidden="true">
     <div class="title">
       <h1 data-i18n="meta.title">Next-generation Photographic Styles</h1>
-      <span class="tagline" data-i18n="app.tagline"></span>
+      <span class="tagline" data-i18n="app.tagline">Photographic Styles for your photos</span>
     </div>
     <label class="language">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
@@ -35,8 +35,8 @@
   </header>
 
   <section class="intro">
-    <h2><span data-i18n="app.hero"></span></h2>
-    <p class="sub" data-i18n="app.lede"></p>
+    <h2><span data-i18n="app.hero">A new mood.</span></h2>
+    <p class="sub" data-i18n="app.lede">Add Styles, Texture and Grain. Privately, on your device.</p>
   </section>
 
   <div class="workspace">
@@ -44,49 +44,49 @@
     <div class="drop-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>
     </div>
-    <strong data-i18n="drop.big"></strong>
-    <span data-i18n="drop.small"></span>
+    <strong data-i18n="drop.big">Choose photos</strong>
+    <span data-i18n="drop.small">HEIC, JPG, PNG, DNG · or drop here</span>
   </div>
   <input type="file" id="file" multiple disabled
          accept="image/heic,image/heif,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,image/x-adobe-dng,video/quicktime,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.dng,.mov">
 
   <div class="options-grid">
   <div class="opts card">
-    <input type="checkbox" id="quality" role="switch" checked>
-    <label for="quality" data-i18n="opt.quality"></label>
+    <input type="checkbox" id="quality" role="switch" checked disabled>
+    <label for="quality" data-i18n="opt.quality">Match styles to the photo’s tones</label>
   </div>
   <div class="opts card">
-    <input type="checkbox" id="ai-portrait" role="switch" aria-describedby="ai-portrait-hint">
-    <label for="ai-portrait" id="ai-portrait-label"></label>
+    <input type="checkbox" id="ai-portrait" disabled role="switch" aria-describedby="ai-portrait-hint">
+    <label for="ai-portrait" id="ai-portrait-label">AI background blur · GPU (experimental)</label>
   </div>
   </div>
   <p id="ai-portrait-hint" class="ai-hint" hidden></p>
-  <p class="ai-hint" data-i18n="hint.softskin"></p>
+  <p class="ai-hint" data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</p>
   </div>
 
   <div class="history-actions">
-    <h2 data-i18n="h.history"></h2>
+    <h2 data-i18n="h.history">Processing history</h2>
     <button id="clear-history" class="history-clear" type="button" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7"/></svg>
-      <span data-i18n="btn.clearhistory"></span>
+      <span data-i18n="btn.clearhistory">Clear history</span>
     </button>
   </div>
   <div id="list" aria-live="polite"></div>
-  <p id="boot"></p>
+  <p id="boot">Preparing the tool for first use…</p>
 
   <details class="help">
-    <summary data-i18n="h.help"></summary>
+    <summary data-i18n="h.help">Help & information</summary>
     <div class="help-content">
-      <section><h2 data-i18n="h.steps"></h2><p data-i18n="help.steps"></p><p data-i18n="tip.body"></p></section>
-      <section><h2 data-i18n="h.formats"></h2><p data-i18n="help.formats"></p><p data-i18n="help.original"></p><p data-i18n="help.live"></p></section>
-      <section><h2 data-i18n="h.editlimits"></h2><p data-i18n="help.editlimits"></p><p data-i18n="help.portraitlimits"></p></section>
-      <section><h2 data-i18n="h.trouble"></h2><p data-i18n="help.slow"></p><p data-i18n="t.date"></p></section>
-      <section><p data-i18n="n.1"></p><p data-i18n="help.language"></p></section>
+      <section><h2 data-i18n="h.steps">How to use</h2><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></section>
+      <section><h2 data-i18n="h.formats">Formats and processing</h2><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></section>
+      <section><h2 data-i18n="h.editlimits">iPhone 16/17 photos with edited Styles or Portrait</h2><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></section>
+      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads an encoder. If the page is slow, turn off tone matching and try again.</p><p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
+      <section><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p><p data-i18n="help.language">The default language follows your browser. Your language choice is remembered and always takes priority.</p></section>
     </div>
   </details>
 
-  <footer><span data-i18n="p.author"></span> · <span data-i18n="p.version"></span> <span id="version"></span> · <a href="https://github.com/WanThinnn/photographic-styles-tool">GitHub</a></footer>
+  <footer><span data-i18n="p.author">by Elio</span> · <span data-i18n="p.version">Version</span> <span id="version">0.6.2-web</span> · <a href="https://github.com/WanThinnn/photographic-styles-tool">GitHub</a></footer>
 </main>
-<script type="module" src="app.js"></script>
+<script type="module" src="src/page-bootstrap.js"></script>
 </body>
 </html>

@@ -11,16 +11,29 @@ import {hasTexture} from '../../web/src/raster/texture.js';
 import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel} from '../../web/src/exif.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/bplist.js';
 import {rebuildHeic} from '../../web/src/graft.js';
-import {topBox} from '../../web/src/box.js';
+import {topBox,concat,be,box} from '../../web/src/box.js';
+import {buildAppleStyleExif} from '../../web/src/raster/exif.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,o)=>{
   const a=o.pixelFormat!=='gray'?fixture.assets.delta:o.width===768?fixture.assets.textureMask:fixture.assets.mask;
   return {...a,hvcc:Uint8Array.from(a.hvcc),payload:Uint8Array.from(a.payload)};
 });
-function photo(width,height){
-  const p=buildGeneratedProfile('48-12',assets),d=discoverHeic(p.meta),g=targetGeometry({width,height});
+function photo(width,height,name='48-12'){
+  const p=buildGeneratedProfile(name,assets),d=discoverHeic(p.meta),g=targetGeometry({width,height});
   const codec=propertyBoxBytes(p.meta,d.props,d.primaryTiles[0],'hvcC'),payload=Uint8Array.of(0,0,0,4,38,1,0,0);
+  if(name==='45-15'){
+    // Independent large native-layout fixture, not the raster 48/12 importer.
+    const values=new Map(p.retained),chunks=[];
+    for(const id of [...d.primaryTiles,...p.manifest.donor_hdr_tiles,d.thumbnail,d.linearThumb])values.set(id,payload);
+    values.set(d.exifItem,buildAppleStyleExif(p.mn54));
+    let cursor=p.ftyp.length+p.meta.length+8;
+    for(const [id,item]of d.iloc.items){if(item.constructionMethod===1)continue;
+      const value=values.get(id);p.meta.set(be(cursor,4),item.extents[0].offsetPos);p.meta.set(be(value.length,4),item.extents[0].lengthPos);
+      cursor+=value.length;chunks.push(value);
+    }
+    return concat([p.ftyp,p.meta,box('mdat',concat(chunks))]);
+  }
   return buildRasterHeic(p,{main:Array(g.primaryTiles).fill(payload),mainHvcc:codec,
     thumb:payload,thumbHvcc:codec,hdr:payload,hdrHvcc:codec},null,null,g);
 }
@@ -57,6 +70,22 @@ test('editable Portrait keeps own primary, HDR, delta, thumbnails and Texture ac
     assert.equal(exifCameraModel(extractItemData(output,after,after.exifItem)),null,'no reference camera attribution');
     assert.throws(()=>buildAiPortrait(output,depth,template),/Existing depth/);
   }
+});
+
+test('larger native delta/HDR grids extend the Portrait graph without losing tiles',()=>{
+  const source=photo(900,600,'45-15'),a=discoverHeic(source);
+  assert.equal(a.deltaTiles.length,48);
+  const output=buildAiPortrait(source,depth,template,{nativeStyles:true}).data,b=discoverHeic(output);
+  for(const [before,after]of [[a.primary,b.primary],[a.deltaGrid,b.deltaGrid],[a.hdrGrid,b.hdrGrid]]){
+    const old=a.refs.find(r=>r.type==='dimg'&&r.from===before).to,newTiles=b.refs.find(r=>r.type==='dimg'&&r.from===after).to;
+    assert.equal(newTiles.length,old.length);
+    old.forEach((id,i)=>{
+      assert.deepEqual(extractItemData(output,b,newTiles[i]),extractItemData(source,a,id));
+      for(const type of ['ispe','hvcC','colr'])assert.deepEqual(propertyBoxBytes(output,b.props,newTiles[i],type),propertyBoxBytes(source,a.props,id,type));
+    });
+  }
+  assert.equal(b.refs.find(r=>r.type==='dimg'&&r.from===b.hdrGrid).to.length,15);
+  assert.deepEqual(extractItemData(output,b,b.stylesItem),extractItemData(source,a,a.stylesItem));
 });
 test('native Styles payload is exact when opted into AI; normal input is immutable',()=>{
   const source=photo(900,600),saved=source.slice(),before=discoverHeic(source);

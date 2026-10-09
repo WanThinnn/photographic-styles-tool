@@ -9,7 +9,7 @@ import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "
 import { RASTER_MIMES } from "./src/image-format.js";
 import { photoCaptureDate } from "./src/photo-date.js";
 import { styleReconstructionRisk } from "./src/style-preservation.js";
-import { AI_STRINGS } from "./src/ai-portrait-ui.js";
+import { AI_STRINGS } from "./src/ai-strings.js";
 import {prepareBrowser} from './src/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
@@ -54,7 +54,7 @@ aiPortrait.addEventListener('change', () => {
   for (const candidate of aiCandidates) {
     if (!aiPortrait.checked) {
       candidate.controller?.abort();
-      if (candidate.aiFile) candidate.ui.output(candidate.outputFile);
+      candidate.ui.output(candidate.outputFile);
       candidate.ui.aiView(false);candidate.ui.aiBusy(false);
       candidate.ui.aiState('');candidate.ui.note('', 'ai');
     } else if (candidate.aiFile) {
@@ -217,7 +217,7 @@ function row(name) {
     },
     aiBusy(busy) {
       el.querySelector('.act').style.display=busy?'none':'';
-      if(busy){this.readyNotice=el.querySelector('.status').textContent;this.set(aiText().loading);}
+      if(busy){this.readyNotice||=el.querySelector('.status').textContent;this.set(aiText().loading);}
       else if(this.readyNotice){this.set(this.readyNotice,'ok');this.readyNotice=null;}
     },
     aiView(visible) { const view=el.querySelector('.ai-details');if(view)view.style.display=visible?'':'none'; },
@@ -233,7 +233,7 @@ function row(name) {
       const host=actions('normal');
       for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
       host.replaceChildren();
-      if(navigator.canShare?.({files:[file]}))this.share(file);
+      if(navigator.canShare?.({files:[file]}))this.share(file,!!this.liveIdentifier);
       this.link(file,file.name);
       const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
       file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);
@@ -318,7 +318,11 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
     nativeStyles:source?discoverHeic(source).stylesItem!==null:false,
     skip: source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
-  if (aiPortrait.checked) await runAiCandidate(candidate);
+  if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
+  else {
+    if(candidate.skip){candidate.state='skipped';ui.aiState(aiText().skip);}
+    ui.output(outputFile);ui.aiBusy(false);
+  }
 }
 
 async function runAiCandidate(candidate) {
@@ -355,7 +359,13 @@ async function runAiCandidate(candidate) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
     ui.aiState(!aiPortrait.checked?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
-  } finally {clearTimeout(deadline);removeCancel();candidate.controller=null;ui.aiBusy(false);}
+  } finally {
+    clearTimeout(deadline);removeCancel();candidate.controller=null;
+    // Publish the normal fallback only after AI failed/cancelled. Never expose
+    // it between Styles processing and the requested Portrait result.
+    if(!candidate.aiFile||!aiPortrait.checked)ui.output(candidate.outputFile);
+    ui.aiBusy(false);
+  }
 }
 
 async function handleFile(file, {allowStyleRebuild = false, existingUi = null} = {}) {
@@ -408,11 +418,9 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       const date = photoCaptureDate(result.data);
       const output = new File([result.data], outName, {type: "image/heic",
         ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {})});
-      ui.set(`${T("st.ready")} — ${T("st.rasterready")}`, "ok");
+      ui.readyNotice=`${T("st.ready")} — ${T("st.rasterready")}`;
       ui.note(result.hdr?T('raster.hdr'):result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
       showCaptureDate(ui, date);
-      if (navigator.canShare?.({files: [output]})) ui.share(output);
-      ui.link(output, outName);
       await ui.metadata(result.data, inputSize, {raster: !result.hdr, raw: input.format === 'dng'});
       await tryAiPortrait(null,output,ui,file.name,file);
       return;
@@ -431,6 +439,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       ui.note(T("warn.stylerebuild"), 'style-rebuild');
     }
     const liveIdentifier = photoContentIdentifier(bytes);
+    ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
     let data, bits, suffix;
     if (d.stylesItem !== null) {
@@ -490,7 +499,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
     }
     data=await addMissingSoftSkin(data,file,ui,{nativeStyles:d.stylesItem!==null,sourceBytes:bytes});
-    ui.set(`${T("st.ready")} — ${bits.join(sep)}`, "ok");
+    ui.readyNotice=`${T("st.ready")} — ${bits.join(sep)}`;
 
     const outName = file.name.replace(/\.[^.]+$/, "") + suffix;
     // On iPhone the share sheet lands the file straight in Photos; elsewhere a plain
@@ -499,16 +508,14 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
     const shareFile = new File([data], outName, { type: "image/heic",
       ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
     showCaptureDate(ui, date);
-    if (navigator.canShare && navigator.canShare({ files: [shareFile] })) ui.share(shareFile, !!liveIdentifier);
-    ui.link(new Blob([data], { type: "image/heic" }), outName);
     await ui.metadata(data, inputSize);
+    await tryAiPortrait(bytes,shareFile,ui,file.name,file);
     if (liveIdentifier) {
       ui.note(T("live.waitmovie"));
       const photo = { identifier: liveIdentifier, source: bytes, output: data, name: outName, ui };
       livePhotos.push(photo);
       attachMovie(photo);
     }
-    await tryAiPortrait(bytes,shareFile,ui,file.name,file);
   } catch (e) {
     // Past the format sniff, every remaining rejection means the same thing to a
     // visitor: this is a HEIC, but not one this build can handle. The real reason
@@ -582,11 +589,12 @@ function countVisit() {
     profileIndex = await response.json();
     browserReady = true;
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
+    quality.disabled=false;aiPortrait.disabled=false;
     $('boot').textContent = '';
+    navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.
     // Conversion awaits the same promise, so it never races runtime loading.
     prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
-    warmDecoder();
   } catch (e) {
     console.error('Browser preparation failed', e);
     $("boot").textContent = T('err.setup');

@@ -1,0 +1,53 @@
+export const AI_STRINGS={
+  "vi": {
+    "toggle": "AI xoá phông · GPU (thử nghiệm)",
+    "hint": "Thêm Portrait để chỉnh ƒ và ánh sáng trong Ảnh. Giữ depth gốc nếu đã có. AI chạy trên thiết bị.",
+    "loading": "Đang tải AI · khoảng 120 MB lần đầu",
+    "inference": "Đang tạo độ sâu trên GPU",
+    "encoding": "Đang thêm Portrait vào HEIC",
+    "skip": "Đã giữ depth và Portrait gốc.",
+    "ready": "Portrait mặc định tắt. Sau khi lưu, mở ảnh trong Ảnh và bật Portrait để chỉnh ƒ và ánh sáng.",
+    "failed": "AI chưa xử lý được. Bản Styles bình thường vẫn có thể tải xuống.",
+    "gpu": "Trình duyệt chưa hỗ trợ WebGPU. Bản Styles bình thường vẫn có thể tải xuống.",
+    "cancel": "Dừng AI",
+    "cancelled": "Đã dừng AI. Bản Styles vẫn có thể tải xuống.",
+    "timeout": "AI mất quá lâu. Hãy thử lại hoặc tải bản Styles.",
+    "preview": "Xem trước xoá phông",
+    "focus": "Chạm vào ảnh để chọn điểm lấy nét.",
+    "blur": "Độ mờ xem trước"
+  },
+  "en": {
+    "toggle": "AI background blur · GPU (experimental)",
+    "hint": "Add Portrait to edit aperture and lighting in Photos. Existing depth is preserved. AI runs on your device.",
+    "loading": "Loading AI · about 120 MB initially",
+    "inference": "Generating depth on GPU",
+    "encoding": "Adding Portrait to HEIC",
+    "skip": "Original depth and Portrait preserved.",
+    "ready": "Portrait starts off. After saving, open the photo in Photos and turn on Portrait to adjust aperture and lighting.",
+    "failed": "AI could not finish. Your normal Styles photo is still available.",
+    "gpu": "WebGPU is unavailable. Your normal Styles photo is still available.",
+    "cancel": "Stop AI",
+    "cancelled": "AI stopped. Your Styles photo is still available.",
+    "timeout": "AI took too long. Retry, or download your Styles photo.",
+    "preview": "Background blur preview",
+    "focus": "Tap the photo to choose a focus point.",
+    "blur": "Preview blur"
+  },
+  "zh": {
+    "toggle": "AI 背景虚化 · GPU（实验）",
+    "hint": "添加人像，在照片 App 中调整光圈和人像光效。保留原有深度，AI 在设备上运行。",
+    "loading": "正在加载 AI · 首次约 120 MB",
+    "inference": "GPU 正在生成深度",
+    "encoding": "正在为 HEIC 添加人像",
+    "skip": "已保留原始深度和人像。",
+    "ready": "人像默认关闭。保存后在照片 App 中开启人像，调整光圈和人像光效。",
+    "failed": "AI 未能完成，仍可下载普通风格照片。",
+    "gpu": "浏览器不支持 WebGPU，仍可下载普通风格照片。",
+    "cancel": "停止 AI",
+    "cancelled": "AI 已停止，仍可下载风格照片。",
+    "timeout": "AI 处理超时，可重试或下载风格照片。",
+    "preview": "背景虚化预览",
+    "focus": "点击照片选择焦点。",
+    "blur": "预览虚化程度"
+  }
+};

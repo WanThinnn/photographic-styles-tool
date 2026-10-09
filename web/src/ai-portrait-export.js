@@ -102,7 +102,14 @@ export function buildAiPortrait(source,depth,template,{nativeStyles=false,focusX
       let ids;[meta,ids]=addItems(meta,[{key:from,itemType:'hvc1'}]);copy(from,ids.get(from));
       removed.add(to);slots.forEach(id=>removed.add(id));return;
     }
-    if(!tiles?.length||tiles.length>slots.length)throw Error('Portrait image exceeds tile budget');
+    if(!tiles?.length)throw Error('Portrait image has no tiles');
+    // Native 24 MP captures have 48 delta / 15 HDR tiles. The reference's
+    // smaller grids describe relationships, not a limit on this photo's data.
+    if(tiles.length>slots.length){
+      let ids;const extra=tiles.slice(slots.length);
+      [meta,ids]=addItems(meta,extra.map(id=>({key:id,itemType:d.infos.get(id).type})));
+      slots=[...slots,...extra.map(id=>ids.get(id))];
+    }
     copy(from,to);tiles.forEach((id,i)=>copy(id,slots[i]));
     slots.slice(tiles.length).forEach(id=>removed.add(id));meta=setItemReference(meta,'dimg',to,slots.slice(0,tiles.length));
   }

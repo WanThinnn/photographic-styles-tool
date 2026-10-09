@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v70`;
+const CACHE_NAME = `${CACHE_PREFIX}v71`;
 
 // Keep this list self-contained so a successful installation guarantees that
 // the converter and both supported donor profiles can run without a network.
@@ -8,6 +8,8 @@ const APP_SHELL = [
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./src/page-bootstrap.js",
+  "./src/ai-strings.js",
   "./src/ai-portrait.js",
   "./src/ai-inference.js",
   "./src/ai-inference-worker.js",
@@ -102,13 +104,30 @@ const APP_SHELL = [
   "./src/zip.js"
 ];
 
+// Only the initial screen gates activation. Preloading the whole converter
+// here left first visits waiting for every rarely-used processing module.
+const BOOT_SHELL=['./','./index.html','./styles.css','./src/page-bootstrap.js','./src/i18n.js','./src/ai-strings.js','./icons/photographic-styles.svg'];
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cache.addAll(BOOT_SHELL))
       .catch(error => console.warn('Offline cache unavailable:', error))
       .then(() => self.skipWaiting())
   );
+});
+
+let warming;
+self.addEventListener('message',event=>{
+  if(event.data?.type!=='WARM_CACHE')return;
+  warming??=(async()=>{
+    const cache=await caches.open(CACHE_NAME),pending=APP_SHELL.slice();
+    // Run after the UI and converter are ready, with bounded parallel requests.
+    await Promise.all(Array.from({length:4},async()=>{
+      while(pending.length){const path=pending.shift();if(await cache.match(path))continue;
+        const response=await fetch(path,{cache:'no-cache'});if(response.ok)await cache.put(path,response);}
+    }));
+  })().catch(error=>{warming=null;console.warn('Offline preparation unavailable:',error);});
+  event.waitUntil(warming);
 });
 
 self.addEventListener("activate", (event) => {

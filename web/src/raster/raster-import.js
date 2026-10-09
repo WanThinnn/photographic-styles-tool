@@ -1,6 +1,6 @@
 // Raster conversion adapted from ref/Elio-backup; isolated from the native HEIC path.
 import {releaseHevcEncoder} from './ffmpeg-hevc.js';
-import {buildGeneratedProfile} from './generated-profile.js';
+import {buildGeneratedProfile,nclx} from './generated-profile.js';
 import { topBox, metaChildren, findChild, be, box, concat } from "./box.js";
 import {
   discoverHeic, discoverImageItems, parseIloc, parseIpcoIpma, extractItem, propertyForItem,
@@ -683,7 +683,9 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze}) {
       mainColr:hdr.baseIcc?iccColr(hdr.baseIcc):rasterColr(color),
       thumb:thumb.chunks[0],thumbHvcc:thumb.hvcc,thumbColr:thumb.colr,linearThumbnail,
       hdrChunks:gain.chunks,hdrHvcc:gain.hvcc,hdrColr:rasterColr(color),
-      hdrMetadata:hdr.metadata,hdrXmp:hdr.xmp,hdrAlternateColr:iccColr(hdr.alternateIcc),sourceExif,
+      // Adobe gain maps have no alternate rendition ICC: the HDR result uses
+      // the base primaries in extended linear RGB, not the gain image's profile.
+      hdrMetadata:hdr.metadata,hdrXmp:hdr.xmp,hdrAlternateColr:hdr.alternateIcc?iccColr(hdr.alternateIcc):nclx(hdr.primaries==='smpte432'?12:1,8,0,true),sourceExif,
       lightMaps:analyze?buildLightMaps(sampleRasterLuma(opened.image,32,32)):null,
     },analyze?Array.from(sampleRasterLuma(opened.image)).sort((a,b)=>a-b):null,null,geometry);
     return {data,geometry,hdr:true};

@@ -13,7 +13,8 @@ import {
   repointItemProperty, addItems, ispeBox, IROT_IDENTITY, idatItemBytes, replaceIdatItem,
   MATTE_URIS, MATTE_URI_SET, DEPTH_URI,
 } from "../core/heif.js";
-import { injectAppleMakerNoteTag } from "../core/exif.js";
+import { injectAppleMakerNoteTag, extractAppleMakerNoteTag } from "../core/exif.js";
+import {parseBplist} from '../core/bplist.js';
 import {
   addTextureItems, hasTexture, softSkinPeople, filmGrainSeed,
   CLASSIC_MATTE_EMPTY, CLASSIC_MATTE_HVCC,
@@ -64,6 +65,19 @@ export function profileFor(index, d, experimental = false) {
  */
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
+  // A capture can retain its selected Style even when an export omitted the
+  // Styles auxiliary graph. Keep that selection when adding the missing graph.
+  let selection;
+  try{selection=extractAppleMakerNoteTag(extractItem(targetData,td.iloc,td.exifItem));}
+  catch(error){if(!error.message.includes('tag 0x54 not found'))throw error;}
+  if(selection){
+    const marker=parseBplist(selection.payload);
+    if(![1,7].includes(selection.type)||!(marker instanceof Map)||marker.get('0')!==1
+      ||!Number.isInteger(marker.get('4'))||marker.get('4')<1
+      ||!['1','2'].every(key=>Number.isFinite(marker.get(key))))throw Error(UNSUPPORTED);
+    profile={...profile,mn54:selection.payload,
+      manifest:{...profile.manifest,smartstyle_makernote_type:selection.type}};
+  }
   const hasHdr = td.hdrGrid !== null && (td.infos.get(td.hdrGrid)?.type === "hvc1" || td.hdrTiles.length > 0);
   if (!hasHdr && !opts.experimental) throw new Error(UNSUPPORTED);
   if ((td.thumbnail === null && !opts.linearThumb) || td.exifItem === null) throw new Error(UNSUPPORTED);

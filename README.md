@@ -56,6 +56,9 @@ Optional AI Portrait requires WebGPU and adds editable aperture ƒ and Portrait 
 on the tested Photos versions. Portrait starts off: enable it in Photos after saving.
 The website offers one combined output after focus/aperture adjustments. See
 [web/AI-PORTRAIT.md](web/AI-PORTRAIT.md) for compatibility and model limitations.
+The web aperture ruler uses fixed f/1.4–f/16 stops and Off. Tested legacy Portrait
+exports regain aperture/lighting through a native-depth compatibility repair;
+their existing Style selection, including Bright, is preserved when adding Styles.
 
 It runs the same porting logic as the Python tool, checked against it item by item (byte for byte where the plist packing allows) — see
 [`web/README.md`](web/README.md) for how that is verified, and for the two iPhone quirks it

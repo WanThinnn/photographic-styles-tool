@@ -18,7 +18,15 @@ export async function executeJob(job, decode) {
   if (job.operation === 'patch') {
     const opts = {...job.opts};
     if (opts.decode) opts.decode = (_data, options) => decode(options);
-    return patch(job.data, job.profile, opts);
+    const output=await patch(job.data, job.profile, opts);
+    // Restore legacy Portrait editing only after adding its missing Styles.
+    // Native Styles captures keep their already working graph unchanged.
+    if(discoverHeic(job.data).stylesItem===null){
+      const {restoreNativePortrait}=await import('../portrait/ai-portrait-export.js');
+      const restored=await restoreNativePortrait(output.data);
+      if(restored){output.data=restored.data;output.report.nativePortrait=restored.report;}
+    }
+    return output;
   }
   throw Error('Unknown HEIC operation');
 }

@@ -2502,3 +2502,58 @@ from Highest Resolution / Most Compatible: https://support.apple.com/en-sg/11176
 Its archive guide also describes Export Unmodified Original from Photos:
 https://support.apple.com/en-us/108306. Current selects a picker format; it is
 not a guarantee of an unmodified capture or complete Portrait edit resources.
+
+### 10.50 Native depth on the accepted capture graph, V2 (2026-10-10)
+
+Device feedback for NativePortrait_On_V1: every tested variant offers a Portrait
+viewing icon, but Edit still offers Styles only, with no aperture control. Adding
+MiPr, classification/enable flags and rendering parameters to the old graph is
+therefore insufficient for those tests. No V1 metadata changes were deployed.
+
+The private native-portrait-rebuild-trials.mjs now freezes
+NativePortrait_Rebuild_V2 for IMG_1029 (iPhone 13) and IMG_1033 (iPhone 16).
+The script detaches only the old depth item and its dedicated sidecar from an
+assembly input, then runs the actual production buildAiPortrait with the exact
+native compressed depth and codec. This uses the already device-tested capture
+graph and complete MakerNote rather than retaining the old capture structure.
+It adds no duplicate depth auxiliary and performs no inference or re-encoding.
+
+A_WorkingCapture uses that accepted capture's depth metadata as a diagnostic
+control; its range/calibration are reference values, so blur accuracy is not
+established. B_NativeDepthMetadata retains the source depth property boxes,
+orientation, quantization ranges and available calibration XMP, adding only the
+reference rendering parameters, aperture and lighting fields. Both use the
+existing exporter's reference MakerNote/renderer data. All primary/HDR/delta
+tiles, Styles selection and plist, Texture and remaining input resources are
+asserted byte-identical/present. Reference photographic payloads are never used.
+The originals remain untouched. Subsequent device feedback confirms A for both
+samples has working aperture and lighting adjustments; B still shows the viewing
+icon but no aperture in Edit. A's original IMG_1033 selection was Standard because
+the earlier Styles stage had already overwritten the original Bright marker.
+
+### 10.51 Fixed web aperture stops and accepted native Portrait repair (2026-10-10)
+
+The web ruler now uses exactly 23 positions: f/1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8,
+3.2, 3.5, 4.0, 4.5, 5.0, 5.6, 6.3, 7.1, 8.0, 9.0, 10, 11, 13, 14, 16 and Off.
+Labels retain their decimal suffixes and numeric settings export the exact stop.
+Reset restores f/4.5. Off draws an unblurred preview; it retains editable depth
+and writes f/16 rather than an invalid zero/null aperture. Saved Portrait starts
+off at all stops. The existing preview calibration and native range interaction,
+wave, debounce/latest-output guards and reduced-motion behavior are retained.
+
+restoreNativePortrait uses the accepted V2 A adapter only for legacy capture type
+10 or type 11 with Portrait enabled, with one 8-bit hvc1 depth and its dedicated
+sidecar, and missing rendering parameters. It detaches that depth for assembly,
+then reuses its exact compressed payload with buildAiPortrait. Complete and
+next-generation Portrait-off graphs are unchanged. The Styles worker applies it
+when adding a missing Styles graph; it does not run AI or re-encode camera depth.
+Reference calibration/REND remain compatibility estimates, not native calibration.
+
+Original IMG_1031-1 has a six-key MakerNote 0x54 selection: Bright (key 4 = 16),
+Tone -0.5 and Colour 0.5. IMG_1033 and V2 A/B inherited the earlier generated
+Standard marker. patch now carries an existing valid selection into its new
+Styles graph without mutating the cached profile. The production native adapter
+matches both accepted V2 A files byte-for-byte. Portable regression tests cover
+legacy/on restoration, untouched off/unknown graphs, no duplicate repair, exact
+depth/primary/Styles retention and six-key Bright preservation. Private checks
+exercise the real worker job and originals; private photographs are not published.

@@ -500,7 +500,11 @@ Preview shaders/textures are reused, with offscreen GPU suspension.
 The compact Portrait toolbar has an accessible circular reset button and an
 indeterminate progress icon. Its native aperture range has a decorative tick
 ruler, a yellow selection and a short wave around the active drag position.
-The displayed ƒ value matches the exported aperture; reset restores ƒ 4.5.
+The range snaps to f/1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5, 4.0, 4.5,
+5.0, 5.6, 6.3, 7.1, 8.0, 9.0, 10, 11, 13, 14, 16 and Off. Numeric labels match
+the exported aperture; reset restores f/4.5. Off disables preview blur, retains
+editable depth and writes a valid f/16 metadata value. Saved Portrait starts off
+at every aperture, as before.
 Touch and keyboard remain native, and reduced motion disables the transitions.
 Focus changes are debounced and assembled in a separate worker. The one download
 pair waits for the latest metadata; rapid edits cannot publish older settings.

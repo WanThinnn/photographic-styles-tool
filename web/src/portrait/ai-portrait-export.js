@@ -217,6 +217,41 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   if(!bytesEqual(extractItemData(data,after,reference.stylesItem),extractItemData(source,d,d.stylesItem)))throw Error('Completed Styles changed');
   return {data,report:{mode:'editable-ai-portrait',relative:true,bakedBlur:false,referenceCalibration:true}};
 }
+/** Native Portrait V2 A: reuse the camera's exact encoded depth, without AI. */
+export async function restoreNativePortrait(source,template){
+  const d=discoverHeic(source),depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
+  if(depths.length!==1)return null;
+  const ownExif=extractItemData(source,d,d.exifItem);
+  let capture,enabled;
+  try{
+    const little=String.fromCharCode(...getMakerNoteBlob(ownExif).slice(12,14))==='II';
+    const read=id=>{const tag=extractAppleMakerNoteTag(ownExif,id);if(![4,9].includes(tag.type)||tag.payload.length!==4)throw Error('Unknown capture flag');
+      return new DataView(tag.payload.buffer,tag.payload.byteOffset,4).getUint32(0,little);};
+    capture=read(0x14);enabled=read(0x1f);
+  }catch{return null;}
+  // Leave the already working next-generation Portrait-off route and complete
+  // capture graphs alone. Only the tested legacy/on capture contracts use V2 A.
+  if(capture!==10&&!(capture===11&&enabled===1))return null;
+  const id=depths[0],sidecars=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(id)&&d.infos.get(r.from)?.type==='mime');
+  if(sidecars.length!==1||sidecars[0].to.length!==1)return null;
+  const side=sidecars[0].from,xmp=new TextDecoder().decode(extractItemData(source,d,side));
+  if(xmp.includes('depthBlurEffect:RenderingParameters'))return null;
+  const [width,height]=dimensionsForItem(d.props,id),hvcc=propertyBoxBytes(source,d.props,id,'hvcC');
+  // The accepted rendering metadata expects the tested 8-bit disparity stream.
+  const pixi=propertyBoxBytes(source,d.props,id,'pixi');
+  if(d.infos.get(id)?.type!=='hvc1'||!hvcc||!pixi||pixi[12]!==1||pixi[13]!==8)return null;
+  const depth={width,height,hvcc,payload:extractItemData(source,d,id)};
+  const meta=removeItems(source.slice(d.meta.off,d.meta.off+d.meta.size),[id,side]),graph=discoverHeic(meta);
+  const payloads=new Map([...graph.infos.keys()].filter(key=>graph.iloc.items.get(key)?.constructionMethod!==1)
+    .map(key=>[key,extractItemData(source,d,key)]));
+  const ft=topBox(source,'ftyp'),prepared=assemble(meta,payloads,source.slice(ft.off,ft.off+ft.size));
+  template??=await loadTemplate();
+  const output=buildAiPortrait(prepared,depth,template);
+  const after=discoverHeic(output.data),newId=[...after.infos.keys()].find(key=>auxUriForItem(after.props,key)===DEPTH_URI);
+  if(!bytesEqual(extractItemData(output.data,after,newId),depth.payload))throw Error('Native depth changed');
+  output.report.mode='restored-native-portrait';output.report.modelInference=false;
+  return output;
+}
 export async function exportAiPortrait(result,onProgress=()=>{},{signal}={}){
   signal?.throwIfAborted();const template=await loadTemplate();signal?.throwIfAborted();
   const {encodeHevcPixels,releaseHevcEncoder}=await import('../raster/ffmpeg-hevc.js');

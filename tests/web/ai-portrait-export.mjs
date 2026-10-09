@@ -1,20 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {buildAiPortrait} from '../../web/src/portrait/ai-portrait-export.js';
-import {portraitEligibility} from '../../web/src/portrait/ai-portrait-container.js';
+import {buildAiPortrait,restoreNativePortrait} from '../../web/src/portrait/ai-portrait-export.js';
+import {portraitEligibility,attachAiDepth} from '../../web/src/portrait/ai-portrait-container.js';
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
 import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations,removeItems} from '../../web/src/raster/heif.js';
 import {hasTexture} from '../../web/src/raster/texture.js';
-import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel} from '../../web/src/core/exif.js';
+import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel,getMakerNoteBlob} from '../../web/src/core/exif.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
 import {rebuildHeic} from '../../web/src/styles/graft.js';
 import {topBox,concat,be,box} from '../../web/src/core/box.js';
 import {buildAppleStyleExif} from '../../web/src/raster/exif.js';
 import {styleCapabilities} from '../../web/src/styles/style-capabilities.js';
 import {photoContentIdentifier} from '../../web/src/media/live-photo.js';
+import {patch} from '../../web/src/styles/port.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,o)=>{
@@ -40,9 +41,9 @@ function photo(width,height,name='48-12'){
     thumb:payload,thumbHvcc:codec,hdr:payload,hdrHvcc:codec},null,null,g);
 }
 const depth={payload:assets.mask.payload,hvcc:assets.mask.hvcc,width:64,height:64};
-function withoutThumbnail(source){
+function withoutThumbnail(source,items){
   const before=discoverHeic(source),ft=topBox(source,'ftyp'),ftyp=source.slice(ft.off,ft.off+ft.size);
-  const meta=removeItems(source.slice(before.meta.off,before.meta.off+before.meta.size),[before.thumbnail]);
+  const meta=removeItems(source.slice(before.meta.off,before.meta.off+before.meta.size),items??[before.thumbnail]);
   const graph=discoverHeic(meta),chunks=[];let cursor=ftyp.length+meta.length+8;
   for(const [id,item]of graph.iloc.items){
     if(item.constructionMethod===1)continue;
@@ -65,6 +66,46 @@ function withStyles(source,blob){
   const d=discoverHeic(source),ft=topBox(source,'ftyp');
   return rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.stylesItem,blob]]));
 }
+
+test('legacy native Portrait rebuild keeps encoded depth and imagery; leaves working off captures alone',async()=>{
+  function capture(source,classification,enabled){
+    const d=discoverHeic(source),ft=topBox(source,'ftyp');let exif=extractItemData(source,d,d.exifItem);
+    const little=String.fromCharCode(...getMakerNoteBlob(exif).slice(12,14))==='II';
+    for(const [id,value]of [[0x14,classification],[0x1f,enabled]]){
+      let bytes=be(value,4);if(little)bytes=bytes.reverse();exif=injectAppleMakerNoteTag(exif,bytes,id,9);
+      // The blob injector counts bytes; this test constructs an inline LONG.
+      const mn=getMakerNoteBlob(exif),view=new DataView(mn.buffer,mn.byteOffset,mn.byteLength);
+      for(let i=0;i<view.getUint16(14,little);i++){const at=16+12*i;
+        if(view.getUint16(at,little)===id)view.setUint32(at+4,1,little);}
+    }
+    return rebuildHeic(source,d,source.slice(0,ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.exifItem,exif]]));
+  }
+  for(const [classification,enabled]of [[10,0],[11,1]]){
+    const source=capture(attachAiDepth(photo(900,600),depth),classification,enabled),before=discoverHeic(source),saved=source.slice();
+    const output=await restoreNativePortrait(source,template);assert.ok(output);assert.deepEqual(source,saved);
+    const after=discoverHeic(output.data),id=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+    assert.equal(output.report.modelInference,false);assert.equal(output.report.mode,'restored-native-portrait');
+    assert.deepEqual(extractItemData(output.data,after,id),depth.payload);
+    assert.deepEqual(selectedStyle(output.data),selectedStyle(source));
+    assert.deepEqual(extractItemData(output.data,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+    before.primaryTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(output.data,after,after.primaryTiles[i])));
+    assert.equal(await restoreNativePortrait(output.data,template),null,'accepted capture is not rebuilt twice');
+  }
+  assert.equal(await restoreNativePortrait(capture(attachAiDepth(photo(900,600),depth),11,0),template),null);
+  assert.equal(await restoreNativePortrait(capture(attachAiDepth(photo(900,600),depth),99,1),template),null);
+  assert.equal(await restoreNativePortrait(photo(900,600),template),null);
+});
+
+test('adding a missing Styles graph preserves an original six-key Bright selection instead of Standard',async()=>{
+  const base=photo(900,600),marker=buildBplist(new Map([['3',1],['1',-.5],['4',16],['2',.5],['0',1],['5',0]]));
+  const graph=discoverHeic(base);
+  const source=withoutThumbnail(withMarker(base,marker),[graph.stylesItem,graph.deltaGrid,graph.linearThumb]);
+  assert.equal(discoverHeic(source).stylesItem,null);
+  const originalProfile=buildGeneratedProfile('48-12',assets),saved=originalProfile.mn54.slice();
+  const output=await patch(source,originalProfile,{experimental:true});
+  assert.deepEqual(selectedStyle(output.data),selectedStyle(source));
+  assert.deepEqual(originalProfile.mn54,saved,'cached neutral profile must not inherit another photo selection');
+});
 
 test('unknown Styles contracts are preserved instead of silently downgraded into Portrait',()=>{
   const base=photo(900,600),d=discoverHeic(base),plist=parseBplist(extractItemData(base,d,d.stylesItem),{preserveReals:true});

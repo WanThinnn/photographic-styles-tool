@@ -2138,3 +2138,42 @@ JPEG conversion also pass; the direct raster Portrait Styles payload equals its
 normal completed result exactly. No page errors or intermediate download flashes
 occur. These checks establish data preservation, not quantitative skin appearance
 or iPhone Photos controls; the user must confirm the new one-step output on-device.
+
+### 10.38 Mirrored/rotated AI depth disagreed with Photos (2026-10-09)
+
+The user reports correct-looking web preview but misplaced blur in Photos on
+IMG_0978/0979 (older iPhone) and IMG_0982 from iPhone 16 Pro IMG_1096.
+Both unblurred Styles input IMG_0977 and original IMG_1096 have ordered primary
+properties irot=1 then imir=0, EXIF Orientation=5. Their canonical transform is
+angle 90, mirror 1; stored sizes are 3088x2320 and 4032x3024 respectively.
+The Photos exports have normalized portrait primary/depth orientation; 0978
+and 0979 contain exactly the same compressed depth despite differing main pixels.
+Rendered exports do not retain the completed Styles graph or original AI sidecar.
+
+AI formerly read raw rotation/mirror values independently, interpreted mirror
+0 as horizontal instead of HEIF's vertical reflection, and inverted rotation
+and reflection in a different order. Preview and click-to-focus repeated that
+convention, so picture/depth could appear mutually aligned while the exported
+auxiliary was transformed by Photos according to the actual HEIF properties.
+The mirrored quarter-turn cases are a concrete frame-alignment defect, separate
+from relative-depth accuracy, REND semantics or colour strength.
+
+AI now uses raster/heif itemOrientation(), composed in primary ipma order.
+Both bitmap and libheif display pixels are mapped into stored coordinates with
+the existing displayPointToStored convention. GPU preview and focus selection
+use the same axes/order. Export copies rotation/mirror properties in the primary's
+actual order rather than forcing rotation first. No model, depth quantization,
+colour coefficients, camera calibration, REND or primary pixels are changed.
+Prior outputs need regeneration: their misoriented AI depth is not repaired by
+switching Portrait off/on. Device confirmation remains pending; matching web
+preview geometry does not promise identical blur strength to Apple's renderer.
+
+Verification adds 24 ordered rotation/mirror cases at the affine seam and an
+export regression proving identical primary/depth transform order. Desktop Chrome
+checks 12 angle/mirror combinations using asymmetric coloured pixel fixtures:
+real bitmap decoding and a deterministic libheif display substitute recover
+stored pixels exactly, GPU zero-blur preview matches independently arranged
+display pixels within 1/255, and tap-to-focus returns the expected stored point.
+This verifies frame mapping without asserting model accuracy or actual libheif
+decode equivalence. The full suite passes 71 of 81 cases (10 optional-fixture
+skips); PWA and language checks pass. Physical Photos blur alignment is pending.

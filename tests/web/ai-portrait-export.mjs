@@ -6,7 +6,7 @@ import {portraitEligibility} from '../../web/src/ai-portrait-container.js';
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
-import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem} from '../../web/src/raster/heif.js';
+import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations} from '../../web/src/raster/heif.js';
 import {hasTexture} from '../../web/src/raster/texture.js';
 import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel} from '../../web/src/exif.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/bplist.js';
@@ -117,6 +117,22 @@ test('one-step generated Styles plus Portrait matches the successful re-upload r
   assert.deepEqual(direct,reuploaded);
   const after=discoverHeic(direct);
   assert.deepEqual(extractItemData(direct,after,after.stylesItem),extractItemData(source,d,d.stylesItem));
+});
+
+test('exported depth uses the same ordered rotation/mirror transform as the primary',()=>{
+  const base=photo(900,600),d=discoverHeic(base),ft=topBox(base,'ftyp');
+  for(const order of [['irot','imir'],['imir','irot']]){
+    let meta=base.slice(d.meta.off,d.meta.off+d.meta.size);const indices=[];
+    for(const type of order){let index;[meta,index]=appendIpcoProperty(meta,box(type,Uint8Array.of(type==='irot'?1:0)));indices.push([index,true]);}
+    const own=(d.props.associations.get(d.primary)||[]).filter(a=>!['irot','imir'].includes(d.props.properties[a.index-1].type));
+    meta=setItemPropertyAssociations(meta,d.primary,[...own.map(a=>[a.index,a.essential]),...indices]);
+    const source=rebuildHeic(base,d,base.slice(ft.off,ft.off+ft.size),meta,new Map());
+    const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+    const id=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+    assert.deepEqual(itemOrientation(output,after.props,id),itemOrientation(output,after.props,after.primary));
+    const types=i=>(after.props.associations.get(i)||[]).map(a=>after.props.properties[a.index-1].type).filter(t=>['irot','imir'].includes(t));
+    assert.deepEqual(types(id),order);assert.deepEqual(types(after.primary),order);
+  }
 });
 
 test('Bright preset and non-neutral Tone/Colour survive both AI routes and focus changes',()=>{

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v73`;
+const CACHE_NAME = `${CACHE_PREFIX}v74`;
 
 // Warm the complete offline converter after startup. Only BOOT_SHELL below
 // gates installation, so first visits do not wait for the whole module graph.

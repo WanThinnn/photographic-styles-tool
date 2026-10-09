@@ -9,8 +9,8 @@ uniform vec2 sourceSize;uniform float focus;uniform float radius;
 uniform int angle;uniform int mirror;
 in vec2 uv;out vec4 colour;
 vec2 stored(vec2 p){
- if(mirror==0)p.x=1.-p.x;else if(mirror==1)p.y=1.-p.y;
  if(angle==90)p=vec2(1.-p.y,p.x);else if(angle==180)p=1.-p;else if(angle==270)p=vec2(p.y,1.-p.x);
+ if(mirror==0)p.y=1.-p.y;else if(mirror==1)p.x=1.-p.x;
  return vec2(p.x,1.-p.y);
 }
 vec3 linearRgb(vec3 s){return pow(max(s,vec3(0)),vec3(2.2));}

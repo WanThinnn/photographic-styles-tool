@@ -167,7 +167,8 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
     ...[...boxes(meta,rm.off+rm.hdr+4,rm.off+rm.size)].filter(b=>b.type!=='grpl').map(b=>meta.slice(b.off,b.off+b.size)),...groups]));
   const depthProps=[box('ispe',concat([new Uint8Array(4),be(depth.width,4),be(depth.height,4)])),
     box('pixi',new Uint8Array([0,0,0,0,1,8])),depth.hvcc,appleDepthAuxc(),
-    ...['irot','imir'].map(type=>propertyBoxBytes(source,d.props,d.primary,type)).filter(Boolean)];
+    ...(d.props.associations.get(d.primary)||[]).map(a=>d.props.properties[a.index-1])
+      .filter(p=>['irot','imir'].includes(p.type)).map(p=>source.slice(p.box.off,p.box.off+p.box.size))];
   const associations=[];for(const p of depthProps){let index;[meta,index]=appendIpcoProperty(meta,p);associations.push([index,!['ispe','pixi'].includes(String.fromCharCode(...p.slice(4,8)))]);}
   meta=setItemPropertyAssociations(meta,depthId,associations);
   if(![focusX,focusY,aperture].every(Number.isFinite)||focusX<0||focusX>1||focusY<0||focusY>1||aperture<1||aperture>22)

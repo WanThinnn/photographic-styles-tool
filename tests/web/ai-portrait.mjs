@@ -8,6 +8,23 @@ import {loadProfile} from '../../web/src/zip.js';
 import {discoverHeic,extractItem,auxUriForItem,DEPTH_URI,propertyBoxBytes,idatItemBytes} from '../../web/src/heif.js';
 import {concat,box,be,boxes} from '../../web/src/box.js';
 import {renderDepthBlur} from '../../web/src/ai-portrait-blur.js';
+import {displayToStoredTransform} from '../../web/src/ai-portrait-source.js';
+import {itemOrientation} from '../../web/src/raster/heif.js';
+
+test('AI source mapping honors HEIF mirror axes and ordered rotation/mirror properties',()=>{
+  const bytes=Uint8Array.of(0,0),point={x:.17,y:.63},w=3088,h=2320;
+  const rotate=(p,t)=>[p,{x:p.y,y:1-p.x},{x:1-p.x,y:1-p.y},{x:1-p.y,y:p.x}][t];
+  const flip=(p,axis)=>axis===0?{x:p.x,y:1-p.y}:{x:1-p.x,y:p.y};
+  for(const turn of [0,1,2,3])for(const axis of [null,0,1])for(const order of [false,true]){
+    bytes[0]=turn;bytes[1]=axis??0;
+    const associations=(order?[2,1]:[1,2]).filter(i=>i!==2||axis!==null).map(index=>({index}));
+    const props={properties:[{type:'irot',box:{off:0,hdr:0}},{type:'imir',box:{off:1,hdr:0}}],associations:new Map([[7,associations]])};
+    let displayed={...point};for(const {index}of associations)displayed=index===1?rotate(displayed,turn):flip(displayed,axis);
+    const {angle,mirror}=itemOrientation(bytes,props,7),[a,b,c,d,e,f]=displayToStoredTransform(w,h,angle,mirror);
+    assert.ok(Math.abs((a*displayed.x+c*displayed.y+e)/w-point.x)<1e-12);
+    assert.ok(Math.abs((b*displayed.x+d*displayed.y+f)/h-point.y)<1e-12);
+  }
+});
 
 test('portable preview blur softens background, preserves foreground and avoids dark borders',()=>{
   const w=9,h=9,rgba=new Uint8ClampedArray(w*h*4),gray=new Uint8Array(w*h);

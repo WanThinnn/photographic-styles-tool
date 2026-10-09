@@ -1,4 +1,5 @@
 import {renderBokeh} from './ai-bokeh.js';
+import {displayPointToStored} from './raster/heif.js';
 export {AI_STRINGS} from './ai-strings.js';
 
 export function blurPreview(result,host,strings,exportImage) {
@@ -33,9 +34,8 @@ export function blurPreview(result,host,strings,exportImage) {
   slider.addEventListener('input',schedule);
   focusSlider.addEventListener('input',()=>{focus=Number(focusSlider.value);schedule();});
   view.addEventListener('click',event=>{
-    const rect=view.getBoundingClientRect();let x=(event.clientX-rect.left)/rect.width,y=(event.clientY-rect.top)/rect.height;
-    if(mirror===0)x=1-x;if(mirror===1)y=1-y;
-    if(angle===90)[x,y]=[1-y,x];else if(angle===180)[x,y]=[1-x,1-y];else if(angle===270)[x,y]=[y,1-x];
+    const rect=view.getBoundingClientRect();
+    const {x,y}=displayPointToStored((event.clientX-rect.left)/rect.width,(event.clientY-rect.top)/rect.height,angle,mirror);
     focus=focusAt(Math.floor(x*w),Math.floor(y*h));focusSlider.value=String(focus);schedule();
   });
   save.addEventListener('click',async()=>{

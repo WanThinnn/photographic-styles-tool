@@ -1,5 +1,13 @@
 import {loadLibheif} from './decode.js';
 import {releaseLibheif} from './libheif-lifecycle.js';
+import {displayPointToStored} from './raster/heif.js';
+
+// Both browser and libheif decoders return display-oriented pixels. Recover
+// stored coordinates using the canonical HEIF transform, including ipma order.
+export function displayToStoredTransform(width,height,angle,mirror){
+  const a=displayPointToStored(0,0,angle,mirror),b=displayPointToStored(1,0,angle,mirror),c=displayPointToStored(0,1,angle,mirror);
+  return [(b.x-a.x)*width,(b.y-a.y)*height,(c.x-a.x)*width,(c.y-a.y)*height,a.x*width,a.y*height];
+}
 
 // Independent of the stable thumbnail decoder used for Styles statistics.
 // Always sample the primary photo; release the full-resolution surface before
@@ -13,10 +21,8 @@ export async function aiSourceCanvas(data,{width,height,angle=0,mirror=null},sou
   try {
     try {bitmap=await createImageBitmap(blob);} catch {}
     if(bitmap){
-      const swap=angle===90||angle===270,sw=swap?height:width,sh=swap?width:height;
-      ctx.translate(width/2,height/2);ctx.rotate(angle*Math.PI/180);
-      if(mirror===0)ctx.scale(-1,1);else if(mirror===1)ctx.scale(1,-1);
-      ctx.drawImage(bitmap,-sw/2,-sh/2,sw,sh);
+      ctx.setTransform(...displayToStoredTransform(width,height,angle,mirror));
+      ctx.drawImage(bitmap,0,0,1,1);
     }else{
       libheif=await loadLibheif();decoder=new libheif.HeifDecoder();
       images=decoder.decode(sourceFile?new Uint8Array(await sourceFile.arrayBuffer()):data);
@@ -29,10 +35,8 @@ export async function aiSourceCanvas(data,{width,height,angle=0,mirror=null},sou
       fctx.putImageData(pixels,0,0);
       // libheif display returns the display orientation; undo it like the
       // existing decoder, but without selecting the embedded thumbnail.
-      const swap=angle===90||angle===270,sw=swap?height:width,sh=swap?width:height;
-      ctx.translate(width/2,height/2);ctx.rotate(angle*Math.PI/180);
-      if(mirror===0)ctx.scale(-1,1);else if(mirror===1)ctx.scale(1,-1);
-      ctx.drawImage(full,-sw/2,-sh/2,sw,sh);
+      ctx.setTransform(...displayToStoredTransform(width,height,angle,mirror));
+      ctx.drawImage(full,0,0,1,1);
     }
     ctx.resetTransform();return canvas;
   }catch(error){canvas.width=canvas.height=0;throw error;}

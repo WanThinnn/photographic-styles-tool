@@ -1,4 +1,5 @@
 import {renderBokeh} from './ai-bokeh.js';
+import {displayPointToStored} from './raster/heif.js';
 // Preview only. Export keeps the unblurred primary and editable Portrait depth.
 export function portraitPreview(result,host,strings,onSettings){
   const {width:w,height:h,gray,previewRgb:rgb,orientation:{angle,mirror}}=result;
@@ -26,9 +27,8 @@ export function portraitPreview(result,host,strings,onSettings){
     });
   };
   view.addEventListener('click',e=>{
-    const r=view.getBoundingClientRect();let a=(e.clientX-r.left)/r.width,b=(e.clientY-r.top)/r.height;
-    if(mirror===0)a=1-a;if(mirror===1)b=1-b;
-    if(angle===90)[a,b]=[1-b,a];else if(angle===180)[a,b]=[1-a,1-b];else if(angle===270)[a,b]=[b,1-a];
+    const r=view.getBoundingClientRect();
+    const {x:a,y:b}=displayPointToStored((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height,angle,mirror);
     x=Math.max(0,Math.min(1,a));y=Math.max(0,Math.min(1,b));changed();
   });
   blur.addEventListener('input',changed);draw();

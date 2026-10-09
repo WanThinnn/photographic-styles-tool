@@ -1,5 +1,6 @@
 import {normalizeDisparity,inferenceGeometry} from './ai-portrait-container.js';
-import {discoverHeic,dimensionsForItem,irotAngleForItem,imirAxisForItem} from './heif.js';
+import {discoverHeic,dimensionsForItem} from './heif.js';
+import {itemOrientation} from './raster/heif.js';
 import {aiSourceCanvas,rgbSample} from './ai-portrait-source.js';
 import {inferDepth,awaitAiSource} from './ai-inference.js';
 
@@ -13,7 +14,7 @@ export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{s
     // Keep aspect ratio and a multiple of the network patch size. Bounding the
     // longest edge limits mobile GPU allocations without stretching the subject.
     const input=inferenceGeometry(w,h);
-    const orientation={angle:irotAngleForItem(data,d.props,d.primary),mirror:imirAxisForItem(data,d.props,d.primary)};
+    const orientation=itemOrientation(data,d.props,d.primary);
     const scale=Math.min(1,768/Math.max(w,h)),width=Math.max(2,Math.round(w*scale/2)*2),height=Math.max(2,Math.round(h*scale/2)*2);
     source=await awaitAiSource(()=>aiSourceCanvas(data,{width,height,...orientation},sourceFile),signal);
     signal?.throwIfAborted();

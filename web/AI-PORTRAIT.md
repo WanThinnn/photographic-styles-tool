@@ -5,6 +5,9 @@ Styles/Texture pipeline. With it on, depth inference and Portrait export are par
 of one visible processing flow. One save/download pair exports Styles, Texture
 and AI Portrait together. The browser preview supports tap-to-focus and blur;
 changes reuse the same encoded depth, never rerun AI or re-encode the primary.
+Inference, preview and tap-to-focus share a canonical stored/display transform
+that honors the primary's ordered `irot`/`imir` properties. The exported depth
+retains that same property order; rotation and mirroring do not commute.
 The intermediate normal result stays hidden while opt-in AI processing runs.
 Cancellation or failure publishes that result once as a fallback.
 

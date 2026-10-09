@@ -432,6 +432,11 @@ on non-native inputs remain unresolved and colour fitting is paused.
 Portrait grids grow beyond the reference template's tile counts when needed.
 The reported 24 MP IMG_0945 layout retains all 45 primary, 48 delta and 15 HDR
 tiles, their compressed payloads and properties, and the selected native Styles.
+Depth inference maps decoded display pixels back to stored coordinates using the
+primary's ordered rotation/mirror transform. Preview and tap-to-focus use the
+same convention, and the exported depth keeps the primary's transform order.
+This corrects mirrored/rotated uploads that looked aligned in the web preview
+but supplied differently oriented depth to Photos.
 
 AI inference runs in a WebGPU worker. Stop AI or switch off to terminate active
 inference; a two-minute deadline stops stalled jobs. The first model download is

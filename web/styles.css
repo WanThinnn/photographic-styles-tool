@@ -2,6 +2,9 @@
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#101118;--surface:#20212bd9;--fg:#f1f1f7;--muted:#ababbd;--line:#ffffff18;--accent-text:#b6aaff;--ok:#72dba1;--err:#ff9ba5}}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#101118;--surface:#20212bd9;--fg:#f1f1f7;--muted:#ababbd;--line:#ffffff18;--accent-text:#b6aaff;--ok:#72dba1;--err:#ff9ba5}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%;min-height:100%;background:var(--page-background,var(--bg))}
+/* Hide the page indicator without disabling touch, wheel or keyboard scrolling. */
+html,body{scrollbar-width:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0;height:0}
 /* Paint behind iOS system areas; only the content is inset from cutouts. */
 body{--page-gutter:22px;margin:0;color:var(--fg);font:15px/1.5 var(--sans);min-height:100vh;min-height:100svh;padding:calc(28px + env(safe-area-inset-top,0px)) max(var(--page-gutter),env(safe-area-inset-right,0px)) calc(36px + env(safe-area-inset-bottom,0px)) max(var(--page-gutter),env(safe-area-inset-left,0px));background:transparent}
 main{max-width:640px;margin:auto;display:flex;flex-direction:column;gap:18px}a{color:var(--accent-text)}button{font:inherit;cursor:pointer}button,a,input,summary,[role="button"]{-webkit-tap-highlight-color:transparent}

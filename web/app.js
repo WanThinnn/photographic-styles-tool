@@ -5,7 +5,7 @@ import { styleDeltaSize } from "./src/styles/graft.js";
 import { hasTexture } from "./src/styles/texture.js";
 import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
 import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/ui/i18n.js";
-import { photoContentIdentifier, moviePairingMetadata, livePhotoPackage } from "./src/media/live-photo.js";
+import { photoContentIdentifier, moviePairingMetadata, createLivePhotoExport } from "./src/media/live-photo.js";
 import { RASTER_MIMES } from "./src/media/image-format.js";
 import { photoCaptureDate } from "./src/media/photo-date.js";
 import { styleReconstructionRisk } from "./src/styles/style-preservation.js";
@@ -105,18 +105,7 @@ const livePhotos = [];
 
 function attachMovie(photo) {
   const movie = liveMovies.get(photo.identifier);
-  if (!movie || photo.paired) return;
-  try {
-    const zip = livePhotoPackage(photo.source, photo.output, movie.bytes, photo.name);
-    photo.ui.link(new Blob([zip], { type: "application/zip" }),
-      photo.name.replace(/\.[^.]+$/, "") + "_LivePhoto.zip", "btn.livezip");
-    photo.ui.note(T("live.paired"));
-    movie.ui.set(T("live.matched"), "ok");
-    photo.paired = true;
-  } catch (e) {
-    console.error("Live Photo export stopped", e);
-    photo.ui.note(T("live.changed"));
-  }
+  if (movie) photo.exporter.setMovie(movie.bytes);
 }
 
 async function handleMovie(file, bytes, ui) {
@@ -262,6 +251,7 @@ function row(name) {
       host.replaceChildren();
       if(navigator.canShare?.({files:[file]}))this.share(file,!!this.liveIdentifier);
       this.link(file,file.name);
+      this.liveExporter?.setOutput(file);
       if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
         file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);}
       this.outputPending(Boolean(this.outputPendingState));
@@ -551,13 +541,23 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
     showCaptureDate(ui, date);
     await ui.metadata(data, inputSize);
-    await tryAiPortrait(bytes,shareFile,ui,file.name,file);
     if (liveIdentifier) {
       ui.note(T("live.waitmovie"));
-      const photo = { identifier: liveIdentifier, source: bytes, output: data, name: outName, ui };
+      const exporter=createLivePhotoExport(bytes,{
+        onReady({data:zip,name}){
+          ui.link(new Blob([zip],{type:'application/zip'}),name,'btn.livezip');
+          ui.outputPending(Boolean(ui.outputPendingState));
+          ui.note(T('live.paired'));
+          liveMovies.get(liveIdentifier)?.ui.set(T('live.matched'),'ok');
+        },
+        onError(error){console.error('Live Photo export stopped',error);ui.note(T('live.changed'));},
+      });
+      ui.liveExporter=exporter;ui.cleanup(()=>exporter.dispose());
+      const photo = { identifier: liveIdentifier, exporter, ui };
       livePhotos.push(photo);
       attachMovie(photo);
     }
+    await tryAiPortrait(bytes,shareFile,ui,file.name,file);
   } catch (e) {
     // Past the format sniff, every remaining rejection means the same thing to a
     // visitor: this is a HEIC, but not one this build can handle. The real reason

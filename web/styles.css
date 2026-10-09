@@ -44,6 +44,11 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding-top:15px}foot
 .workspace{border-color:transparent;background:linear-gradient(var(--bg),var(--bg)) padding-box,var(--ring-gradient) border-box;box-shadow:-12px 1px 35px #0894ff20,0 -9px 30px #c959dd20,12px 4px 35px #ff2e5420,0 16px 40px #ff900418}
 #drop{background:linear-gradient(120deg,#0894ff0b,#c959dd0d 48%,#ff2e540b 80%,#ff90040b);border:1px solid var(--line)}
 #drop.over{background:linear-gradient(120deg,#0894ff18,#c959dd1c 48%,#ff2e5418 80%,#ff900415);border-color:var(--ai-violet)}
+.photo-format-tip{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:start;gap:4px 10px;margin:12px 2px 0;padding:13px 14px 4px;border:1px solid var(--line);border-radius:16px;background:#0894ff0b;font-size:12px}
+.photo-format-tip>svg{width:20px;height:20px;color:var(--accent-text)}
+.photo-format-tip strong{font-weight:600;color:var(--fg)}
+.photo-format-tip p{margin:4px 0 0;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+.photo-format-tip button{grid-column:2;justify-self:end;min-width:64px;min-height:44px;padding:8px 0 8px 12px;border:0;background:transparent;color:var(--accent-text);font-weight:600}
 @media(hover:hover){#drop:hover{background:linear-gradient(120deg,#0894ff18,#c959dd1c 48%,#ff2e5418 80%,#ff900415);border-color:var(--ai-violet)}}
 .drop-icon{background:var(--ai-blue);box-shadow:0 6px 18px #0894ff26}
 .dl{background:var(--button-gradient);color:#fff}.dl.alt{background:transparent;color:var(--accent-text)}

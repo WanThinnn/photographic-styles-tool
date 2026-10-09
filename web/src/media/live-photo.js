@@ -76,3 +76,25 @@ export function livePhotoPackage(source,output,movie,name='LivePhoto') {
     importNote:'Import both resources with a Live Photo-aware importer. Browser Save to Photos does not create a paired Photos asset. Movie frames do not receive the still image Styles.'};
   return writeZip(new Map([[manifest.photo,output],[manifest.movie,movie],['pair.json',new TextEncoder().encode(JSON.stringify(manifest,null,2))]]));
 }
+
+// Follow the same File as the still download. A delayed read must never publish
+// an older focus setting, toggle state, or a result whose history row was removed.
+export function createLivePhotoExport(source,{onReady,onError}) {
+  let file=null,movie=null,revision=0,disposed=false;
+  async function refresh() {
+    const current=++revision,chosen=file,paired=movie;
+    if(disposed||!chosen||!paired)return;
+    const isCurrent=()=>!disposed&&revision===current;
+    try {
+      const output=new Uint8Array(await chosen.arrayBuffer());
+      if(!isCurrent())return;
+      const data=livePhotoPackage(source,output,paired,chosen.name);
+      onReady({data,name:chosen.name.replace(/\.[^.]+$/,'')+'_LivePhoto.zip',file:chosen});
+    } catch(error) { if(isCurrent())onError(error); }
+  }
+  return {
+    setOutput(value){if(disposed)return;file=value;return refresh();},
+    setMovie(value){if(disposed||movie===value)return;movie=value;return refresh();},
+    dispose(){disposed=true;revision++;source=file=movie=null;},
+  };
+}

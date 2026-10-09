@@ -96,6 +96,7 @@ test('reported iPhone 16 Pro Live Photo builds editable still Portrait with nati
   const source=new Uint8Array(fs.readFileSync(liveFixture)),saved=source.slice(),before=discoverHeic(source);
   assert.ok(photoContentIdentifier(source));assert.equal(portraitEligibility(source),null);
   const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
+  assert.equal(photoContentIdentifier(output),photoContentIdentifier(source));
   assert.deepEqual(source,saved);
   assert.deepEqual(extractItemData(output,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
   assert.deepEqual(selectedStyle(output),selectedStyle(source));
@@ -105,6 +106,17 @@ test('reported iPhone 16 Pro Live Photo builds editable still Portrait with nati
     aa.forEach((id,i)=>assert.deepEqual(extractItemData(output,after,bb[i]),extractItemData(source,before,id)));
   }
   assert.ok([...after.infos.keys()].some(id=>auxUriForItem(after.props,id)===DEPTH_URI));
+});
+test('Portrait and revised focus retain the source Live Photo identifier without inventing one',()=>{
+  const base=photo(900,600),d=discoverHeic(base),ft=topBox(base,'ftyp'),id=new TextEncoder().encode('live-photo-portable-identifier\0');
+  const exif=injectAppleMakerNoteTag(extractItemData(base,d,d.exifItem),id,0x11,2);
+  const source=rebuildHeic(base,d,base.slice(ft.off,ft.off+ft.size),base.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.exifItem,exif]]));
+  for(const settings of [{},{focusX:.2,focusY:.7,aperture:8}]){
+    const output=buildAiPortrait(source,depth,template,settings).data,after=discoverHeic(output);
+    assert.equal(photoContentIdentifier(output),'live-photo-portable-identifier');
+    assert.deepEqual(extractAppleMakerNoteTag(extractItemData(output,after,after.exifItem),0x11).payload,id);
+  }
+  assert.equal(photoContentIdentifier(buildAiPortrait(base,depth,template).data),null);
 });
 test('editable Portrait keeps own primary, HDR, delta, thumbnails and Texture across geometries',()=>{
   for(const[w,h]of[[900,600],[3024,4032],[1200,1200],[8000,1000]]){

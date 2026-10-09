@@ -20,9 +20,18 @@ async function loadTemplate(){
 }
 function makerBlob(template,sourceMarker,sourceExif){
   const little=template.makerLittle,write=(n,size)=>little?be(n,size).reverse():be(n,size);
-  const entries=[],values=[];let cursor=20+12*template.maker.length;
-  for(const tag of template.maker){
-    let payload=decode(tag.payload),type=tag.type,count=tag.count;
+  // Live Photo identity belongs to the source, never the Portrait template.
+  const tags=template.maker.filter(tag=>tag.id!==0x11);
+  let identity;
+  try{identity=extractAppleMakerNoteTag(sourceExif,0x11);}catch{}
+  if(identity){
+    if(![1,2,7].includes(identity.type))throw Error('Unsupported Live Photo identifier type');
+    tags.push({id:0x11,type:identity.type,count:identity.payload.length,bytes:identity.payload});
+    tags.sort((a,b)=>a.id-b.id);
+  }
+  const entries=[],values=[];let cursor=20+12*tags.length;
+  for(const tag of tags){
+    let payload=tag.bytes||decode(tag.payload),type=tag.type,count=tag.count;
     if(tag.id===0x54){
       // The completed input owns its selected preset and Tone/Colour pad. The
       // capture template's neutral marker is only for newly generated Styles.

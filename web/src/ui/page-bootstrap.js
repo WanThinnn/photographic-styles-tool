@@ -3,6 +3,17 @@
 import {applyLanguage,pickLanguage,rememberLanguage,t} from './i18n.js';
 import {AI_STRINGS} from './ai-strings.js';
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
+const formatTip=document.getElementById('ios-format-tip'),drop=document.getElementById('drop');
+const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
+const formatTipKey='photo-format-tip-dismissed-v1';
+let formatTipDismissed=false;
+try{formatTipDismissed=localStorage.getItem(formatTipKey)==='1';}catch{}
+formatTip.hidden=!ios||formatTipDismissed;
+if(!formatTip.hidden)drop.setAttribute('aria-describedby','ios-format-copy');
+document.getElementById('ios-format-dismiss').addEventListener('click',()=>{
+  formatTip.hidden=true;drop.removeAttribute('aria-describedby');
+  try{localStorage.setItem(formatTipKey,'1');}catch{}
+});
 function render(){
   const lang=selector.value,strings=AI_STRINGS[lang]||AI_STRINGS.en;
   applyLanguage(lang);document.getElementById('ai-portrait-label').textContent=strings.toggle;

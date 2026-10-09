@@ -36,6 +36,9 @@
 
 export const STRINGS = {
   vi: {
+    "tip.firsttitle": "Giữ định dạng ảnh gốc",
+    "tip.firstbody": "Chọn ảnh → <b>•••</b> → <b>Tùy chọn</b> → <b>Định dạng</b> → <b>Hiện tại</b>.",
+    "tip.dismiss": "Đã hiểu",
     "raster.hdr": "Đã chuyển dữ liệu HDR từ JPEG gốc. Hãy kiểm tra bản sao trong Ảnh.",
     "err.hdrjpeg": "Chưa chuyển được HDR của JPEG này. Chưa tạo bản HEIC để tránh mất HDR; hãy giữ ảnh gốc.",
     "hint.softskin": "Tự bổ sung Soft Skin khi ảnh còn thiếu dữ liệu. Ảnh luôn được xử lý trên máy.",
@@ -145,6 +148,9 @@ export const STRINGS = {
     "p.version": "Phiên bản",
   },
   en: {
+    "tip.firsttitle": "Keep the original photo format",
+    "tip.firstbody": "Select photos → <b>•••</b> → <b>Options</b> → <b>Format</b> → <b>Current</b>.",
+    "tip.dismiss": "Got it",
     "raster.hdr": "HDR data transferred from the original JPEG. Check the copy in Photos.",
     "err.hdrjpeg": "Could not transfer this JPEG's HDR. No HEIC was created to avoid losing HDR; keep the original.",
     "hint.softskin": "Missing Soft Skin data is added automatically. Photos are always processed on your device.",
@@ -280,6 +286,9 @@ export const STRINGS = {
   },
 
   zh: {
+    "tip.firsttitle": "保留照片原始格式",
+    "tip.firstbody": "选择照片 → <b>•••</b> → <b>选项</b> → <b>格式</b> → <b>当前</b>。",
+    "tip.dismiss": "知道了",
     "raster.hdr": "已转移原始 JPEG 的 HDR 数据。请在“照片”中检查副本。",
     "err.hdrjpeg": "无法转移此 JPEG 的 HDR。为避免丢失 HDR，未创建 HEIC；请保留原图。",
     "hint.softskin": "自动补充缺失的柔肤数据。照片始终在本机处理。",

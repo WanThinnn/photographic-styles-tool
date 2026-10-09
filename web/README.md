@@ -297,6 +297,11 @@ QuickTime content identifier, and checks for a still-image-time metadata key. Fi
 are not used as proof of pairing. After successful image processing, **Download Live Photo
 pair** exports a ZIP containing the processed HEIC, the byte-identical original MOV and
 `pair.json`. Processing must preserve the photo's identifier or pair export stops.
+The ZIP follows the current HEIC download, including optional AI Portrait,
+focus/aperture changes and AI toggle restoration. A late MOV selection pairs with
+that current output; older asynchronous reads cannot restore an obsolete ZIP.
+AI Portrait retains the source Live Photo identifier rather than borrowing one
+from its metadata template.
 
 Extract the ZIP and import both resources together using a Live Photo-aware importer.
 The browser's **Save still photo** button shares only the HEIC; it does not create a paired
@@ -527,6 +532,12 @@ Safari sharing a HEIC saves a still image. A ZIP is only a package of Live Photo
 not a Photos asset. Creating a Live Photo in Photos requires a native importer that adds
 the `.photo` and `.pairedVideo` resources in one PhotoKit creation request. No such native
 importer is included in this browser build.
+
+On first use on iPhone/iPad, a compact reminder below the photo picker shows
+**Select photos → ••• → Options → Format → Current**. **Got it** dismisses it
+and remembers the choice locally; the complete instructions remain in Help.
+The reminder is rendered before converter modules load and supports all three
+interface languages. It does not change the native picker's format setting.
 
 Live Photo stills use the same AI eligibility checks as other HEIC images; MOV
 is not required for still Portrait export. Native Styles 131088 (the flag-bearing

@@ -2427,3 +2427,43 @@ respect all four insets and have no horizontal overflow. Screenshots were
 visually inspected. This verifies CSS layout, not native iOS status-bar rendering;
 Home Screen relaunch on the user's device remains the final check. PWA validation
 passes and the shell cache advances to v85, without changing depth's 630/518 policy.
+
+### 10.47 Live Photo ZIP follows the final web output (2026-10-10)
+
+Pair export formerly captured the initial Styles byte array and stopped updating
+after its first ZIP. It now follows the same File as the HEIC download, including
+Portrait focus/aperture changes, toggle-off fallback and toggle-on restoration.
+A MOV selected later pairs with the current output. Revision guards discard old
+asynchronous file reads and errors; disposing a row invalidates pending exports.
+The current output clears/revokes the previous ZIP URL along with the still URL,
+and a newly generated ZIP respects the output's existing pending-download state.
+
+Testing with the private IMG_0471 HEIC also exposed a missing pairing identifier:
+the Portrait MakerNote replacement dropped source tag 0x11. The assembler now
+retains that source byte/string tag in its rebuilt table and never imports a Live
+Photo identity from the reference template. Portable tests cover final ZIP bytes,
+unchanged MOV bytes, late MOV, toggle/focus changes, stale reads, removal, failed
+identity checks and Portrait identifier preservation. This does not change movie
+frames or add a browser-to-PhotoKit importer; Photos still receives a still image
+through the normal web share action.
+
+A private browser probe used IMG_0471, deterministic substitute inference, a
+real HEVC encoder/Portrait assembler and a synthetic MOV metadata container.
+It verified that late MOV selection and each focus/reset/toggle update package
+the exact current HEIC and unchanged MOV bytes, preserving the source pairing
+identifier. It also checked removal and URL disposal. This does not validate
+motion playback or native Photos import of an AI-edited Live Photo pair.
+
+### 10.48 First-use iOS picker format reminder (2026-10-10)
+
+iPhone/iPad users see a compact reminder below the upload area showing the
+native picker path: Select photos → ••• → Options → Format → Current. Explicit
+Got it dismissal is stored locally; desktop users do not see this notice. The
+longer Help instructions remain available. The early page bootstrap renders
+the reminder before converter loading and tolerates blocked local storage.
+Vietnamese, English and Chinese copy is included, with an English HTML fallback.
+A private browser layout check passed at 320/430 widths in light/dark modes,
+including translated copy, dismissal/reload persistence, desktop hiding and
+iPad detection with blocked storage. No horizontal overflow was observed.
+The web cannot select the native picker format for the user. Shell cache v87
+ships this notice and the current-output Live Photo ZIP fix.

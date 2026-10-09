@@ -242,8 +242,7 @@ function row(name) {
     async portraitPreview(result,onSettings) {
       const {portraitPreview}=await import('./src/ai-portrait-preview.js');
       el.querySelector('.ai-details')?.remove();
-      const host=document.createElement('details');host.className='ai-details';host.open=true;
-      const summary=document.createElement('summary');summary.textContent=aiText().preview;host.append(summary);
+      const host=document.createElement('section');host.className='ai-details';host.setAttribute('aria-label',aiText().preview);
       el.insertBefore(host,el.querySelector('.act'));
       try{
         this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{

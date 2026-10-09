@@ -450,7 +450,12 @@ about 120 MB and verified/cached independently of UI releases. Input starts at
 maximum edge 1036, with 770/518 fallbacks for resource failures. RGB-guided depth
 refinement and quantization run in the inference worker; saved depth has maximum
 edge 1024. This improves the data Photos receives, not only the web preview.
-Preview shaders/textures are reused, with offscreen/collapsed GPU suspension.
+Preview shaders/textures are reused, with offscreen GPU suspension.
+The compact Portrait toolbar has an accessible circular reset button and an
+indeterminate progress icon. Its native aperture range has a decorative tick
+ruler, a yellow selection and a short wave around the active drag position.
+The displayed ƒ value matches the exported aperture; reset restores ƒ 4.5.
+Touch and keyboard remain native, and reduced motion disables the transitions.
 Focus changes are debounced and assembled in a separate worker. The one download
 pair waits for the latest metadata; rapid edits cannot publish older settings.
 No CPU fallback or image upload is used. The low-level

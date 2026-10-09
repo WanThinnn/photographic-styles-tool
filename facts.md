@@ -2293,3 +2293,28 @@ and Texture with `portrait=true` opt-in, direct binary POST response, native
 preservation and explicit processing failures. A GPU container backend requires
 native codec/inference adapters and parity testing; no cloud deployment or paid
 resources have been created.
+
+### 10.42 Compact Portrait editor and aperture ruler (2026-10-09)
+
+Replace the preview disclosure heading with a compact Portrait toolbar, a
+44-pixel circular reset button at the upper right, and a short focus hint.
+Pending metadata updates use an accessible indeterminate spinner instead of
+visible updating text; failures remain visible beside the controls. The spinner
+pauses offscreen and respects reduced motion. Export still waits for the latest
+settings and uses the same single output actions.
+
+The native range remains responsible for touch, keyboard and assistive technology.
+A decorative 41-tick ruler shows a yellow selected position and a local wave while
+dragging or using adjustment keys. Only tick transforms transition, for 140 ms;
+reduced motion removes the transition. There is no continuous animation loop.
+The ƒ readout uses exactly the existing exported aperture mapping, with finer
+0.1 blur steps and localized decimals. Reset restores centre focus and ƒ 4.5.
+This is a relative preview control, not a newly calibrated physical lens model.
+
+Browser checks pass at 320/430/900 widths in light/dark mode for vi/en/zh:
+18 layouts, native pointer drag and wave, range/readout/reset agreement, progress
+without layout shift, accessible reset and explicit failure feedback. Twelve
+rotation/mirror checks retain correct focus mapping. Targeted lifecycle,
+language and Portrait export regressions pass 28/28, including native imagery,
+HDR and Styles preservation. Real WebGPU and HEVC integration on IMG_0471 also
+passes. Chrome automation does not replace a physical Safari interaction check.

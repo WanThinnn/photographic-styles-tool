@@ -1,5 +1,7 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v74`;
+const CACHE_NAME = `${CACHE_PREFIX}v75`;
+// Immutable dependency identity, independent of UI/service-worker releases.
+const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
 // Warm the complete offline converter after startup. Only BOOT_SHELL below
 // gates installation, so first visits do not wait for the whole module graph.
@@ -13,6 +15,9 @@ const APP_SHELL = [
   "./src/ai-portrait.js",
   "./src/ai-inference.js",
   "./src/ai-inference-worker.js",
+  "./src/ai-depth-refinement.js",
+  "./src/ai-portrait-assembler.js",
+  "./src/ai-portrait-export-worker.js",
   "./src/libheif-lifecycle.js",
   "./src/ai-portrait-container.js",
   "./src/apple-depth-metadata.js",
@@ -46,6 +51,7 @@ const APP_SHELL = [
   "./src/decode.js",
   "./src/exif.js",
   "./src/style-preservation.js",
+  "./src/style-capabilities.js",
   "./src/startup.js",
   "./src/heic-worker.js",
   "./src/heic-processing.js",
@@ -187,7 +193,12 @@ self.addEventListener("fetch", (event) => {
     // storage quota/private-mode failures instead of discarding a valid response.
     event.respondWith((async () => {
       let cache;
-      try {cache=await caches.open(`${CACHE_NAME}-ai`);const hit=await cache.match(request);if(hit)return isolated(hit);} catch {}
+      // The model downloader owns complete, SHA-verified model storage. Avoid
+      // retaining a second 100 MB copy here. Small runtime assets share a
+      // revision cache; the manifest revalidates when deployment changes.
+      if(url.pathname.endsWith('/model.onnx'))return isolated(await fetch(request));
+      if(url.pathname.endsWith('/assets.json'))return networkFirst(request);
+      try {cache=await caches.open(DEPTH_ASSET_CACHE);const hit=await cache.match(request);if(hit)return isolated(hit);} catch {}
       const response=await fetch(request);
       if(response.ok&&cache)try{await cache.put(request,response.clone());}catch{}
       return isolated(response);

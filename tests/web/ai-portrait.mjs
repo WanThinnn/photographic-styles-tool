@@ -55,11 +55,11 @@ test('background blur rejects nearer subject colours at the silhouette',()=>{
   const output=renderDepthBlur(rgba,gray,w,h,255,10);
   for(let i=0;i<gray.length;i++)assert.deepEqual([...output.slice(i*4,i*4+4)],[...rgba.slice(i*4,i*4+4)]);
 });
-test('GPU input keeps aspect ratio within patch rounding and bounds mobile memory',()=>{
-  for(const [w,h] of [[4032,3024],[3024,4032],[900,600],[8000,1000]]){
-    const input=inferenceGeometry(w,h);assert.ok(Math.max(input.width,input.height)<=518);
+test('high detail GPU input and resource fallbacks keep aspect ratio within patch rounding',()=>{
+  for(const edge of [1036,770,518])for(const [w,h] of [[4032,3024],[3024,4032],[900,600],[8000,1000]]){
+    const input=inferenceGeometry(w,h,edge);assert.ok(Math.max(input.width,input.height)<=edge);
     assert.equal(input.width%14,0);assert.equal(input.height%14,0);
-    const scale=518/Math.max(w,h);
+    const scale=edge/Math.max(w,h);
     assert.ok(Math.abs(input.width-w*scale)<=7);assert.ok(Math.abs(input.height-h*scale)<=7);
   }
 });

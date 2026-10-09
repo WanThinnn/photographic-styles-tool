@@ -403,6 +403,10 @@ DOM-based decoding still runs in the page and returns sampled RGB to the worker.
 **Clear processing history** is available once processing finishes. It removes result
 rows, revokes download URLs, clears Live Photo pairing data, disposes bokeh previews and
 releases converter workers. It does not delete downloaded files or originals.
+Each completed result can also be removed separately to release its buffers,
+Portrait assembly worker, preview GPU resources and download URLs.
+Tone matching is automatic when generating Styles; native Styles keep their
+original route. If decoding fails, the normal donor-statistics fallback remains.
 
 AI can be enabled before selection or after processing. With AI enabled, the app
 finishes Styles, Texture and depth as one visible workflow, shows a tap-to-focus
@@ -439,9 +443,24 @@ This corrects mirrored/rotated uploads that looked aligned in the web preview
 but supplied differently oriented depth to Photos.
 
 AI inference runs in a WebGPU worker. Stop AI or switch off to terminate active
-inference; a two-minute deadline stops stalled jobs. The first model download is
-about 120 MB. No CPU fallback or image upload is used. The low-level
+inference; a two-minute watchdog covers GPU phases separately from streaming
+model downloads. Downloads show progress and stop after 30 seconds without data;
+the overall opt-in operation has a ten-minute ceiling. The first model download is
+about 120 MB and verified/cached independently of UI releases. Input starts at
+maximum edge 1036, with 770/518 fallbacks for resource failures. RGB-guided depth
+refinement and quantization run in the inference worker; saved depth has maximum
+edge 1024. This improves the data Photos receives, not only the web preview.
+Preview shaders/textures are reused, with offscreen/collapsed GPU suspension.
+Focus changes are debounced and assembled in a separate worker. The one download
+pair waits for the latest metadata; rapid edits cannot publish older settings.
+No CPU fallback or image upload is used. The low-level
 `exportAiDepth` attachment remains a research helper, not the production exporter.
+
+An unknown native Styles schema retains its original additive Texture route,
+while AI Portrait and added Soft Skin are skipped with an info message.
+Supported Styles payloads retain unknown keys byte-exactly. Compatibility follows
+actual file contracts, not a rewritten Software/iOS version; future Photos
+versions still require real-file and physical-device validation.
 
 Result headings show the filename above the success dot and short outcome. Expanded details
 show camera, dimensions, file size, capture time and available HDR/depth resources.

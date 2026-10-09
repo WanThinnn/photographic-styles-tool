@@ -40,3 +40,23 @@ test('network responses and isolation survive denied cache or quota failures',as
     const response=await pending;assert.equal(await response.text(),'fresh');assert.equal(response.headers.get('Cross-Origin-Embedder-Policy'),'require-corp');
   }
 });
+
+test('UI updates retain pinned depth dependencies without caching a second model copy',async()=>{
+  const events={},opened=[],deleted=[],fetched=[];
+  const dependency='photographic-style-depth-assets-4472b736-ort-1.22.0';
+  runInNewContext(readFileSync(new URL('../../web/sw.js',import.meta.url),'utf8'),{
+    URL,Headers,Response,console,caches:{keys:async()=>['photographic-style-port-v1',dependency,'photographic-style-encoder-assets-v1'],
+      delete:async name=>deleted.push(name),open:async name=>{opened.push(name);return {match:async()=>new Response('pinned'),put:async()=>{}};}},
+    fetch:async request=>{fetched.push(typeof request==='string'?request:request.url);return new Response('network');},
+    self:{location:{origin:'https://example.com'},addEventListener:(name,fn)=>events[name]=fn,clients:{claim:async()=>{}}},
+  });
+  let pending;events.activate({waitUntil:p=>pending=p});await pending;
+  assert.ok(deleted.includes('photographic-style-port-v1'));assert.ok(!deleted.includes(dependency));assert.ok(!deleted.includes('photographic-style-encoder-assets-v1'));
+  const request=filename=>({method:'GET',url:'https://example.com/vendor/ai-portrait/'+filename,mode:'cors'});
+  events.fetch({request:request('ort.webgpu.min.mjs'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'pinned');
+  assert.deepEqual(opened,[dependency]);assert.equal(fetched.length,0);
+  events.fetch({request:request('model.onnx?sha256=known'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'network');
+  assert.deepEqual(opened,[dependency],'model storage belongs to the downloader, not a duplicate SW cache');
+  events.fetch({request:request('assets.json'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'network');
+  assert.equal(fetched.length,2,'manifest revalidates instead of trusting old dependency metadata');
+});

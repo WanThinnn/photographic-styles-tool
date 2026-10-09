@@ -13,6 +13,7 @@ import {parseBplist,buildBplist,BplistReal} from '../../web/src/bplist.js';
 import {rebuildHeic} from '../../web/src/graft.js';
 import {topBox,concat,be,box} from '../../web/src/box.js';
 import {buildAppleStyleExif} from '../../web/src/raster/exif.js';
+import {styleCapabilities} from '../../web/src/style-capabilities.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,o)=>{
@@ -51,6 +52,18 @@ function withStyles(source,blob){
   const d=discoverHeic(source),ft=topBox(source,'ftyp');
   return rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.stylesItem,blob]]));
 }
+
+test('unknown Styles contracts are preserved instead of silently downgraded into Portrait',()=>{
+  const base=photo(900,600),d=discoverHeic(base),plist=parseBplist(extractItemData(base,d,d.stylesItem),{preserveReals:true});
+  plist.set('0',999);plist.set('future-resource',new Uint8Array([9,3,42]));
+  const source=withStyles(base,buildBplist(plist)),saved=source.slice();
+  assert.deepEqual(styleCapabilities(source),{native:true,schema:999,editable:false});
+  assert.equal(portraitEligibility(source),'unverified-styles');
+  assert.throws(()=>buildAiPortrait(source,depth,template),/Unsupported Styles schema/);assert.deepEqual(source,saved);
+  plist.set('0',14);
+  const known=withStyles(base,buildBplist(plist)),output=buildAiPortrait(known,depth,template).data,after=discoverHeic(output);
+  assert.deepEqual(extractItemData(output,after,after.stylesItem),extractItemData(known,discoverHeic(known),discoverHeic(known).stylesItem),'unknown keys in a supported opaque payload survive byte-exactly');
+});
 test('editable Portrait keeps own primary, HDR, delta, thumbnails and Texture across geometries',()=>{
   for(const[w,h]of[[900,600],[3024,4032],[1200,1200],[8000,1000]]){
     const source=photo(w,h),before=discoverHeic(source);

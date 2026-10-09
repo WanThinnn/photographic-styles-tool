@@ -7,6 +7,8 @@ import {buildAppleStyleExif,preserveRasterExif,readExifOrientation} from './rast
 import {getMakerNoteBlob,extractAppleMakerNoteTag} from './exif.js';
 import {parseBplist} from './bplist.js';
 import {appleDepthAuxc} from './apple-depth-metadata.js';
+import {portraitAssembler} from './ai-portrait-assembler.js';
+import {styleCapabilities} from './style-capabilities.js';
 const decode=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const xml=s=>new TextEncoder().encode(s);
 let templatePromise;
@@ -70,6 +72,7 @@ function assemble(meta,payloads,ftyp){
 }
 /** Pure assembly seam, also used by regression tests. No decode/re-encode. */
 export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,aperture=4.5}={}){
+  if(!styleCapabilities(source).editable)throw Error('Unsupported Styles schema for Portrait');
   const d=discoverHeic(source);
   if([...d.infos.keys()].some(id=>auxUriForItem(d.props,id)===DEPTH_URI))throw Error('Existing depth must not be replaced');
   if(!d.stylesItem||!d.deltaGrid||!d.thumbnail||!d.linearThumb)throw Error('Portrait requires the completed Styles graph');
@@ -209,8 +212,9 @@ export async function exportAiPortrait(result,onProgress=()=>{},{signal}={}){
     const encoded=await encodeHevcPixels(result.gray,{width:result.width,height:result.height,pixelFormat:'gray',fullRange:true,lossless:true},onProgress);
     signal?.throwIfAborted();
     const depth={...encoded,width:result.width,height:result.height};
-    const withSettings=settings=>buildAiPortrait(result.sourceData,depth,template,settings);
-    return {...withSettings(),withSettings};
+    const assembler=portraitAssembler(result.sourceData,depth,template,{signal});
+    try{return {...await assembler.build(),withSettings:assembler.build,dispose:assembler.dispose};}
+    catch(error){assembler.dispose();throw error;}
   }catch(error){if(signal?.aborted)throw signal.reason;throw error;}
   finally{signal?.removeEventListener('abort',abort);releaseHevcEncoder();}
 }

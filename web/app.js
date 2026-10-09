@@ -16,9 +16,10 @@ import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-he
 import {readImageFile, addTextureInWorker, repairTextureInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/heic-processing.js';
 import {formatBytes} from './src/result-metadata.js';
 import {hasSoftSkinData} from './src/soft-skin-container.js';
+import {styleCapabilities} from './src/style-capabilities.js';
 
 const $ = (id) => document.getElementById(id);
-const fileInput = $("file"), drop = $("drop"), list = $("list"), quality = $("quality");
+const fileInput = $("file"), drop = $("drop"), list = $("list");
 const aiPortrait = $("ai-portrait");
 const clearHistory = $('clear-history');
 const resultUrls = new Set(), resultCleanups = new Set();
@@ -54,10 +55,12 @@ aiPortrait.addEventListener('change', () => {
   for (const candidate of aiCandidates) {
     if (!aiPortrait.checked) {
       candidate.controller?.abort();
+      candidate.ui.outputPending(false);
       candidate.ui.output(candidate.outputFile);
       candidate.ui.aiView(false);candidate.ui.aiBusy(false);
       candidate.ui.aiState('');candidate.ui.note('', 'ai');
     } else if (candidate.aiFile) {
+      candidate.ui.outputPending(Boolean(candidate.ui.portraitPending));
       candidate.ui.output(candidate.aiFile);candidate.ui.note(aiText().ready, 'ai');
       candidate.ui.aiView(true);
     } else if (['new', 'failed'].includes(candidate.state)) {
@@ -66,16 +69,16 @@ aiPortrait.addEventListener('change', () => {
   }
 });
 
-// Fetch the decoder while the visitor is still choosing a photo (or switches analysis on),
+// Fetch the decoder while the visitor is still choosing a photo,
 // so the first photo does not wait for the download, and someone just reading the page
 // downloads nothing. A failure here is harmless: ensureDecode() tries again and falls back.
-const warmDecoder = () => { if (quality.checked) loadLibheif().catch(() => {}); };
-quality.addEventListener("change", warmDecoder);
+const warmDecoder = () => { loadLibheif().catch(() => {}); };
 for (const ev of ["pointerdown", "dragenter", "focus"]) drop.addEventListener(ev, warmDecoder, { once: true });
 
 let lang = pickLanguage();
 const T = (key) => t(lang, key);
 async function addMissingSoftSkin(data,file,ui,options={}) {
+  if(options.nativeStyles&&!styleCapabilities(data).editable){ui.note(aiText().compatibility,'compatibility');return data;}
   if(hasSoftSkinData(data)) return data;
   ui.set(T('st.softskinworking'));
   try {
@@ -164,6 +167,11 @@ function row(name) {
   el.querySelector(".name").textContent = name;
   el.querySelector(".name").title = name;
   list.appendChild(el);
+  const cleanups=new Set();let disposed=false;
+  const remove=document.createElement('button');remove.type='button';remove.className='result-remove';remove.disabled=true;
+  remove.setAttribute('aria-label',T('btn.removeresult'));
+  remove.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  const title=document.createElement('div');title.className='result-title';title.append(el.querySelector('.name'),remove);el.querySelector('.result-header').prepend(title);
   refreshHistoryButton();
   function actions(group) {
     let host=el.querySelector(`.output-actions[data-output="${group}"]`);
@@ -181,13 +189,23 @@ function row(name) {
     }
     return host;
   }
-  return {
+  const ui={
+    cleanup(fn){cleanups.add(fn);},
+    dispose(){
+      if(disposed)return;disposed=true;
+      for(const cleanup of cleanups)cleanup();cleanups.clear();resultCleanups.delete(ui.dispose);
+      for(const a of el.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
+      for(let i=aiCandidates.length-1;i>=0;i--)if(aiCandidates[i].ui===ui){aiCandidates[i].controller?.abort();aiCandidates[i].state='removed';aiCandidates.splice(i,1);}
+      for(let i=livePhotos.length-1;i>=0;i--)if(livePhotos[i].ui===ui)livePhotos.splice(i,1);
+      for(const [id,movie]of liveMovies)if(movie.ui===ui)liveMovies.delete(id);
+      el.remove();refreshHistoryButton();
+    },
     async metadata(data, inputSize, {raster = false, raw = false, outputEpoch = null} = {}) {
       if(outputEpoch===null){this.inputSize=inputSize;this.metadataOptions={raster,raw};}
       let m;
       try { m = await describeInWorker(data); }
       catch (error) { console.warn('Metadata unavailable:', error); return; }
-      if(outputEpoch!==null&&outputEpoch!==this.outputEpoch)return;
+      if(disposed||outputEpoch!==null&&outputEpoch!==this.outputEpoch)return;
       const values = [['meta.camera', m.camera], ['meta.dimensions', `${m.width} × ${m.height}`],
         ['meta.size', `${formatBytes(inputSize)} → ${formatBytes(m.bytes)}`],
         ['meta.resources', [raster ? 'SDR' : m.hdr ? 'HDR' : 'SDR', ...(m.depth ? [T('meta.depth')] : []), ...(raw ? ['RAW → HEIC'] : [])].join(' · ')]];
@@ -227,18 +245,30 @@ function row(name) {
       const host=document.createElement('details');host.className='ai-details';host.open=true;
       const summary=document.createElement('summary');summary.textContent=aiText().preview;host.append(summary);
       el.insertBefore(host,el.querySelector('.act'));
-      resultCleanups.add(portraitPreview(result,host,aiText(),onSettings));
+      try{
+        this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{
+          this.portraitPending=pending;if(aiPortrait.checked)this.outputPending(pending);
+        }}));
+      }catch(error){host.remove();this.note(aiText().previewFailed,'preview');throw error;}
     },
-    output(file) {
+    outputPending(pending){
+      this.outputPendingState=pending;el.querySelector('.act').setAttribute('aria-busy',String(pending));
+      for(const button of el.querySelectorAll('.act button'))button.disabled=pending;
+      for(const link of el.querySelectorAll('.act a')){link.setAttribute('aria-disabled',String(pending));link.tabIndex=pending?-1:0;}
+    },
+    output(file,{metadata=true}={}) {
+      if(disposed)return;
       const host=actions('normal');
       for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
       host.replaceChildren();
       if(navigator.canShare?.({files:[file]}))this.share(file,!!this.liveIdentifier);
       this.link(file,file.name);
-      const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
-      file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);
+      if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
+        file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);}
+      this.outputPending(Boolean(this.outputPendingState));
     },
     set(text, cls) {
+      remove.disabled=!['ok','err','info'].includes(cls);
       const s = el.querySelector(".status");
       s.textContent = cls === 'ok' ? T("st.ready") : text;
       delete s.dataset.i18n;
@@ -284,6 +314,7 @@ function row(name) {
       a.download = filename;
       a.textContent = T(key);
       a.className = "dl alt";
+      a.addEventListener('click',e=>{if(this.outputPendingState)e.preventDefault();});
       actions(group).appendChild(a);
     },
     rebuildStyle(action) {
@@ -303,11 +334,12 @@ function row(name) {
         b.disabled = true;
         try { await navigator.share({ files: [file] }); }
         catch (e) { if (e.name !== "AbortError") b.textContent = T("btn.blocked"); }
-        finally { b.disabled = false; }
+        finally { b.disabled = Boolean(this.outputPendingState); }
       });
       actions(group).prepend(b);
     },
   };
+  remove.addEventListener('click',ui.dispose);resultCleanups.add(ui.dispose);return ui;
 }
 
 // Keep the normal result for toggle-off/cancellation. Only opt-in adds Portrait.
@@ -318,7 +350,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
   aiCandidates.push(candidate);
   if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
   else {
-    if(candidate.skip){candidate.state='skipped';ui.aiState(aiText().skip);}
+    if(candidate.skip){candidate.state='skipped';ui.aiState(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip);}
     ui.output(outputFile);ui.aiBusy(false);
   }
 }
@@ -326,33 +358,39 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null) {
 async function runAiCandidate(candidate) {
   if (!aiPortrait.checked || !['new', 'failed'].includes(candidate.state)) return;
   const {ui, name, sourceFile} = candidate;
-  if (candidate.skip) { candidate.state = 'skipped'; ui.aiState(aiText().skip);ui.aiBusy(false); return; }
+  if (candidate.skip) { candidate.state = 'skipped'; ui.aiState(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip);ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
   ui.aiBusy(true);
   const controller=new AbortController();candidate.controller=controller;
   const removeCancel=ui.cancelAi(controller);
-  const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),120000);
+  // Downloads have a stall timeout; GPU phases have their own watchdog.
+  const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
   try {
     const {createAiPortrait} = await import('./src/ai-portrait.js');
     const {exportAiPortrait} = await import('./src/ai-portrait-export.js');
     const data = new Uint8Array(await candidate.outputFile.arrayBuffer());
-    const result = await createAiPortrait(data,stage => ui.aiState(aiText()[stage] || stage),sourceFile,{signal:controller.signal});
+    const result = await createAiPortrait(data,(stage,progress)=>{
+      if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
+        ui.aiState(`${aiText().download}${percent} · ${formatBytes(progress.loaded)}`);
+      }else ui.aiState(aiText()[stage]||aiText().loading);
+    },sourceFile,{signal:controller.signal});
     ui.aiState(aiText().encoding);
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
+    ui.cleanup(output.dispose);
     controller.signal.throwIfAborted();
     if(!aiPortrait.checked)throw new DOMException('AI disabled','AbortError');
     const date=photoCaptureDate(output.data);
-    const publish=data=>{
+    const publish=(data,metadata=true)=>{
       candidate.aiFile=new File([data],name.replace(/\.[^.]+$/,'')+'_Portrait.HEIC',{
         type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})});
-      if(aiPortrait.checked)ui.output(candidate.aiFile);
+      if(aiPortrait.checked)ui.output(candidate.aiFile,{metadata});
     };
     publish(output.data);
-    try{await ui.portraitPreview(result,settings=>publish(output.withSettings(settings).data));}
+    try{await ui.portraitPreview(result,async(settings,isCurrent)=>{const updated=await output.withSettings(settings);if(isCurrent())publish(updated.data,false);});}
     catch(error){console.warn('Portrait preview unavailable; edit focus in Photos',error);}
     candidate.state = 'done';
     ui.aiView(aiPortrait.checked);
-    if(aiPortrait.checked){ui.output(candidate.aiFile);ui.aiState('');ui.note(aiText().ready,'ai');}
+    if(aiPortrait.checked){ui.aiState('');ui.note(aiText().ready,'ai');}
   } catch(error) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
@@ -405,7 +443,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
               ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
             else if (progress.stage === "main") ui.set(`${T("st.rastertiles")} ${progress.done}/${progress.total}`);
             else ui.set(T("st.rasterworking"));
-          }, {analyze: quality.checked});
+          }, {analyze: true});
       } catch (error) {
         console.error("Raster conversion failed", file.name, error);
         ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
@@ -478,7 +516,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
         }
       }
 
-      const canDecode = quality.checked ? await ensureDecode(bytes) : false;
+      const canDecode = await ensureDecode(bytes);
       ui.set(T("st.working"));
       const opts = canDecode
         ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target", linearThumb, experimental: needsExperimental }
@@ -587,7 +625,7 @@ function countVisit() {
     profileIndex = await response.json();
     browserReady = true;
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
-    quality.disabled=false;aiPortrait.disabled=false;
+    aiPortrait.disabled=false;
     $('boot').textContent = '';
     navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.

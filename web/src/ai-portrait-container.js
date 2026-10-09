@@ -3,10 +3,13 @@ import {topBox, box, concat, be, bytesEqual} from './box.js';
 import {discoverHeic, auxUriForItem, DEPTH_URI, extractItem, addItems, parseIloc, ispeBox, propertyBoxBytes,
   appendIpcoProperty,idatItemBytes} from './heif.js';
 import {appleDepthAuxc,appleDepthXmp} from './apple-depth-metadata.js';
+import {styleCapabilities} from './style-capabilities.js';
 
 export function portraitEligibility(data) {
   const d = discoverHeic(data);
   if ([...d.infos.keys()].some(id => auxUriForItem(d.props,id) === DEPTH_URI)) return 'existing-depth';
+  const styles=styleCapabilities(data);
+  if(styles.native&&!styles.editable)return 'unverified-styles';
   return null;
 }
 
@@ -18,9 +21,10 @@ export function normalizeDisparity(values) {
   return Uint8Array.from(values,v=>Math.round(255*(v-min)/(max-min)));
 }
 
-export function inferenceGeometry(width,height) {
+export function inferenceGeometry(width,height,maxEdge=1036) {
   if(!(width>0&&height>0))throw Error('Invalid source geometry');
-  const scale=518/Math.max(width,height);
+  if(![1036,770,518].includes(maxEdge))throw Error('Invalid AI quality budget');
+  const scale=maxEdge/Math.max(width,height);
   return {width:Math.max(14,Math.round(width*scale/14)*14),height:Math.max(14,Math.round(height*scale/14)*14)};
 }
 

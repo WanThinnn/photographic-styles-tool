@@ -2177,3 +2177,86 @@ display pixels within 1/255, and tap-to-focus returns the expected stored point.
 This verifies frame mapping without asserting model accuracy or actual libheif
 decode equivalence. The full suite passes 71 of 81 cases (10 optional-fixture
 skips); PWA and language checks pass. Physical Photos blur alignment is pending.
+
+### 10.39 Depth detail and interactive performance (2026-10-09)
+
+The user subsequently confirms the one-step Styles/Portrait and orientation fixes
+work smoothly, and authorizes higher depth resolution and UI/performance changes.
+This confirmation applies to the earlier exporter and orientation fix; the new
+depth refinement below still needs physical Photos quality comparison.
+
+Depth Anything V2 Small now receives real primary-image pixels with maximum edge
+1036 and dimensions rounded to its 14-pixel patch size. GPU allocation/device-loss
+failures retry at 770, then 518; unsupported WebGPU and invalid model results do
+not silently become a CPU estimate. Ray-tracing support is not evidence of WebGPU
+allocation capacity. Saved depth/preview maximum edge rises from 768 to 1024.
+The inference worker keeps float predictions through joint RGB-guided resampling
+and quantizes once to the existing Apple-compatible 8-bit depth auxiliary.
+Guidance reduces bleeding at an existing high-contrast depth boundary without
+creating new layers from texture on a constant-depth surface. It cannot invent
+hair, glass or occluded geometry that the relative-depth model did not recover.
+
+Preview now reuses shaders, texture uploads and its GPU context instead of
+compiling and destroying them for every frame. Offscreen/collapsed previews free
+GPU resources while retaining a canvas snapshot. Source canvas disposal does not
+reset the stored blur scale. Focus has a marker, keyboard arrows and reset.
+HEIC assembly moves into its own Worker, which owns the completed source and
+encoded depth until the result is removed. Changes debounce for 220 ms; range
+release/reset commits immediately. Pending downloads are disabled, older replies
+cannot overwrite newer settings, and focus updates skip redundant metadata reads.
+
+Tone matching is automatic for generated Styles, with the existing decoder
+fallback; native Styles remain unchanged. The only visible switch is AI Portrait,
+with its hint revealed when enabled. Each result has a remove action that releases
+its Worker, GPU resources, links and Live Photo pairing data. Clear history remains.
+Model downloads report progress, use a separate 30-second stall timeout and verify
+SHA-256 before inference. GPU phase timeouts remain two minutes and the full AI
+flow is bounded at ten minutes. Model/runtime caches survive UI/SW updates using
+content/dependency identities, rather than retaining duplicate model copies.
+
+Desktop Chrome measured reused 768x576 preview updates at 0.6 ms median versus
+9.8 ms with new contexts (ten samples each). For the real 1,938,864-byte IMG_1096
+container, main-thread assembly took 110.1 ms median; Worker assembly took 91.9 ms
+with a maximum 10 ms UI timer gap of 11.1 ms. These are local desktop observations,
+not iPhone timing predictions. Real WebGPU inference on the supplied Indigo JPEG
+used 770x1036 and produced 768x1024 depth in about 4 seconds, without fallback.
+An end-to-end native IMG_1096 browser check uses real decode, model, HEVC and
+assembly, retaining all primary/delta/HDR tiles, native Styles and selection
+exactly; Soft Skin is a no-face substitute in that UI probe. Real Indigo HDR
+conversion uses a deterministic depth substitute in its separate export probe.
+Rapid settings/reset, OFF/ON while pending, row removal and URL revocation pass.
+Fresh visits and 320/430/900 px light/dark layouts pass without missing labels or
+horizontal overflow. Twelve orientation cases and post-disposal preview blur pass.
+
+Local regression: 86 cases, 76 passed, ten unavailable optional-fixture skips,
+zero failures. PWA asset-list and Vietnamese/English/Chinese checks pass.
+Physical quality of the higher-resolution refined depth remains unverified.
+Strong Styles colour fitting remains paused at the user's request.
+
+### 10.40 Future format compatibility is not an iOS version downgrade (2026-10-09)
+
+The user proposes converting future iOS 27.2/28 data to the current 27.0.1 label.
+EXIF Software is descriptive identity; changing it alone does not transform HEIF
+item relationships, codecs, Styles schemas, calibration or REND contracts.
+Blindly changing bytes or schema flags could pair unknown semantics with an older
+renderer declaration. The accepted current exporter already rebuilds an understood
+Portrait graph from the photo's own resources and a tested metadata reference;
+that is a specific adapter, not universal conversion of future Apple formats.
+
+The new compatibility guard checks actual Styles contracts: 13, 14, 16 and the
+accepted flag-bearing value 131087. Unknown schemas retain their native additive
+Texture path and Styles payload, while added Soft Skin and AI Portrait are skipped
+with an informational message. A second guard in the pure Portrait builder
+prevents callers from bypassing this check. Unknown keys inside supported Styles
+remain byte-identical; the guard never forces schema/Software to an older value.
+Regression adds a hypothetical schema 999 and opaque resource: transformation is
+rejected without mutating the source; the same extra resource in schema 14 survives
+Portrait export exactly. This verifies code behavior, not future Apple compatibility.
+
+A newer iOS version can continue to work if its actual contract stays supported.
+An unknown contract needs sanitized original fixtures and an explicit adapter,
+followed by physical import/edit/Portrait/lighting/Texture/save/reopen checks.
+Even a known schema cannot guarantee unchanged interpretation by a future Photos
+renderer. MakerNote/calibration replacement remains limited to the current tested
+Portrait adapter; this guard is not comprehensive version negotiation or a way to
+defeat a future Apple restriction.

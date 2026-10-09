@@ -26,7 +26,6 @@
 //   app.lede     the short description above the drop area
 //   drop.*       the drop area: the action only, no instructions
 //   tip.*        the Photo Library tip under the drop area
-//   opt.quality  the analysis switch
 //   st.*         status text on a finished row
 //   err.*        failures a visitor can see
 //   btn.*        buttons on a finished row
@@ -48,6 +47,7 @@ export const STRINGS = {
     "st.softskinunavailable": "Chưa bổ sung được Soft Skin. Hãy kiểm tra kết nối và thử lại; bản Styles vẫn dùng được.",
     "h.history": "Lịch sử xử lý",
     "btn.clearhistory": "Xóa lịch sử",
+    "btn.removeresult": "Xóa kết quả này",
     "btn.retry": "Thử lại",
     "st.preparing": "Đang chuẩn bị công cụ cho lần sử dụng đầu tiên…",
     "err.setup": "Chưa chuẩn bị được công cụ. Hãy kiểm tra kết nối và mở trang bằng HTTPS, rồi thử lại.",
@@ -61,7 +61,7 @@ export const STRINGS = {
     "help.formats": "Hỗ trợ HEIC, JPG, PNG, DNG, WebP, GIF, BMP và AVIF. DNG được giải mã sang sRGB và xuất HEIC, không còn RAW. Ảnh động chỉ dùng một khung hình.",
     "help.original": "Hãy giữ ảnh gốc. Để giữ Styles, HDR và chỉnh Chân dung trên ảnh iPhone 16 trở lên, hãy thêm Texture vào HEIC gốc trước khi chỉnh trong Ảnh. Bản xuất sau chỉnh sửa có thể thiếu dữ liệu cần thiết.",
     "help.live": "Lưu vào Ảnh chỉ lưu ảnh tĩnh. Xuất cặp Live Photo cần video MOV gốc tương ứng và công cụ nhập tương thích.",
-    "help.slow": "Lần chuyển đổi đầu tiên cần tải bộ mã hóa. Nếu trang chạy chậm, hãy tắt tùy chọn khớp sắc độ rồi thử lại.",
+    "help.slow": "Lần đầu cần tải công cụ xử lý. AI được tải khi cần và lưu để dùng lại. Với ảnh lớn, hãy xử lý từng ảnh.",
     "help.language": "Ngôn ngữ mặc định theo trình duyệt. App luôn ưu tiên và ghi nhớ ngôn ngữ bạn chọn.",
     "date.kept": "Thời gian chụp trong file:",
     "t.date": "<b>Ngày chụp</b>: file giữ metadata thời gian chụp gốc. Ảnh và iCloud có thể gán ngày lưu; web không kiểm soát được ngày trong thư viện.",
@@ -156,6 +156,7 @@ export const STRINGS = {
     "st.softskinunavailable": "Soft Skin could not be added. Check your connection and retry; the Styles copy is still usable.",
     "h.history": "Processing history",
     "btn.clearhistory": "Clear history",
+    "btn.removeresult": "Remove this result",
     "btn.retry": "Try again",
     "st.preparing": "Preparing the tool for first use…",
     "err.setup": "Could not prepare the tool. Check your connection and open the page over HTTPS, then try again.",
@@ -171,7 +172,7 @@ export const STRINGS = {
     "help.formats": "HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.",
     "help.original": "Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.",
     "help.live": "Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.",
-    "help.slow": "The first conversion downloads an encoder. If the page is slow, turn off tone matching and try again.",
+    "help.slow": "The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.",
     "date.kept": "Capture time in the file:",
     "t.date": "<b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.",
     "date.missing": "The source has no readable capture time. Photos may use the import date.",
@@ -290,6 +291,7 @@ export const STRINGS = {
     "st.softskinunavailable": "无法添加柔肤。请检查网络后重试；摄影风格副本仍可使用。",
     "h.history": "处理记录",
     "btn.clearhistory": "清空记录",
+    "btn.removeresult": "移除此结果",
     "btn.retry": "重试",
     "st.preparing": "正在准备首次使用…",
     "err.setup": "无法准备工具。请检查网络连接，并通过 HTTPS 打开网页后重试。",
@@ -305,7 +307,7 @@ export const STRINGS = {
     "help.formats": "支持 HEIC、JPG、PNG、DNG、WebP、GIF、BMP 与 AVIF。DNG 转换为 sRGB 并导出 HEIC，不再保留 RAW；动态图像仅使用一帧。",
     "help.original": "请保留原图。要保留 iPhone 16 及更新机型照片的摄影风格、HDR 和人像编辑，请先为原始 HEIC 添加质感，再在“照片”中编辑。编辑后导出的副本可能缺少所需数据。",
     "help.live": "存储到照片仅保存静态图像。实况照片导出需要匹配的原始 MOV 和兼容的导入工具。",
-    "help.slow": "首次转换会下载编码器。如果页面运行缓慢，请关闭影调匹配后重试。",
+    "help.slow": "首次使用需下载处理工具。AI 按需下载并保存供后续使用。处理大照片时，建议逐张处理。",
     "h.formats": "格式与处理方式",
     "opt.analysishelp": "影调匹配会分析每张照片，首次使用需下载小型解码器。如处理缓慢或页面卡住，可关闭此选项。",
     "date.kept": "文件中的拍摄时间：",

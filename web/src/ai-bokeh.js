@@ -1,5 +1,5 @@
 // A disk-shaped aperture in linear light, with depth-dependent circle of
-// confusion and foreground rejection. Used identically for preview and export.
+// confusion and foreground rejection. Preview only; Photos renders the saved depth.
 const vertex=`#version 300 es
 in vec2 position;out vec2 uv;void main(){uv=position*.5+.5;gl_Position=vec4(position,0,1);}`;
 const fragment=`#version 300 es
@@ -37,7 +37,8 @@ void main(){
  }
  colour=vec4(pow(sum/max(weights,.001),vec3(1./2.2)),1);
 }`;
-export function renderBokeh(source,gray,width,height,{focus,blur,angle=0,mirror=null}){
+export function createBokehRenderer(source,gray,width,height,{angle=0,mirror=null}={}){
+  const sourceEdge=Math.max(source.width,source.height);
   const canvas=document.createElement('canvas'),swap=angle===90||angle===270;
   canvas.width=swap?source.height:source.width;canvas.height=swap?source.width:source.height;
   const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,preserveDrawingBuffer:true,powerPreference:'high-performance'});
@@ -52,7 +53,7 @@ export function renderBokeh(source,gray,width,height,{focus,blur,angle=0,mirror=
     const location=gl.getAttribLocation(program,'position');gl.enableVertexAttribArray(location);gl.vertexAttribPointer(location,2,gl.FLOAT,false,0,0);
     depthCanvas=document.createElement('canvas');depthCanvas.width=width;depthCanvas.height=height;
     const ctx=depthCanvas.getContext('2d'),image=ctx.createImageData(width,height);
-    for(let i=0;i<gray.length;i++)image.data.set([gray[i],gray[i],gray[i],255],i*4);ctx.putImageData(image,0,0);
+    for(let i=0;i<gray.length;i++){const p=i*4;image.data[p]=image.data[p+1]=image.data[p+2]=gray[i];image.data[p+3]=255;}ctx.putImageData(image,0,0);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
     [source,depthCanvas].forEach((surface,index)=>{
       const texture=gl.createTexture();textures.push(texture);gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,texture);
@@ -63,12 +64,20 @@ export function renderBokeh(source,gray,width,height,{focus,blur,angle=0,mirror=
       gl.uniform1i(gl.getUniformLocation(program,index?'depth':'photo'),index);
     });
     gl.uniform2f(gl.getUniformLocation(program,'sourceSize'),source.width,source.height);
-    gl.uniform1f(gl.getUniformLocation(program,'focus'),focus/255);
-    gl.uniform1f(gl.getUniformLocation(program,'radius'),blur*Math.max(source.width,source.height)/768);
+    const focusLocation=gl.getUniformLocation(program,'focus'),radiusLocation=gl.getUniformLocation(program,'radius');
     gl.uniform1i(gl.getUniformLocation(program,'angle'),angle);gl.uniform1i(gl.getUniformLocation(program,'mirror'),mirror??-1);
-    gl.viewport(0,0,canvas.width,canvas.height);gl.drawArrays(gl.TRIANGLES,0,6);gl.finish();
-    if(gl.getError()!==gl.NO_ERROR)throw Error('BOKEH_RENDER');
-    return {canvas,close(){canvas.width=canvas.height=0;gl.getExtension('WEBGL_lose_context')?.loseContext();}};
-  }catch(error){canvas.width=canvas.height=0;gl.getExtension('WEBGL_lose_context')?.loseContext();throw error;}
-  finally{for(const texture of textures)gl.deleteTexture(texture);if(buffer)gl.deleteBuffer(buffer);if(program)gl.deleteProgram(program);for(const shader of shaders)gl.deleteShader(shader);if(depthCanvas)depthCanvas.width=depthCanvas.height=0;}
+    depthCanvas.width=depthCanvas.height=0;depthCanvas=null;let closed=false;
+    return {canvas,draw({focus,blur}){
+      if(closed||gl.isContextLost())throw Error('BOKEH_GPU');
+      gl.uniform1f(focusLocation,focus/255);gl.uniform1f(radiusLocation,blur*sourceEdge/768);
+      gl.viewport(0,0,canvas.width,canvas.height);gl.drawArrays(gl.TRIANGLES,0,6);
+      if(gl.getError()!==gl.NO_ERROR)throw Error('BOKEH_RENDER');
+    },close(){if(closed)return;closed=true;release();}};
+  }catch(error){release();throw error;}
+  function release(){for(const texture of textures)gl.deleteTexture(texture);if(buffer)gl.deleteBuffer(buffer);if(program)gl.deleteProgram(program);for(const shader of shaders)gl.deleteShader(shader);if(depthCanvas)depthCanvas.width=depthCanvas.height=0;canvas.width=canvas.height=0;gl.getExtension('WEBGL_lose_context')?.loseContext();}
+}
+// One-shot callers retain the old API; interactive previews reuse one renderer.
+export function renderBokeh(source,gray,width,height,settings){
+  const renderer=createBokehRenderer(source,gray,width,height,settings);
+  try{renderer.draw(settings);return renderer;}catch(error){renderer.close();throw error;}
 }

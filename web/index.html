@@ -50,15 +50,9 @@
   <input type="file" id="file" multiple disabled
          accept="image/heic,image/heif,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,image/x-adobe-dng,video/quicktime,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.dng,.mov">
 
-  <div class="options-grid">
-  <div class="opts card">
-    <input type="checkbox" id="quality" role="switch" checked disabled>
-    <label for="quality" data-i18n="opt.quality">Match styles to the photo’s tones</label>
-  </div>
-  <div class="opts card">
+  <div class="portrait-option">
+    <label for="ai-portrait" id="ai-portrait-label">AI background blur</label>
     <input type="checkbox" id="ai-portrait" disabled role="switch" aria-describedby="ai-portrait-hint">
-    <label for="ai-portrait" id="ai-portrait-label">AI background blur · GPU (experimental)</label>
-  </div>
   </div>
   <p id="ai-portrait-hint" class="ai-hint" hidden></p>
   <p class="ai-hint" data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</p>
@@ -80,7 +74,7 @@
       <section><h2 data-i18n="h.steps">How to use</h2><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></section>
       <section><h2 data-i18n="h.formats">Formats and processing</h2><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></section>
       <section><h2 data-i18n="h.editlimits">iPhone 16/17 photos with edited Styles or Portrait</h2><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></section>
-      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads an encoder. If the page is slow, turn off tone matching and try again.</p><p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
+      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p><p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
       <section><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p><p data-i18n="help.language">The default language follows your browser. Your language choice is remembered and always takes priority.</p></section>
     </div>
   </details>

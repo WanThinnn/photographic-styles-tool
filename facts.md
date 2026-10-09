@@ -2407,3 +2407,23 @@ Final AI failures add the step and a bounded diagnostic to Details. Completed
 conversion encoder workers and decode samples are released before GPU inference
 to reduce simultaneous memory use. Safari's budget remains 630/518; v84 updates
 the shell while keeping model caches. Process termination still bypasses fallback.
+
+### 10.46 iPhone edge-to-edge page background (2026-10-10)
+
+The user's Home Screen app screenshot shows a separate light status-bar strip,
+with the same problem in dark mode. HTML already has viewport-fit=cover but used
+the default Apple status-bar style. It now requests black-translucent, following
+Apple's standalone web-app configuration, so the background can extend beneath
+the status bar. The page gradient lives on the root canvas rather than only the
+body. Light/dark browser theme colors and the manifest's light launch color now
+match the CSS base colors. Body content padding adds top/bottom safe areas to
+the ordinary spacing and respects side cutouts in landscape. OS status icons
+remain visible; this does not force Safari's browser chrome into fullscreen.
+
+A private Chrome layout probe substitutes safe-area environment values because
+the installed CDP does not support setSafeAreaInsets. Light and dark layouts at
+430 portrait, 932 landscape and 320 compact widths keep the root gradient,
+respect all four insets and have no horizontal overflow. Screenshots were
+visually inspected. This verifies CSS layout, not native iOS status-bar rendering;
+Home Screen relaunch on the user's device remains the final check. PWA validation
+passes and the shell cache advances to v85, without changing depth's 630/518 policy.

@@ -132,6 +132,14 @@ after startup. Full offline processing requires that background caching and any 
 encoder/model downloads to finish. Paths stay relative so the same files work at the
 root of a domain or under a GitHub Pages project subpath.
 
+For iPhone Home Screen launches, `viewport-fit=cover` and the translucent status
+bar configuration let the page background extend beneath system areas. The root
+canvas owns the same gradient in light/dark mode; content padding includes all
+four safe-area insets so the header, controls and footer avoid cutouts and the
+Home indicator. Browser chrome remains controlled by Safari. See Apple's
+[web app configuration](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html)
+and WebKit's [safe-area guidance](https://webkit.org/blog/7929/designing-websites-for-iphone-x/).
+
 The initial HTML contains fallback text. A small bootstrap applies the selected language
 before loading processing modules, so slow or failed downloads leave visible labels and
 a usable language menu. Photo selection waits for browser setup; decoder initialization

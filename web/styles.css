@@ -101,7 +101,6 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding-top:15px}foot
 .row .act .dl{flex:0 1 auto}
 .row .act>.output-actions:only-child{grid-column:1/-1}
 .output-actions:not(:has(>.dl~.dl))>.dl{grid-column:1/-1;justify-self:center;min-width:min(240px,100%)}
-.row .act>.rebuild-style{grid-column:1/-1;justify-self:center;max-width:100%;white-space:normal;text-align:center;padding-inline:24px}
 .dl.alt{border:1.5px solid var(--muted)}
 .history-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 4px 0;margin-bottom:-8px}.history-actions:has(button[hidden]){display:none}
 .history-actions h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--fg)}

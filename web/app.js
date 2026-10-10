@@ -306,13 +306,6 @@ function row(name) {
       a.addEventListener('click',e=>{if(this.outputPendingState)e.preventDefault();});
       actions(group).appendChild(a);
     },
-    rebuildStyle(action, key = 'btn.rebuildstyle') {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'dl alt rebuild-style';
-      b.textContent = T(key);
-      b.addEventListener('click', () => { b.remove(); action(); }, {once: true});
-      el.querySelector('.act').appendChild(b);
-    },
     portraitAdvice(text) {
       const advice=document.createElement('p');advice.className='portrait-advice';advice.textContent=text;
       el.insertBefore(advice,el.querySelector('.act'));
@@ -404,7 +397,7 @@ async function runAiCandidate(candidate) {
   }
 }
 
-async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed = false} = {}) {
+async function handleFile(file) {
   const ui = row(file.name);
   const inputSize = file.size;
   try {
@@ -465,11 +458,11 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
 
     const d = input.discovery;
     const textureOnly = preserveNativeStyles(bytes,d);
-    const preserveIncomplete = textureOnly && d.stylesItem === null && !allowStyleRebuild;
+    const preserveIncomplete = textureOnly && d.stylesItem === null;
     const {nativePortraitBaseState}=await import('./src/portrait/ai-portrait-container.js');
     const portraitState=nativePortraitBaseState(bytes,d);
-    const restorePortrait=portraitOffConfirmed||portraitState==='legacy-photo-base';
-    if (styleReconstructionRisk(bytes,d)) ui.note(T(allowStyleRebuild ? 'warn.stylerebuild' : 'warn.textureonly'),'style-rebuild');
+    const restorePortrait=portraitState==='legacy-photo-base';
+    if (styleReconstructionRisk(bytes,d)) ui.note(T('warn.textureonly'),'style-rebuild');
     const liveIdentifier = photoContentIdentifier(bytes);
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
@@ -482,7 +475,7 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
       data ||= bytes;
       bits = [T('st.original')];
       suffix = '_Preserved.HEIC';
-    } else if ((textureOnly && !allowStyleRebuild) || d.stylesItem !== null) {
+    } else if (textureOnly || d.stylesItem !== null) {
       // A native iPhone 16/17 style photo is never re-ported (that would replace its real
       // style data); it only gets the iOS 27 Texture/Grain set added.
       ui.set(T("st.working"));
@@ -525,13 +518,11 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
       const opts = canDecode
         ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) }
         : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
-      opts.reconstructedBright=allowStyleRebuild&&textureOnly&&d.stylesItem===null;
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
       // patch() degrades rather than failing when the decoder misbehaves, so trust
       // what it reports it actually did, not what we asked for.
       if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
-      if(report.styleSelectionCompatibility==='bright-palette70')ui.note(T('warn.brightcompat'),'style-rebuild');
 
       bits = [T(report.decoded ? "st.matched" : "st.neutral")];
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));
@@ -543,7 +534,7 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
     if (!preserveIncomplete)
       data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});
     if(restorePortrait&&!preserveIncomplete){
-      const restored=await restoreNativePortraitInWorker(data,{portraitOffConfirmed});
+      const restored=await restoreNativePortraitInWorker(data);
       if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
     }
     ui.readyNotice=`${T("st.ready")} — ${bits.join(sep)}`;
@@ -574,13 +565,8 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
     }
     await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
     if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));
-    if(portraitState==='existing-renderer'&&preserveIncomplete){
-      ui.portraitAdvice(T('warn.portraiton'));
-      ui.rebuildStyle(() => queueTask(() => handleFile(file,{allowStyleRebuild:true})));
-    }else if(portraitState&&portraitState!=='existing-renderer'&&!restorePortrait){
+    else if(portraitState&&portraitState!=='existing-renderer'&&!restorePortrait)
       ui.portraitAdvice(T(portraitState==='portrait-capture'?'warn.portraiton':'warn.portraitunknown'));
-      ui.rebuildStyle(() => queueTask(() => handleFile(file,{allowStyleRebuild:preserveIncomplete,portraitOffConfirmed:true})), 'btn.portraitoff');
-    }else if (preserveIncomplete) ui.rebuildStyle(() => queueTask(() => handleFile(file,{allowStyleRebuild:true})));
   } catch (e) {
     // Past the format sniff, every remaining rejection means the same thing to a
     // visitor: this is a HEIC, but not one this build can handle. The real reason

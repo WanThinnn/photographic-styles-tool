@@ -111,19 +111,29 @@ V13 reduces only the neutral variant's Palette to 85 or 70, preserving its HDR
 and depth data. The user found K (70) lighter than G and acceptable on this sample.
 Legacy/ISO rendering equivalence and general compatibility remain unverified.
 
-The website now uses K only for explicit Styles reconstruction of an incomplete
-iPhone 16 Pro Bright export with the tested original Tone -0.5 / Colour 0.5 and
-single-channel ISO HDR contract. It keeps Bright, resets Tone/Colour to neutral,
-sets Palette to 70 and adds headroom metadata derived from the photo's own ISO
-parameters. The result explains the changed settings. Complete native Styles,
-other presets/cameras, unsupported ISO versions and the default preserved-copy
-route do not use this adjustment. Portrait editing still requires a confirmed
-sharp base; already baked blur cannot be reversed through metadata.
-The actual browser output for IMG_1163 matches K's measured Styles, thumbnail,
+The V94 website briefly offered K through explicit reconstruction: Bright,
+neutral Tone/Colour, Palette 70 and headroom derived from the photo's own ISO
+parameters. The actual browser output for IMG_1163 matched K's measured Styles, thumbnail,
 selection and HDR sidecar, with original RGB/HDR/depth samples exact. A complete
 native Bright input retains its own EXIF and Styles payloads exactly. This is a
 scoped compatibility compromise tested on one edited photo, not recovery of the
 missing native calibration or a universal colour correction.
+
+The user subsequently selected a fully automatic preservation policy. The web
+no longer offers Create new Styles or Portrait-Off confirmation actions and does
+not invoke the K reconstruction path. Complete native Styles keep their original
+preset and parameters and only receive Texture supplementation. Incomplete
+native exports keep their own rendered image, selected preset, depth and HDR;
+missing Styles editing data and Texture are not synthesized, because doing so
+can change colours. The result explains this limitation. This follows upstream's
+Texture-only route when native Styles are present without its Standard preset
+fallback when they are missing.
+Only the previously tested legacy sharp Photo+depth contract restores aperture
+and lighting automatically. Existing renderers are preserved. Unknown native
+Portrait exports (including both IMG_1158 and IMG_1163) do not gain another blur
+renderer based on PhotosAppFeatureFlags, capture class or a guessed On/Off state.
+Turning Portrait off in Photos alone does not prove a sharp base from the file's
+metadata. Already rendered blur cannot be reversed through metadata.
 
 SkinSmoothFaceRoughness now uses local-detail residual variance: the user found variant D
 smoother than A/B/C/E/F/G on IMG_0783, with Glow/Film working. Eye statistics still use the

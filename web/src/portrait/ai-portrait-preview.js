@@ -88,7 +88,7 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   const draw=()=>{
     if(document.hidden)return;
     const focus=gray[Math.min(h-1,Math.floor(y*h))*w+Math.min(w-1,Math.floor(x*w))];
-    const active=ensureRenderer();active.draw({focus,blur:previewBlur(selectedAperture(blur))});view.getContext('2d').drawImage(active.canvas,0,0);
+    const active=ensureRenderer();active.draw({focus,blur:previewBlur(selectedAperture(blur))*(result.disparityMax??1)});view.getContext('2d').drawImage(active.canvas,0,0);
   };
   const commit=()=>{
     clearTimeout(timer);timer=null;

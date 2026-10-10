@@ -5,6 +5,35 @@ import {releaseLibheif} from '../../web/src/codecs/libheif-lifecycle.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {waitForVisiblePage} from '../../web/src/ui/processing-scheduler.js';
+import {clearDownloadedAssets} from '../../web/src/core/cache-cleanup.js';
+import {MODEL_CACHE_NAME} from '../../web/src/core/model-download.js';
+import {depthModel,asDisparity} from '../../web/src/portrait/depth-models.js';
+
+test('download cleanup is scoped and preserves photos, shell, and sibling projects',async()=>{
+  const entries=new Map([
+    [MODEL_CACHE_NAME,new Map([
+      ['https://example.com/tool/vendor/ai-portrait/pro-model.onnx_data?sha256=p',new Response('weights',{headers:{'content-length':'7'}})],
+      ['https://example.com/other/vendor/ai-portrait/model.onnx',new Response('other')],
+      ['https://example.com/tool/photo.heic',new Response('photo')],
+    ])],
+    ['photographic-style-port-v100',new Map([['https://example.com/tool/index.html',new Response('shell')]])],
+    ['unrelated-app',new Map([['https://example.com/tool/vendor/ai-portrait/model.onnx',new Response('other cache')]])],
+  ]);
+  const cacheStorage={keys:async()=>[...entries.keys()],open:async name=>{
+    const map=entries.get(name);return {keys:async()=>[...map.keys()].map(url=>({url})),match:async r=>map.get(r.url),delete:async r=>map.delete(r.url)};
+  }};
+  assert.deepEqual(await clearDownloadedAssets({cacheStorage,base:'https://example.com/tool/'}),{count:1,bytes:7});
+  assert.equal(entries.get(MODEL_CACHE_NAME).size,2);assert.equal(entries.get('photographic-style-port-v100').size,1);assert.equal(entries.get('unrelated-app').size,1);
+  assert.deepEqual(await clearDownloadedAssets({cacheStorage,base:'https://example.com/tool/'}),{count:0,bytes:0});
+  await assert.rejects(clearDownloadedAssets({cacheStorage:null}),/unavailable/);
+});
+
+test('depth choices reject unknown models and convert positive V3 depth to near-bright disparity',()=>{
+  assert.equal(depthModel().label,'Standard');assert.equal(depthModel('lite').files.length,1);assert.equal(depthModel('pro').rank,5);
+  assert.throws(()=>depthModel('__proto__'),/Unsupported/);
+  const depth=Float32Array.of(1,2,4);assert.deepEqual(asDisparity(depth,'depth'),Float32Array.of(1,.5,.25));assert.deepEqual(depth,Float32Array.of(1,2,4));
+  for(const value of [0,-1,NaN,Infinity])assert.throws(()=>asDisparity(Float32Array.of(value),'depth'),/Invalid/);
+});
 
 test('a hidden photo batch waits for visibility and then removes its listener',async()=>{
   const doc=new EventTarget();doc.hidden=true;let done=false;
@@ -17,7 +46,7 @@ test('a hidden photo batch waits for visibility and then removes its listener',a
 test('CPU selection reaches the depth worker explicitly, invalid providers do not start a worker',async()=>{
   let worker,terminated=0;
   const result=await inferDepth(new Uint8Array(3),{width:1,height:1},{provider:'wasm',workerFactory:()=>worker={
-    postMessage(message){assert.equal(message.provider,'wasm');queueMicrotask(()=>worker.onmessage({data:{result:{gray:Uint8Array.of(42)}}}));},
+    postMessage(message){assert.equal(message.provider,'wasm');assert.equal(message.modelId,'standard');queueMicrotask(()=>worker.onmessage({data:{result:{gray:Uint8Array.of(42)}}}));},
     terminate(){terminated++;},
   }});
   assert.deepEqual(result.gray,Uint8Array.of(42));assert.equal(terminated,1);

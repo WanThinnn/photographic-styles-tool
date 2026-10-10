@@ -1,12 +1,14 @@
 import {inferenceGeometry} from './ai-portrait-container.js';
-import {refineDepth} from './ai-depth-refinement.js';
+import {refineDepth,shapeAiDisparity,AI_DISPARITY_MAX} from './ai-depth-refinement.js';
 import {discoverHeic,dimensionsForItem} from '../core/heif.js';
 import {itemOrientation} from '../raster/heif.js';
 import {aiSourceCanvas,rgbSample} from './ai-portrait-source.js';
 import {inferDepth,awaitAiSource,depthInputBudgets,canRetryDepth} from './ai-inference.js';
 import {readPersonGuidance} from './person-depth-guidance.js';
+import {depthModel} from './depth-models.js';
 
-export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{signal,provider='webgpu'}={}) {
+export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{signal,provider='webgpu',modelId='standard'}={}) {
+  depthModel(modelId);
   if (provider==='webgpu'&&!navigator.gpu) throw Error('WEBGPU');
   if (!globalThis.crossOriginIsolated) throw Error('ISOLATION');
   let source;
@@ -27,7 +29,7 @@ export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{s
     signal?.throwIfAborted();
     for(const edge of budgets){
       used=inferenceGeometry(w,h,edge);
-      try{inferred=await inferDepth(rgbSample(source,used.width,used.height),used,{signal,provider,onProgress,guidance:{rgb:previewRgb,person,width,height}});break;}
+      try{inferred=await inferDepth(rgbSample(source,used.width,used.height),used,{signal,provider,modelId,onProgress,guidance:{rgb:previewRgb,person,width,height}});break;}
       catch(error){
         signal?.throwIfAborted();
         if(edge===budgets.at(-1)||!canRetryDepth(error))throw error;
@@ -36,7 +38,7 @@ export async function createAiPortrait(data,onProgress=()=>{},sourceFile=null,{s
     }
     // Custom providers may return float values. The production worker refines
     // the map off the UI thread and quantizes only after guided resampling.
-    const gray=inferred.gray||refineDepth(inferred.values,inferred.mw,inferred.mh,previewRgb,width,height);
-    return {gray,width,height,previewRgb,orientation,sourceData:data,sourceFile,sourceWidth:w,sourceHeight:h,inferenceWidth:used.width,inferenceHeight:used.height,provider};
+    const gray=shapeAiDisparity(inferred.gray||refineDepth(inferred.values,inferred.mw,inferred.mh,previewRgb,width,height));
+    return {gray,disparityMax:AI_DISPARITY_MAX,width,height,previewRgb,orientation,sourceData:data,sourceFile,sourceWidth:w,sourceHeight:h,inferenceWidth:used.width,inferenceHeight:used.height,provider,modelId};
   } finally { if(source)source.width=source.height=0; }
 }

@@ -41,7 +41,7 @@ export function refineDepth(values,mw,mh,rgb,width,height){
 // missed subject or replace semantic segmentation. Called after releasing GPU
 // tensors; scratch storage stays bounded even for large source photographs.
 // Separable sliding extrema replace a square neighbourhood scan. This keeps
-// the exact same local envelope with O(pixels) work instead of O(radius²).
+// the exact same local envelope with O(pixels) work instead of O(radius虏).
 export function depthEnvelope(field,w,h,radius=4){
   const deque=new Int32Array(Math.max(w,h)),temporary=new Float32Array(field.length);
   const filter=(input,output,length,lines,stride,lineStep,isMin)=>{
@@ -116,4 +116,12 @@ export function refineDepthEdges(gray,rgb,width,height){
     out[p]=Math.round(Math.max(lo,gray[p]-24,Math.min(hi,gray[p]+24,corrected)));
   }
   return out;
+}
+// Device-tested F response for generated relative depth. Compress differences
+// on the near side without flattening surfaces into a single subject plane.
+// Keep this separate from refinement and never apply it to native depth.
+export const AI_DISPARITY_MAX=.75;
+const AI_DISPARITY_CURVE=Uint8Array.from({length:256},(_,i)=>Math.round(255*Math.sqrt(i/255)));
+export function shapeAiDisparity(gray){
+  return Uint8Array.from(gray,value=>AI_DISPARITY_CURVE[value]);
 }

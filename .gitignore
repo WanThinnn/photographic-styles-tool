@@ -87,4 +87,5 @@ ref/
 
 # Downloaded opt-in AI binaries; Pages CI fetches the pinned, verified copies.
 web/vendor/ai-portrait/*.onnx
+web/vendor/ai-portrait/*.onnx_data
 web/vendor/ai-portrait/*.wasm

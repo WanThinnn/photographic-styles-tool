@@ -39,7 +39,22 @@ results do not guarantee physical depth accuracy or support for all cameras.
 An original Style selection stored in MakerNote 0x54 survives adding a missing
 Styles graph, including Bright and the original Tone/Colour values.
 
-Depth Anything V2 Small runs locally through ONNX Runtime WebGPU by default.
+The model control has three steps: Lite (V2 Small q4, 27.4 MB), Standard
+(V2 Small fp32, 99.1 MB, default), and Pro (V3 Small fp32, 105.3 MB including
+external weights). These sizes describe model downloads, not peak memory or
+total runtime downloads. Only the selected model is downloaded when needed;
+changing the control applies to the next operation. Each artifact is pinned by
+revision, size and SHA-256. Both V2 and V3 Small conversions are Apache 2.0.
+V3 uses ImageNet normalization with a five-dimensional single-view input and
+positive depth output, converted to inverse depth before common refinement.
+Two-photo desktop comparisons at the same 630 input budget verified GPU and
+CPU execution, but did not establish better individual hair strands for V3.
+Pro is an optional experiment, not a guarantee of better portrait boundaries;
+the shared person segmentation remains a separate constraint. Physical Safari
+memory, Photos rendering and thermal behaviour still need device validation.
+Lite reduces download size; it is not necessarily faster or cooler than Standard.
+
+Inference runs locally through ONNX Runtime WebGPU by default.
 The circular settings control beside the Depth switch lets users turn GPU acceleration off to use
 single-thread WASM CPU inference. This applies to the next operation, uses the
 same model and refinement, and does not change the GPU preview. CPU is slower
@@ -72,7 +87,8 @@ Texture/Styles/depth, native Styles retention and public-template privacy.
 Graph checks do not prove Photos controls across every device or photo.
 
 Run `node tools/download-ai-portrait.mjs` to download/verify pinned assets.
-The initial download is approximately 120 MB; model/runtime binaries are ignored
+Standard's initial download is approximately 120 MB; other selections differ.
+Model/runtime binaries are ignored
 by Git and fetched/verified by Pages CI. They are not installed with the PWA shell.
 Depth Anything V2 Small is Apache-2.0 and ONNX Runtime is MIT; both licenses ship
 with the assets. Model input starts at maximum edge 1036 (multiples of 14),
@@ -104,6 +120,25 @@ validation; metadata and lossless codec checks do not prove visual parity.
 Complete model downloads are SHA-256 verified and cached by content hash;
 runtime caching uses its pinned dependency identity rather than the UI release.
 No image is sent to a server. Safari/device memory and latency vary.
+
+Generated AI disparity uses the device-accepted F response: a square-root curve
+and relative range [0, 0.75]. Preview, auxiliary depth descriptor and XMP use
+the same response, including subsequent focus/aperture edits. This compresses
+near-side defocus relative to distant background in the tested scene; it is an
+empirical adjustment, not metric camera calibration or a hair-detail fix. Native
+depth is never remapped.
+
+Clear cache sits beside Clear history. It removes this app's downloaded model
+and processor cache entries and releases idle converter resources. It preserves
+photos, settings, offline UI and sibling GitHub Pages project entries. It is
+disabled while processing or updating Portrait settings. Browser HTTP caches
+are outside this button's control; tools download again when required.
+Download and successful share actions gain a checkmark and an Again label for
+that output File. A cancelled share is unchanged. New focus/aperture output
+starts unmarked; these indicators record UI actions, not proof of a Photos save.
+
+Model sources: https://huggingface.co/onnx-community/depth-anything-v2-small
+and https://huggingface.co/onnx-community/depth-anything-v3-small.
 
 Completed conversion encoders are released before depth inference to avoid
 overlapping their WASM heaps with the GPU model. Runtime failures retain their

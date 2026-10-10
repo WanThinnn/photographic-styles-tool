@@ -32,6 +32,41 @@
       "url": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort-wasm-simd-threaded.jsep.wasm",
       "bytes": 21872216,
       "sha256": "b45970d0632383a057c27ca5b660b216f8e00c17cf8db9f6207b5e4abc839368"
+    },
+    "lite-model_q4.onnx": {
+      "url": "https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/4472b7362082ad9968fee890ca0f1e5aca36b93d/onnx/model_q4.onnx",
+      "bytes": 27404416,
+      "sha256": "5d55b02762e1907589158af3e366bd61ddf648155852a07bbf5e3a074639fcf8"
+    },
+    "pro-model.onnx": {
+      "url": "https://huggingface.co/onnx-community/depth-anything-v3-small/resolve/0b6a7f3bf5595f9950b91389e0da3a0de130324c/onnx/model.onnx",
+      "bytes": 640691,
+      "sha256": "396008798244a074297fd88e450433b1357fc687f534939375c804ded86e7b2a"
+    },
+    "pro-model.onnx_data": {
+      "url": "https://huggingface.co/onnx-community/depth-anything-v3-small/resolve/0b6a7f3bf5595f9950b91389e0da3a0de130324c/onnx/model.onnx_data",
+      "bytes": 104702464,
+      "sha256": "802bb24741e67f5bb2b369fc64d40afe11439cc895d676d658d65cfb75c9860f"
+    }
+  },
+  "models": {
+    "lite": {
+      "source": "onnx-community/depth-anything-v2-small",
+      "revision": "4472b7362082ad9968fee890ca0f1e5aca36b93d",
+      "variant": "q4",
+      "license": "Apache-2.0"
+    },
+    "standard": {
+      "source": "onnx-community/depth-anything-v2-small",
+      "revision": "4472b7362082ad9968fee890ca0f1e5aca36b93d",
+      "variant": "fp32",
+      "license": "Apache-2.0"
+    },
+    "pro": {
+      "source": "onnx-community/depth-anything-v3-small",
+      "revision": "0b6a7f3bf5595f9950b91389e0da3a0de130324c",
+      "variant": "fp32",
+      "license": "Apache-2.0"
     }
   }
 }

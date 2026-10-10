@@ -61,29 +61,49 @@
     <label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
     <input type="checkbox" id="ai-portrait" disabled role="switch" aria-describedby="ai-portrait-hint">
   </div>
-  <p id="ai-portrait-hint" class="ai-hint" hidden></p>
-  <details id="ai-settings" class="ai-settings" hidden>
+  <details id="ai-settings" class="ai-settings">
     <summary>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h3m4 0h9M4 12h9m4 0h3M4 18h3m4 0h9"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg>
       <span id="ai-settings-label" class="sr-only">AI settings</span>
     </summary>
-    <div class="ai-settings-panel"><div class="portrait-option">
+    <div class="ai-settings-panel">
+    <div class="depth-model-row portrait-option">
+      <div class="ai-option-copy">
+      <label for="depth-model" id="depth-model-label">Model</label>
+      <p id="depth-model-hint" class="ai-hint">Downloads only the selected model when processing.</p>
+      </div>
+      <div class="depth-model-control">
+        <output id="depth-model-value" for="depth-model">Standard</output>
+        <div class="depth-model-slider" data-level="1">
+          <input id="depth-model" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Standard" aria-describedby="depth-model-hint">
+          <span class="model-stop" data-level="0" aria-hidden="true"></span><span class="model-stop" data-level="1" aria-hidden="true"></span><span class="model-stop" data-level="2" aria-hidden="true"></span>
+          <span class="model-knob" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+    <div class="portrait-option">
+      <div class="ai-option-copy">
       <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
+      <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
+      </div>
       <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
     </div>
-    <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
     </div>
   </details>
   </section>
-  <p class="ai-hint" data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</p>
+  <p class="ai-hint"><span id="ai-portrait-hint" hidden></span> <span data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</span></p>
   </div>
 
   <div class="history-actions">
     <h2 data-i18n="h.history">Processing history</h2>
+    <div class="history-tools">
+      <button id="clear-assets" type="button" class="history-clear" aria-describedby="clear-assets-hint" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="cache-icon" d="M7 21h14M3 17a2 2 0 0 1 0-2.8L14.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L9.8 21H7ZM8 10l8 8"/><path class="cache-done" d="m5 12 4 4L19 6"/><path class="cache-spinner" d="M20 12a8 8 0 1 1-4-6.93"/></svg><span id="clear-assets-label">Clear cache</span></button>
+      <p id="clear-assets-hint" class="sr-only">Removes downloaded tools; keeps photos and preferences. Tools download again when needed.</p><p id="clear-assets-status" class="sr-only" role="status"></p>
     <button id="clear-history" class="history-clear" type="button" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7"/></svg>
       <span data-i18n="btn.clearhistory">Clear history</span>
     </button>
+    </div>
   </div>
   <div id="list" aria-live="polite"></div>
   <p id="boot">Preparing the tool for first use…</p>
@@ -94,7 +114,8 @@
       <section><h2 data-i18n="h.steps">How to use</h2><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></section>
       <section><h2 data-i18n="h.formats">Formats and processing</h2><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></section>
       <section><h2 data-i18n="h.editlimits">iPhone 16/17 photos with edited Styles or Portrait</h2><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></section>
-      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p><p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
+      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p>
+        <p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
       <section><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p><p data-i18n="help.language">The default language follows your browser. Your language choice is remembered and always takes priority.</p></section>
     </div>
   </details>

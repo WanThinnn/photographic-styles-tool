@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v99`;
+const CACHE_NAME = `${CACHE_PREFIX}v100`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -19,6 +19,8 @@ const APP_SHELL = [
   "./src/portrait/ai-portrait.js",
   "./src/portrait/ai-inference.js",
   "./src/portrait/ai-inference-worker.js",
+  "./src/portrait/depth-models.js",
+  "./src/core/cache-cleanup.js",
   "./src/portrait/ai-depth-refinement.js",
   "./src/portrait/person-depth-guidance.js",
   "./src/media/auxiliary-image.js",
@@ -201,7 +203,7 @@ self.addEventListener("fetch", (event) => {
       // The model downloader owns complete, SHA-verified model storage. Avoid
       // retaining a second 100 MB copy here. Small runtime assets share a
       // revision cache; the manifest revalidates when deployment changes.
-      if(url.pathname.endsWith('/model.onnx'))return isolated(await fetch(request));
+      if(/\.onnx(?:_data)?$/.test(url.pathname))return isolated(await fetch(request));
       if(url.pathname.endsWith('/assets.json'))return networkFirst(request);
       try {cache=await caches.open(DEPTH_ASSET_CACHE);const hit=await cache.match(request);if(hit)return isolated(hit);} catch {}
       const response=await fetch(request);

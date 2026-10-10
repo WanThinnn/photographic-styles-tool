@@ -5,9 +5,11 @@ import {AI_STRINGS} from './ai-strings.js';
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
 // Native selects can match :focus-visible after a tap. Keep keyboard focus on
 // the surrounding pill, without painting a rectangular ring inside it on iOS.
-selector.addEventListener('pointerdown',()=>selector.setAttribute('data-pointer-focus',''));
-selector.addEventListener('blur',()=>selector.removeAttribute('data-pointer-focus'));
-selector.addEventListener('keydown',()=>selector.removeAttribute('data-pointer-focus'));
+for(const control of [selector,document.getElementById('depth-model')]){
+  control.addEventListener('pointerdown',()=>control.setAttribute('data-pointer-focus',''));
+  control.addEventListener('blur',()=>control.removeAttribute('data-pointer-focus'));
+  control.addEventListener('keydown',()=>control.removeAttribute('data-pointer-focus'));
+}
 const formatTip=document.getElementById('ios-format-tip'),drop=document.getElementById('drop');
 const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
 const formatTipKey='photo-format-tip-dismissed-v1';
@@ -26,6 +28,7 @@ function render(){
   document.getElementById('ai-settings-label').textContent=strings.settings;
   document.getElementById('gpu-acceleration-label').textContent=strings.acceleration;
   document.getElementById('gpu-acceleration-hint').textContent=strings.accelerationHint;
+  for(const [id,key]of [['depth-model-label','model'],['depth-model-hint','modelHint'],['clear-assets-label','cleanup'],['clear-assets-hint','cleanupHint']])document.getElementById(id).textContent=strings[key];
   boot.textContent=t(lang,'st.preparing');
 }
 selector.value=pickLanguage();render();

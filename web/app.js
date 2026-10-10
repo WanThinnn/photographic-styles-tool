@@ -18,11 +18,28 @@ import {formatBytes} from './src/ui/result-metadata.js';
 import {hasSoftSkinData} from './src/styles/soft-skin-container.js';
 import {styleCapabilities} from './src/styles/style-capabilities.js';
 import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
+import {depthModel} from './src/portrait/depth-models.js';
+import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
 const aiPortrait = $("ai-portrait");
 const gpuAcceleration=$('gpu-acceleration');
+const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
+const modelLevels=['lite','standard','pro'];
+const selectedModel=()=>modelLevels[Number(modelSelector.value)];
+function renderModel(){
+  const name=depthModel(selectedModel()).label;
+  $('depth-model-value').textContent=name;modelSelector.setAttribute('aria-valuetext',name);
+  modelSelector.parentElement.style.setProperty('--model-position',['14px','50%','calc(100% - 14px)'][Number(modelSelector.value)]);
+  modelSelector.parentElement.dataset.level=modelSelector.value;
+}
+let clearingAssets=false,assetStatus='';
+try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved);modelSelector.value=modelLevels.indexOf(saved);}catch{}
+renderModel();
+modelSelector.addEventListener('input',()=>{
+  renderModel();try{localStorage.setItem('depth-model',selectedModel());}catch{}
+});
 try{gpuAcceleration.checked=localStorage.getItem('depth-gpu-acceleration')!=='off';}catch{}
 gpuAcceleration.addEventListener('change',()=>{
   try{localStorage.setItem('depth-gpu-acceleration',gpuAcceleration.checked?'on':'off');}catch{}
@@ -34,6 +51,7 @@ let browserReady = false, pendingTasks = 0;
 function refreshHistoryButton() {
   clearHistory.hidden = !list.childElementCount;
   clearHistory.disabled = pendingTasks > 0;
+  clearAssets.disabled=!browserReady||pendingTasks>0||clearingAssets||aiCandidates.some(candidate=>candidate.ui.portraitPending);
 }
 function queueTask(task) {
   pendingTasks++; refreshHistoryButton();
@@ -50,15 +68,34 @@ clearHistory.addEventListener('click', () => {
   list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
   releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor(); refreshHistoryButton();
 });
+clearAssets.addEventListener('click',async()=>{
+  if(clearAssets.disabled)return;
+  clearingAssets=true;assetStatus='cleaning';translateAi();refreshHistoryButton();
+  aiPortrait.disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
+  fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
+  try{
+    releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
+    const {releaseOrtModels}=await import('./src/vision/ort-vision.js');await releaseOrtModels();
+    await clearDownloadedAssets();assetStatus='cleaned';
+  }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
+  finally{clearingAssets=false;aiPortrait.disabled=!browserReady;modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+});
 const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
 function translateAi() {
   $("ai-portrait-label").textContent = aiText().toggle;
   $("ai-portrait-hint").textContent = aiText().hint;
   $("ai-portrait-hint").hidden = !aiPortrait.checked;
-  $('ai-settings').hidden=!aiPortrait.checked;
+  $('ai-settings').hidden=false;
   $('ai-settings-label').textContent=aiText().settings;
   $('gpu-acceleration-label').textContent=aiText().acceleration;
   $('gpu-acceleration-hint').textContent=aiText().accelerationHint;
+  $('depth-model-label').textContent=aiText().model;
+  $('depth-model-hint').textContent=aiText().modelHint;
+  $('clear-assets-label').textContent=aiText().cleanup;
+  $('clear-assets-hint').textContent=aiText().cleanupHint;
+  $('clear-assets-status').textContent=assetStatus?aiText()[assetStatus]:'';
+  clearAssets.dataset.state=assetStatus;clearAssets.setAttribute('aria-busy',String(clearingAssets));
+  clearAssets.title=assetStatus==='cleanupFailed'?aiText().cleanupFailed:aiText().cleanupHint;
 }
 aiPortrait.addEventListener('change', () => {
   translateAi();
@@ -166,7 +203,11 @@ function row(name) {
   el.querySelector(".name").textContent = name;
   el.querySelector(".name").title = name;
   list.appendChild(el);
-  const cleanups=new Set();let disposed=false;
+  const cleanups=new Set(),downloadedFiles=new WeakSet(),savedFiles=new WeakSet();let disposed=false;
+  function checkIcon(){
+    const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');icon.classList.add('download-check');
+    icon.innerHTML='<path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';return icon;
+  }
   const remove=document.createElement('button');remove.type='button';remove.className='result-remove';remove.disabled=true;
   remove.setAttribute('aria-label',T('btn.removeresult'));
   remove.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -245,7 +286,7 @@ function row(name) {
       el.insertBefore(host,el.querySelector('.act'));
       try{
         this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{
-          this.portraitPending=pending;if(aiPortrait.checked)this.outputPending(pending);
+          this.portraitPending=pending;if(aiPortrait.checked)this.outputPending(pending);refreshHistoryButton();
         }}));
       }catch(error){host.remove();this.note(aiText().previewFailed,'preview');throw error;}
     },
@@ -311,9 +352,11 @@ function row(name) {
       a.href = URL.createObjectURL(blob);
       resultUrls.add(a.href);
       a.download = filename;
-      a.textContent = T(key);
+      const label=document.createElement('span');
+      const renderDownload=()=>{const downloaded=downloadedFiles.has(blob);a.classList.toggle('is-downloaded',downloaded);label.dataset.i18n=downloaded?'btn.downloadagain':key;label.textContent=T(label.dataset.i18n);};
       a.className = "dl alt";
-      a.addEventListener('click',e=>{if(this.outputPendingState)e.preventDefault();});
+      a.append(checkIcon(),label);renderDownload();
+      a.addEventListener('click',e=>{if(this.outputPendingState){e.preventDefault();return;}downloadedFiles.add(blob);renderDownload();});
       actions(group).appendChild(a);
     },
     portraitAdvice(text) {
@@ -324,12 +367,14 @@ function row(name) {
       const b = document.createElement("button");
       b.className = "dl";
       b.type = "button";
-      b.textContent = T(label || (live ? "btn.savestill" : "btn.save"));
+      const text=document.createElement('span');
+      const renderSave=()=>{const saved=savedFiles.has(file);b.classList.toggle('is-downloaded',saved);text.dataset.i18n=saved?'btn.saveagain':label||(live?'btn.savestill':'btn.save');text.textContent=T(text.dataset.i18n);};
+      b.append(checkIcon(),text);renderSave();
       b.addEventListener("click", async () => {
         if (b.disabled) return;
         b.disabled = true;
-        try { await navigator.share({ files: [file] }); }
-        catch (e) { if (e.name !== "AbortError") b.textContent = T("btn.blocked"); }
+        try { await navigator.share({ files: [file] });savedFiles.add(file);renderSave(); }
+        catch (e) { if (e.name !== "AbortError") {text.dataset.i18n='btn.blocked';text.textContent=T('btn.blocked');} }
         finally { b.disabled = Boolean(this.outputPendingState); }
       });
       actions(group).prepend(b);
@@ -364,6 +409,7 @@ async function runAiCandidate(candidate) {
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
   let lastStage='loading';
   const provider=gpuAcceleration.checked?'webgpu':'wasm';
+  const modelId=selectedModel();
   try {
     const {createAiPortrait} = await import('./src/portrait/ai-portrait.js');
     const {exportAiPortrait} = await import('./src/portrait/ai-portrait-export.js');
@@ -376,7 +422,7 @@ async function runAiCandidate(candidate) {
       if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
         ui.aiState(`${aiText().download}${percent} · ${formatBytes(progress.loaded)}`);
       }else ui.aiState(stage==='inference'&&provider==='wasm'?aiText().inferenceCpu:aiText()[stage]||aiText().loading);
-    },sourceFile,{signal:controller.signal,provider});
+    },sourceFile,{signal:controller.signal,provider,modelId});
     lastStage='encoding';ui.aiState(aiText().encoding);
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     ui.cleanup(output.dispose);
@@ -617,7 +663,7 @@ async function handleFiles(files) {
 }
 // Serialize separate picker/drop events so duplicate MOVs cannot race pairing.
 let fileQueue = Promise.resolve();
-const enqueueFiles = (files) => { if (browserReady) queueTask(() => handleFiles(files)); };
+const enqueueFiles = (files) => { if (browserReady&&!clearingAssets) queueTask(() => handleFiles(files)); };
 
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
@@ -669,7 +715,7 @@ function countVisit() {
     const response = await fetch('profiles/index.json');
     if (!response.ok) throw Error('Profile index unavailable');
     profileIndex = await response.json();
-    browserReady = true;
+    browserReady = true;refreshHistoryButton();
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
     aiPortrait.disabled=false;
     $('boot').textContent = '';

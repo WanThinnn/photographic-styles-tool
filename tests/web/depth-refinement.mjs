@@ -1,8 +1,20 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {refineDepth,refineDepthEdges,depthEnvelope} from '../../web/src/portrait/ai-depth-refinement.js';
+import {refineDepth,refineDepthEdges,depthEnvelope,shapeAiDisparity,AI_DISPARITY_MAX} from '../../web/src/portrait/ai-depth-refinement.js';
 import {portraitAssembler,latestSettingsWriter} from '../../web/src/portrait/ai-portrait-assembler.js';
 import {protectPersonDepth} from '../../web/src/portrait/person-depth-guidance.js';
 import {inferDepth} from '../../web/src/portrait/ai-inference.js';
+
+test('F depth response preserves ordering and reduces near-object defocus relative to distant background',()=>{
+  const original=Uint8Array.of(2,65,118,166,255),shaped=shapeAiDisparity(original);
+  assert.deepEqual(original,Uint8Array.of(2,65,118,166,255),'never alter the input');
+  assert.deepEqual(shaped,Uint8Array.of(23,129,173,206,255));
+  const beforeNear=original[3]-original[1],afterNear=(shaped[3]-shaped[1])*AI_DISPARITY_MAX;
+  const beforeFar=original[1]-original[0],afterFar=(shaped[1]-shaped[0])*AI_DISPARITY_MAX;
+  assert.ok(afterNear<beforeNear);assert.ok(afterFar>beforeFar);
+  const ramp=shapeAiDisparity(Uint8Array.from({length:256},(_,i)=>i));
+  assert.equal(ramp[0],0);assert.equal(ramp[255],255);
+  assert.ok(ramp.every((v,i)=>i===0||v>=ramp[i-1]));
+});
 
 test('fast depth envelope matches a square scan at borders, tiny dimensions and tied values',()=>{
   for(const [w,h]of [[1,1],[1,19],[19,1],[23,17]])for(const radius of [0,1,4,32]){

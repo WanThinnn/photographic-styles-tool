@@ -28,7 +28,7 @@ export function awaitAiSource(create, signal) {
     },error=>{signal.removeEventListener('abort',abort);reject(error);});
   });
 }
-export function inferDepth(rgb, input, {signal, guidance,provider='webgpu',timeoutMs = provider==='wasm'?240000:120000, onProgress = () => {}, workerFactory = () => new Worker(new URL('./ai-inference-worker.js',import.meta.url),{type:'module'})} = {}) {
+export function inferDepth(rgb, input, {signal, guidance,provider='webgpu',modelId='standard',timeoutMs = provider==='wasm'?240000:120000, onProgress = () => {}, workerFactory = () => new Worker(new URL('./ai-inference-worker.js',import.meta.url),{type:'module'})} = {}) {
   return new Promise((resolve,reject) => {
     if(!['webgpu','wasm'].includes(provider)){reject(Error('Unsupported depth provider'));return;}
     if(signal?.aborted){reject(signal.reason || new DOMException('Cancelled','AbortError'));return;}
@@ -45,6 +45,6 @@ export function inferDepth(rgb, input, {signal, guidance,provider='webgpu',timeo
       else if(data.result)finish(null,data.result);
       else finish(Object.assign(Error('AI worker returned no depth'),{stage}));
     };
-    try { worker.postMessage({rgb,input,guidance,provider},[rgb.buffer]); } catch(error) {finish(error);}
+    try { worker.postMessage({rgb,input,guidance,provider,modelId},[rgb.buffer]); } catch(error) {finish(error);}
   });
 }

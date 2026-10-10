@@ -22,6 +22,7 @@ import {tmapGainMap} from '../../web/src/core/gain-map.js';
 import {encodeTmapMetadata} from '../../web/src/raster/jpeg-hdr.js';
 import {registerTmapHdr,editableTmapHeadroom} from '../../web/src/styles/hdr-compatibility.js';
 import {executeJob} from '../../web/src/media/heic-worker.js';
+import {appleDepthAuxc} from '../../web/src/portrait/apple-depth-metadata.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,o)=>{
@@ -47,6 +48,17 @@ function photo(width,height,name='48-12'){
     thumb:payload,thumbHvcc:codec,hdr:payload,hdrHvcc:codec},null,null,g);
 }
 const depth={payload:assets.mask.payload,hvcc:assets.mask.hvcc,width:64,height:64};
+test('generated F disparity range is consistent in auxC and XMP across focus/aperture updates',()=>{
+  const source=photo(900,600),scaled={...depth,floatMax:.75};
+  for(const settings of [{},{focusX:.2,focusY:.7,aperture:2.8}]){
+    const output=buildAiPortrait(source,scaled,template,settings).data,d=discoverHeic(output);
+    const id=[...d.infos.keys()].find(id=>auxUriForItem(d.props,id)===DEPTH_URI);
+    assert.deepEqual(propertyBoxBytes(output,d.props,id,'auxC'),appleDepthAuxc({floatMax:.75}));
+    const side=d.refs.find(r=>r.type==='cdsc'&&r.to.includes(id)&&d.infos.get(r.from)?.type==='mime');
+    assert.match(new TextDecoder().decode(extractItemData(output,d,side.from)),/<apdi:FloatMaxValue>0\.75<\/apdi:FloatMaxValue>/);
+  }
+  for(const floatMax of [0,-1,NaN,Infinity])assert.throws(()=>buildAiPortrait(source,{...depth,floatMax},template),/Invalid relative disparity range/);
+});
 function withoutThumbnail(source,items){
   const before=discoverHeic(source),ft=topBox(source,'ftyp'),ftyp=source.slice(ft.off,ft.off+ft.size);
   const meta=removeItems(source.slice(before.meta.off,before.meta.off+before.meta.size),items??[before.thumbnail]);

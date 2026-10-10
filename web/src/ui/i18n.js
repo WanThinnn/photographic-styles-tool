@@ -124,6 +124,8 @@ export const STRINGS = {
     "err.nothumb": "Thiếu ảnh thu nhỏ. Trình duyệt có thể tạo bằng bộ mã hóa tùy chọn.",
     "btn.save": "Lưu vào Ảnh",
     "btn.download": "Tải xuống",
+    "btn.downloadagain": "Tải lại",
+    "btn.saveagain": "Lưu lại",
     "btn.livezip": "Tải cặp Live Photo",
     "btn.savestill": "Lưu ảnh tĩnh",
     "live.help": "Live Photo: chọn HEIC và MOV gốc từ Tệp, cùng lúc hoặc riêng lẻ. Tải cặp đã kiểm tra dưới dạng ZIP, giải nén và nhập cả hai bằng công cụ hỗ trợ Live Photo. Lưu ảnh tĩnh chỉ lưu ảnh; khung hình video không thay đổi.",
@@ -249,6 +251,8 @@ export const STRINGS = {
 
     "btn.save": "Save to Photos",
     "btn.download": "Download",
+    "btn.downloadagain": "Download again",
+    "btn.saveagain": "Save again",
     "btn.livezip": "Download Live Photo pair",
     "btn.savestill": "Save still photo",
     "live.help": "Live Photo: select the original HEIC and its MOV from Files, together or separately. Download the verified pair as a ZIP. Import both files with a Live Photo-aware importer; Save still photo saves only the image. Video frames are unchanged.",
@@ -393,6 +397,8 @@ export const STRINGS = {
 
     "btn.save": "存储到“照片”",
     "btn.download": "下载",
+    "btn.downloadagain": "再次下载",
+    "btn.saveagain": "再次存储",
     "btn.livezip": "下载实况照片文件对",
     "btn.savestill": "存储静态照片",
     "live.help": "实况照片：从“文件”选择原始 HEIC 及其 MOV，可一起或分开添加。下载验证后的 ZIP，解压后使用支持实况照片的工具同时导入两个文件。“存储静态照片”仅保存图片，视频帧保持不变。",

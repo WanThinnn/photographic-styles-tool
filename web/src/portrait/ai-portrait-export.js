@@ -186,7 +186,7 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   meta=box('meta',concat([meta.slice(rm.off+rm.hdr,rm.off+rm.hdr+4),
     ...[...boxes(meta,rm.off+rm.hdr+4,rm.off+rm.size)].filter(b=>b.type!=='grpl').map(b=>meta.slice(b.off,b.off+b.size)),...groups]));
   const depthProps=[box('ispe',concat([new Uint8Array(4),be(depth.width,4),be(depth.height,4)])),
-    box('pixi',new Uint8Array([0,0,0,0,1,8])),depth.hvcc,appleDepthAuxc(),
+    box('pixi',new Uint8Array([0,0,0,0,1,8])),depth.hvcc,appleDepthAuxc({floatMax:depth.floatMax??1}),
     ...(d.props.associations.get(d.primary)||[]).map(a=>d.props.properties[a.index-1])
       .filter(p=>['irot','imir'].includes(p.type)).map(p=>source.slice(p.box.off,p.box.off+p.box.size))];
   const associations=[];for(const p of depthProps){let index;[meta,index]=appendIpcoProperty(meta,p);associations.push([index,!['ispe','pixi'].includes(String.fromCharCode(...p.slice(4,8)))]);}
@@ -194,7 +194,8 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   if(![focusX,focusY,aperture].every(Number.isFinite)||focusX<0||focusX>1||focusY<0||focusY>1||aperture<1||aperture>22)
     throw Error('Invalid Portrait focus/aperture');
   payloads.set(depthId,depth.payload);
-  payloads.set(depthSide,xml(template.depthXmp.replace(/(<depthBlurEffect:SimulatedAperture>)[^<]+(<\/depthBlurEffect:SimulatedAperture>)/,
+  payloads.set(depthSide,xml(template.depthXmp.replace(/(<apdi:FloatMaxValue>)[^<]+(<\/apdi:FloatMaxValue>)/,
+    (_,a,b)=>a+(depth.floatMax??1)+b).replace(/(<depthBlurEffect:SimulatedAperture>)[^<]+(<\/depthBlurEffect:SimulatedAperture>)/,
     (_,a,b)=>a+aperture.toFixed(6)+b)));
   const ownExif=extractItemData(source,d,d.exifItem),[w,h]=dimensionsForItem(d.props,d.primary);
   payloads.set(focusSide,xml(`<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:mwg-rs="http://www.metadataworkinggroup.com/schemas/regions/" xmlns:stDim="http://ns.adobe.com/xap/1.0/sType/Dimensions#" xmlns:stArea="http://ns.adobe.com/xmp/sType/Area#"><mwg-rs:Regions rdf:parseType="Resource"><mwg-rs:AppliedToDimensions stDim:w="${w}" stDim:h="${h}" stDim:unit="pixel"/><mwg-rs:RegionList><rdf:Bag><rdf:li rdf:parseType="Resource"><mwg-rs:Type>Focus</mwg-rs:Type><mwg-rs:Area stArea:x="${focusX}" stArea:y="${focusY}" stArea:w="0.1" stArea:h="0.1" stArea:unit="normalized"/></rdf:li></rdf:Bag></mwg-rs:RegionList></mwg-rs:Regions></rdf:Description></rdf:RDF></x:xmpmeta>`));
@@ -265,7 +266,7 @@ export async function exportAiPortrait(result,onProgress=()=>{},{signal}={}){
   try{
     const encoded=await encodeHevcPixels(result.gray,{width:result.width,height:result.height,pixelFormat:'gray',fullRange:true,lossless:true},onProgress);
     signal?.throwIfAborted();
-    const depth={...encoded,width:result.width,height:result.height};
+    const depth={...encoded,width:result.width,height:result.height,floatMax:result.disparityMax??1};
     const assembler=portraitAssembler(result.sourceData,depth,template,{signal});
     try{return {...await assembler.build(),withSettings:assembler.build,dispose:assembler.dispose};}
     catch(error){assembler.dispose();throw error;}

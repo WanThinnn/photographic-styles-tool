@@ -43,12 +43,6 @@ function applePngEnvelope(png){
   return Buffer.concat(parts);
 }
 
-// Desktop "any" icons preserve this app's rounded transparent artwork.
-for(const size of [192,512]){
-  await writeFile(new URL(`icon-${size}.png`,directory),
-    await sharp(svg).resize(size,size).png().toBuffer());
-}
-
 // iOS Home Screen appearance generation is heuristic for web clips. A dense
 // matrix, even centered, did not reliably receive Dark/Light appearance
 // synthesis. Keep the install artwork intentionally simple and high-contrast.
@@ -60,6 +54,13 @@ const touchSvg=Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
 const touch=await sharp(touchSvg).resize(180,180).ensureAlpha(1).png().toBuffer();
 const appleTouch=applePngEnvelope(touch);
 await writeFile(new URL('icon-180.png',directory),appleTouch);
+
+// Use the same rounded-camera artwork for Windows/desktop PWA installs.
+for(const size of [192,512]){
+  await writeFile(new URL(`icon-${size}.png`,directory),
+    await sharp(touchSvg).resize(size,size).ensureAlpha(1).png().toBuffer());
+}
+
 // Keep the stable name and also emit a fresh URL so Safari/iOS cannot reuse
 // the failed matrix Web Clip artwork from cache.
 await writeFile(new URL('apple-touch-icon.png',directory),appleTouch);

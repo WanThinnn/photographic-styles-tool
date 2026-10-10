@@ -18,6 +18,8 @@ const provider=process.argv.includes('--webgpu')?'webgpu':'wasm';
 const requested=process.argv.find(arg=>arg.startsWith('--models='))?.slice('--models='.length);
 const modelIds=requested?requested.split(','):['lite'];
 const sampleSize=Number(process.argv.find(arg=>arg.startsWith('--size='))?.slice('--size='.length)||24);
+const workerCountArg=process.argv.find(arg=>arg.startsWith('--workers='));
+const workerCount=workerCountArg?Number(workerCountArg.slice('--workers='.length)):null;
 if(!Number.isInteger(sampleSize)||sampleSize<8||sampleSize>2048)throw Error('Invalid --size');
 const browserCandidates=[
  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -114,7 +116,7 @@ try{
     rgba[4*i]=i%255;rgba[4*i+1]=Math.floor(i/width)%255;rgba[4*i+2]=125;rgba[4*i+3]=255;
    }
    const started=performance.now();
-   const result=await inferDetailTiles({width,height,data:rgba},{modelId:'${modelId}',provider:'${provider}',timeoutMs:180000});
+   const result=await inferDetailTiles({width,height,data:rgba},{modelId:'${modelId}',provider:'${provider}',timeoutMs:180000${workerCount!==null?`,workerCount:${workerCount}`:''}});
    if(result.width!==width||result.height!==height||result.data.length!==rgba.length)throw Error('Bad model output shape');
    let sum=0;
    for(let i=0;i<rgba.length;i+=4)sum+=Math.abs(rgba[i]-result.data[i]);

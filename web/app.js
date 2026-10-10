@@ -1,6 +1,6 @@
 import { loadProfile } from "./src/core/zip.js";
 import { profileFor, VERSION, UNSUPPORTED } from "./src/styles/port.js";
-import { dimensionsForItem } from "./src/core/heif.js";
+import { dimensionsForItem, discoverHeic } from "./src/core/heif.js";
 import { styleDeltaSize } from "./src/styles/graft.js";
 import { hasTexture } from "./src/styles/texture.js";
 import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
@@ -470,6 +470,10 @@ async function runAiCandidate(candidate) {
   }
 }
 
+function stagePercent(done,total){
+  return Number.isFinite(done)&&Number.isFinite(total)&&total>0 ? `${Math.min(100,Math.max(0,Math.round(done/total*100)))}%` : '';
+}
+
 async function handleFile(file) {
   const ui = row(file.name);
   const inputSize = file.size;
@@ -488,7 +492,7 @@ async function handleFile(file) {
       const {importDngFile}=await import('./src/dng/dng-import.js');
       try {file=await importDngFile(bytes,file.name,progress=>{
         const label=lang==='vi'?'Giải mã RAW':lang==='zh'?'解码 RAW':'Developing RAW';
-        ui.set(progress.total&&progress.done?`${label} ${progress.done}/${progress.total}`:label);
+        const percent=stagePercent(progress.done,progress.total);ui.set(percent?`${label} ${percent}`:label);
       });}catch(error){
         console.warn('DNG import failed',error);
         const reason=/JPEG XL/.test(error.message)?'JPEG XL':/large RAW/.test(error.message)?'oversized RAW':'decode';
@@ -510,8 +514,9 @@ async function handleFile(file) {
             else if (progress.stage === "download" || progress.stage === "modelLoading")
               ui.set(aiText().detailPreparing);
             else if (progress.stage === "inference")
-              ui.set(progress.progress?.total ? `${aiText().detailWorking} ${progress.progress.done}/${progress.progress.total}` : aiText().detailWorking);
-            else if (progress.stage === "main") ui.set(`${T("st.rastertiles")} ${progress.done}/${progress.total}`);
+              ui.set(stagePercent(progress.progress?.done,progress.progress?.total) ? `${aiText().detailWorking} ${stagePercent(progress.progress?.done,progress.progress?.total)}` : aiText().detailWorking);
+            else if (progress.stage === "main") ui.set(stagePercent(progress.done,progress.total) ? `${T("st.rastertiles")} ${stagePercent(progress.done,progress.total)}` : T("st.rastertiles"));
+            else if (progress.stage === "auxiliary") ui.set(stagePercent(progress.done,progress.total) ? `${aiText().detailHdrWorking} ${stagePercent(progress.done,progress.total)}` : aiText().detailHdrWorking);
             else ui.set(T("st.rasterworking"));
           }, {analyze: true,detail:aiFeatures.enabled('detail')?{modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null});
       } catch (error) {
@@ -534,9 +539,39 @@ async function handleFile(file) {
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
-    if(aiFeatures.enabled('detail'))ui.note(aiText().detailHeic,'detail');
+    let d = input.discovery;
+    if(aiFeatures.enabled('detail')){
+      if(d.hdrGrid!==null&&d.hdrTiles?.length){
+        if(!globalThis.crossOriginIsolated){
+          ui.note(`${aiText().detailSkipped} ${T("err.reloadencoder")}`,'detail');
+        }else{
+          try{
+            const {enhanceNativeHdrHeic}=await import('./src/detail/detail-native-heic.js');
+            const enhanced=await enhanceNativeHdrHeic(bytes,{
+              modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
+            },{onProgress:progress=>{
+              if(progress.stage==='download'||progress.stage==='modelLoading')ui.set(aiText().detailPreparing);
+              else if(progress.stage==='inference'){
+                const percent=stagePercent(progress.progress?.done,progress.progress?.total);
+                ui.set(percent?`${aiText().detailWorking} ${percent}`:aiText().detailWorking);
+              }else if(/^hdr(Primary|Gain)(Decode|Encode)$/.test(progress.stage)){
+                const percent=stagePercent(progress.done,progress.total);
+                ui.set(percent?`${aiText().detailHdrWorking} ${percent}`:aiText().detailHdrWorking);
+              }
+              else if(progress.stage==='modelDownload')
+                ui.set(`${T("st.encoderload")} ${(progress.loaded/1048576).toFixed(1)} MB`);
+              else ui.set(aiText().detailHdrWorking);
+            }});
+            bytes=enhanced.data;d=discoverHeic(bytes);
+            ui.note(aiText().detailHdrApplied,'detail');
+          }catch(error){
+            console.warn('Native HDR AI detail unavailable; preserving original HEIC',error);
+            ui.note(`${aiText().detailSkipped} ${String(error?.message||error).slice(0,180)}`,'detail');
+          }
+        }
+      }else ui.note(aiText().detailHeic,'detail');
+    }
 
-    const d = input.discovery;
     const textureOnly = preserveNativeStyles(bytes,d);
     const {nativePortraitBaseState}=await import('./src/portrait/ai-portrait-container.js');
     const portraitState=nativePortraitBaseState(bytes,d);

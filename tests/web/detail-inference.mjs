@@ -1,14 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {detailModel,validateDetailAsset} from '../../web/src/detail/detail-models.js';
-import {inferDetailTiles} from '../../web/src/detail/detail-inference.js';
+import {inferDetailTiles,recommendedDetailWorkers,recommendedWasmThreads} from '../../web/src/detail/detail-inference.js';
 import {assertDetailRasterAllowed} from '../../web/src/detail/detail-raster.js';
 
 test('3 verified AI families are separately selected and bounded',()=>{
  assert.equal(detailModel('lite').family,'1x SuperScale SPAN');
  assert.equal(detailModel('standard').family,'1x SuperScale RPLKSR-S');
  assert.equal(detailModel('pro').family,'1x Fatality DeBlur');
+ assert.equal(detailModel('lite').tile,384);
+ assert.equal(detailModel('standard').webgpuWorkers,4);
+ assert.equal(detailModel('pro').webgpuWorkers,1);
  assert.throws(()=>detailModel('random'),RangeError);
+});
+
+test('desktop WebGPU uses measured worker pool while Pro stays single-session',()=>{
+ const desktop={hardwareConcurrency:12,isolated:true,shared:true};
+ assert.equal(recommendedDetailWorkers('lite','webgpu',desktop),2);
+ assert.equal(recommendedDetailWorkers('standard','webgpu',desktop),4);
+ assert.equal(recommendedDetailWorkers('pro','webgpu',desktop),1);
+ assert.equal(recommendedDetailWorkers('standard','wasm',desktop),1);
+ assert.equal(recommendedDetailWorkers('standard','webgpu',{...desktop,hardwareConcurrency:8}),2);
+ assert.equal(recommendedDetailWorkers('standard','webgpu',{...desktop,hardwareConcurrency:6}),1);
+ assert.equal(recommendedWasmThreads({hardwareConcurrency:12,isolated:true}),4);
+ assert.equal(recommendedWasmThreads({hardwareConcurrency:12,isolated:false}),1);
 });
 test('reject invalid/truncated model manifests instead of silently substituting a model',()=>{
  const valid={file:'model.onnx',family:'rplksr',bytes:200,sha256:'a'.repeat(64),
@@ -38,6 +53,33 @@ test('worker-backed AI results do not mutate caller pixels or fall back to a fak
  assert.equal(terminated,1);
  await assert.rejects(inferDetailTiles(image,{modelId:'unknown',workerFactory:factory}),/Unsupported detail model/);
 });
+
+test('explicit worker pool shares one image buffer and aggregates progress safely',async()=>{
+ const width=800,height=4,image={width,height,data:new Uint8ClampedArray(width*height*4)};
+ for(let i=0;i<image.data.length;i++)image.data[i]=i%251;
+ let terminated=0,created=0,lastProgress;
+ const factory=()=>{
+  created++;
+  return {
+   postMessage(message){
+    const input=new Uint8ClampedArray(message.sharedInput),output=new Uint8ClampedArray(message.sharedOutput);
+    output.set(input);
+    queueMicrotask(()=>{
+     this.onmessage({data:{stage:'inference',progress:{done:message.tileIndices.length,total:message.tileIndices.length}}});
+     this.onmessage({data:{complete:true}});
+    });
+   },
+   terminate(){terminated++;},
+  };
+ };
+ const result=await inferDetailTiles(image,{modelId:'lite',provider:'webgpu',workerCount:2,workerFactory:factory,
+   timeoutMs:1000,onProgress:progress=>{if(progress.stage==='inference')lastProgress=progress;}});
+ assert.equal(created,2);assert.equal(terminated,2);
+ assert.deepEqual(result.data,image.data);
+ assert.equal(lastProgress.progress.done,lastProgress.progress.total);
+ assert.equal(lastProgress.workers,2);
+});
+
 test('total time budget terminates an unresponsive model worker',async()=>{
   let terminated=0;
   await assert.rejects(inferDetailTiles({width:2,height:2,data:new Uint8ClampedArray(16)},{

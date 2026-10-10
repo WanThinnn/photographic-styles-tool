@@ -90,6 +90,8 @@ test('Detail switch matches the existing settings layout and has accessible loca
   assert.match(css,/\.ai-settings :is\(\.detail-option, \.gpu-option\)/);
   assert.match(css,/:is\(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration\)/);
   assert.match(app,/features:\{portrait:aiPortrait,detail:aiDetail\}/);
+  assert.match(app,/function stagePercent\(/);
+  assert.doesNotMatch(app,/progress\.progress\.done}\/${progress\.progress\.total}|progress\.done}\/${progress\.total}/);
   for(const lang of ['vi','en','zh']){
     assert.ok(AI_STRINGS[lang].detailToggle);
     assert.ok(AI_STRINGS[lang].detailHint);

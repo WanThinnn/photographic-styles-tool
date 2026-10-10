@@ -15,24 +15,30 @@ export function assertDetailRasterAllowed(width,height,{hdr=false}={}){
  * Caller MUST dispose result canvas in finally.
  */
 export async function enhanceRasterImage(image,{modelId='standard',provider='wasm',signal,onProgress=()=>{},
- infer=inferDetailTiles}={}){
+ colorSpace='srgb',infer=inferDetailTiles}={}){
  const {width,height}=image;
  assertDetailRasterAllowed(width,height);
+ if(!['srgb','display-p3'].includes(colorSpace))throw Error('Unsupported AI detail colour space');
  signal?.throwIfAborted?.();
  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
  try{
-   const ctx=canvas.getContext('2d',{colorSpace:'srgb',willReadFrequently:true,alpha:false});
+   const ctx=canvas.getContext('2d',{colorSpace,willReadFrequently:true,alpha:false});
    if(!ctx)throw Error('AI detail canvas unavailable');
+   const actual=ctx.getContextAttributes?.().colorSpace;
+   if(actual&&actual!==colorSpace)throw Error(`AI detail canvas lost ${colorSpace} colour space`);
    ctx.drawImage(image,0,0,width,height);
-   const source=ctx.getImageData(0,0,width,height,{colorSpace:'srgb'});
-   if(source.colorSpace&&source.colorSpace!=='srgb')throw Error('AI detail requires colour-managed sRGB');
+   const source=ctx.getImageData(0,0,width,height,{colorSpace});
+   if(source.colorSpace&&source.colorSpace!==colorSpace)throw Error(`AI detail requires colour-managed ${colorSpace} pixels`);
    const restored=await infer(source,{modelId,provider,signal,onProgress});
    signal?.throwIfAborted?.();
    if(restored?.data?.length!==source.data.length||restored.width!==width||restored.height!==height)
      throw Error('AI detail returned incompatible dimensions');
    // Edge-aware finishing stays conservative after learned restoration.
    const processed=enhanceDetail(restored,{preset:'natural',strength:35,signal});
-   ctx.putImageData(new ImageData(processed.data,width,height),0,0);
+   let output;
+   try{output=new ImageData(processed.data,width,height,{colorSpace});}
+   catch(error){if(colorSpace!=='srgb')throw Error('Display P3 ImageData is unavailable');output=new ImageData(processed.data,width,height);}
+   ctx.putImageData(output,0,0);
    return canvas;
  }catch(error){canvas.width=canvas.height=0;throw error;}
 }

@@ -3,9 +3,9 @@
 // Model families require different training objectives; labels indicate resource tiers,
 // NOT guaranteed image-quality rankings.
 export const DETAIL_MODELS = Object.freeze({
-  lite: Object.freeze({label:'Lite',family:'1x SuperScale SPAN',tile:256,overlap:16}),
-  standard: Object.freeze({label:'Standard',family:'1x SuperScale RPLKSR-S',tile:256,overlap:24}),
-  pro: Object.freeze({label:'Pro',family:'1x Fatality DeBlur',tile:256,overlap:32}),
+  lite: Object.freeze({label:'Lite',family:'1x SuperScale SPAN',tile:384,overlap:16,webgpuWorkers:2}),
+  standard: Object.freeze({label:'Standard',family:'1x SuperScale RPLKSR-S',tile:256,overlap:24,webgpuWorkers:4}),
+  pro: Object.freeze({label:'Pro',family:'1x Fatality DeBlur',tile:256,overlap:32,webgpuWorkers:1}),
 });
 export const DETAIL_DEFAULT='standard';
 export function detailModel(id=DETAIL_DEFAULT){

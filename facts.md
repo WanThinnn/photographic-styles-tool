@@ -2757,3 +2757,102 @@ after Portrait Off. Native Styles coefficients in complete Bright captures
 IMG_0932 and IMG_1092 differ in 49,590 of 51,840 bytes; a universal replacement
 cannot be inferred from matching presets. No unrelated native calibration is
 copied, selection values are not neutralized, and no colour fix is claimed.
+
+
+### 10.57 AI Detail HDR rebase experiment (feature/ai-ml-processing, 2026-10-11)
+
+The opt-in AI Detail preprocessing path now has an HDR-aware implementation instead
+of sharpening an SDR primary while leaving its gain map stale. For compatible ISO
+21496-1 gain maps the browser parses the existing tmap headroom, per-channel
+GainMapMin/GainMapMax, Gamma and SDR/HDR offsets. It reconstructs the original HDR
+alternate in linear light, transfers the AI restoration's per-channel linear detail
+delta to that alternate, then solves and quantizes a replacement gain map against
+the restored SDR/primary image. Existing tmap metadata is kept byte-exact. If more
+than 2% of gain components would exceed the declared min/max range, the AI path
+fails closed and the original image is retained.
+
+JPEG Adaptive HDR now uses this rebase before the existing generated HEIC/Styles
+assembly. Native HEIC HDR has a separate browser path that decodes the photo's own
+primary and gain-map grids, supports both RGB 4:2:0 gain maps and Apple's common
+monochrome HEVC gain maps, runs the selected Lite/Standard/Pro restoration model,
+re-encodes the primary/gain grids, regenerates the normal and linear thumbnails,
+and repacks only changed external payloads. Primary codec colour/range signalling
+is required to be explicit and is preserved; unsupported colour/tmap contracts
+fall back to the original HEIC. Monochrome gain maps preserve decoded gray samples
+and full/limited range; their primaries/transfer/matrix VUI may be absent after
+x265 because those tags do not affect gray numerical gain samples.
+
+Two real-browser Edge/WebGPU + FFmpeg.wasm end-to-end probes passed with the Lite
+SPAN model. HDR_Edit_Isolation_V21/A_V20_Control_AllFeatures_NoAIDepth (3024x4032,
+RGB P3/sRGB gain map) completed in ~36.4 s: 48 primary + 12 gain tiles and two
+thumbnail resources changed, 49 unrelated external payloads remained byte-exact,
+21 of 9,144,576 gain components clipped to the existing declared range. The
+native Portrait 5129 Styles+Texture fixture (4032x3024 primary, monochrome Apple
+gain map) completed in ~45.2 s: the same 62 image resources changed, 63 unrelated
+payloads including Styles/Exif/depth remained byte-exact, 663 of 9,144,576 gain
+components clipped, and maximum measured quantized linear-HDR solve error was
+~0.00362 in the probe. The output remains 48 primary + 12 HDR tiles with the
+original tmap values.
+
+A private phone-test artifact is written to
+tests/private-fixtures/AI_Detail_HDR_V1/IMG_5129_Lite_AI_HDR.HEIC. It is not
+published or committed. Desktop structural tests do NOT establish Apple Photos
+rendering/editability. The file still requires physical iPhone import, HDR display,
+Styles/Texture, aperture and Portrait Lighting checks, including Save -> reopen ->
+re-edit. Current full-resolution AI preprocessing is intentionally bounded to
+12.5 megapixels to avoid unsafe mobile memory peaks; larger native HDR photos fail
+closed until a streaming/tiled full-image implementation is validated.
+
+The selected browser regression set completes 140 cases: 125 passes, 15 optional
+private-fixture skips, no failures. PWA, module-path and three-language checks pass.
+
+
+### 10.58 AI Detail inference concurrency and progress optimization (2026-10-11)
+
+Performance profiling on the local Windows laptop showed that 256px tile count was
+not the only bottleneck. ONNX Runtime WebGPU does not allow concurrent
+`InferenceSession.run()` calls from multiple sessions in one JS realm (it throws
+"Session already started"), so true concurrent inference requires separate
+DedicatedWorker realms, each with its own ORT session. The production detail path
+now uses a SharedArrayBuffer-backed global input/output image and assigns disjoint
+global tile indices to workers. Tile cores do not overlap, so workers write
+separate output regions and no band seam/stitching approximation is introduced.
+
+Measured policy:
+- Lite / SPAN: 384px tiles, up to 2 WebGPU workers.
+- Standard / RPLKSR-S: 256px tiles, up to 4 WebGPU workers.
+- Pro / Fatality DeBlur: 256px tiles, exactly 1 WebGPU worker; two workers were
+  slower in the measured workload.
+- Desktop auto-scaling: <8 logical CPUs = 1 worker; 8-11 = at most 2 workers;
+  >=12 = at most 4 workers, still capped by the per-model value above.
+- WASM/CPU remains one inference worker but ORT may use up to 4 WASM threads on
+  cross-origin-isolated pages, avoiding nested worker oversubscription.
+
+Direct WebGPU dynamic-shape measurements (single session, average run time) showed
+that larger tiles are not universally faster: Lite 256/384/512 = 74/118/271 ms;
+Standard = 2394/5659/9668 ms; Pro = 1203/2777/12103 ms. Per-pixel throughput
+favoured 384 for Lite but did not justify larger tiles for Standard/Pro.
+
+Production 768x768 Standard tests with the shared-buffer worker pool measured:
+1 worker 82.6 s, 2 workers 43.4 s, 3 workers 35.0 s, 4 workers 26.1 s,
+5 workers 28.8 s, 6 workers 25.4 s. Four is selected instead of six because the
+~0.6 s difference is small/noisy while six duplicates 50% more sessions/VRAM.
+An earlier worker-isolation benchmark also measured Pro at ~21.4 s with one worker
+versus ~24.9 s with two, confirming the single-worker Pro policy.
+
+On the real 3024x4032 Adaptive HDR JPEG
+`tests/private-fixtures/HDR_Input/IDG_20251020_121945_809.JPEG`, the Lite
+end-to-end browser/WebGPU/FFmpeg.wasm path dropped from ~57.3 s before this change
+to ~31.4 s after 384px + two-worker inference, about a 45% wall-time reduction.
+HDR remained enabled; 48 primary + 12 gain tiles and the original tmap
+(headroom 0 -> 3.83289) were preserved structurally. Gain-map rebasing remained
+21 clipped components out of 9,144,576 with the same measured maximum solve error.
+
+AI Detail/HDR progress shown in the UI now uses percentages instead of raw
+`done/total` counters for inference, primary/raster tile encoding, auxiliary HDR
+gain-map encoding, and native HDR decode/encode phases. Service-worker shell cache
+is v107.
+
+The selected browser regression set now completes 142 cases: 127 passes,
+15 optional private-fixture skips, no failures. PWA, module-path and three-language
+checks pass.

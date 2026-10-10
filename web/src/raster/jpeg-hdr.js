@@ -184,6 +184,30 @@ export function extractJpegHdr(bytes) {
 }
 
 export const iccColr=profile=>box('colr',concat([enc.encode('prof'),profile]));
+
+export function parseTmapMetadata(bytes){
+ if(!(bytes instanceof Uint8Array)||bytes.length<22)fail('Invalid tmap metadata');
+ const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+ if(bytes[0]!==0||v.getUint16(1)!==0||v.getUint16(3)!==0)fail('Unsupported tmap metadata version');
+ const flags=bytes[5],channels=(flags&128)?3:1,useBaseColorSpace=Boolean(flags&64);
+ if(bytes.length!==22+channels*40)fail('Invalid tmap metadata length');
+ let p=6;
+ const rational=(signed=false)=>{
+  const n=signed?v.getInt32(p):v.getUint32(p),den=v.getUint32(p+4);p+=8;
+  if(!den)fail('Invalid tmap rational');return n/den;
+ };
+ const baseHeadroom=rational(),alternateHeadroom=rational(),items=[];
+ for(let i=0;i<channels;i++){
+  const min=rational(true),max=rational(true),gamma=rational(),baseOffset=rational(true),alternateOffset=rational(true);
+  if(![min,max,gamma,baseOffset,alternateOffset].every(Number.isFinite)||min>max||gamma<=0||baseOffset<0||alternateOffset<0)
+    fail('Invalid tmap channel');
+  items.push({min,max,gamma,baseOffset,alternateOffset});
+ }
+ if(!Number.isFinite(baseHeadroom)||!Number.isFinite(alternateHeadroom)||baseHeadroom===alternateHeadroom)
+  fail('Invalid tmap headroom');
+ return {baseHeadroom,alternateHeadroom,channels:items,useBaseColorSpace};
+}
+
 export function encodeTmapMetadata(metadata) {
  const {baseHeadroom,alternateHeadroom,channels,useBaseColorSpace}=metadata;
  if(![1,3].includes(channels.length))fail('Invalid tmap channels');
@@ -198,6 +222,86 @@ export function encodeTmapMetadata(metadata) {
  rational(baseHeadroom);rational(alternateHeadroom);
  for(const c of channels){rational(c.min,true);rational(c.max,true);rational(c.gamma);rational(c.baseOffset,true);rational(c.alternateOffset,true);}
  return out;
+}
+
+
+const clamp01=value=>Math.max(0,Math.min(1,value));
+export const srgbToLinear=value=>{value=clamp01(value);return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4;};
+export const bt709ToLinear=value=>{value=clamp01(value);return value<.081?value/4.5:((value+.099)/1.099)**(1/.45);};
+export function encodedToLinear(value,transfer='srgb'){
+ if(transfer==='srgb'||transfer==='iec61966-2-1')return srgbToLinear(value);
+ if(transfer==='bt709'||transfer==='smpte170m')return bt709ToLinear(value);
+ fail('Unsupported HDR transfer');
+}
+
+/** Decode full-range JPEG YUV420 samples into encoded RGB gain-map samples. */
+export function yuv420ToRgba(source,width,height,{matrix='smpte170m',fullRange=true}={}){
+ if(width%2||height%2||source.length!==width*height*1.5)fail('Invalid JPEG YUV samples');
+ const coeff=matrix==='bt709'?[.2126,.0722]:['smpte170m','bt470bg'].includes(matrix)?[.299,.114]:null;
+ if(!coeff)fail('Unsupported YUV matrix');
+ const [kr,kb]=coeff,kg=1-kr-kb,plane=width*height,chroma=plane/4,out=new Uint8ClampedArray(plane*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const i=y*width+x,c=Math.floor(y/2)*(width/2)+Math.floor(x/2);
+  const Y=fullRange?source[i]/255:(source[i]-16)/219;
+  const cb=(source[plane+c]-128)/(fullRange?255:224),cr=(source[plane+chroma+c]-128)/(fullRange?255:224);
+  const p=i*4;
+  out[p]=Math.round(255*clamp01(Y+2*(1-kr)*cr));
+  out[p+1]=Math.round(255*clamp01(Y-2*kb*(1-kb)/kg*cb-2*kr*(1-kr)/kg*cr));
+  out[p+2]=Math.round(255*clamp01(Y+2*(1-kb)*cb));out[p+3]=255;
+ }
+ return out;
+}
+function channelMeta(metadata,c){
+ const channel=metadata.channels[metadata.channels.length===1?0:c];
+ if(!channel)fail('Missing HDR gain-map channel');
+ return channel;
+}
+/** ISO 21496-1 gain sample -> logarithmic (base-2) gain. */
+export function decodeGainLog(sample,channel){
+ const {min,max,gamma}=channel;
+ if(max===min)return min;
+ return min+Math.pow(clamp01(sample),1/gamma)*(max-min);
+}
+/** Logarithmic gain -> encoded gain-map sample using existing metadata. */
+export function encodeGainLog(logGain,channel){
+ const {min,max,gamma}=channel;
+ if(max===min)return .5;
+ const normalized=clamp01((logGain-min)/(max-min));
+ return Math.pow(normalized,gamma);
+}
+/**
+ * Recompute gain-map samples after the SDR baseline was restored by AI.
+ *
+ * The original HDR alternate is reconstructed in linear light. The same
+ * per-channel linear detail delta introduced by AI is added to that HDR
+ * alternate, then a new gain map is solved against the restored SDR base.
+ * Metadata remains unchanged so headroom behaviour is preserved.
+ */
+export function rebaseGainMapRgba(originalBase,restoredBase,gainMap,metadata,{transfer='srgb'}={}){
+ if(originalBase.length!==restoredBase.length||originalBase.length!==gainMap.length||originalBase.length%4)
+  fail('HDR gain-map rebase dimensions disagree');
+ const output=new Uint8ClampedArray(gainMap.length);let clipped=0,maxError=0;
+ for(let p=0;p<gainMap.length;p+=4){
+  for(let c=0;c<3;c++){
+   const meta=channelMeta(metadata,c),oldSdr=encodedToLinear(originalBase[p+c]/255,transfer);
+   const newSdr=encodedToLinear(restoredBase[p+c]/255,transfer),sample=gainMap[p+c]/255;
+   const oldLog=decodeGainLog(sample,meta);
+   const oldHdr=Math.max(0,(oldSdr+meta.baseOffset)*2**oldLog-meta.alternateOffset);
+   // Transfer exactly the AI's linear-light detail correction to the HDR alternate.
+   const newHdr=Math.max(0,oldHdr+(newSdr-oldSdr));
+   const ratio=(newHdr+meta.alternateOffset)/Math.max(1e-8,newSdr+meta.baseOffset);
+   const solved=Math.log2(Math.max(1e-8,ratio));
+   const bounded=Math.max(meta.min,Math.min(meta.max,solved));
+   if(bounded!==solved)clipped++;
+   const encoded=encodeGainLog(bounded,meta);
+   output[p+c]=Math.round(255*encoded);
+   // Quantized round-trip error in linear HDR units.
+   const decoded=(newSdr+meta.baseOffset)*2**decodeGainLog(output[p+c]/255,meta)-meta.alternateOffset;
+   maxError=Math.max(maxError,Math.abs(decoded-newHdr));
+  }
+  output[p+3]=255;
+ }
+ return {rgba:output,clipped,components:(gainMap.length/4)*3,maxError};
 }
 
 export function yuv420Tile(source,width,height,column,row,tile=512) {

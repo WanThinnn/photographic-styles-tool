@@ -1,33 +1,117 @@
-import {detailModel,validateDetailAsset} from './detail-models.js';
+import {detailModel} from './detail-models.js';
+
 const ROOT=new URL('../../vendor/ai-detail/',import.meta.url);
+const makeWorker=()=>new Worker(new URL('./detail-worker.js',import.meta.url),{type:'module'});
 function fail(message){const error=new Error(message);error.code='AI_DETAIL_UNAVAILABLE';return error;}
-/** Single session per invocation, transferable tensors, cancel by worker termination. */
-export function inferDetailTiles(image,{modelId='standard',provider='wasm',signal,onProgress=()=>{},
-  workerFactory=()=>new Worker(new URL('./detail-worker.js',import.meta.url),{type:'module'}),timeoutMs=180000,maxTotalMs=300000}={}){
-  try { detailModel(modelId); } catch (error) { return Promise.reject(error); }
-  if(!['wasm','webgpu'].includes(provider))return Promise.reject(Error('Invalid AI detail provider'));
+
+export function recommendedDetailWorkers(modelId,provider,{hardwareConcurrency=globalThis.navigator?.hardwareConcurrency??1,
+  isolated=globalThis.crossOriginIsolated===true,shared=typeof SharedArrayBuffer==='function'}={}){
+  const model=detailModel(modelId);
+  if(provider!=='webgpu'||!isolated||!shared||hardwareConcurrency<8)return 1;
+  const desktopCap=hardwareConcurrency>=12?4:2;
+  return Math.max(1,Math.min(desktopCap,model.webgpuWorkers??1));
+}
+
+export function recommendedWasmThreads({hardwareConcurrency=globalThis.navigator?.hardwareConcurrency??1,
+  isolated=globalThis.crossOriginIsolated===true}={}){
+  if(!isolated)return 1;
+  return Math.max(1,Math.min(4,hardwareConcurrency-1));
+}
+
+function validateInput(image,provider){
+  if(!['wasm','webgpu'].includes(provider))throw Error('Invalid AI detail provider');
   if(!image||image.data?.length!==image.width*image.height*4||!Number.isInteger(image.width)||!Number.isInteger(image.height))
-    return Promise.reject(Error('Invalid detail input'));
+    throw Error('Invalid detail input');
+}
+
+function singleWorkerInference(image,{modelId,provider,signal,onProgress,workerFactory,timeoutMs,maxTotalMs,wasmThreads}){
+ return new Promise((resolve,reject)=>{
+   const worker=workerFactory();let timer,totalTimer,settled=false;
+   const finish=(error,result)=>{
+     if(settled)return;settled=true;clearTimeout(timer);clearTimeout(totalTimer);
+     signal?.removeEventListener('abort',cancel);worker.terminate();
+     error?reject(error):resolve(result);
+   };
+   const cancel=()=>finish(signal.reason||new DOMException('Aborted','AbortError'));
+   const arm=()=>{clearTimeout(timer);timer=setTimeout(()=>finish(new DOMException('AI detail stage timed out','TimeoutError')),timeoutMs);};arm();
+   totalTimer=setTimeout(()=>finish(new DOMException('AI detail exceeded total time budget','TimeoutError')),maxTotalMs);
+   signal?.addEventListener('abort',cancel,{once:true});
+   worker.onerror=event=>{event.preventDefault?.();finish(fail('AI detail worker crashed'));};
+   worker.onmessage=({data})=>{
+     if(data.stage){arm();onProgress({stage:data.stage,progress:data.progress});return;}
+     if(data.error){finish(fail(data.error));return;}
+     if(data.result)finish(null,data.result);
+   };
+   const rgba=new Uint8ClampedArray(image.data);
+   try{
+     worker.postMessage({modelId,provider,width:image.width,height:image.height,rgba,assetRoot:ROOT.href,wasmThreads},[rgba.buffer]);
+   }catch(error){finish(error);}
+ });
+}
+
+function pooledWorkerInference(image,{modelId,provider,signal,onProgress,workerFactory,timeoutMs,maxTotalMs,workerCount,wasmThreads}){
+ const model=detailModel(modelId),tile=model.tile,pad=model.overlap,step=tile-2*pad;
+ const nx=Math.ceil(image.width/step),ny=Math.ceil(image.height/step),totalTiles=nx*ny;
+ const count=Math.max(1,Math.min(workerCount,totalTiles));
+ if(count===1)return singleWorkerInference(image,{modelId,provider,signal,onProgress,workerFactory,timeoutMs,maxTotalMs,wasmThreads});
+ return new Promise((resolve,reject)=>{
+   const sharedInput=new SharedArrayBuffer(image.data.byteLength),sharedOutput=new SharedArrayBuffer(image.data.byteLength);
+   new Uint8ClampedArray(sharedInput).set(image.data);
+   const assignments=Array.from({length:count},()=>[]);
+   for(let index=0;index<totalTiles;index++)assignments[index%count].push(index);
+   const workers=assignments.map(()=>workerFactory()),done=Array(count).fill(0);
+   const announced=new Set();let timer,totalTimer,settled=false,completed=0;
+   const terminate=()=>{for(const worker of workers)try{worker.terminate();}catch{}};
+   const finish=(error,result)=>{
+     if(settled)return;settled=true;clearTimeout(timer);clearTimeout(totalTimer);
+     signal?.removeEventListener('abort',cancel);terminate();error?reject(error):resolve(result);
+   };
+   const cancel=()=>finish(signal.reason||new DOMException('Aborted','AbortError'));
+   const arm=()=>{clearTimeout(timer);timer=setTimeout(()=>finish(new DOMException('AI detail stage timed out','TimeoutError')),timeoutMs);};arm();
+   totalTimer=setTimeout(()=>finish(new DOMException('AI detail exceeded total time budget','TimeoutError')),maxTotalMs);
+   signal?.addEventListener('abort',cancel,{once:true});
+   workers.forEach((worker,index)=>{
+     worker.onerror=event=>{event.preventDefault?.();finish(fail('AI detail worker crashed'));};
+     worker.onmessage=({data})=>{
+       if(data.error){finish(fail(data.error));return;}
+       if(data.stage){
+         arm();
+         if(data.stage==='inference'&&data.progress){
+           done[index]=data.progress.done;
+           onProgress({stage:'inference',progress:{done:done.reduce((a,b)=>a+b,0),total:totalTiles},workers:count});
+         }else if(!announced.has(data.stage)){
+           announced.add(data.stage);onProgress({stage:data.stage,workers:count});
+         }
+         return;
+       }
+       if(data.complete&&++completed===count){
+         finish(null,{data:new Uint8ClampedArray(sharedOutput),width:image.width,height:image.height});
+       }
+     };
+     try{
+       worker.postMessage({modelId,provider,width:image.width,height:image.height,assetRoot:ROOT.href,
+         sharedInput,sharedOutput,tileIndices:assignments[index],wasmThreads});
+     }catch(error){finish(error);}
+   });
+ });
+}
+
+/**
+ * Tile inference with model-aware WebGPU worker pooling.
+ * WebGPU: a measured model-aware worker pool is used on desktop-class CPUs
+ * (Lite 2, Standard up to 4, Pro 1). Pro remains single-worker because
+ * parallel sessions reduce measured throughput. WASM uses one worker with up
+ * to four ORT threads to avoid oversubscription.
+ */
+export function inferDetailTiles(image,{modelId='standard',provider='wasm',signal,onProgress=()=>{},
+  workerFactory=makeWorker,timeoutMs=180000,maxTotalMs=300000,workerCount=null,wasmThreads=null}={}){
+  let model;
+  try{model=detailModel(modelId);validateInput(image,provider);}catch(error){return Promise.reject(error);}
   if(signal?.aborted)return Promise.reject(signal.reason||new DOMException('Aborted','AbortError'));
-  return new Promise((resolve,reject)=>{
-    const worker=workerFactory();let timer,totalTimer,settled=false;
-    const finish=(error,result)=>{
-      if(settled)return;settled=true;clearTimeout(timer);clearTimeout(totalTimer);
-      signal?.removeEventListener('abort',cancel);worker.terminate();
-      error?reject(error):resolve(result);
-    };
-    const cancel=()=>finish(signal.reason||new DOMException('Aborted','AbortError'));
-    const arm=()=>{clearTimeout(timer);timer=setTimeout(()=>finish(new DOMException('AI detail stage timed out','TimeoutError')),timeoutMs);};arm();
-    totalTimer=setTimeout(()=>finish(new DOMException('AI detail exceeded total time budget','TimeoutError')),maxTotalMs);
-    signal?.addEventListener('abort',cancel,{once:true});
-    worker.onerror=event=>{event.preventDefault?.();finish(fail('AI detail worker crashed'));};
-    worker.onmessage=({data})=>{
-      if(data.stage){arm();onProgress(data.stage,data.progress);return;}
-      if(data.error){finish(fail(data.error));return;}
-      if(data.result)finish(null,data.result);
-    };
-    const rgba=new Uint8ClampedArray(image.data);
-    try { worker.postMessage({modelId,provider,width:image.width,height:image.height,rgba,assetRoot:ROOT.href},[rgba.buffer]); }
-    catch(error){finish(error);}
-  });
+  const threads=wasmThreads??(provider==='wasm'?recommendedWasmThreads():1);
+  const desired=workerCount??recommendedDetailWorkers(modelId,provider);
+  const canPool=desired>1&&typeof SharedArrayBuffer==='function'&&(globalThis.crossOriginIsolated===true||workerCount!==null);
+  if(!canPool)return singleWorkerInference(image,{modelId,provider,signal,onProgress,workerFactory,timeoutMs,maxTotalMs,wasmThreads:threads});
+  return pooledWorkerInference(image,{modelId,provider,signal,onProgress,workerFactory,timeoutMs,maxTotalMs,
+    workerCount:Math.min(desired,model.webgpuWorkers??1),wasmThreads:threads});
 }

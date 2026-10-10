@@ -8,7 +8,7 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/ui/i18n.
 import { photoContentIdentifier, moviePairingMetadata, createLivePhotoExport } from "./src/media/live-photo.js";
 import { RASTER_MIMES } from "./src/media/image-format.js";
 import { photoCaptureDate } from "./src/media/photo-date.js";
-import { preserveNativeStyles, styleReconstructionRisk } from "./src/styles/style-preservation.js";
+import { preserveNativeStyles, styleReconstructionRisk, nativeTextureCapture } from "./src/styles/style-preservation.js";
 import { AI_STRINGS } from "./src/ui/ai-strings.js";
 import {prepareBrowser} from './src/ui/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
@@ -588,6 +588,7 @@ async function handleFile(file) {
     }
 
     const textureOnly = preserveNativeStyles(bytes,d);
+    const nativeTexture = nativeTextureCapture(bytes,d);
     const {nativePortraitBaseState}=await import('./src/portrait/ai-portrait-container.js');
     const portraitState=nativePortraitBaseState(bytes,d);
     const rebuildNativePortrait=textureOnly&&d.stylesItem===null&&portraitState!==null;
@@ -599,7 +600,14 @@ async function handleFile(file) {
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
     let data, bits, suffix;
-    if (preserveIncomplete) {
+    if (nativeTexture && !hasTexture(d.infos)) {
+      // iPhone 18+ native captures can expose Texture/Film through capture metadata
+      // without the grafted texture_styles/matte graph. Never graft a second Texture
+      // contract onto those files; Photos already owns the native render path.
+      data=bytes;
+      bits=[T('st.native'),T('st.texture')];
+      suffix='_Preserved.HEIC';
+    } else if (preserveIncomplete) {
       // A selected preset is not the Styles editing graph. Adding Texture alone
       // advertises a new renderer without the colour resources it needs. Keep
       // this incomplete native export intact and register only its own HDR map.

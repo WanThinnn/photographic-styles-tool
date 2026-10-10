@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {be, concat} from '../../web/src/core/box.js';
 import {exifCameraModel} from '../../web/src/core/exif.js';
-import {styleReconstructionRisk,preserveNativeStyles} from '../../web/src/styles/style-preservation.js';
+import {styleReconstructionRisk,preserveNativeStyles,nativeTextureCapture} from '../../web/src/styles/style-preservation.js';
 import {discoverHeic, extractItem, idatItemBytes, propertyBoxBytes} from '../../web/src/core/heif.js';
 import {addTexture} from '../../web/src/styles/texture.js';
 
@@ -48,6 +48,20 @@ test('iPhone 16+ preserves native Styles even when exports omit editing resource
     assert.equal(styleReconstructionRisk(data, discovery(data)), null);
     assert.equal(preserveNativeStyles(data,discovery(data)),false);
   }
+});
+
+const nativeFilmDirectory=new URL('../private-fixtures/Film_Halation_V1/',import.meta.url);
+test('native iPhone 18 Film capture is detected without grafted Texture metadata',{
+  skip:!fs.existsSync(new URL('IMG_0243.HEIC',nativeFilmDirectory)),
+},()=>{
+  const native18=new Uint8Array(fs.readFileSync(new URL('IMG_0243.HEIC',nativeFilmDirectory)));
+  const d18=discoverHeic(native18);
+  assert.equal(d18.stylesItem,null);
+  assert.equal(nativeTextureCapture(native18,d18),true);
+
+  const older=new Uint8Array(fs.readFileSync(new URL('IMG_7864.HEIC',nativeFilmDirectory)));
+  const d16=discoverHeic(older);
+  assert.equal(nativeTextureCapture(older,d16),false);
 });
 
 const directory = 'C:/Users/WanThinnn/Downloads/iCloud Photos/iCloud Photos/';

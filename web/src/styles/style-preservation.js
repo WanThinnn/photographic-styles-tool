@@ -1,5 +1,17 @@
 import {discoverHeic, extractItem} from '../core/heif.js';
-import {exifCameraModel} from '../core/exif.js';
+import {exifCameraModel,extractAppleMakerNoteTag} from '../core/exif.js';
+
+export function nativeTextureCapture(data, discovery = discoverHeic(data)) {
+  if (discovery.exifItem === null) return false;
+  const exif=extractItem(data,discovery.iloc,discovery.exifItem);
+  const model=exifCameraModel(exif);
+  const generation=/^iPhone (\d+)(?:\s|$)/.exec(model||'');
+  if(!generation||Number(generation[1])<18)return false;
+  try {
+    const tag=extractAppleMakerNoteTag(exif,0x65);
+    return tag.type===7&&tag.payload.length>0;
+  } catch { return false; }
+}
 
 export function preserveNativeStyles(data, discovery = discoverHeic(data)) {
   if (discovery.exifItem === null) return false;

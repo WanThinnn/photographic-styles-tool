@@ -2856,3 +2856,158 @@ is v107.
 The selected browser regression set now completes 142 cases: 127 passes,
 15 optional private-fixture skips, no failures. PWA, module-path and three-language
 checks pass.
+
+
+### 10.59 Film final-render red-highlight overflow mitigation (2026-10-11; superseded by §10.61)
+
+Upstream issue #8 reports that iOS 27 Photos previews the Film texture normally
+but, after tapping Done, the saved/final render can produce severe red highlight
+halation. The same behavior was reported from the Swift port, which shares the
+same Texture metadata contract, so this is treated as a renderer-metadata
+compatibility issue rather than a browser-only pixel bug.
+
+A repository scan of 241 private HEIC fixtures containing
+`texture_styles` found two renderer profiles in historical/generated outputs:
+182 with `HardwareModel=iPhone19,2` and 59 with `iPhone19,7`. The raster
+Texture baseline already declared `iPhone19,7`, but its production add-texture
+path immediately overwrote that field back to `iPhone19,2`; the native-style
+web path and Python path also wrote `iPhone19,2`.
+
+New outputs now consistently use `iPhone19,7` in `texture_styles`:
+- `web/src/styles/texture.js`: baseline blob and per-photo rebuilt header.
+- `web/src/raster/texture.js`: the old forced `iPhone19,2` override is removed.
+- `photographic_style_port.py`: baseline blob and header are kept in parity.
+
+This is a compatibility mitigation for issue #8, not proof that iOS' final
+renderer bug is fully characterized. `iPhone16,1` remains rejected because
+earlier phone testing produced a separate white-highlight glow. Existing native
+photos are never auto-migrated solely because they contain `iPhone19,2`, since
+that value also occurs in genuine native Texture metadata. Existing app-generated
+files should be regenerated to receive the new renderer profile.
+
+Regression tests parse both web Texture baselines and an actual raster
+add-texture output and require `HardwareModel=iPhone19,7`; the Python plist
+test requires the same value. Service-worker shell cache is v110.
+
+
+### 10.60 Device feedback: iPhone19,7 experiment (2026-10-11; rejected in §10.61)
+
+Device testing of the `iPhone19,7` Texture renderer mitigation reports that
+Film's red highlight halation is visibly lighter than before, but the user cannot
+yet confirm whether that lighter amount matches a native iPhone 18 Pro capture.
+More importantly, Photos preview becomes non-monotonic near maximum strength:
+the red halation is still visible around 97 but disappears again by 100. This
+means `iPhone19,7` is only a symptom-reducing compatibility mitigation, not a
+validated native-equivalent fix.
+
+Existing project evidence already shows native iPhone 16/17 Texture/Styles files
+using `iPhone19,2` do not reproduce the reconstructed-photo maximum-strength
+red/orange problem. Therefore `HardwareModel` alone cannot explain the bug; it
+interacts with reconstructed Styles/render resources or selects a different
+renderer response curve.
+
+Production remains temporarily on `iPhone19,7` while a strict same-file A/B/C
+probe is tested. `tools/film-halation-variants.mjs` creates three variants from
+the reconstructed `IMG_0783_Web_Default_D.HEIC`, changing only the
+`texture_styles` HardwareModel payload:
+A = `iPhone19,2`, B = `iPhone19,7`, C = field removed. The HEIC rebuild
+self-check preserves every other original external payload byte-exact. Outputs
+are under `tests/private-fixtures/Film_Halation_V1/`; device comparison should
+check Film preview at 90/94/97/98/99/100 and the saved result after Done.
+
+
+### 10.61 iPhone19,7 rejected; native renderer profile restored; Bright preservation control (2026-10-11)
+
+Device A/B testing reports A (`iPhone19,2`) and B (`iPhone19,7`) have the
+same Film halation, while C (no HardwareModel) renders with severe blown/incorrect
+colour. The `iPhone19,7` mitigation therefore does not solve upstream issue #8.
+It also introduced a new regression on some captures: a source selected as Bright
+could reopen as Standard after the tool, whereas this did not occur before the
+renderer-profile experiment.
+
+The production Texture renderer profile is restored to the native donor value
+`iPhone19,2` in web native-style, web raster and Python paths. The raster baseline
+constant is also restored to `iPhone19,2`; no hidden `iPhone19,7` production
+override remains. The no-HardwareModel variant is rejected.
+
+`tests/private-fixtures/Film_Halation_V1/IMG_7864.HEIC` is a useful street-light
+positive control. It is an iPhone 16 Pro native Styles image (schema 131087).
+Current add-Texture output preserves the original Styles payload byte-exact and
+the complete Exif/MakerNote payload byte-exact, while adding only Texture/mattes.
+A regression test now enforces this and requires the generated Texture item to use
+`HardwareModel=iPhone19,2`.
+
+A separate native Bright+Texture fixture
+`NativePortrait_Bright_HDR_V4/E_CompleteBright_HDR.HEIC` confirms that Apple
+itself stores `texture_styles.Preset=Standard` together with a working Bright
+Styles/MakerNote state and `HardwareModel=iPhone19,2`. Therefore the Texture
+`Preset` string is not the Photographic Style selector and must not be rewritten
+to Bright. The Bright regression was caused by the renderer-profile experiment,
+not by direct replacement of the native Styles payload.
+
+For phone comparison, `IMG_7864_Texture_iPhone19,2.HEIC` and the generated
+`IMG_7864_AB/` variants provide a same-photo street-light Film test. Film issue
+#8 remains unresolved after rejecting the HardwareModel hypothesis; the next
+useful evidence is whether this native-Styles positive control shows the same
+preview-vs-Done red overflow after Texture is added.
+
+
+### 10.62 Native iPhone 18 Pro Film path differs from the grafted Texture graph (2026-10-11)
+
+Two user-supplied native iPhone 18 Pro captures were inspected:
+`tests/private-fixtures/Film_Halation_V1/IMG_0240.HEIC` and
+`IMG_0243.HEIC`. Both expose Texture/Film in Photos on-device, but their HEIC
+containers contain no 2023 Styles URI item, no `texture_styles` URI item, no
+2026 matte set, no linearthumbnail and no style delta map. This proves native
+iPhone 18 Pro Texture/Film can be enabled through a capture-generation path that
+is distinct from the older-device graft used by this tool.
+
+Both iPhone 18 Pro Exif MakerNotes contain private tag `0x65` (UNDEFINED,
+binary plist, 74 bytes). A scan of the available private HEIC corpus found:
+- iPhone 18 Pro: 2/2 files contain `0x65`.
+- iPhone 16 Pro: 0/219.
+- iPhone 13 Pro Max: 0/8.
+- iPhone 11 Pro Max: 0/18.
+- iPhone X / iPhone 7: 0/all tested.
+
+The two observed native payloads are:
+- IMG_0243 neutral-looking: `{0:0, 1:0, 2:0.0, 3:1}`.
+- IMG_0240: `{0:1, 1:54, 2:0.20462970435619354, 3:1}`.
+
+The semantic meaning of tag `0x65` is unknown. It is therefore not injected by
+production code yet. A strict same-file diagnostic set was generated at
+`tests/private-fixtures/Film_Halation_V1/IMG_7864_65/`:
+A = current control with no tag 0x65; B = only the neutral 0x65 payload from
+IMG_0243; C = only the 0x65 payload from IMG_0240. Styles, Texture resources and
+pixels remain unchanged; only the Exif/MakerNote item is rebuilt. The phone test
+should compare Film preview at 90/96/97/100 and the saved result after Done.
+If B aligns saved Film strength with preview, neutral 0x65 becomes the leading
+candidate for a production compatibility marker on grafted Texture photos.
+
+
+### 10.63 Film preview-vs-Done mismatch confirmed as a native iOS 27 Photos bug (2026-10-11)
+
+Device testing of the strict MakerNote-0x65 variants on IMG_7864 found A/B/C visually
+identical. Injecting either observed iPhone 18 Pro 0x65 payload therefore does not change
+the Film preview/final mismatch and 0x65 is rejected as a compatibility fix.
+
+More importantly, the untouched native iPhone 18 Pro capture
+`tests/private-fixtures/Film_Halation_V1/IMG_0243.HEIC` reproduces the exact bug on
+iOS 27 Photos: while editing, moving the Film slider shows little/no red halation, but
+after tapping Done the saved Photos render shows the red Film halation. This file was
+captured by an iPhone 18 Pro with Exif Software `27.0`; it has not passed through this
+tool. Its container has no 2023 Styles URI item, no grafted `texture_styles`, no 2026
+matte set, no linearthumbnail and no style delta map. The same Photos preview-vs-final
+mismatch therefore exists on Apple's native capture/render path.
+
+This evidence rules out the tool's HardwareModel choice, FilmGrainSeed and MakerNote
+0x65 as root causes for issue #8. A file-side metadata mutation cannot be claimed as a
+correct fix while an untouched native Apple file exhibits the same renderer mismatch.
+Any attempt to pre-compensate the saved result would deliberately diverge from native
+Apple semantics and would make the edit preview less trustworthy.
+
+The web app now detects the native iPhone 18+ capture path conservatively as
+`camera generation >= 18` plus Apple MakerNote tag `0x65`. Such files are preserved
+without grafting a second Texture contract when no grafted `texture_styles` exists.
+A private regression asserts IMG_0243 is detected as native Texture while IMG_7864
+(iPhone 16 Pro) is not. Service-worker shell cache is v112.

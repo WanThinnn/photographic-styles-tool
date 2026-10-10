@@ -124,10 +124,8 @@ URI_TEXTURE_STYLES = "tag:apple.com,2026:photo:metadata:texture_styles"
 #   - iPhone 16 (v0.4.4) graph + texture item only          -> NO palette at all
 #   - iPhone 18 donor graph, texture item appended last    -> palette + Texture/Grain
 # So the texture item without the mattes breaks the editor outright, and item order is free.
-# These are Apple's exact 216 bytes from iPhone 18 Pro IMG_0309 (a binary plist: Preset
-# Standard, CaptureType LF, CaptureMode Still, PortType PortTypeBack, HardwareModel iPhone19,2,
-# TextureStylePeopleDataVersion 3, FilmGrainSeed 92). Leave HardwareModel alone: rewriting
-# it to iPhone16,1 kept the controls but made white areas glow under some styles.
+# Native Texture renderer baseline. Device A/B testing found iPhone19,7 did not
+# improve Film halation and could regress selected Bright captures to Standard.
 TEXTURE_STYLES_BLOB = base64.b64decode(
     "YnBsaXN0MDDXAQIDBAUGBwgJCgsMDQ5WUHJlc2V0W0NhcHR1cmVUeXBlW0NhcHR1cmVNb2RlWFBv"
     "cnRUeXBlXUhhcmR3YXJlTW9kZWxfEB1UZXh0dXJlU3R5bGVQZW9wbGVEYXRhVmVyc2lvbl1GaWxt"

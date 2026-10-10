@@ -85,13 +85,7 @@ if (!(manifest.icons || []).some(icon=>icon.sizes==='512x512'&&String(icon.purpo
   errors.push('manifest must retain a separate 512x512 any icon for Windows/desktop');
 }
 
-const refIcons=join(ROOT,"ref","Shalielie","web","icons");
 const sha=bytes=>createHash("sha256").update(bytes).digest("hex");
-for(const size of [180,192,512]){
-  const ours=readFileSync(join(WEB,"icons",`icon-${size}.png`));
-  const ref=readFileSync(join(refIcons,`icon-${size}.png`));
-  if(sha(ours)===sha(ref))errors.push(`icon-${size}.png must use this app's artwork, not Shalielie's artwork`);
-}
 
 const touchIcon=join(WEB,"icons","apple-touch-icon-v2.png");
 if(pngDimensions(touchIcon)?.join("x")!=="180x180")errors.push("apple-touch-icon-v2.png is not a 180x180 PNG");

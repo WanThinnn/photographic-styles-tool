@@ -4,10 +4,33 @@ import {discoverHeic, auxUriForItem, DEPTH_URI, extractItem, addItems, parseIloc
   appendIpcoProperty,idatItemBytes} from '../core/heif.js';
 import {appleDepthAuxc,appleDepthXmp} from './apple-depth-metadata.js';
 import {styleCapabilities} from '../styles/style-capabilities.js';
-import {extractAppleMakerNoteTag,getMakerNoteBlob} from '../core/exif.js';
+import {extractAppleMakerNoteTag,getMakerNoteBlob,exifCameraModel} from '../core/exif.js';
+
+// 0x1f is PhotosAppFeatureFlags, not Portrait On/Off. Do not use it to
+// classify blur. The tested legacy Photo capture with native depth uses a
+// sharp primary (IMG_6246); Scene/Manual Focus exports can have baked blur.
+export function nativePortraitBaseState(data,d=discoverHeic(data)){
+  const depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
+  if(depths.length!==1||d.exifItem===null)return null;
+  const exif=extractItem(data,d.iloc,d.exifItem);
+  const model=/^iPhone (\d+)(?:\s|$)/.exec(exifCameraModel(exif)||'');
+  if(!model)return null;
+  const sides=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(depths[0])&&d.infos.get(r.from)?.type==='mime');
+  if(sides.some(r=>new TextDecoder().decode(extractItem(data,d.iloc,r.from)).includes('depthBlurEffect:RenderingParameters')))
+    return 'existing-renderer';
+  try{
+    const tag=extractAppleMakerNoteTag(exif,0x14);
+    if(![4,9].includes(tag.type)||tag.payload.length!==4)return 'unknown-base';
+    const little=getMakerNoteBlob(exif)[12]===73;
+    const capture=new DataView(tag.payload.buffer,tag.payload.byteOffset,4).getUint32(0,little);
+    if(capture===10&&Number(model[1])<16)return 'legacy-photo-base';
+    if(capture===2)return 'portrait-capture';
+  }catch{}
+  return 'unknown-base';
+}
 
 // This detects missing edit resources, not whether pixels contain digital blur.
-// Capture/enable flags alone cannot prove that a base image is unblurred.
+// Capture classifications alone cannot prove that a base image is unblurred.
 export function nativePortraitSourceRisk(data,d=discoverHeic(data)){
   const depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
   if(depths.length!==1||d.exifItem===null)return null;

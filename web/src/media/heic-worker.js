@@ -22,6 +22,15 @@ export async function executeJob(job, decode) {
   if (job.operation === 'repair-texture') return keepEditableHdr(repairTextureCurve(job.data,job.opts),job.data);
   if (job.operation === 'metadata') return describeHeic(job.data);
   if (job.operation === 'soft-skin') return {data:installSoftSkin(job.data,job.people,job.opts)};
+  if (job.operation === 'native-portrait') {
+    const {restoreNativePortrait}=await import('../portrait/ai-portrait-export.js');
+    const {nativePortraitBaseState}=await import('../portrait/ai-portrait-container.js');
+    // Explicit confirmation is for files whose render history cannot be read.
+    // Otherwise restore only the legacy sharp Photo+depth contract, not every
+    // native depth capture and not a guessed state from Photos feature flags.
+    if(job.opts?.portraitOffConfirmed!==true&&nativePortraitBaseState(job.data)!=='legacy-photo-base')return {data:null};
+    return keepEditableHdr(await restoreNativePortrait(job.data,job.opts?.template,{unblurredBase:true})||{data:null},job.data);
+  }
   if (job.operation === 'patch') {
     const opts = {...job.opts};
     if (opts.decode) opts.decode = (_data, options) => decode(options);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {buildAiPortrait,restoreNativePortrait} from '../../web/src/portrait/ai-portrait-export.js';
-import {portraitEligibility,attachAiDepth} from '../../web/src/portrait/ai-portrait-container.js';
+import {portraitEligibility,attachAiDepth,nativePortraitBaseState} from '../../web/src/portrait/ai-portrait-container.js';
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
@@ -85,6 +85,44 @@ function capture(source,classification,enabled){
     }
     return rebuildHeic(source,d,source.slice(0,ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.exifItem,exif]]));
 }
+
+function withCamera(source,model){
+  const d=discoverHeic(source),e=extractItemData(source,d,d.exifItem);
+  const start=new DataView(e.buffer,e.byteOffset,4).getUint32(0)+4,t=e.subarray(start);
+  const little=t[0]===73,v=new DataView(t.buffer,t.byteOffset,t.length),root=v.getUint32(4,little);
+  const num=(value,size)=>little?be(value,size).reverse():be(value,size);
+  const name=new TextEncoder().encode(model+'\0'),entries=[];
+  for(let i=0;i<v.getUint16(root,little);i++)entries.push(t.slice(root+2+i*12,root+14+i*12));
+  entries.push(concat([num(0x110,2),num(2,2),num(name.length,4),num(t.length,4)]));
+  const exif=concat([e,name,num(entries.length,2),...entries,new Uint8Array(4)]);
+  new DataView(exif.buffer).setUint32(start+4,t.length+name.length,little);
+  const ft=topBox(source,'ftyp');
+  return rebuildHeic(source,d,source.slice(0,ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.exifItem,exif]]));
+}
+
+test('legacy native Photo depth restores editing independently of Photos feature flags; modern/blurred exports need confirmation',async()=>{
+  for(const flags of [0,1,7]){
+    const source=withCamera(capture(attachAiDepth(photo(900,600),depth),10,flags),'iPhone 13 Pro Max');
+    assert.equal(nativePortraitBaseState(source),'legacy-photo-base');
+    const out=await executeJob({operation:'native-portrait',data:source,opts:{template}});
+    assert.equal(out.report.mode,'restored-native-portrait');
+    assert.equal(out.report.modelInference,false);
+    const before=discoverHeic(source),after=discoverHeic(out.data);
+    assert.deepEqual(selectedStyle(out.data),selectedStyle(source));
+    assert.deepEqual(extractItemData(out.data,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+    before.primaryTiles.forEach((id,i)=>assert.deepEqual(extractItemData(out.data,after,after.primaryTiles[i]),extractItemData(source,before,id)));
+  }
+  for(const model of ['iPhone 13 Pro Max','iPhone 16 Pro']){
+    const source=withCamera(capture(attachAiDepth(photo(900,600),depth),12,0),model);
+    assert.equal(nativePortraitBaseState(source),'unknown-base');
+    assert.equal((await executeJob({operation:'native-portrait',data:source,opts:{template}})).data,null);
+    const confirmed=await executeJob({operation:'native-portrait',data:source,opts:{template,portraitOffConfirmed:true}});
+    assert.equal(confirmed.report.mode,'restored-native-portrait');
+  }
+  const on=withCamera(capture(attachAiDepth(photo(900,600),depth),2,1),'iPhone 13 Pro');
+  assert.equal(nativePortraitBaseState(on),'portrait-capture');
+  assert.equal((await executeJob({operation:'native-portrait',data:on,opts:{template}})).data,null);
+});
 test('diagnostic native rebuild requires explicit verified unblurred pixels regardless of flags',async()=>{
   for(const [classification,enabled]of [[10,0],[11,1],[11,0]]){
     const source=capture(attachAiDepth(photo(900,600),depth),classification,enabled),before=discoverHeic(source),saved=source.slice();
@@ -166,6 +204,22 @@ test('ISO-only tmap gain maps are reported and preserved as HDR when adding Port
   assert.equal(auxUriForItem(before.props,before.hdrGrid),null);
   assert.equal(before.hdrGrid,d.hdrGrid);assert.equal(discoverCoreHeic(source).hdrGrid,d.hdrGrid);
   assert.equal(describeHeic(source).hdr,true);
+  // A native edited export can retain its ISO gain map and selected preset,
+  // without carrying any of the colour-editing resources. HDR registration
+  // must work without inventing a Styles graph or a Texture renderer.
+  const incomplete=withoutThumbnail(source,[before.stylesItem,before.deltaGrid,before.linearThumb]);
+  const missing=discoverHeic(incomplete);
+  assert.equal(missing.stylesItem,null);
+  assert.equal(hasTexture(missing.infos),false);
+  const preserved=await executeJob({operation:'repair-texture',data:incomplete,opts:{preserveStyles:true}});
+  const pd=discoverHeic(preserved.data);
+  assert.equal(pd.stylesItem,null);
+  assert.equal(hasTexture(pd.infos),false);
+  assert.equal(auxUriForItem(pd.props,pd.hdrGrid),'urn:com:apple:photo:2020:aux:hdrgainmap');
+  for(const id of missing.infos.keys())
+    assert.deepEqual(extractItemData(preserved.data,pd,id),extractItemData(incomplete,missing,id));
+  assert.deepEqual(selectedStyle(preserved.data),selectedStyle(incomplete));
+  assert.equal(registerTmapHdr(preserved.data),null);
   const output=buildAiPortrait(source,depth,template).data,after=discoverHeic(output);
   assert.equal(describeHeic(output).hdr,true);
   assert.equal(after.hdrTiles.length,before.hdrTiles.length);

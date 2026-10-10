@@ -2688,3 +2688,43 @@ tiles are unchanged. The native IMG_1092 route completes without replacing its
 camera depth, with exact source Styles and Exif preserved. Soft Skin was mocked
 as no-face in this isolated browser probe. No Safari or Photos rendering claim
 is inferred from these desktop results. Shell v91.
+
+### 10.55 Native editing regressions after the preservation policy (shell v92)
+
+The user supplied IMG_1119/1120 and processed IMG_1121/1122 in
+D:/Downloads/16pro/iCloud Photos. Both inputs already lack the Styles URI,
+linear thumbnail and delta map, despite retaining Bright and pad coordinates.
+Adding Texture alone does not restore Styles; the v91 native status incorrectly
+implied that it did. The default incomplete-native route now preserves the
+input without advertising an incomplete Texture renderer. Experimental Styles
+reconstruction is explicit, retains the selected preset/pad, and warns that
+missing original colour calibration can still change Photos rendering.
+IMG_1119 is returned byte-identically. IMG_1120 receives only an additive HDR
+role/reference for its own unambiguous ISO gain map; all payloads are identical.
+Registration no longer unnecessarily depends on a Styles plist being present.
+
+The blanket removal of native reconstruction also regressed the previously
+accepted iPhone 13 Pro Max case. IMG_6246 decodes to a sharp base and uses the
+legacy Photo capture class with camera depth. That contract again receives the
+accepted renderer after Styles processing, without AI or re-encoding depth.
+Other incomplete captures require explicit confirmation that Portrait was
+turned off in Photos and the uploaded image is sharp. A compact notice appears
+above output actions; an unknown state is never represented as certainly On.
+Complete native renderers and Styles stay on the additive preservation route.
+
+ExifTool's Apple.pm identifies 0x1f as PhotosAppFeatureFlags, not Portrait
+On/Off; 0x14 is ImageCaptureType (2 Portrait, 10 Photo, 11 Manual Focus, 12 Scene).
+The former is no longer interpreted as an enable state. These private fields
+alone cannot establish whether edited RGB contains baked blur. The adapter
+supports understood capture layouts with a confirmed sharp base, while default
+diagnostic calls still do not rebuild arbitrary captures.
+Source: https://github.com/exiftool/exiftool/blob/master/lib/Image/ExifTool/Apple.pm
+
+107 selected tests complete: 97 passes, ten optional-fixture skips, no failures.
+PWA validation passes. The browser probe covers both 16 Pro pairs, complete
+IMG_1092, already processed IMG_1094, and automatic legacy IMG_6246 restoration.
+It verifies exact original compressed primary/HDR/depth data and selected Style
+parameters. The reconstructed 13 Pro file contains rendering parameters and
+Styles, but the updated result still needs physical Photos effect validation.
+Soft Skin is mocked as no-face only in the experimental reconstruction probe.
+Private V7 comparison files are not published or committed.

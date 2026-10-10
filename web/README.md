@@ -529,19 +529,24 @@ Photos editor without changing the image, gain-map tiles, tone-map parameters or
 Style. Private phone tests confirm HDR and aperture/lighting editing for the tested
 native Portrait export; stronger Style colours on reconstructed exports remain unresolved.
 
-Native iPhone 16+ HEIC inputs use Texture-only processing, including edited exports
-that omit their original Styles auxiliary graph. Their existing Styles bytes,
-selection, primary images, depth and HDR resources are preserved; missing Styles
-are not recreated with reference-camera coefficients. Legacy tone-curve repair
-is disabled for this route. Texture controls still depend on the editing data
-that the source file actually contains.
+Native iPhone 16+ HEIC inputs with Styles use Texture-only processing. Their
+Styles bytes, selection, primary images, depth and HDR resources are preserved.
+If an export omits its Styles graph, the default result preserves the input
+without adding a Texture renderer that lacks required colour resources. A
+separate experimental action can create new Styles, retaining the chosen preset
+and Tone/Colour values; this cannot recover missing native calibration and may
+change colours in Photos. Existing ISO tmap HDR is also registered for editing
+when Styles are absent. Legacy tone-curve repair stays disabled on native inputs.
 
-Existing native Portrait is preserved without automatic capture reconstruction.
-A Portrait export may already have blur baked into its primary pixels, and adding
-a reference renderer cannot make Off return a sharp image. Existing functional
-aperture/lighting resources remain unchanged, including the tested iPhone 13 case.
-The native reconstruction adapter is diagnostic only and requires an explicit
-verified unblurred base; capture flags alone cannot establish that condition.
+Existing complete Portrait renderers remain unchanged. The tested legacy native
+Photo capture with depth (IMG_6246, iPhone 13 Pro Max) again receives an editable
+Portrait graph after Styles processing, without running an AI model or encoding
+new depth. Other incomplete native captures need the user's confirmation that
+Portrait was turned off in Photos and the uploaded base is sharp. A compact
+notice explains this before the download controls. Turning a flag off cannot
+remove blur baked into pixels. PhotosAppFeatureFlags (0x1f) is not Portrait On/Off
+and is no longer used as an enable-state test. Missing native Styles calibration
+and Photos editing effects still require device validation.
 
 AI depth now includes bounded RGB guided edge refinement after GPU resources are
 released. Coefficients are computed on a grid no larger than 256 pixels per edge,

@@ -51,7 +51,7 @@ function makerBlob(template,sourceMarker,sourceExif){
       if((String.fromCharCode(mn[12],mn[13])==='II')!==little)
         payload=concat([payload.slice(0,4).reverse(),payload.slice(4,8).reverse()]);
     }
-    if(tag.id===0x1f){payload=write(1,4);count=1;} // User explicitly enabled AI Portrait.
+    if(tag.id===0x1f){payload=write(1,4);count=1;} // Accepted Photos feature contract, not Portrait On/Off.
     entries.push(concat([write(tag.id,2),write(type,2),write(count,4),
       payload.length<=4?concat([payload,new Uint8Array(4-payload.length)]):write(cursor,4)]));
     if(payload.length>4){values.push(payload);cursor+=payload.length;}
@@ -228,17 +228,16 @@ export async function restoreNativePortrait(source,template,{unblurredBase=false
   const d=discoverHeic(source),depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
   if(depths.length!==1)return null;
   const ownExif=extractItemData(source,d,d.exifItem);
-  let capture,enabled;
+  let capture;
   try{
     const little=String.fromCharCode(...getMakerNoteBlob(ownExif).slice(12,14))==='II';
     const read=id=>{const tag=extractAppleMakerNoteTag(ownExif,id);if(![4,9].includes(tag.type)||tag.payload.length!==4)throw Error('Unknown capture flag');
       return new DataView(tag.payload.buffer,tag.payload.byteOffset,4).getUint32(0,little);};
-    capture=read(0x14);enabled=read(0x1f);
+    capture=read(0x14);
   }catch{return null;}
-  // An exported Portrait-mode photo can carry enabled=0 while lacking the
-  // standalone editor resources (IMG_1079/1080). The enable flag does not prove
-  // that its existing capture graph is editable. Keep complete/unknown graphs.
-  if(![10,11].includes(capture)||![0,1].includes(enabled)||!styleCapabilities(source).editable)return null;
+  // Feature flags are not the Portrait toggle. An explicit sharp-base
+  // confirmation is required above; the capture class only scopes this adapter.
+  if(![2,10,11,12].includes(capture)||!styleCapabilities(source).editable)return null;
   const id=depths[0],sidecars=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(id)&&d.infos.get(r.from)?.type==='mime');
   if(sidecars.length!==1||sidecars[0].to.length!==1)return null;
   const side=sidecars[0].from,xmp=new TextDecoder().decode(extractItemData(source,d,side));

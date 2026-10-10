@@ -16,6 +16,7 @@ import {
 import { injectAppleMakerNoteTag, extractAppleMakerNoteTag, exifCameraModel } from "../core/exif.js";
 import {parseBplist,buildBplist,BplistReal} from '../core/bplist.js';
 import {editableTmapHeadroom} from './hdr-compatibility.js';
+import {nativePortraitBaseState} from '../portrait/ai-portrait-container.js';
 import {
   addTextureItems, hasTexture, softSkinPeople, filmGrainSeed,
   CLASSIC_MATTE_EMPTY, CLASSIC_MATTE_HVCC,
@@ -66,6 +67,13 @@ export function profileFor(index, d, experimental = false) {
  */
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
+  const nativePortraitRebuild=opts.portraitStyleRebuild===true&&td.stylesItem===null
+    &&/^iPhone (1[6-9]|[2-9]\d)(?:\s|$)/.test(exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))||'')
+    &&nativePortraitBaseState(targetData,td)!==null;
+  const evidence=opts.sharpBackgroundEvidence;
+  const measuredSharp=evidence?.method==='native-background-detail-v1'
+    &&Number.isInteger(evidence.detailedTiles)&&evidence.detailedTiles>=3
+    &&Number.isInteger(evidence.farTiles)&&evidence.farTiles>=evidence.detailedTiles;
   // A capture can retain its selected Style even when an export omitted the
   // Styles auxiliary graph. Keep that selection when adding the missing graph.
   let selection,selectionCompatibility;
@@ -77,10 +85,10 @@ export async function patch(targetData, profile, opts = {}) {
       ||!Number.isInteger(marker.get('4'))||marker.get('4')<1
       ||!['1','2'].every(key=>Number.isFinite(marker.get(key))))throw Error(UNSUPPORTED);
     let payload=selection.payload;
-    // Opt-in reconstruction only. K was phone-tested on an incomplete 16 Pro
-    // Bright export with these original adjustments and ISO HDR parameters.
-    // Complete native Styles and all other presets/cameras remain untouched.
-    if(opts.reconstructedBright===true&&td.stylesItem===null
+    // K was phone-tested on an incomplete 16 Pro Bright export with these
+    // adjustments and ISO HDR parameters. Automatic use requires measured
+    // sharp-background evidence; diagnostic callers can explicitly request it.
+    if((opts.reconstructedBright===true||(nativePortraitRebuild&&measuredSharp))&&td.stylesItem===null
       &&exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))==='iPhone 16 Pro'
       &&marker.get('4')===16&&marker.get('1')===-0.5&&marker.get('2')===0.5
       &&editableTmapHeadroom(targetData,td)!==null){
@@ -92,9 +100,15 @@ export async function patch(targetData, profile, opts = {}) {
         payload=buildBplist(neutral);selectionCompatibility='bright-palette70';
       }
     }
+    // Missing native calibration cannot be faithfully reconstructed from a
+    // preset label. Use the tested Bright compromise only on a sharp base;
+    // otherwise use upstream's neutral Standard rather than double-applying it.
+    if(nativePortraitRebuild&&!selectionCompatibility){payload=profile.mn54;selectionCompatibility='portrait-standard';}
     profile={...profile,mn54:payload,
-      manifest:{...profile.manifest,smartstyle_makernote_type:selection.type}};
+      manifest:{...profile.manifest,smartstyle_makernote_type:selectionCompatibility==='portrait-standard'
+        ?profile.manifest.smartstyle_makernote_type??7:selection.type}};
   }
+  else if(nativePortraitRebuild)selectionCompatibility='portrait-standard';
   const hasHdr = td.hdrGrid !== null && (td.infos.get(td.hdrGrid)?.type === "hvc1" || td.hdrTiles.length > 0);
   if (!hasHdr && !opts.experimental) throw new Error(UNSUPPORTED);
   if ((td.thumbnail === null && !opts.linearThumb) || td.exifItem === null) throw new Error(UNSUPPORTED);

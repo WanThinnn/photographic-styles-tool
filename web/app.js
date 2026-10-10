@@ -458,11 +458,13 @@ async function handleFile(file) {
 
     const d = input.discovery;
     const textureOnly = preserveNativeStyles(bytes,d);
-    const preserveIncomplete = textureOnly && d.stylesItem === null;
     const {nativePortraitBaseState}=await import('./src/portrait/ai-portrait-container.js');
     const portraitState=nativePortraitBaseState(bytes,d);
-    const restorePortrait=portraitState==='legacy-photo-base';
-    if (styleReconstructionRisk(bytes,d)) ui.note(T('warn.textureonly'),'style-rebuild');
+    const rebuildNativePortrait=textureOnly&&d.stylesItem===null&&portraitState!==null;
+    const preserveIncomplete = textureOnly && d.stylesItem === null&&!rebuildNativePortrait;
+    let sharpBackgroundEvidence=null;
+    let restorePortrait=portraitState==='legacy-photo-base';
+    if (styleReconstructionRisk(bytes,d)&&!rebuildNativePortrait) ui.note(T('warn.textureonly'),'style-rebuild');
     const liveIdentifier = photoContentIdentifier(bytes);
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
@@ -475,7 +477,7 @@ async function handleFile(file) {
       data ||= bytes;
       bits = [T('st.original')];
       suffix = '_Preserved.HEIC';
-    } else if (textureOnly || d.stylesItem !== null) {
+    } else if ((textureOnly&&!rebuildNativePortrait) || d.stylesItem !== null) {
       // A native iPhone 16/17 style photo is never re-ported (that would replace its real
       // style data); it only gets the iOS 27 Texture/Grain set added.
       ui.set(T("st.working"));
@@ -513,16 +515,30 @@ async function handleFile(file) {
         }
       }
 
+      // Finish thumbnail encoding before retaining a decoded primary canvas:
+      // keeping both full-resolution jobs live increases Safari's memory peak.
+      if(rebuildNativePortrait&&portraitState!=='existing-renderer'){
+        ui.set(T('st.working'));
+        try{
+          const {analyzeNativePortraitBase}=await import('./src/portrait/native-base-analysis.js');
+          sharpBackgroundEvidence=await analyzeNativePortraitBase(bytes,d);
+          restorePortrait ||= Boolean(sharpBackgroundEvidence);
+        }catch(error){console.warn('Native background analysis unavailable',error);}
+      }
       const canDecode = await ensureDecode(bytes);
       ui.set(T("st.working"));
       const opts = canDecode
         ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) }
         : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
+      opts.portraitStyleRebuild=rebuildNativePortrait;
+      opts.sharpBackgroundEvidence=sharpBackgroundEvidence;
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
       // patch() degrades rather than failing when the decoder misbehaves, so trust
       // what it reports it actually did, not what we asked for.
       if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
+      if(report.styleSelectionCompatibility==='portrait-standard')ui.note(T('warn.portraitstandard'),'style-rebuild');
+      else if(report.styleSelectionCompatibility==='bright-palette70')ui.note(T('warn.brightcompat'),'style-rebuild');
 
       bits = [T(report.decoded ? "st.matched" : "st.neutral")];
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));
@@ -534,7 +550,7 @@ async function handleFile(file) {
     if (!preserveIncomplete)
       data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});
     if(restorePortrait&&!preserveIncomplete){
-      const restored=await restoreNativePortraitInWorker(data);
+      const restored=await restoreNativePortraitInWorker(data,{sharpBackgroundEvidence});
       if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
     }
     ui.readyNotice=`${T("st.ready")} — ${bits.join(sep)}`;

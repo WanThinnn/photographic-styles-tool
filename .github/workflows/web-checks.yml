@@ -18,5 +18,5 @@ jobs:
       - run: node tests/web/check-i18n.mjs
       - run: node tests/web/check-pwa.mjs
       - run: node --test tests/web/module-paths.mjs
-      - run: node --test tests/web/depth-refinement.mjs
+      - run: node --test tests/web/depth-refinement.mjs tests/web/native-base-analysis.mjs
       - run: node --test tests/web/startup.mjs tests/web/lifecycle.mjs tests/web/ai-portrait.mjs tests/web/ai-portrait-export.mjs tests/web/apple-depth.mjs tests/web/heic-worker.mjs tests/web/style-preservation.mjs tests/web/texture-compatibility.mjs tests/web/soft-skin.mjs tests/web/face-refinement.mjs tests/web/raster-import.mjs tests/web/jpeg-hdr.mjs tests/web/dng-import.mjs tests/web/language.mjs tests/web/photo-date.mjs tests/web/live-photo.mjs tests/web/thumbnail-graph.mjs

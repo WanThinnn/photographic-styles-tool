@@ -25,10 +25,14 @@ export async function executeJob(job, decode) {
   if (job.operation === 'native-portrait') {
     const {restoreNativePortrait}=await import('../portrait/ai-portrait-export.js');
     const {nativePortraitBaseState}=await import('../portrait/ai-portrait-container.js');
-    // Explicit confirmation is for files whose render history cannot be read.
-    // Otherwise restore only the legacy sharp Photo+depth contract, not every
-    // native depth capture and not a guessed state from Photos feature flags.
-    if(job.opts?.portraitOffConfirmed!==true&&nativePortraitBaseState(job.data)!=='legacy-photo-base')return {data:null};
+    // Manual diagnostic confirmation or measured, separated sharp background
+    // detail permits the adapter. Otherwise retain the legacy Photo+depth rule;
+    // Photos feature flags never establish Portrait On/Off.
+    const evidence=job.opts?.sharpBackgroundEvidence;
+    const measuredSharp=evidence?.method==='native-background-detail-v1'
+      &&Number.isInteger(evidence.detailedTiles)&&evidence.detailedTiles>=3
+      &&Number.isInteger(evidence.farTiles)&&evidence.farTiles>=evidence.detailedTiles;
+    if(job.opts?.portraitOffConfirmed!==true&&!measuredSharp&&nativePortraitBaseState(job.data)!=='legacy-photo-base')return {data:null};
     return keepEditableHdr(await restoreNativePortrait(job.data,job.opts?.template,{unblurredBase:true})||{data:null},job.data);
   }
   if (job.operation === 'patch') {
@@ -38,7 +42,7 @@ export async function executeJob(job, decode) {
     // Preserve native Portrait resources. An incomplete exported capture may
     // already contain blurred pixels; adding reference rendering metadata
     // exposes controls that apply a second blur and cannot turn the first off.
-    return keepEditableHdr(output,job.data,{headroom:output.report.styleSelectionCompatibility==='bright-palette70'});
+    return keepEditableHdr(output,job.data,{headroom:['bright-palette70','portrait-standard'].includes(output.report.styleSelectionCompatibility)});
   }
   throw Error('Unknown HEIC operation');
 }

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v95`;
+const CACHE_NAME = `${CACHE_PREFIX}v96`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -23,6 +23,7 @@ const APP_SHELL = [
   "./src/portrait/ai-portrait-export-worker.js",
   "./src/codecs/libheif-lifecycle.js",
   "./src/portrait/ai-portrait-container.js",
+  "./src/portrait/native-base-analysis.js",
   "./src/portrait/apple-depth-metadata.js",
   "./src/portrait/ai-portrait-export.js",
   "./src/portrait/ai-portrait-preview.js",

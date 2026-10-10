@@ -296,6 +296,51 @@ test('opt-in Bright reconstruction matches K and carries own HDR headroom withou
   assert.deepEqual(selectedStyle(portrait),selectedStyle(output.data));
 });
 
+test('automatic incomplete native Portrait gains Styles/Texture, with neutral Standard when the base is unknown',async()=>{
+  const source=capture(attachAiDepth(incompleteBrightIso(),depth),12,0),before=discoverHeic(source);
+  const profile=buildGeneratedProfile('48-12',assets),saved=profile.mn54.slice();
+  const output=await executeJob({operation:'patch',data:source,profile,opts:{portraitStyleRebuild:true,experimental:true}});
+  const after=discoverHeic(output.data);
+  assert.equal(output.report.styleSelectionCompatibility,'portrait-standard');
+  assert.deepEqual(selectedStyle(output.data).payload,saved);
+  assert.ok(after.stylesItem!==null&&hasTexture(after.infos));
+  assert.equal((await executeJob({operation:'native-portrait',data:output.data})).data,null);
+  for(const role of ['primaryTiles','hdrTiles'])before[role].forEach((id,i)=>
+    assert.deepEqual(extractItemData(output.data,after,after[role][i]),extractItemData(source,before,id)));
+  const id=[...before.infos.keys()].find(id=>auxUriForItem(before.props,id)===DEPTH_URI);
+  assert.deepEqual(extractItemData(output.data,after,id),extractItemData(source,before,id));
+  assert.ok(after.refs.filter(r=>r.type==='cdsc'&&r.to.includes(after.hdrGrid)).some(r=>
+    new TextDecoder().decode(extractItemData(output.data,after,r.from)).includes('HDRGainMapHeadroom>4.000000000')));
+  assert.deepEqual(profile.mn54,saved);
+});
+
+test('measured sharp native background restores aperture without altering reconstructed Bright or HDR',async()=>{
+  const source=capture(attachAiDepth(incompleteBrightIso(),depth),12,0),profile=buildGeneratedProfile('48-12',assets);
+  const sharpBackgroundEvidence={method:'native-background-detail-v1',detailedTiles:3,farTiles:16};
+  const output=await executeJob({operation:'patch',data:source,profile,
+    opts:{portraitStyleRebuild:true,sharpBackgroundEvidence,experimental:true}});
+  const marker=parseBplist(selectedStyle(output.data).payload);
+  assert.equal(output.report.styleSelectionCompatibility,'bright-palette70');
+  assert.deepEqual([marker.get('4'),marker.get('1'),marker.get('2'),marker.get('3')],[16,0,0,.7]);
+  const restored=await executeJob({operation:'native-portrait',data:output.data,opts:{template,sharpBackgroundEvidence}});
+  assert.equal(restored.report.mode,'restored-native-portrait');
+  assert.deepEqual(selectedStyle(restored.data),selectedStyle(output.data));
+  const before=discoverHeic(output.data),after=discoverHeic(restored.data);
+  for(const role of ['primaryTiles','hdrTiles'])before[role].forEach((id,i)=>
+    assert.deepEqual(extractItemData(restored.data,after,after[role][i]),extractItemData(output.data,before,id)));
+  for(const evidence of [true,{}, {...sharpBackgroundEvidence,detailedTiles:2}])
+    assert.equal((await executeJob({operation:'native-portrait',data:output.data,opts:{template,sharpBackgroundEvidence:evidence}})).data,null);
+});
+
+test('native Portrait reconstruction does not reset complete native Styles or an unrelated photo',async()=>{
+  const profile=buildGeneratedProfile('48-12',assets);
+  for(const source of [incompleteBrightIso(),capture(attachAiDepth(incompleteBrightIso({complete:true}),depth),12,0)]){
+    const out=await executeJob({operation:'patch',data:source,profile,opts:{portraitStyleRebuild:true,experimental:true}});
+    assert.equal(out.report.styleSelectionCompatibility,undefined);
+    assert.deepEqual(selectedStyle(out.data),selectedStyle(source));
+  }
+});
+
 test('Bright compatibility is never implicit or applied to complete native Styles or other cameras/presets',async()=>{
   const profile=buildGeneratedProfile('48-12',assets);
   for(const settings of [{},{model:'iPhone 13 Pro'},{model:'iPhone 17 Pro'},{preset:1},{complete:true}]){

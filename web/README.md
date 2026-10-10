@@ -72,8 +72,9 @@ person/skin colour statistics in a newly reconstructed Styles graph. Source mode
 detection protects this rule even when a caller passes `nativeStyles: false`.
 This guard does not recover missing native calibration or fix the existing colour
 change on entering Edit. Keeping the Bright selection in EXIF also does not,
-by itself, restore the Styles editor; the incomplete-input result says so beside
-its save actions.
+by itself, restore the Styles editor. Native Portrait reconstruction therefore
+uses a neutral Standard fallback or the scoped phone-tested Bright compromise
+described below, instead of blindly preserving every numeric setting.
 
 The private Shalielie comparison (V9) isolated the selected Style marker from
 the reconstructed graph. The profile ZIPs are identical to upstream. Using the
@@ -119,21 +120,31 @@ native Bright input retains its own EXIF and Styles payloads exactly. This is a
 scoped compatibility compromise tested on one edited photo, not recovery of the
 missing native calibration or a universal colour correction.
 
-The user subsequently selected a fully automatic preservation policy. The web
-no longer offers Create new Styles or Portrait-Off confirmation actions and does
-not invoke the K reconstruction path. Complete native Styles keep their original
-preset and parameters and only receive Texture supplementation. Incomplete
-native exports keep their own rendered image, selected preset, depth and HDR;
-missing Styles editing data and Texture are not synthesized, because doing so
-can change colours. The result explains this limitation. This follows upstream's
-Texture-only route when native Styles are present without its Standard preset
-fallback when they are missing.
-Only the previously tested legacy sharp Photo+depth contract restores aperture
-and lighting automatically. Existing renderers are preserved. Unknown native
-Portrait exports (including both IMG_1158 and IMG_1163) do not gain another blur
-renderer based on PhotosAppFeatureFlags, capture class or a guessed On/Off state.
-Turning Portrait off in Photos alone does not prove a sharp base from the file's
-metadata. Already rendered blur cannot be reversed through metadata.
+After V95, the user clarified that native Portrait exports must receive Styles
+and Texture automatically, even when native Styles editing resources are missing.
+There are still no Create new Styles or Portrait-Off confirmation buttons.
+Complete native Styles retain their preset and parameters and receive Texture
+supplementation. Incomplete native Portrait exports use upstream's neutral
+Standard selection, retaining their own image, depth and HDR samples. Reusing
+the original preset without its calibration can double-apply colours, so keeping
+the preset name is not sufficient. A supported sharp Bright export uses the
+phone-tested K compromise instead: Bright, neutral Tone/Colour and Palette 70.
+Incomplete native exports without depth still use the preserved-copy route.
+
+The legacy sharp Photo+depth contract still restores aperture/lighting directly.
+For incomplete newer native Portrait exports, V96 also samples at most 1024 pixels
+along the long edge and decodes the existing bounded 8-bit disparity image. A
+conservative test requires strong detail in at least three separated far-depth
+regions; isolated edges, foreground detail, flat depth and noise are insufficient.
+The actual browser classifies IMG_1158 as unknown (Standard, no added renderer)
+and IMG_1163 as sharp (Bright K, original-depth aperture/lighting adapter). Their
+RGB/HDR samples remain exact; IMG_1163's selection and Styles match phone-tested K.
+This is an experimental image heuristic, not proof of the Photos Portrait toggle.
+Sparse or naturally soft backgrounds, small thumbnails, mismatched orientation,
+unsupported depth, and decoding failures remain unknown. They still get Styles
+and Texture but do not gain another blur renderer. PhotosAppFeatureFlags never
+determines On/Off. Existing renderers are preserved, and rendered blur cannot be
+reversed through metadata. New automatic outputs still need phone validation.
 
 SkinSmoothFaceRoughness now uses local-detail residual variance: the user found variant D
 smoother than A/B/C/E/F/G on IMG_0783, with Glow/Film working. Eye statistics still use the
@@ -474,16 +485,15 @@ asset date independently: this web app cannot set PhotoKit's `creationDate` dire
 
 ## HEIC compatibility
 
-An iPhone 16/17 export may retain depth while losing its native Styles resources
-and HDR gain map after editing/export. In that state, the browser explains the limitation
-before offering **Create new Styles (experimental)**. This per-file warning is only
-shown when the camera Model identifies an iPhone 16/17 and native Styles are absent;
-older iPhones, other cameras and missing camera metadata do not trigger it.
-This action rebuilds Styles; it
-cannot recover the selected native style, missing HDR, or guarantee aperture/Portrait
-Lighting editing. Choose an unmodified original HEIC from Files, add Texture first, and
-then reapply edits in Photos. Files that still contain native Styles use the existing
-`add-texture` route and preserve their original image payloads.
+An iPhone 16+ export may retain depth while losing native Styles resources after
+editing/export. Native Portrait files now receive Styles and Texture automatically:
+complete Styles use `add-texture`, while missing calibration uses neutral Standard
+or the supported Bright K compromise. An image/depth test can permit the native
+aperture/lighting adapter; unsupported or ambiguous samples retain their existing
+blur without an added renderer. There are no additional reconstruction buttons.
+The app preserves existing HDR resources; it cannot recreate a missing gain map.
+An incomplete newer-iPhone export without native depth keeps the preserved-copy
+route and explains that Styles/Texture editing was not added.
 
 Legacy native Styles version 14 without a tone curve need one extra compatibility step:
 the app adds a neutral 516-byte curve to fix black Glow/Film rendering and inactive
@@ -600,22 +610,22 @@ native Portrait export; stronger Style colours on reconstructed exports remain u
 
 Native iPhone 16+ HEIC inputs with Styles use Texture-only processing. Their
 Styles bytes, selection, primary images, depth and HDR resources are preserved.
-If an export omits its Styles graph, the default result preserves the input
-without adding a Texture renderer that lacks required colour resources. A
-separate experimental action can create new Styles, retaining the chosen preset
-and Tone/Colour values; this cannot recover missing native calibration and may
-change colours in Photos. Existing ISO tmap HDR is also registered for editing
-when Styles are absent. Legacy tone-curve repair stays disabled on native inputs.
+If a native Portrait export omits its Styles graph, the app creates Styles and
+Texture automatically using the Standard/Bright policy described above, preserving
+its own image and HDR samples. Non-Portrait incomplete native exports retain the
+preserved-copy route. Existing supported ISO tmap HDR is registered with headroom
+derived from its own parameters. Legacy tone-curve repair stays disabled on native inputs.
 
 Existing complete Portrait renderers remain unchanged. The tested legacy native
 Photo capture with depth (IMG_6246, iPhone 13 Pro Max) again receives an editable
 Portrait graph after Styles processing, without running an AI model or encoding
-new depth. Other incomplete native captures need the user's confirmation that
-Portrait was turned off in Photos and the uploaded base is sharp. A compact
-notice explains this before the download controls. Turning a flag off cannot
-remove blur baked into pixels. PhotosAppFeatureFlags (0x1f) is not Portrait On/Off
-and is no longer used as an enable-state test. Missing native Styles calibration
-and Photos editing effects still require device validation.
+new depth. For incomplete modern Portrait captures, separated background detail
+and validated native disparity permit the same adapter automatically. The test
+is conservative and experimental; insufficient evidence keeps the existing blur
+without reconstructing aperture/lighting. Turning a flag off cannot remove blur
+baked into pixels. PhotosAppFeatureFlags (0x1f) is not Portrait On/Off and never
+determines the route. Missing native calibration and Photos rendering still
+require device validation.
 
 AI depth now includes bounded RGB guided edge refinement after GPU resources are
 released. Coefficients are computed on a grid no larger than 256 pixels per edge,

@@ -1,3 +1,22 @@
+// Serialize expensive writes and skip intermediate slider positions. All callers
+// await the newest requested write; an older failure cannot swallow newer work.
+export function latestSettingsWriter(write){
+  let latest,version=0,active=null;
+  return value=>{
+    latest=value;version++;
+    if(!active)active=Promise.resolve().then(async()=>{try{
+      let written=0;
+      while(written!==version){
+        const current=version,value=latest;
+        try{await write(value,()=>current===version);}
+        catch(error){if(current===version)throw error;}
+        written=current;
+      }
+    }finally{active=null;}});
+    return active;
+  };
+}
+
 // The worker owns source/depth buffers until the result is removed. Focus edits
 // never parse/copy large HEIC containers on the UI thread.
 export function portraitAssembler(source,depth,template,{signal,workerFactory=()=>new Worker(new URL('./ai-portrait-export-worker.js',import.meta.url),{type:'module'})}={}){

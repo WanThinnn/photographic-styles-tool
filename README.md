@@ -52,7 +52,8 @@ It can generate missing HEIC thumbnails locally with a verified WASM encoder. Fi
 setup prepares the browser automatically; see [web/README.md](web/README.md) for requirements.
 Raster/DNG inputs are encoded as HEIC; supported JPEG HDR gain maps are transferred,
 while DNG development produces SDR. Existing HEIC primary/HDR/Styles payloads are preserved.
-Optional AI Portrait requires WebGPU and adds editable aperture ƒ and Portrait Lighting
+Optional AI Portrait defaults to WebGPU, with an explicit CPU option in AI settings,
+and adds editable aperture ƒ and Portrait Lighting
 on the tested Photos versions. Portrait starts off: enable it in Photos after saving.
 The website offers one combined output after focus/aperture adjustments. See
 [web/AI-PORTRAIT.md](web/AI-PORTRAIT.md) for compatibility and model limitations.

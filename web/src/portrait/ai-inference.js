@@ -1,7 +1,8 @@
 // Termination releases the worker and its GPU session, including hung inference.
 // A WebKit process termination bypasses catch/fallback entirely. Start within
 // a moderate mobile budget instead of probing 1036/770 allocations on Safari.
-export function depthInputBudgets({userAgent='',platform='',maxTouchPoints=0}=globalThis.navigator||{}){
+export function depthInputBudgets({userAgent='',platform='',maxTouchPoints=0}=globalThis.navigator||{},provider='webgpu'){
+  if(provider==='wasm')return [630,518];
   const ios=/iPhone|iPad|iPod/i.test(userAgent)||(platform==='MacIntel'&&maxTouchPoints>1);
   const safari=/Safari/i.test(userAgent)&&!/Chrome|Chromium|Edg\/|OPR\/|Android|Firefox/i.test(userAgent);
   return ios||safari?[630,518]:[1036,770,518];
@@ -27,8 +28,9 @@ export function awaitAiSource(create, signal) {
     },error=>{signal.removeEventListener('abort',abort);reject(error);});
   });
 }
-export function inferDepth(rgb, input, {signal, guidance,timeoutMs = 120000, onProgress = () => {}, workerFactory = () => new Worker(new URL('./ai-inference-worker.js',import.meta.url),{type:'module'})} = {}) {
+export function inferDepth(rgb, input, {signal, guidance,provider='webgpu',timeoutMs = provider==='wasm'?240000:120000, onProgress = () => {}, workerFactory = () => new Worker(new URL('./ai-inference-worker.js',import.meta.url),{type:'module'})} = {}) {
   return new Promise((resolve,reject) => {
+    if(!['webgpu','wasm'].includes(provider)){reject(Error('Unsupported depth provider'));return;}
     if(signal?.aborted){reject(signal.reason || new DOMException('Cancelled','AbortError'));return;}
     const worker = workerFactory();let settled=false,stage='modelLoading';
     const finish = (error,result) => { if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);worker.terminate();error?reject(error):resolve(result); };
@@ -43,6 +45,6 @@ export function inferDepth(rgb, input, {signal, guidance,timeoutMs = 120000, onP
       else if(data.result)finish(null,data.result);
       else finish(Object.assign(Error('AI worker returned no depth'),{stage}));
     };
-    try { worker.postMessage({rgb,input,guidance},[rgb.buffer]); } catch(error) {finish(error);}
+    try { worker.postMessage({rgb,input,guidance,provider},[rgb.buffer]); } catch(error) {finish(error);}
   });
 }

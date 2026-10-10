@@ -40,6 +40,33 @@ export function refineDepth(values,mw,mh,rgb,width,height){
 // align a gradual model boundary with a real colour edge. It cannot recover a
 // missed subject or replace semantic segmentation. Called after releasing GPU
 // tensors; scratch storage stays bounded even for large source photographs.
+// Separable sliding extrema replace a square neighbourhood scan. This keeps
+// the exact same local envelope with O(pixels) work instead of O(radius²).
+export function depthEnvelope(field,w,h,radius=4){
+  const deque=new Int32Array(Math.max(w,h)),temporary=new Float32Array(field.length);
+  const filter=(input,output,length,lines,stride,lineStep,isMin)=>{
+    for(let line=0;line<lines;line++){
+      const start=line*lineStep;let head=0,tail=0,added=-1;
+      for(let x=0;x<length;x++){
+        const right=Math.min(length-1,x+radius);
+        while(added<right){
+          const i=++added,value=input[start+i*stride];
+          while(tail>head&&(isMin?input[start+deque[tail-1]*stride]>=value:input[start+deque[tail-1]*stride]<=value))tail--;
+          deque[tail++]=i;
+        }
+        while(deque[head]<x-radius)head++;
+        output[start+x*stride]=input[start+deque[head]*stride];
+      }
+    }
+  };
+  const result=[new Float32Array(field.length),new Float32Array(field.length)];
+  for(let i=0;i<2;i++){
+    filter(field,temporary,w,h,1,w,i===0);filter(temporary,result[i],h,w,w,1,i===0);
+    for(let p=0;p<field.length;p++)result[i][p]*=255;
+  }
+  return result;
+}
+
 export function refineDepthEdges(gray,rgb,width,height){
   if(![width,height].every(n=>Number.isInteger(n)&&n>0)||gray.length!==width*height||rgb.length!==width*height*3)throw Error('Invalid depth edge geometry');
   const scale=Math.min(1,256/Math.max(width,height)),w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale)),n=w*h;
@@ -70,14 +97,7 @@ export function refineDepthEdges(gray,rgb,width,height){
     coefficients[2][i]=(xz*rp[i]+yz*gp[i]+zz*bp[i])/det;
     coefficients[3][i]=averages[3][i]-coefficients[0][i]*averages[0][i]-coefficients[1][i]*averages[1][i]-coefficients[2][i]*averages[2][i];
   }
-  const smooth=coefficients.map(mean),out=new Uint8Array(gray.length),minimum=new Float32Array(n),maximum=new Float32Array(n);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    let lo=1,hi=0;
-    for(let ay=Math.max(0,y-radius);ay<=Math.min(h-1,y+radius);ay++)for(let ax=Math.max(0,x-radius);ax<=Math.min(w-1,x+radius);ax++){
-      const value=channels[3][ay*w+ax];lo=Math.min(lo,value);hi=Math.max(hi,value);
-    }
-    minimum[y*w+x]=lo*255;maximum[y*w+x]=hi*255;
-  }
+  const smooth=coefficients.map(mean),out=new Uint8Array(gray.length),[minimum,maximum]=depthEnvelope(channels[3],w,h,radius);
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
     const sx=(x+.5)*w/width-.5,sy=(y+.5)*h/height-.5,ix=Math.floor(sx),iy=Math.floor(sy),p=y*width+x;
     let fitted=0,lo=255,hi=0;

@@ -1,6 +1,10 @@
 export const AI_STRINGS={
   "vi": {
-    "toggle": "Độ sâu thông minh với AI",
+    "toggle": "Hiệu ứng chiều sâu với AI",
+    "settings": "Tuỳ chọn AI",
+    "acceleration": "Tăng tốc GPU",
+    "accelerationHint": "Tắt để tạo depth bằng CPU. Có thể chậm hơn và chưa chắc ít nóng hơn. Áp dụng cho lần xử lý tiếp theo; preview vẫn dùng GPU.",
+    "inferenceCpu": "Đang tạo độ sâu trên CPU",
     "hint": "Thêm Portrait để chỉnh ƒ và ánh sáng trong Ảnh. Giữ depth gốc nếu đã có. AI chạy trên thiết bị.",
     "loading": "Đang tải AI · khoảng 120 MB lần đầu",
     "download": "Đang tải AI",
@@ -29,7 +33,11 @@ export const AI_STRINGS={
     "previewFailed": "Không hiển thị được preview. Bạn vẫn có thể chỉnh Portrait trong Ảnh."
   },
   "en": {
-    "toggle": "Intelligent Depth with AI",
+    "toggle": "Depth Effect with AI",
+    "settings": "AI settings",
+    "acceleration": "GPU acceleration",
+    "accelerationHint": "Off uses CPU for depth AI. It may be slower and is not necessarily cooler. Applies to the next run; preview still uses GPU.",
+    "inferenceCpu": "Generating depth on CPU",
     "hint": "Add Portrait to edit aperture and lighting in Photos. Existing depth is preserved. AI runs on your device.",
     "loading": "Loading AI · about 120 MB initially",
     "download": "Downloading AI",
@@ -58,7 +66,11 @@ export const AI_STRINGS={
     "previewFailed": "Preview unavailable. You can still edit Portrait in Photos."
   },
   "zh": {
-    "toggle": "基于 AI 的智能景深",
+    "toggle": "AI 景深效果",
+    "settings": "AI 设置",
+    "acceleration": "GPU 加速",
+    "accelerationHint": "关闭后使用 CPU 生成深度，可能更慢，也不一定更凉。适用于下次处理；预览仍使用 GPU。",
+    "inferenceCpu": "CPU 正在生成深度",
     "hint": "添加人像，在照片 App 中调整光圈和人像光效。保留原有深度，AI 在设备上运行。",
     "loading": "正在加载 AI · 首次约 120 MB",
     "download": "正在下载 AI",

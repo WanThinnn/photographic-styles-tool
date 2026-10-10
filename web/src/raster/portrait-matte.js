@@ -1,6 +1,24 @@
 import {parseIinf,parseIref,parseIpcoIpma,auxUriForItem,extractItemData,appendIpcoProperty,setItemPropertyAssociations,setItemReference,addItems,removeItems,ispeBox,auxcBox,MATTE_URIS,findItemsByType} from './heif.js';
 import {topBox,bytesEqual} from './box.js';
 
+// Descriptor observed in both native profile layouts. A people matte is not a
+// 2026 Texture instance mask: Photos needs its own pixel-data type and version.
+export function portraitMatteXmp(){
+  return new TextEncoder().encode('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+    +'<rdf:Description xmlns:apdi="http://ns.apple.com/pixeldatainfo/1.0/" xmlns:portraitEffectsMatte="http://ns.apple.com/portraitEffectsMatte/1.0/">'
+    +'<apdi:AuxiliaryImageSubType>portraiteffectsmatte</apdi:AuxiliaryImageSubType><apdi:AuxiliaryImageType>depth</apdi:AuxiliaryImageType>'
+    +'<apdi:NativeFormat>1278226488</apdi:NativeFormat><apdi:StoredFormat>1278226488</apdi:StoredFormat>'
+    +'<portraitEffectsMatte:PortraitEffectsMatteVersion>65537</portraitEffectsMatte:PortraitEffectsMatteVersion></rdf:Description></rdf:RDF></x:xmpmeta>');
+}
+export function registerGeneratedPortraitMatte(meta,payloads,id){
+  const refs=parseIref(meta,topBox(meta,'meta')),infos=parseIinf(meta,topBox(meta,'meta'));
+  const sides=refs.filter(r=>r.type==='cdsc'&&r.to.includes(id)&&infos.get(r.from)?.type==='mime');
+  let side=sides.find(r=>r.to.length===1)?.from;
+  if(side===undefined){let ids;[meta,ids]=addItems(meta,[{key:'portrait-xmp',itemType:'mime',contentType:'application/rdf+xml',refType:'cdsc',refTo:[id]}]);side=ids.get('portrait-xmp');}
+  for(const r of sides)if(r.from!==side)meta=setItemReference(meta,'cdsc',r.from,r.to.filter(to=>to!==id));
+  payloads.set(side,portraitMatteXmp());return meta;
+}
+
 /** Do not pass a donor portrait effect matte off as target-derived data. */
 export function installPortraitMatte(meta,payloads,targetData=null,target=null,generated=null,primary=null) {
   const uri=MATTE_URIS.portraiteffectsmatte,props=parseIpcoIpma(meta,topBox(meta,'meta')),infos=parseIinf(meta,topBox(meta,'meta')),refs=parseIref(meta,topBox(meta,'meta'));
@@ -34,5 +52,6 @@ function install(meta,payloads,source,target,generated,native,existing,props,pri
   const associations=[];for(const p of values){const current=parseIpcoIpma(meta,topBox(meta,'meta'));let index=current.properties.find(v=>bytesEqual(meta.slice(v.box.off,v.box.off+v.box.size),p.bytes))?.index;if(index===undefined)[meta,index]=appendIpcoProperty(meta,p.bytes);associations.push([index,p.essential]);}
   meta=setItemPropertyAssociations(meta,id,associations);payloads.set(id,payload);
   meta=setItemReference(meta,'auxl',id,[primary,...findItemsByType(parseIinf(meta,topBox(meta,'meta')),'tmap').slice(0,1)]);
+  if(native===undefined)meta=registerGeneratedPortraitMatte(meta,payloads,id);
   return {meta,report:{mode:native!==undefined?'native-preserved':'target-person-segmentation',itemId:id,sourceItemId:native??null,donorPlaceholderUsed:false,width:generated?.width,height:generated?.height}};
 }

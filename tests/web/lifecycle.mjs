@@ -4,6 +4,25 @@ import {inferDepth,awaitAiSource,depthWorkerFailure,canRetryDepth} from '../../w
 import {releaseLibheif} from '../../web/src/codecs/libheif-lifecycle.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {waitForVisiblePage} from '../../web/src/ui/processing-scheduler.js';
+
+test('a hidden photo batch waits for visibility and then removes its listener',async()=>{
+  const doc=new EventTarget();doc.hidden=true;let done=false;
+  const pending=waitForVisiblePage(doc).then(()=>done=true);
+  await Promise.resolve();doc.dispatchEvent(new Event('visibilitychange'));await Promise.resolve();assert.equal(done,false);
+  doc.hidden=false;doc.dispatchEvent(new Event('visibilitychange'));await pending;assert.equal(done,true);
+  await waitForVisiblePage(doc);
+});
+
+test('CPU selection reaches the depth worker explicitly, invalid providers do not start a worker',async()=>{
+  let worker,terminated=0;
+  const result=await inferDepth(new Uint8Array(3),{width:1,height:1},{provider:'wasm',workerFactory:()=>worker={
+    postMessage(message){assert.equal(message.provider,'wasm');queueMicrotask(()=>worker.onmessage({data:{result:{gray:Uint8Array.of(42)}}}));},
+    terminate(){terminated++;},
+  }});
+  assert.deepEqual(result.gray,Uint8Array.of(42));assert.equal(terminated,1);
+  await assert.rejects(inferDepth(new Uint8Array(3),{}, {provider:'unknown',workerFactory:()=>{throw Error('should not start');}}),/Unsupported depth provider/);
+});
 
 test('cancelling source preparation releases the queue and discards late canvases',async()=>{
   const controller=new AbortController(),canvas={width:10,height:10};let complete;

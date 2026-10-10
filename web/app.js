@@ -17,10 +17,16 @@ import {readImageFile, addTextureInWorker, repairTextureInWorker, restoreNativeP
 import {formatBytes} from './src/ui/result-metadata.js';
 import {hasSoftSkinData} from './src/styles/soft-skin-container.js';
 import {styleCapabilities} from './src/styles/style-capabilities.js';
+import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
 const aiPortrait = $("ai-portrait");
+const gpuAcceleration=$('gpu-acceleration');
+try{gpuAcceleration.checked=localStorage.getItem('depth-gpu-acceleration')!=='off';}catch{}
+gpuAcceleration.addEventListener('change',()=>{
+  try{localStorage.setItem('depth-gpu-acceleration',gpuAcceleration.checked?'on':'off');}catch{}
+});
 const clearHistory = $('clear-history');
 const resultUrls = new Set(), resultCleanups = new Set();
 const aiCandidates = [];
@@ -31,7 +37,7 @@ function refreshHistoryButton() {
 }
 function queueTask(task) {
   pendingTasks++; refreshHistoryButton();
-  const pending = fileQueue.catch(() => {}).then(task);
+  const pending = fileQueue.catch(() => {}).then(async()=>{await waitForVisiblePage();return task();});
   fileQueue = pending.catch(() => {}).finally(() => { pendingTasks--; refreshHistoryButton(); });
   return pending;
 }
@@ -49,6 +55,10 @@ function translateAi() {
   $("ai-portrait-label").textContent = aiText().toggle;
   $("ai-portrait-hint").textContent = aiText().hint;
   $("ai-portrait-hint").hidden = !aiPortrait.checked;
+  $('ai-settings').hidden=!aiPortrait.checked;
+  $('ai-settings-label').textContent=aiText().settings;
+  $('gpu-acceleration-label').textContent=aiText().acceleration;
+  $('gpu-acceleration-hint').textContent=aiText().accelerationHint;
 }
 aiPortrait.addEventListener('change', () => {
   translateAi();
@@ -353,6 +363,7 @@ async function runAiCandidate(candidate) {
   // Downloads have a stall timeout; GPU phases have their own watchdog.
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
   let lastStage='loading';
+  const provider=gpuAcceleration.checked?'webgpu':'wasm';
   try {
     const {createAiPortrait} = await import('./src/portrait/ai-portrait.js');
     const {exportAiPortrait} = await import('./src/portrait/ai-portrait-export.js');
@@ -364,8 +375,8 @@ async function runAiCandidate(candidate) {
       lastStage=stage;
       if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
         ui.aiState(`${aiText().download}${percent} · ${formatBytes(progress.loaded)}`);
-      }else ui.aiState(aiText()[stage]||aiText().loading);
-    },sourceFile,{signal:controller.signal});
+      }else ui.aiState(stage==='inference'&&provider==='wasm'?aiText().inferenceCpu:aiText()[stage]||aiText().loading);
+    },sourceFile,{signal:controller.signal,provider});
     lastStage='encoding';ui.aiState(aiText().encoding);
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     ui.cleanup(output.dispose);
@@ -593,7 +604,7 @@ async function handleFile(file) {
   } finally {
     // Samples belong to this serialized processing operation, not its history
     // row. Release them after export while retaining only the downloadable file.
-    releaseDecodeCache();
+    releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
   }
 }
 
@@ -602,7 +613,7 @@ function showCaptureDate(ui, date) {
 }
 
 async function handleFiles(files) {
-  for (const f of files) await handleFile(f);
+  for (const f of files){await waitForVisiblePage();await handleFile(f);}
 }
 // Serialize separate picker/drop events so duplicate MOVs cannot race pairing.
 let fileQueue = Promise.resolve();

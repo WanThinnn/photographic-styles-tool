@@ -1,7 +1,59 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {refineDepth,refineDepthEdges} from '../../web/src/portrait/ai-depth-refinement.js';
-import {portraitAssembler} from '../../web/src/portrait/ai-portrait-assembler.js';
+import {refineDepth,refineDepthEdges,depthEnvelope} from '../../web/src/portrait/ai-depth-refinement.js';
+import {portraitAssembler,latestSettingsWriter} from '../../web/src/portrait/ai-portrait-assembler.js';
+import {protectPersonDepth} from '../../web/src/portrait/person-depth-guidance.js';
 import {inferDepth} from '../../web/src/portrait/ai-inference.js';
+
+test('fast depth envelope matches a square scan at borders, tiny dimensions and tied values',()=>{
+  for(const [w,h]of [[1,1],[1,19],[19,1],[23,17]])for(const radius of [0,1,4,32]){
+    const values=Float32Array.from({length:w*h},(_,i)=>(i*79%13)/13),[minimum,maximum]=depthEnvelope(values,w,h,radius);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let min=1,max=0;
+      for(let ay=Math.max(0,y-radius);ay<=Math.min(h-1,y+radius);ay++)for(let ax=Math.max(0,x-radius);ax<=Math.min(w-1,x+radius);ax++){
+        min=Math.min(min,values[ay*w+ax]);max=Math.max(max,values[ay*w+ax]);
+      }
+      assert.equal(minimum[y*w+x],Math.fround(min*255));assert.equal(maximum[y*w+x],Math.fround(max*255));
+    }
+  }
+});
+
+test('person guidance protects an eroded confident edge without expanding it into background or uncertain hair',()=>{
+  const w=128,h=24,gray=new Uint8Array(w*h),person=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;gray[i]=x>=65?190+y:x===64?145:35;person[i]=x>=65?255:x===64?240:0;
+  }
+  const original=gray.slice(),fixed=protectPersonDepth(gray,person,w,h);
+  for(let y=0;y<h;y++)assert.ok(fixed[y*w+64]>gray[y*w+64],'confident eroded subject boundary moves toward interior');
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(x!==64)assert.equal(fixed[y*w+x],gray[y*w+x],'background and subject 3D shape stay intact');
+  assert.deepEqual(gray,original,'input map is immutable');
+  person.fill(128);assert.deepEqual(protectPersonDepth(gray,person,w,h),gray,'uncertain matte cannot pull depth forward');
+  person.fill(0);assert.deepEqual(protectPersonDepth(gray,person,w,h),gray,'empty template masks do nothing');
+  person.fill(255);assert.deepEqual(protectPersonDepth(gray,person,w,h),gray,'no segmentation boundary means no correction');
+  person.fill(240);const shallow=new Uint8Array(w*h).fill(100);assert.deepEqual(protectPersonDepth(shallow,person,w,h),shallow);
+  assert.throws(()=>protectPersonDepth(gray,person,0,h),/geometry/);
+});
+
+test('slow settings writes serialize and coalesce intermediate slider values; flush awaits the newest',async()=>{
+  const calls=[],releases=[];let active=0,maxActive=0;
+  const write=latestSettingsWriter(async(value,isCurrent)=>{
+    active++;maxActive=Math.max(active,maxActive);calls.push(value);
+    await new Promise(resolve=>releases.push(resolve));active--;
+    if(value===1)assert.equal(isCurrent(),false);
+  });
+  const first=write(1);await Promise.resolve();
+  write(2);const latest=write(3);assert.equal(first,latest);
+  releases.shift()();await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,[1,3]);assert.equal(active,1);releases.shift()();await latest;
+  assert.equal(maxActive,1);assert.equal(active,0);
+  const last=write(4);await Promise.resolve();releases.shift()();await last;assert.deepEqual(calls,[1,3,4]);
+});
+
+test('a stale settings error does not discard the newest requested write',async()=>{
+  let reject;const calls=[];
+  const write=latestSettingsWriter(async value=>{calls.push(value);if(value===1)await new Promise((_,fail)=>reject=fail);});
+  const first=write(1);await Promise.resolve();write(2);reject(Error('old request failed'));await first;
+  assert.deepEqual(calls,[1,2]);
+});
 
 test('RGB-guided depth keeps a true silhouette sharp while preserving near/far direction',()=>{
   const w=48,h=8,rgb=new Uint8Array(w*h*3);

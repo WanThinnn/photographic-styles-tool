@@ -75,6 +75,13 @@ test('Soft Skin enrichment preserves native Styles, HDR, depth, Exif and origina
     }
   }
   for(const ref of before.refs) assert.ok(after.refs.some(r=>JSON.stringify(r)===JSON.stringify(ref)));
+  const portrait=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===MATTE_URIS.portraiteffectsmatte);
+  const portraitSides=after.refs.filter(r=>r.type==='cdsc'&&r.to.includes(portrait)&&after.infos.get(r.from)?.type==='mime');
+  assert.equal(portraitSides.length,1,'one unambiguous Portrait descriptor');
+  const portraitXmp=new TextDecoder().decode(extractItem(result,after.iloc,portraitSides[0].from));
+  assert.match(portraitXmp,/<apdi:AuxiliaryImageSubType>portraiteffectsmatte<\//);
+  assert.match(portraitXmp,/<portraitEffectsMatte:PortraitEffectsMatteVersion>65537<\//);
+  assert.ok(!portraitXmp.includes('FSINCMatteVersion'),'Portrait is not a Texture matte');
   const metadata=parseBplist(extractItem(result,after.iloc,tex)),entries=metadata.get('TextureStylePostProcessedPeopleData');
   assert.deepEqual(entries.map(entry=>entry.get('faceID')),[0,1]);
   assert.equal(entries[0].get('faceLandmarks').length,76);

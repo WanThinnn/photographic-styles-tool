@@ -13,6 +13,9 @@ import {readExifOrientation} from '../../web/src/raster/exif.js';
 import {hasTexture} from '../../web/src/raster/texture.js';
 import {rgbaToI420} from '../../web/src/raster/raster-color.js';
 import {box, concat, be} from '../../web/src/raster/box.js';
+import {installPortraitMatte} from '../../web/src/raster/portrait-matte.js';
+import {parseIref,parseIinf} from '../../web/src/raster/heif.js';
+import {topBox} from '../../web/src/raster/box.js';
 
 test('signatures distinguish HEIC and AVIF regardless of file extension', () => {
   const text = s => new TextEncoder().encode(s);
@@ -76,6 +79,22 @@ const assets = await generateSyntheticHevc(null, async (_, options) => {
   const asset = options.pixelFormat !== 'gray' ? fixture.assets.delta
     : options.width === 768 ? fixture.assets.textureMask : fixture.assets.mask;
   return {...asset, hvcc:Uint8Array.from(asset.hvcc), payload:Uint8Array.from(asset.payload)};
+});
+
+test('generated Portrait matte has one dedicated descriptor and repeated registration is stable',()=>{
+  const profile=buildGeneratedProfile('48-12',assets),graph=discoverHeic(profile.meta),payloads=new Map(profile.retained);
+  const generated={...assets.mask,width:64,height:64,pixi:box('pixi',Uint8Array.of(0,0,0,0,1,8))};
+  const first=installPortraitMatte(profile.meta,payloads,null,null,generated,graph.primary);
+  const refs=parseIref(first.meta,topBox(first.meta,'meta')),infos=parseIinf(first.meta,topBox(first.meta,'meta'));
+  const sides=refs.filter(r=>r.type==='cdsc'&&r.to.includes(first.report.itemId)&&infos.get(r.from)?.type==='mime');
+  assert.equal(sides.length,1);
+  const xmp=new TextDecoder().decode(payloads.get(sides[0].from));
+  assert.match(xmp,/<apdi:AuxiliaryImageType>depth<\//);
+  assert.match(xmp,/<apdi:StoredFormat>1278226488<\//);
+  assert.match(xmp,/<portraitEffectsMatte:PortraitEffectsMatteVersion>65537<\//);
+  assert.ok(!xmp.includes('FSINCMatteVersion'));
+  const second=installPortraitMatte(first.meta,payloads,null,null,generated,graph.primary);
+  assert.deepEqual(second.meta,first.meta);
 });
 
 test('new raster container keeps own tiles, independent Main10 thumbnail and removes donor Portrait masks', () => {

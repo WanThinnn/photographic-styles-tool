@@ -23,6 +23,9 @@ function render(){
   const lang=selector.value,strings=AI_STRINGS[lang]||AI_STRINGS.en;
   applyLanguage(lang);document.getElementById('ai-portrait-label').textContent=strings.toggle;
   document.getElementById('ai-portrait-hint').textContent=strings.hint;
+  document.getElementById('ai-settings-label').textContent=strings.settings;
+  document.getElementById('gpu-acceleration-label').textContent=strings.acceleration;
+  document.getElementById('gpu-acceleration-hint').textContent=strings.accelerationHint;
   boot.textContent=t(lang,'st.preparing');
 }
 selector.value=pickLanguage();render();

@@ -7,6 +7,7 @@ import {parseBplist, buildBplist, BplistReal} from '../core/bplist.js';
 import {applyPersonMetadata, setPersonMasksValid} from '../raster/styles.js';
 import {rebuildHeic} from './graft.js';
 import {preserveNativeStyles} from './style-preservation.js';
+import {registerGeneratedPortraitMatte} from '../raster/portrait-matte.js';
 
 const xml = text => new TextEncoder().encode('<x:xmpmeta xmlns:x="adobe:ns:meta/">'
   + '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
@@ -73,6 +74,7 @@ export function installSoftSkin(bytes, result, {nativeStyles=false, sourceBytes=
     const assoc=[[property(ispeBox(encoded.width,encoded.height)),false],
       [property(encoded.pixi),false],[property(auxcBox(uri)),true],[property(encoded.hvcc),true],...orientation];
     meta=setItemPropertyAssociations(meta,id,assoc);payloads.set(id,encoded.payload);
+    if(uri===MATTE_URIS.portraiteffectsmatte){meta=registerGeneratedPortraitMatte(meta,payloads,id);return;}
     if(instance || !d.infos.has(id)) {
       let sidecar;[meta,sidecar]=addItems(meta,[{key:'xmp',itemType:'mime',contentType:'application/rdf+xml',refType:'cdsc',refTo:[id]}]);
       const key=encoded.referenceKey;

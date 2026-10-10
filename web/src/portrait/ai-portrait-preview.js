@@ -1,5 +1,6 @@
 import {createBokehRenderer} from './ai-bokeh.js';
 import {displayPointToStored} from '../raster/heif.js';
+import {latestSettingsWriter} from './ai-portrait-assembler.js';
 const APERTURES=[1.4,1.6,1.8,2,2.2,2.5,2.8,3.2,3.5,4,4.5,5,5.6,6.3,7.1,8,9,10,11,13,14,16,null];
 const DEFAULT_APERTURE=APERTURES.indexOf(4.5);
 const selectedAperture=input=>APERTURES[Number(input.value)];
@@ -80,10 +81,12 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   host.append(toolbar,frame,instruction,aperture.element,state);
   const showUpdating=busy=>{progress.hidden=!busy;host.setAttribute('aria-busy',String(busy));};
   let x=.5,y=.5,displayX=.5,displayY=.5,pending=null,timer=null,version=0,disposed=false,lastCommitted=0,inFlight=null;
+  const writeLatest=latestSettingsWriter(({chosen,current},isLatest)=>onSettings(chosen,()=>!disposed&&version===current&&isLatest()));
   // The saved HEIC always starts with Portrait off and keeps editable depth.
   // Off is a preview state, not an invalid zero aperture in its depth metadata.
   const settings=()=>({focusX:x,focusY:y,aperture:selectedAperture(blur)??16});
   const draw=()=>{
+    if(document.hidden)return;
     const focus=gray[Math.min(h-1,Math.floor(y*h))*w+Math.min(w-1,Math.floor(x*w))];
     const active=ensureRenderer();active.draw({focus,blur:previewBlur(selectedAperture(blur))});view.getContext('2d').drawImage(active.canvas,0,0);
   };
@@ -91,7 +94,7 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
     clearTimeout(timer);timer=null;
     if(disposed||lastCommitted===version)return inFlight||Promise.resolve();
     const current=version,chosen=settings();lastCommitted=current;
-    inFlight=Promise.resolve().then(()=>onSettings(chosen,()=>!disposed&&version===current)).then(()=>{
+    inFlight=writeLatest({chosen,current}).then(()=>{
       if(!disposed&&version===current){showUpdating(false);state.textContent='';onPending(false);}
     }).catch(error=>{
       console.warn('Portrait settings update failed',error);
@@ -122,6 +125,9 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   // that are visible; their canvas snapshots and settings survive suspension.
   const observer=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{host.classList.toggle('is-suspended',!entries[0].isIntersecting);if(!entries[0].isIntersecting)releaseRenderer();}):null;
   observer?.observe(frame);
-  const dispose=()=>{disposed=true;clearTimeout(timer);if(pending!==null)cancelAnimationFrame(pending);aperture.dispose();observer?.disconnect();releaseRenderer();view.width=view.height=0;host.replaceChildren();};
+  const suspend=()=>{if(pending!==null){cancelAnimationFrame(pending);pending=null;}releaseRenderer();};
+  const visibility=()=>{if(document.hidden)suspend();};
+  document.addEventListener('visibilitychange',visibility);window.addEventListener('pagehide',suspend);
+  const dispose=()=>{disposed=true;clearTimeout(timer);if(pending!==null)cancelAnimationFrame(pending);aperture.dispose();observer?.disconnect();document.removeEventListener('visibilitychange',visibility);window.removeEventListener('pagehide',suspend);releaseRenderer();view.width=view.height=0;host.replaceChildren();};
   dispose.flush=commit;return dispose;
 }

@@ -53,9 +53,9 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding-top:15px}foot
 @media(hover:hover){#drop:hover{background:linear-gradient(120deg,#0894ff18,#c959dd1c 48%,#ff2e5418 80%,#ff900415);border-color:var(--ai-violet)}}
 .drop-icon{background:var(--ai-blue);box-shadow:0 6px 18px #0894ff26}
 .dl{background:var(--button-gradient);color:#fff}.dl.alt{background:transparent;color:var(--accent-text)}
-#ai-portrait{appearance:none;-webkit-appearance:none;width:42px;height:26px;border-radius:999px;position:relative;background:#8885;flex:none;margin:0;cursor:pointer}
-#ai-portrait::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0002;transition:transform .2s}
-#ai-portrait:checked{background:var(--ai-blue)}#ai-portrait:checked::after{transform:translateX(16px)}
+:is(#ai-portrait,#gpu-acceleration){appearance:none;-webkit-appearance:none;width:42px;height:26px;border-radius:999px;position:relative;background:#8885;flex:none;margin:0;cursor:pointer}
+:is(#ai-portrait,#gpu-acceleration)::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0002;transition:transform .2s}
+:is(#ai-portrait,#gpu-acceleration):checked{background:var(--ai-blue)}:is(#ai-portrait,#gpu-acceleration):checked::after{transform:translateX(16px)}
 .ai-hint{font-size:12px;color:var(--muted);margin:0 13px 8px;line-height:1.5}
 .ai-details{grid-column:1/-1;padding-top:12px;min-width:0}
 .ai-preview{display:block;max-width:100%;max-height:420px;width:auto;height:auto;border-radius:14px;margin:12px auto;cursor:crosshair}
@@ -91,6 +91,10 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding-top:15px}foot
 .portrait-option{display:flex;align-items:center;justify-content:flex-start;gap:12px;margin:12px 12px 0;padding:12px 0 4px;border-top:1px solid var(--line)}
 .portrait-option label{display:flex;align-items:center;min-height:44px;font-size:14px;cursor:pointer;color:var(--fg)}
 .portrait-option input{flex:none}
+.ai-settings{margin:4px 13px 10px;color:var(--muted);font-size:12px}
+.ai-settings summary{cursor:pointer;width:fit-content;padding:8px 0}
+.ai-settings .portrait-option{margin:0;padding:0;border:0}
+.ai-settings .ai-hint{margin:0 0 8px}
 
 /* Each output owns its save/download pair; a fourth button never spans the row. */
 .row .act{grid-column:1/-1;grid-row:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:8px;align-items:stretch}

@@ -2,6 +2,7 @@
 // Run from the repository root with: node tests/web/check-pwa.mjs
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,7 +47,12 @@ if (!startup.includes("serviceWorker?.register('./sw.js'") || !app.includes('awa
 function pngInfo(path) {
   const data = readFileSync(path);
   if (data.length < 26 || data.toString("ascii", 1, 4) !== "PNG") return null;
-  return {width:data.readUInt32BE(16),height:data.readUInt32BE(20),colorType:data[25]};
+  const chunks=[];let offset=8;
+  while(offset+12<=data.length){
+    const length=data.readUInt32BE(offset),type=data.toString("ascii",offset+4,offset+8);
+    chunks.push(type);offset+=12+length;
+  }
+  return {width:data.readUInt32BE(16),height:data.readUInt32BE(20),colorType:data[25],chunks};
 }
 function pngDimensions(path) {
   const info=pngInfo(path);return info?[info.width,info.height]:null;
@@ -69,8 +75,8 @@ for (const icon of manifest.icons || []) {
     errors.push(`${icon.src} is not a ${icon.sizes} PNG`);
   }
   const purpose=String(icon.purpose||"any");
-  if (purpose.includes("maskable") && info && [4,6].includes(info.colorType))
-    errors.push(`${icon.src} must be opaque for maskable/iOS-style appearance treatment`);
+  if(purpose.includes("maskable")&&info?.colorType!==6)
+    errors.push(`${icon.src} must remain full-opaque RGBA for Apple/maskable appearance treatment`);
 }
 if (!(manifest.icons || []).some(icon=>icon.sizes==='512x512'&&String(icon.purpose||'').includes('maskable'))) {
   errors.push('manifest 512x512 icon must remain maskable');
@@ -79,11 +85,25 @@ if (!(manifest.icons || []).some(icon=>icon.sizes==='512x512'&&String(icon.purpo
   errors.push('manifest must retain a separate 512x512 any icon for Windows/desktop');
 }
 
-const touchIcon=join(WEB,"icons","icon-180.png");
-if(pngDimensions(touchIcon)?.join("x")!=="180x180")errors.push("icon-180.png is not a 180x180 PNG");
-if([4,6].includes(pngInfo(touchIcon)?.colorType))errors.push("icon-180.png must be opaque for iOS Home Screen");
-if(!html.includes('rel="apple-touch-icon" href="icons/icon-180.png"'))
-  errors.push("index.html must expose one stable Apple touch icon so the OS can apply appearance treatment");
+const refIcons=join(ROOT,"ref","Shalielie","web","icons");
+const sha=bytes=>createHash("sha256").update(bytes).digest("hex");
+for(const size of [180,192,512]){
+  const ours=readFileSync(join(WEB,"icons",`icon-${size}.png`));
+  const ref=readFileSync(join(refIcons,`icon-${size}.png`));
+  if(sha(ours)===sha(ref))errors.push(`icon-${size}.png must use this app's artwork, not Shalielie's artwork`);
+}
+
+const touchIcon=join(WEB,"icons","apple-touch-icon-v2.png");
+if(pngDimensions(touchIcon)?.join("x")!=="180x180")errors.push("apple-touch-icon-v2.png is not a 180x180 PNG");
+const touchInfo=pngInfo(touchIcon);
+if(touchInfo?.colorType!==6)errors.push("apple-touch-icon-v2.png must remain a 32-bit RGBA PNG");
+for(const chunk of ["sRGB","gAMA","pHYs"])if(!touchInfo?.chunks.includes(chunk))
+  errors.push(`apple-touch-icon-v2.png is missing Apple-compatible ${chunk} PNG metadata`);
+if(!html.includes('rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-v2.png"'))
+  errors.push("index.html must expose the dedicated Apple touch icon so iOS can synthesize Home Screen appearances");
+const legacyTouch=join(WEB,"icons","icon-180.png");
+if(!existsSync(legacyTouch)||sha(readFileSync(legacyTouch))!==sha(readFileSync(touchIcon)))
+  errors.push("legacy icon-180.png must mirror apple-touch-icon-v2.png for compatibility");
 
 const shellMatch = worker.match(/const APP_SHELL = (\[[\s\S]*?\n\]);/);
 if (!shellMatch) {

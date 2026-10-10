@@ -22,6 +22,7 @@ import {depthModel} from './src/portrait/depth-models.js';
 import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
 import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
 
+
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
 const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), enhanceAi = $("enhance-ai");
@@ -37,6 +38,9 @@ function renderModel(){
 }
 let clearingAssets=false,assetStatus='';
 try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved);modelSelector.value=modelLevels.indexOf(saved);}catch{}
+
+
+
 renderModel();
 modelSelector.addEventListener('input',()=>{
   renderModel();try{localStorage.setItem('depth-model',selectedModel());}catch{}
@@ -95,6 +99,8 @@ function translateAi() {
   $("ai-portrait-hint").hidden = false;
   $("ai-detail-label").textContent = aiText().detailToggle;
   $("ai-detail-hint").textContent = aiText().detailHint;
+
+
   $('ai-settings').hidden=false;
   $('ai-settings-label').textContent=aiText().settings;
   $('gpu-acceleration-label').textContent=aiText().acceleration;
@@ -501,15 +507,21 @@ async function handleFile(file) {
           null, progress => {
             if (progress.stage === "modelDownload")
               ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
+            else if (progress.stage === "download" || progress.stage === "modelLoading")
+              ui.set(aiText().detailPreparing);
+            else if (progress.stage === "inference")
+              ui.set(progress.progress?.total ? `${aiText().detailWorking} ${progress.progress.done}/${progress.progress.total}` : aiText().detailWorking);
             else if (progress.stage === "main") ui.set(`${T("st.rastertiles")} ${progress.done}/${progress.total}`);
             else ui.set(T("st.rasterworking"));
-          }, {analyze: true});
+          }, {analyze: true,detail:aiFeatures.enabled('detail')?{modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null});
       } catch (error) {
         console.error("Raster conversion failed", file.name, error);
         ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
         return;
       }
       const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
+      if(result.detailSkipped)ui.note(`${aiText().detailSkipped} ${result.detailSkipped}`,'detail');
+      else if(result.detailApplied)ui.note(aiText().detailApplied,'detail');
       result.data=await addMissingSoftSkin(result.data,file,ui);
       const date = photoCaptureDate(result.data);
       const output = new File([result.data], outName, {type: "image/heic",
@@ -522,6 +534,7 @@ async function handleFile(file) {
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
+    if(aiFeatures.enabled('detail'))ui.note(aiText().detailHeic,'detail');
 
     const d = input.discovery;
     const textureOnly = preserveNativeStyles(bytes,d);

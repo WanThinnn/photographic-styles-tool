@@ -594,18 +594,33 @@ export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult 
 
 
 /** Browser-decoded still image -> new HEIC. No source HEIC graph is re-encoded here. */
-export async function importRaster(file, profile, onProgress = () => {}, {analyze = true} = {}) {
+export async function importRaster(file, profile, onProgress = () => {}, {analyze = true, detail = null} = {}) {
   // Independent Main10 auxiliary/masks always require the verified WASM encoder.
-  let opened, stored;
+  let opened, stored, enhanced;
+  let detailSkipped = null;
   try {
     const sourceBytes=new Uint8Array(await file.arrayBuffer());
     const sourceHdr=extractJpegHdr(sourceBytes);
-    if(sourceHdr)return await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze});
-    await ensureHevcEncoder(onProgress);
+    if(sourceHdr){
+      const result=await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze});
+      if(detail)result.detailSkipped='HDR gain-map preservation is not yet validated for AI enhancement';
+      return result;
+    }
     const sourceExif = extractRasterExif(sourceBytes);
     opened = await openBrowserImage(file, onProgress);
-    const image = opened.image;
+    let image = opened.image;
     if (!image.width || !image.height) throw Error('Raster image decode failed: empty image');
+    if(detail){
+      try{
+        const {enhanceRasterImage}=await import('../detail/detail-raster.js');
+        enhanced=await enhanceRasterImage(image,{...detail,onProgress});
+        image=enhanced;
+      }catch(error){
+        detailSkipped=String(error?.message||error);
+        console.warn('AI detail unavailable, preserving unchanged raster input',error);
+      }
+    }
+    await ensureHevcEncoder(onProgress);
     const geometry = targetGeometry(image);
     onProgress({stage: 'prepare', ...geometry});
     const assets = await generateSyntheticHevc(onProgress);
@@ -635,10 +650,11 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
       // Like the HEIC route, spatial maps follow the primary's stored orientation.
       lightMaps: analyze ? buildLightMaps(sampleRasterLuma(stored, 32, 32)) : null,
     }, analyze ? Array.from(sampleRasterLuma(image)).sort((a, b) => a - b) : null, null, geometry);
-    return {data, geometry};
+    return {data, geometry, detailApplied:Boolean(enhanced), detailSkipped};
   } finally {
     opened?.close();
     if (stored) stored.width = stored.height = 0;
+    if (enhanced) enhanced.width = enhanced.height = 0;
     releaseHevcEncoder();
   }
 }

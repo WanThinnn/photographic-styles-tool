@@ -67,20 +67,6 @@
       <span id="ai-settings-label" class="sr-only">AI settings</span>
     </summary>
     <div class="ai-settings-panel">
-    <div class="depth-model-row portrait-option">
-      <div class="ai-option-copy">
-      <label for="depth-model" id="depth-model-label">Model</label>
-      <p id="depth-model-hint" class="ai-hint">Downloads only the selected model when processing.</p>
-      </div>
-      <div class="depth-model-control">
-        <output id="depth-model-value" for="depth-model">Standard</output>
-        <div class="depth-model-slider" data-level="1">
-          <input id="depth-model" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Standard" aria-describedby="depth-model-hint">
-          <span class="model-stop" data-level="0" aria-hidden="true"></span><span class="model-stop" data-level="1" aria-hidden="true"></span><span class="model-stop" data-level="2" aria-hidden="true"></span>
-          <span class="model-knob" aria-hidden="true"></span>
-        </div>
-      </div>
-    </div>
     <div class="portrait-option">
       <div class="ai-option-copy"><label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
       <p id="ai-portrait-hint" class="ai-hint"></p></div>
@@ -99,6 +85,20 @@
       <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
       </div>
       <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
+    </div>
+    <div class="depth-model-row portrait-option">
+      <div class="ai-option-copy">
+      <label for="depth-model" id="depth-model-label">Model</label>
+      <p id="depth-model-hint" class="ai-hint">Downloads only the selected model when processing.</p>
+      </div>
+      <div class="depth-model-control">
+        <output id="depth-model-value" for="depth-model">Standard</output>
+        <div class="depth-model-slider" data-level="1">
+          <input id="depth-model" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Standard" aria-describedby="depth-model-hint">
+          <span class="model-stop" data-level="0" aria-hidden="true"></span><span class="model-stop" data-level="1" aria-hidden="true"></span><span class="model-stop" data-level="2" aria-hidden="true"></span>
+          <span class="model-knob" aria-hidden="true"></span>
+        </div>
+      </div>
     </div>
     </div>
   </details>

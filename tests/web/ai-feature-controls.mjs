@@ -80,7 +80,12 @@ test('Detail switch matches the existing settings layout and has accessible loca
   const portrait=html.indexOf('id="ai-portrait"');
   const detail=html.indexOf('id="ai-detail"');
   const gpu=html.indexOf('id="gpu-acceleration"');
-  assert.ok(portrait>=0&&portrait<detail&&detail<gpu,'Detail must sit between Portrait and GPU settings');
+  const sharedModel=html.indexOf('id="depth-model"');
+  assert.ok(portrait>=0&&portrait<detail&&detail<gpu&&gpu<sharedModel,'One model selector must follow Portrait, Detail and GPU');
+  assert.equal((html.match(/type="range"[^>]*id="(?:depth|detail)-model"|id="(?:depth|detail)-model"[^>]*type="range"/g)||[]).length,1);
+  assert.doesNotMatch(html,/id="detail-model"/);
+  assert.match(app,/modelId:selectedModel\(\)/);
+  assert.doesNotMatch(app,/detailSelector|selectedDetailModel|renderDetailModel/);
   assert.match(html,/id="ai-detail"[^>]+role="switch"[^>]+aria-describedby="ai-detail-hint"/);
   assert.match(css,/\.ai-settings :is\(\.detail-option, \.gpu-option\)/);
   assert.match(css,/:is\(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration\)/);

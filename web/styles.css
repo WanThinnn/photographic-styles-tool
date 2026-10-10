@@ -1030,7 +1030,7 @@ code {
 }
 
 .ai-settings-panel {
-   padding: 8px 12px 12px;
+   padding: 16px 12px 12px;
    margin-bottom: 12px;
    border: 1px solid var(--line);
    border-radius: 14px;
@@ -1063,10 +1063,12 @@ code {
    padding: 8px 0
 }
 
+
+
 .ai-settings .depth-model-row {
-   padding: 0 0 10px;
-   margin-bottom: 8px;
-   border-bottom: 1px solid var(--line)
+   border-top: 1px solid var(--line);
+   padding: 12px 0 0;
+   margin-top: 12px
 }
 
 .ai-option-copy {

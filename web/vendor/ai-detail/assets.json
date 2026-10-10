@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "source": "Hugging Face pinned 1x RGB restoration ONNX models",
+  "models": {
+    "lite": {
+      "family": "span",
+      "file": "lite.onnx",
+      "bytes": 1643127,
+      "sha256": "3c5982964e9040a655bd8edcbb3a12f5455311419af7b47a0a1e19ee3767c5f4",
+      "channels": 3,
+      "layout": "rgb",
+      "output": "rgb",
+      "repository": "notaneimu/onnx-image-models",
+      "revision": "e4cafda1199bcec66a76b10025aafb655cd0ff30",
+      "sourceUrl": "https://huggingface.co/notaneimu/onnx-image-models/resolve/e4cafda1199bcec66a76b10025aafb655cd0ff30/1x-SuperScale_SPAN.onnx",
+      "license": "upstream-review-required"
+    },
+    "standard": {
+      "family": "rplksr",
+      "file": "standard.onnx",
+      "bytes": 9544993,
+      "sha256": "90c43e0a3642da19e5ed84f5e621c72fa80eb62b11373996e85693a3b4c4ec85",
+      "channels": 3,
+      "layout": "rgb",
+      "output": "rgb",
+      "repository": "notaneimu/onnx-image-models",
+      "revision": "e4cafda1199bcec66a76b10025aafb655cd0ff30",
+      "sourceUrl": "https://huggingface.co/notaneimu/onnx-image-models/resolve/e4cafda1199bcec66a76b10025aafb655cd0ff30/1x-SuperScale_RPLKSR_S.onnx",
+      "license": "upstream-review-required"
+    },
+    "pro": {
+      "family": "fatality-deblur",
+      "file": "pro.onnx",
+      "bytes": 66870328,
+      "sha256": "4ce978edc3c65c56be22a1d6eb5415997d79dbf52ed09a67605e56de6ef7aaa0",
+      "channels": 3,
+      "layout": "rgb",
+      "output": "rgb",
+      "repository": "notaneimu/onnx-image-models",
+      "revision": "42bc0d52e3f9f015b3f0106912c5342462ef0569",
+      "sourceUrl": "https://huggingface.co/notaneimu/onnx-image-models/resolve/42bc0d52e3f9f015b3f0106912c5342462ef0569/1x-Fatality-DeBlur.onnx",
+      "license": "upstream-review-required"
+    }
+  }
+}

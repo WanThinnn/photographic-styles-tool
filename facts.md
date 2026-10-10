@@ -2820,7 +2820,8 @@ separate output regions and no band seam/stitching approximation is introduced.
 
 Measured policy:
 - Lite / SPAN: 384px tiles, up to 2 WebGPU workers.
-- Standard / RPLKSR-S: 256px tiles, up to 4 WebGPU workers.
+- Standard / RT-Focuser 2025: 512px tiles, 32px overlap, 25% output blend,
+  up to 4 WebGPU workers.
 - Pro / Fatality DeBlur: 256px tiles, exactly 1 WebGPU worker; two workers were
   slower in the measured workload.
 - Desktop auto-scaling: <8 logical CPUs = 1 worker; 8-11 = at most 2 workers;
@@ -2828,15 +2829,16 @@ Measured policy:
 - WASM/CPU remains one inference worker but ORT may use up to 4 WASM threads on
   cross-origin-isolated pages, avoiding nested worker oversubscription.
 
-Direct WebGPU dynamic-shape measurements (single session, average run time) showed
-that larger tiles are not universally faster: Lite 256/384/512 = 74/118/271 ms;
-Standard = 2394/5659/9668 ms; Pro = 1203/2777/12103 ms. Per-pixel throughput
-favoured 384 for Lite but did not justify larger tiles for Standard/Pro.
+Historical direct WebGPU measurements for the former RPLKSR-S Standard were
+256/384/512 = 2394/5659/9668 ms. After replacing Standard with RT-Focuser 2025,
+the same browser measured about 156/217/325 ms at 256/384/512 after warmup,
+which makes 512px tiles practical. Lite remained about 78/117/258 ms.
 
-Production 768x768 Standard tests with the shared-buffer worker pool measured:
-1 worker 82.6 s, 2 workers 43.4 s, 3 workers 35.0 s, 4 workers 26.1 s,
-5 workers 28.8 s, 6 workers 25.4 s. Four is selected instead of six because the
-~0.6 s difference is small/noisy while six duplicates 50% more sessions/VRAM.
+The former RPLKSR-S 768x768 Standard path measured 82.6 s with one worker and
+26.1 s with four. The RT-Focuser Standard browser smoke now measures about
+12.1 s on the first 4-worker pass and 7.6 s on a second pass with retained
+sessions. Four remains the desktop cap; session workers are retained briefly
+and released after 90 seconds or explicit cache/history cleanup.
 An earlier worker-isolation benchmark also measured Pro at ~21.4 s with one worker
 versus ~24.9 s with two, confirming the single-worker Pro policy.
 

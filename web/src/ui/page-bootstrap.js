@@ -34,12 +34,25 @@ function render(){
 selector.value=pickLanguage();render();
 const change=()=>{rememberLanguage(selector.value);render();};
 selector.addEventListener('change',change);
+async function loadApplication(){
+  let lastError;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      await import(attempt===0?'../../app.js':`../../app.js?boot-retry=${attempt}-${Date.now()}`);
+      return;
+    }catch(error){
+      lastError=error;
+      if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));
+    }
+  }
+  throw lastError;
+}
 try{
-  await import('../../app.js');
+  await loadApplication();
   selector.removeEventListener('change',change);
 }catch(error){
   console.error('Application scripts unavailable',error);
-  boot.textContent=t(selector.value,'err.setup');boot.className='err';
+  boot.textContent=t(selector.value,'err.resources');boot.className='err';
   const retry=document.createElement('button');retry.className='dl alt';retry.type='button';
   retry.textContent=t(selector.value,'btn.retry');retry.onclick=()=>location.reload();
   boot.append(document.createElement('br'),retry);

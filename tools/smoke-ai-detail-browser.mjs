@@ -18,9 +18,11 @@ const provider=process.argv.includes('--webgpu')?'webgpu':'wasm';
 const requested=process.argv.find(arg=>arg.startsWith('--models='))?.slice('--models='.length);
 const modelIds=requested?requested.split(','):['lite'];
 const sampleSize=Number(process.argv.find(arg=>arg.startsWith('--size='))?.slice('--size='.length)||24);
+const repeat=Number(process.argv.find(arg=>arg.startsWith('--repeat='))?.slice('--repeat='.length)||1);
 const workerCountArg=process.argv.find(arg=>arg.startsWith('--workers='));
 const workerCount=workerCountArg?Number(workerCountArg.slice('--workers='.length)):null;
 if(!Number.isInteger(sampleSize)||sampleSize<8||sampleSize>2048)throw Error('Invalid --size');
+if(!Number.isInteger(repeat)||repeat<1||repeat>5)throw Error('Invalid --repeat');
 const browserCandidates=[
  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -115,12 +117,16 @@ try{
    for(let i=0;i<width*height;i++){
     rgba[4*i]=i%255;rgba[4*i+1]=Math.floor(i/width)%255;rgba[4*i+2]=125;rgba[4*i+3]=255;
    }
-   const started=performance.now();
-   const result=await inferDetailTiles({width,height,data:rgba},{modelId:'${modelId}',provider:'${provider}',timeoutMs:180000${workerCount!==null?`,workerCount:${workerCount}`:''}});
+   const times=[];let result;
+   for(let pass=0;pass<${repeat};pass++){
+    const started=performance.now();
+    result=await inferDetailTiles({width,height,data:rgba},{modelId:'${modelId}',provider:'${provider}',timeoutMs:180000${workerCount!==null?`,workerCount:${workerCount}`:''}});
+    times.push(Math.round(performance.now()-started));
+   }
    if(result.width!==width||result.height!==height||result.data.length!==rgba.length)throw Error('Bad model output shape');
    let sum=0;
    for(let i=0;i<rgba.length;i+=4)sum+=Math.abs(rgba[i]-result.data[i]);
-   return {modelId:'${modelId}',ms:Math.round(performance.now()-started),pixelDifference:sum/width/height};
+   return {modelId:'${modelId}',ms:times[0],passes:times,pixelDifference:sum/width/height};
   })()`;
   const result=await cdp('Runtime.evaluate',{expression:code,awaitPromise:true,returnByValue:true},230000);
   if(result.exceptionDetails)throw Error(modelId+': '+JSON.stringify(result.exceptionDetails));

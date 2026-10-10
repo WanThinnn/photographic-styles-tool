@@ -14,9 +14,12 @@ for (const size of [192, 512]) {
     await sharp(svg).resize(size, size).png().toBuffer());
 }
 
-// iOS Web Clips need a fully opaque square source so iOS can apply its own
-// Light/Dark/Tinted Home Screen treatment. Maskable PWAs use the same rule.
-await writeFile(new URL('icon-180-ios.png', directory),
+// iOS/macOS Web Clips receive one opaque icon, matching Shalielie's structure.
+// Do not swap light/dark files in page code: installed web-app icons are cached,
+// while the system can apply its own Home Screen appearance treatment dynamically.
+await writeFile(new URL('icon-180.png', directory),
   await sharp(svg).resize(180, 180).flatten({background:'#0894ff'}).png().toBuffer());
+
+// Maskable desktop/mobile PWA icon remains separate so "any" icons stay rounded.
 await writeFile(new URL('icon-512-maskable.png', directory),
   await sharp(svg).resize(512, 512).flatten({background:'#0894ff'}).png().toBuffer());

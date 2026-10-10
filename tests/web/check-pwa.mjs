@@ -36,6 +36,9 @@ if (manifest.start_url !== "./" || manifest.scope !== "./") {
 if (!html.includes('rel="manifest" href="manifest.webmanifest"')) {
   errors.push("index.html does not link the web app manifest");
 }
+if (html.includes("manifest-dark.webmanifest") || html.includes("icon-180-ios-dark.png")) {
+  errors.push("install icons must not be frozen to the appearance used when the PWA was installed");
+}
 if (!startup.includes("serviceWorker?.register('./sw.js'") || !app.includes('await prepareBrowser()')) {
   errors.push("app.js does not register the service worker with a relative URL");
 }
@@ -76,13 +79,11 @@ if (!(manifest.icons || []).some(icon=>icon.sizes==='512x512'&&String(icon.purpo
   errors.push('manifest must retain a separate 512x512 any icon for Windows/desktop');
 }
 
-const touchIcon = join(WEB, "icons", "icon-180-ios.png");
-if (!html.includes('rel="apple-touch-icon" href="icons/icon-180-ios.png"')) {
-  errors.push("index.html does not link the dedicated iOS Apple touch icon");
-} else if (pngDimensions(touchIcon)?.join("x") !== "180x180") {
-  errors.push("icons/icon-180-ios.png is not a 180x180 PNG");
-}
-if ([4,6].includes(pngInfo(touchIcon)?.colorType)) errors.push("icons/icon-180-ios.png must be opaque so iOS can apply Home Screen appearance treatments");
+const touchIcon=join(WEB,"icons","icon-180.png");
+if(pngDimensions(touchIcon)?.join("x")!=="180x180")errors.push("icon-180.png is not a 180x180 PNG");
+if([4,6].includes(pngInfo(touchIcon)?.colorType))errors.push("icon-180.png must be opaque for iOS Home Screen");
+if(!html.includes('rel="apple-touch-icon" href="icons/icon-180.png"'))
+  errors.push("index.html must expose one stable Apple touch icon so the OS can apply appearance treatment");
 
 const shellMatch = worker.match(/const APP_SHELL = (\[[\s\S]*?\n\]);/);
 if (!shellMatch) {

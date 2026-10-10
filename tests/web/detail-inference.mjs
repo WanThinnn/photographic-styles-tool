@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {detailModel,validateDetailAsset} from '../../web/src/detail/detail-models.js';
+import {DETAIL_DEFAULT,detailModel,validateDetailAsset} from '../../web/src/detail/detail-models.js';
 import {inferDetailTiles,recommendedDetailWorkers,recommendedWasmThreads} from '../../web/src/detail/detail-inference.js';
 import {assertDetailRasterAllowed} from '../../web/src/detail/detail-raster.js';
 
 test('3 verified AI families are separately selected and bounded',()=>{
+ assert.equal(DETAIL_DEFAULT,'standard');
+ assert.equal(detailModel().family,'RT-Focuser 2025');
  assert.equal(detailModel('lite').family,'1x SuperScale SPAN');
- assert.equal(detailModel('standard').family,'1x SuperScale RPLKSR-S');
+ assert.equal(detailModel('standard').family,'RT-Focuser 2025');
+ assert.equal(detailModel('standard').assetFamily,'rt-focuser');
+ assert.equal(detailModel('standard').tile,512);
+ assert.equal(detailModel('standard').mix,.25);
  assert.equal(detailModel('pro').family,'1x Fatality DeBlur');
  assert.equal(detailModel('lite').tile,384);
  assert.equal(detailModel('standard').webgpuWorkers,4);
@@ -26,7 +31,7 @@ test('desktop WebGPU uses measured worker pool while Pro stays single-session',(
  assert.equal(recommendedWasmThreads({hardwareConcurrency:12,isolated:false}),1);
 });
 test('reject invalid/truncated model manifests instead of silently substituting a model',()=>{
- const valid={file:'model.onnx',family:'rplksr',bytes:200,sha256:'a'.repeat(64),
+ const valid={file:'model.onnx',family:'rt-focuser',bytes:200,sha256:'a'.repeat(64),
    channels:3,layout:'rgb',output:'rgb'};
  assert.equal(validateDetailAsset(valid),valid);
  assert.throws(()=>validateDetailAsset({...valid,sha256:'x'.repeat(64)}));

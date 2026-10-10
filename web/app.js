@@ -10,7 +10,7 @@ import { RASTER_MIMES } from "./src/media/image-format.js";
 import { photoCaptureDate } from "./src/media/photo-date.js";
 import { preserveNativeStyles, styleReconstructionRisk, nativeTextureCapture } from "./src/styles/style-preservation.js";
 import { AI_STRINGS } from "./src/ui/ai-strings.js";
-import {prepareBrowser} from './src/ui/startup.js';
+import {prepareBrowser,fetchJsonWithRetry} from './src/ui/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
 import {readImageFile, addTextureInWorker, repairTextureInWorker, restoreNativePortraitInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/media/heic-processing.js';
@@ -90,7 +90,9 @@ clearHistory.addEventListener('click', () => {
   for (const url of resultUrls) URL.revokeObjectURL(url);
   resultUrls.clear(); livePhotos.length = 0; liveMovies.clear(); aiCandidates.length = 0;
   list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
-  releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor(); refreshHistoryButton();
+  releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor();
+  void import('./src/detail/detail-inference.js').then(({releaseDetailWorkers})=>releaseDetailWorkers()).catch(()=>{});
+  refreshHistoryButton();
 });
 clearAssets.addEventListener('click',async()=>{
   if(clearAssets.disabled)return;
@@ -100,7 +102,9 @@ clearAssets.addEventListener('click',async()=>{
   fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
   try{
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
-    const {releaseOrtModels}=await import('./src/vision/ort-vision.js');await releaseOrtModels();
+    const [{releaseOrtModels},{releaseDetailWorkers}]=await Promise.all([
+      import('./src/vision/ort-vision.js'),import('./src/detail/detail-inference.js')]);
+    releaseDetailWorkers();await releaseOrtModels();
     await clearDownloadedAssets();assetStatus='cleaned';
   }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
   finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
@@ -203,10 +207,21 @@ async function handleMovie(file, bytes, ui) {
   }
 }
 
+let profileIndexPromise=null;
+async function ensureProfileIndex(){
+  if(profileIndex)return profileIndex;
+  if(!profileIndexPromise)profileIndexPromise=fetchJsonWithRetry('profiles/index.json')
+    .then(index=>profileIndex=index)
+    .finally(()=>{profileIndexPromise=null;});
+  return profileIndexPromise;
+}
 async function getProfile(name) {
   if (!profileCache.has(name)) {
-    const res = await fetch(`profiles/${profileIndex[name].file}`);
-    if (!res.ok) throw new Error(UNSUPPORTED);
+    const index=await ensureProfileIndex();
+    const entry=index?.[name];
+    if(!entry?.file)throw Object.assign(new Error('Profile index unavailable'),{code:'APP_RESOURCE_UNAVAILABLE'});
+    const res=await fetch(`profiles/${entry.file}`,{cache:'no-cache'});
+    if(!res.ok)throw Object.assign(new Error(`Profile unavailable: ${name}`),{code:'APP_RESOURCE_UNAVAILABLE'});
     profileCache.set(name, await loadProfile(new Uint8Array(await res.arrayBuffer())));
   }
   return profileCache.get(name);
@@ -633,7 +648,8 @@ async function handleFile(file) {
     } else {
       const needsExperimental = d.hdrGrid === null
         || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));
-      const name = profileFor(profileIndex, d, needsExperimental);
+      const index=await ensureProfileIndex();
+      const name = profileFor(index, d, needsExperimental);
       const profile = await getProfile(name);
       // Start processing; if the thumbnail is missing, dynamically load the generator.
       let linearThumb = undefined;
@@ -728,7 +744,7 @@ async function handleFile(file) {
     // still goes to the console, because "unsupported" on every photo is exactly
     // how a bug elsewhere would look.
     console.error("could not port", file.name, e);
-    ui.set(T("err.unsupported"), "err");
+    ui.set(T(e?.code==="APP_RESOURCE_UNAVAILABLE"?"err.resources":"err.unsupported"), "err");
   } finally {
     // Samples belong to this serialized processing operation, not its history
     // row. Release them after export while retaining only the downloadable file.
@@ -795,9 +811,11 @@ function countVisit() {
   try {
     const browserMode=await prepareBrowser();
     if(browserMode==='reloading')return;
-    const response = await fetch('profiles/index.json',{cache:'no-cache'});
-    if (!response.ok) throw Error('Profile index unavailable');
-    profileIndex = await response.json();
+    // The profile index is only required by legacy/full reconstruction. A transient
+    // deploy/cache miss must not block native HEIC editing or the rest of the UI.
+    try{profileIndex=await fetchJsonWithRetry('profiles/index.json',{attempts:2});}
+    catch(error){console.warn('Profile index will be retried on demand',error);profileIndex=null;}
+
     browserReady = true;refreshHistoryButton();
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
     aiFeatures.sync();
@@ -809,7 +827,7 @@ function countVisit() {
     else console.warn('Running without cross-origin isolation; threaded HEVC/AI features will request isolation when used.');
   } catch (e) {
     console.error('Browser preparation failed', e);
-    $("boot").textContent = T('err.setup');
+    $("boot").textContent = T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources');
     $("boot").className = "err";
     const retry = document.createElement('button');
     retry.className = 'dl alt'; retry.type = 'button'; retry.textContent = T('btn.retry');

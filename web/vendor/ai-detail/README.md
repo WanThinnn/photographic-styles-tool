@@ -8,15 +8,15 @@ node tools/download-ai-detail.mjs
 python tools/verify-ai-detail-models.py
 ```
 
-The download tool streams the pinned Hugging Face revisions to `.partial`
-files, verifies the model's SHA-256, then moves the files into place. Repeat
+The download tool streams pinned upstream model revisions to `.partial`
+files, verifies each SHA-256, then moves the files into place. Repeat
 runs validate the existing files instead of downloading them again.
 `assets.json` holds hashes and model metadata consumed by ONNX Runtime Web.
 
 | UI tier | Original 1x ONNX family | Local asset | Source |
 | --- | --- | --- | --- |
 | Lite | SuperScale SPAN | lite.onnx | notaneimu/onnx-image-models |
-| Standard | SuperScale RPLKSR-S | standard.onnx | notaneimu/onnx-image-models |
+| Standard | RT-Focuser 2025 (25% blend in runtime) | standard.onnx | ReaganWu/RT-Focuser |
 | Pro | Fatality DeBlur | pro.onnx | notaneimu/onnx-image-models |
 
 **Actual local validation:** all three inputs and outputs are RGB float32
@@ -24,12 +24,12 @@ NCHW tensors with scale 1×; tested against onnxruntime CPU with a real
 synthetic RGB image. This does **not** validate Safari/iPhone WebGPU execution,
 image appearance on real photographs, or Apple Photos editability after AI.
 
-**License warning:** OpenModelDB lists the original SuperScale SPAN,
-SuperScale RPLKSR-S and Fatality DeBlur weights as **CC BY-NC-SA 4.0**.
-Hugging Face's `notaneimu/onnx-image-models` contains mixed-license ONNX
-conversions, and that does not override the original weight terms. Review
-attribution, share-alike and non-commercial restrictions before any public
-or commercial use. See `docs/AI-DETAIL-MODEL-EVALUATION.md`.
+**License warning:** RT-Focuser Standard is MIT-licensed and pinned to its
+upstream commit. OpenModelDB lists the original SuperScale SPAN and Fatality
+DeBlur weights as **CC BY-NC-SA 4.0**; the Hugging Face ONNX conversions do not
+override those original terms. Review attribution, share-alike and
+non-commercial restrictions before public/commercial distribution. See
+`docs/AI-DETAIL-MODEL-EVALUATION.md`.
 Therefore the large downloaded ONNX files are ignored by Git and CI/CD
 must not automatically package them for public Pages releases.
 

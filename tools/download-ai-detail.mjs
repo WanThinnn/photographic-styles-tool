@@ -27,12 +27,13 @@ export const SOURCES={
    license:'upstream-review-required',
  },
  standard:{
-   family:'rplksr',label:'Standard',file:'standard.onnx',
-   repository:'notaneimu/onnx-image-models',
-   revision:'e4cafda1199bcec66a76b10025aafb655cd0ff30',
-   remote:'1x-SuperScale_RPLKSR_S.onnx',
-   sha256:'90c43e0a3642da19e5ed84f5e621c72fa80eb62b11373996e85693a3b4c4ec85',
-   license:'upstream-review-required',
+   family:'rt-focuser',label:'Standard',file:'standard.onnx',
+   repository:'ReaganWu/RT-Focuser',
+   revision:'4c8e12d28c2801f34cc1153e9ad8702b7bce657a',
+   remote:'Pretrained_Weights/rt_focuser_wint8_afp32.onnx',
+   url:'https://raw.githubusercontent.com/ReaganWu/RT-Focuser/4c8e12d28c2801f34cc1153e9ad8702b7bce657a/Pretrained_Weights/rt_focuser_wint8_afp32.onnx',
+   sha256:'3e1747165694696996d98c23867275a4c0c0372ad7e9943162498ce245288fd5',
+   license:'MIT',
  },
  pro:{
    family:'fatality-deblur',label:'Pro',file:'pro.onnx',
@@ -54,9 +55,9 @@ async function digestFile(path){
 async function get(id,spec){
  const path=join(root,spec.file);
  if(await digestFile(path)===spec.sha256){console.log(id+': verified existing download');return (await stat(path)).size;}
- const url=`https://huggingface.co/${spec.repository}/resolve/${spec.revision}/${encodeURIComponent(spec.remote)}?download=true`;
+ const url=spec.url||`https://huggingface.co/${spec.repository}/resolve/${spec.revision}/${encodeURIComponent(spec.remote)}?download=true`;
  const response=await fetch(url,{headers:{'user-agent':'photographic-styles-tool/ai-detail-download'}});
- if(!response.ok||!response.body)throw Error(`${id}: Hugging Face request failed ${response.status} ${url}`);
+ if(!response.ok||!response.body)throw Error(`${id}: model request failed ${response.status} ${url}`);
  const partial=path+'.partial';
  let written=0;
  try{
@@ -72,10 +73,10 @@ async function get(id,spec){
  }catch(error){await rm(partial,{force:true});throw error;}
 }
 await mkdir(root,{recursive:true});
-const manifest={schema:1,source:'Hugging Face pinned 1x RGB restoration ONNX models',models:{}};
+const manifest={schema:1,source:'Pinned 1x RGB restoration ONNX models',models:{}};
 for(const [id,spec] of Object.entries(SOURCES)){
  const bytes=await get(id,spec);
- const url=`https://huggingface.co/${spec.repository}/resolve/${spec.revision}/${encodeURIComponent(spec.remote)}`;
+ const url=spec.url||`https://huggingface.co/${spec.repository}/resolve/${spec.revision}/${encodeURIComponent(spec.remote)}`;
  manifest.models[id]={
   family:spec.family,file:spec.file,bytes,sha256:spec.sha256,channels:3,layout:'rgb',output:'rgb',
   repository:spec.repository,revision:spec.revision,sourceUrl:url,license:spec.license,

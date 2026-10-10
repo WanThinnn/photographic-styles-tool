@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {prepareBrowser} from '../../web/src/ui/startup.js';
+import {prepareBrowser,fetchJsonWithRetry} from '../../web/src/ui/startup.js';
 import {downloadModelBytes} from '../../web/src/core/model-download.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
@@ -24,15 +24,27 @@ test('fresh visit claims the page and reloads before photo selection', async () 
   assert.equal(await prepareBrowser({...options, isolated: () => true}), 'ready');
 });
 
-test('failed setup times out, removes listeners and does not reload', async () => {
+test('stalled service-worker setup falls back instead of blocking the app', async () => {
   const listeners = new Set();
-  await assert.rejects(prepareBrowser({isolated: () => false, secure: true, timeoutMs: 10,
+  assert.equal(await prepareBrowser({isolated: () => false, secure: true, timeoutMs: 10,
     reload: () => assert.fail('must not reload'), serviceWorker: {controller: null,
       addEventListener: (_type, listener) => listeners.add(listener),
       removeEventListener: (_type, listener) => listeners.delete(listener),
       register: async () => {},
-    }}), /BROWSER_SETUP_TIMEOUT/);
+    }}),'ready-limited');
   assert.equal(listeners.size, 0);
+});
+
+test('boot JSON retries transient resource failures and reports a resource error after exhaustion',async()=>{
+  let requests=0;
+  const value=await fetchJsonWithRetry('profiles/index.json',{attempts:3,delayMs:0,fetchImpl:async()=>{
+    requests++;
+    if(requests<3)throw Error('transient');
+    return new Response('{"ok":true}',{status:200,headers:{'content-type':'application/json'}});
+  }});
+  assert.deepEqual(value,{ok:true});assert.equal(requests,3);
+  await assert.rejects(fetchJsonWithRetry('missing.json',{attempts:2,delayMs:0,
+    fetchImpl:async()=>new Response('',{status:404})}),error=>error.code==='APP_RESOURCE_UNAVAILABLE');
 });
 
 test('preparation and conversion share a download; failure permits retry', async () => {

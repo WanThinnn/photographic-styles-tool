@@ -45,9 +45,12 @@ source=cv2.imread(str(photo),cv2.IMREAD_COLOR)
 if source is None:raise RuntimeError('Photo unavailable')
 reference=cv2.cvtColor(cv2.resize(source,(256,256),interpolation=cv2.INTER_AREA),cv2.COLOR_BGR2RGB).astype('float32')/255
 rng=np.random.default_rng(2026)
+motion_kernel=np.zeros((11,11),dtype='float32');motion_kernel[5,:]=1/11
+motion_blur=cv2.filter2D(reference,-1,motion_kernel,borderType=cv2.BORDER_REFLECT)
 degradations={
  'clean':reference,
  'blur-1.1':cv2.GaussianBlur(reference,(0,0),1.1),
+ 'motion-11':motion_blur,
  'noise-0.032':np.clip(reference+rng.normal(0,.032,reference.shape).astype('float32'),0,1),
  'jpeg-q45':cv2.cvtColor(cv2.imdecode(cv2.imencode('.jpg',cv2.cvtColor((reference*255).astype('uint8'),cv2.COLOR_RGB2BGR),[cv2.IMWRITE_JPEG_QUALITY,45])[1],1),cv2.COLOR_BGR2RGB).astype('float32')/255,
 }
@@ -64,8 +67,9 @@ def ssim(out,gt):
  return float(np.mean(((2*sig1*sig2+.01**2)*(2*cov+.03**2))/((sig1**2+sig2**2+.01**2)*(v1+v2+.03**2))))
 models={
  'Lite SPAN':REPO/'lite.onnx',
- 'Standard RPLKSR':REPO/'standard.onnx',
+ 'Standard RT-Focuser (raw)':REPO/'standard.onnx',
  'Pro Fatality':REPO/'pro.onnx',
+ **({'RT-Focuser 2025':REPO/'rt-focuser-candidate.onnx'} if (REPO/'rt-focuser-candidate.onnx').exists() else {}),
  **{name:CACHE/file for name,(file,sha) in CANDIDATES.items()},
 }
 settings=ort.SessionOptions()

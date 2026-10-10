@@ -5,7 +5,7 @@
  *
  * Usage:
  *   node tools/package-ai-detail.mjs --lite path/to/span.onnx \
- *      --standard path/to/rplksr.onnx \
+ *      --standard path/to/rt-focuser.onnx \
  *      --pro path/to/fatality-deblur.onnx
  *
  * Uniform I/O contract: RGB float32 [1,3,H,W] -> RGB float32 [1,3,H,W],
@@ -23,7 +23,7 @@ const flags=Object.fromEntries(process.argv.slice(2).reduce((out,arg,i,all)=>{
 },[]));
 const specs={
   lite:{file:'lite.onnx',family:'span',channels:3,layout:'rgb',output:'rgb'},
-  standard:{file:'standard.onnx',family:'rplksr',channels:3,layout:'rgb',output:'rgb'},
+  standard:{file:'standard.onnx',family:'rt-focuser',channels:3,layout:'rgb',output:'rgb'},
   pro:{file:'pro.onnx',family:'fatality-deblur',channels:3,layout:'rgb',output:'rgb'},
 };
 if(Object.keys(specs).some(id=>!flags[id])||Object.keys(flags).some(id=>!specs[id])){

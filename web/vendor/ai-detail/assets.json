@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source": "Hugging Face pinned 1x RGB restoration ONNX models",
+  "source": "Pinned 1x RGB restoration ONNX models",
   "models": {
     "lite": {
       "family": "span",
@@ -16,17 +16,17 @@
       "license": "upstream-review-required"
     },
     "standard": {
-      "family": "rplksr",
+      "family": "rt-focuser",
       "file": "standard.onnx",
-      "bytes": 9544993,
-      "sha256": "90c43e0a3642da19e5ed84f5e621c72fa80eb62b11373996e85693a3b4c4ec85",
+      "bytes": 23716330,
+      "sha256": "3e1747165694696996d98c23867275a4c0c0372ad7e9943162498ce245288fd5",
       "channels": 3,
       "layout": "rgb",
       "output": "rgb",
-      "repository": "notaneimu/onnx-image-models",
-      "revision": "e4cafda1199bcec66a76b10025aafb655cd0ff30",
-      "sourceUrl": "https://huggingface.co/notaneimu/onnx-image-models/resolve/e4cafda1199bcec66a76b10025aafb655cd0ff30/1x-SuperScale_RPLKSR_S.onnx",
-      "license": "upstream-review-required"
+      "repository": "ReaganWu/RT-Focuser",
+      "revision": "4c8e12d28c2801f34cc1153e9ad8702b7bce657a",
+      "sourceUrl": "https://raw.githubusercontent.com/ReaganWu/RT-Focuser/4c8e12d28c2801f34cc1153e9ad8702b7bce657a/Pretrained_Weights/rt_focuser_wint8_afp32.onnx",
+      "license": "MIT"
     },
     "pro": {
       "family": "fatality-deblur",

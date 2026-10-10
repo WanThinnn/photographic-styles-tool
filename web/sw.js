@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v119`;
+const CACHE_NAME = `${CACHE_PREFIX}v120`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -58,8 +58,11 @@ const APP_SHELL = [
   "./icons/apple-touch-icon.png",
   "./icons/apple-touch-icon-v2.png",
   "./icons/icon-192.png",
+  "./icons/icon-192-v2.png",
   "./icons/icon-512.png",
+  "./icons/icon-512-v2.png",
   "./icons/icon-512-maskable.png",
+  "./icons/icon-512-maskable-v2.png",
   "./profiles/index.json",
   "./profiles/45-15.zip",
   "./profiles/48-12.zip",

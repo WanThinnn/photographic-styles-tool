@@ -26,37 +26,70 @@ function New-RoundedRectanglePath {
     return $path
 }
 
-$size = 180
-$bitmap = [System.Drawing.Bitmap]::new($size, $size)
-$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+function Write-Icon {
+    param(
+        [int]$Size,
+        [string[]]$Names,
+        [switch]$RoundedCanvas
+    )
 
-try {
-    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-    $graphics.Clear([System.Drawing.Color]::FromArgb(47, 109, 246))
+    $bitmap = [System.Drawing.Bitmap]::new(
+        $Size,
+        $Size,
+        [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+    )
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 
-    # Proven iOS-friendly motif: one dominant flat background plus one compact,
-    # high-contrast foreground shape. The matrix artwork remains the in-app logo.
-    $framePath = New-RoundedRectanglePath -X 54 -Y 54 -Width 72 -Height 72 -Radius 20
-    $framePen = [System.Drawing.Pen]::new([System.Drawing.Color]::White, 8.5)
     try {
-        $graphics.DrawPath($framePen, $framePath)
-    } finally {
-        $framePen.Dispose()
-        $framePath.Dispose()
-    }
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 
-    $dotBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::White)
-    try {
-        $graphics.FillEllipse($dotBrush, 105, 61.5, 19, 19)
-    } finally {
-        $dotBrush.Dispose()
-    }
+        $blue = [System.Drawing.Color]::FromArgb(47, 109, 246)
+        if ($RoundedCanvas) {
+            $graphics.Clear([System.Drawing.Color]::Transparent)
+            $outer = New-RoundedRectanglePath -X 1 -Y 1 -Width ($Size - 2) -Height ($Size - 2) -Radius ($Size * 0.22)
+            $blueBrush = [System.Drawing.SolidBrush]::new($blue)
+            try {
+                $graphics.FillPath($blueBrush, $outer)
+            } finally {
+                $blueBrush.Dispose()
+                $outer.Dispose()
+            }
+        } else {
+            $graphics.Clear($blue)
+        }
 
-    foreach ($name in @("icon-180.png", "apple-touch-icon.png", "apple-touch-icon-v2.png")) {
-        $bitmap.Save((Join-Path $OutputDirectory $name), [System.Drawing.Imaging.ImageFormat]::Png)
+        $scale = $Size / 180.0
+        $framePath = New-RoundedRectanglePath -X (54 * $scale) -Y (54 * $scale) -Width (72 * $scale) -Height (72 * $scale) -Radius (20 * $scale)
+
+        $framePen = [System.Drawing.Pen]::new([System.Drawing.Color]::White, (8.5 * $scale))
+        try {
+            $graphics.DrawPath($framePen, $framePath)
+        } finally {
+            $framePen.Dispose()
+            $framePath.Dispose()
+        }
+
+        $dotBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::White)
+        try {
+            $graphics.FillEllipse($dotBrush, (105 * $scale), (61.5 * $scale), (19 * $scale), (19 * $scale))
+        } finally {
+            $dotBrush.Dispose()
+        }
+
+        foreach ($name in $Names) {
+            $bitmap.Save((Join-Path $OutputDirectory $name), [System.Drawing.Imaging.ImageFormat]::Png)
+        }
+    } finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
     }
-} finally {
-    $graphics.Dispose()
-    $bitmap.Dispose()
 }
+
+# iOS expects full-bleed artwork and applies its own system mask.
+Write-Icon -Size 180 -Names @("icon-180.png", "apple-touch-icon.png", "apple-touch-icon-v2.png")
+
+# Windows displays PWA icons largely as-authored, so bake the rounded silhouette
+# into the PNG alpha channel instead of relying on the OS to mask it.
+Write-Icon -Size 192 -Names @("icon-192.png", "icon-192-v2.png") -RoundedCanvas
+Write-Icon -Size 512 -Names @("icon-512.png", "icon-512-v2.png", "icon-512-maskable.png", "icon-512-maskable-v2.png") -RoundedCanvas

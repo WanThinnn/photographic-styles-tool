@@ -55,10 +55,17 @@ const touch=await sharp(touchSvg).resize(180,180).ensureAlpha(1).png().toBuffer(
 const appleTouch=applePngEnvelope(touch);
 await writeFile(new URL('icon-180.png',directory),appleTouch);
 
-// Use the same rounded-camera artwork for Windows/desktop PWA installs.
+// Windows does not consistently apply an app-icon mask, so bake the rounded
+// blue silhouette into the PNG itself and leave transparent corners.
+const desktopSvg=Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect x="1" y="1" width="510" height="510" rx="112" fill="#2f6df6"/>
+  <rect x="154" y="154" width="204" height="204" rx="56" fill="none" stroke="#fff" stroke-width="24"/>
+  <circle cx="326" cy="202" r="27" fill="#fff"/>
+</svg>`);
 for(const size of [192,512]){
-  await writeFile(new URL(`icon-${size}.png`,directory),
-    await sharp(touchSvg).resize(size,size).ensureAlpha(1).png().toBuffer());
+  const desktopIcon=await sharp(desktopSvg).resize(size,size).ensureAlpha().png().toBuffer();
+  await writeFile(new URL(`icon-${size}.png`,directory),desktopIcon);
+  await writeFile(new URL(`icon-${size}-v2.png`,directory),desktopIcon);
 }
 
 // Keep the stable name and also emit a fresh URL so Safari/iOS cannot reuse
@@ -66,6 +73,7 @@ for(const size of [192,512]){
 await writeFile(new URL('apple-touch-icon.png',directory),appleTouch);
 await writeFile(new URL('apple-touch-icon-v2.png',directory),appleTouch);
 
-// Separate maskable asset keeps desktop "any" icons rounded/transparent.
-const maskable=await sharp(svg).resize(512,512).flatten({background:'#0894ff'}).ensureAlpha(1).png().toBuffer();
-await writeFile(new URL('icon-512-maskable.png',directory),applePngEnvelope(maskable));
+// Keep the Windows maskable source visually identical too; Edge may prefer it.
+const maskable=await sharp(desktopSvg).resize(512,512).ensureAlpha().png().toBuffer();
+await writeFile(new URL('icon-512-maskable.png',directory),maskable);
+await writeFile(new URL('icon-512-maskable-v2.png',directory),maskable);

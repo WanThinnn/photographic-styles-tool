@@ -525,11 +525,13 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
       const opts = canDecode
         ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) }
         : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
+      opts.reconstructedBright=allowStyleRebuild&&textureOnly&&d.stylesItem===null;
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
       // patch() degrades rather than failing when the decoder misbehaves, so trust
       // what it reports it actually did, not what we asked for.
       if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
+      if(report.styleSelectionCompatibility==='bright-palette70')ui.note(T('warn.brightcompat'),'style-rebuild');
 
       bits = [T(report.decoded ? "st.matched" : "st.neutral")];
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));

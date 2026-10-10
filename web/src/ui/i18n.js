@@ -121,6 +121,7 @@ export const STRINGS = {
     "warn.textureonly": "File thiếu dữ liệu chỉnh Styles gốc. Giữ nguyên ảnh, depth và dữ liệu HDR hiện có; chưa thêm Texture. Có thể tạo Styles mới bên dưới, nhưng màu có thể thay đổi và không bảo đảm khôi phục chỉnh ƒ.",
     "btn.rebuildstyle": "Tạo Styles mới (thử nghiệm)",
     "warn.stylerebuild": "Đang thêm Styles mới từ bản thiếu dữ liệu chỉnh sửa gốc. Dữ liệu HDR hiện có được giữ; HDR đã thiếu không thể khôi phục. Màu và khả năng chỉnh ƒ/ánh sáng cần kiểm tra trong Ảnh.",
+    "warn.brightcompat": "Bright được dựng lại với Tone/Màu trung tính và Palette 70 để giảm màu đậm. Thông số khác ảnh gốc; hãy kiểm tra trong Ảnh.",
     "err.nohdr": "Không tìm thấy bản đồ tăng sáng HDR được hỗ trợ. Web và công cụ dòng lệnh đều chưa hỗ trợ HEIC này.",
     "err.nothumb": "Thiếu ảnh thu nhỏ. Trình duyệt có thể tạo bằng bộ mã hóa tùy chọn.",
     "btn.save": "Lưu vào Ảnh",
@@ -246,6 +247,7 @@ export const STRINGS = {
     "warn.textureonly": "This file lacks original Styles editing data. The image, depth and existing HDR data are kept without adding Texture. You can create new Styles below; colours may change and ƒ editing is not guaranteed.",
     "btn.rebuildstyle": "Create new Styles (experimental)",
     "warn.stylerebuild": "Adding new Styles to a copy missing original editing data. Existing HDR data is kept; missing HDR cannot be recovered. Check colours and ƒ/lighting editing in Photos.",
+    "warn.brightcompat": "Bright was rebuilt with neutral Tone/Colour and Palette 70 to reduce strong colours. Settings differ from the original; check in Photos.",
     "err.nohdr": "No supported HDR gain map was found. This HEIC is unsupported by both the web and command-line tool.",
     "err.nothumb": "Missing thumbnail. The browser can generate one with the optional encoder.",
 
@@ -391,6 +393,7 @@ export const STRINGS = {
     "warn.textureonly": "此文件缺少原始风格编辑数据。保留图像、深度和现有 HDR 数据，暂不添加纹理。可在下方创建新风格，但颜色可能变化，无法保证恢复 ƒ 编辑。",
     "btn.rebuildstyle": "创建新风格（实验性）",
     "warn.stylerebuild": "正在为缺少原始编辑数据的副本添加新风格。保留现有 HDR 数据，但无法恢复已丢失的 HDR。请在“照片”中检查颜色及 ƒ/光效编辑。",
+    "warn.brightcompat": "已使用中性色调/颜色及调色板 70 重建明亮风格，以减轻颜色过重。参数与原图不同，请在“照片”中检查。",
     "err.nohdr": "未找到支持的 HDR 增益图。网页版和命令行工具均不支持此 HEIC 文件。",
     "err.nothumb": "缺少缩略图，浏览器可使用可选编码器生成。",
 

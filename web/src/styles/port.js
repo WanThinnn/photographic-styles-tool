@@ -13,8 +13,9 @@ import {
   repointItemProperty, addItems, ispeBox, IROT_IDENTITY, idatItemBytes, replaceIdatItem,
   MATTE_URIS, MATTE_URI_SET, DEPTH_URI,
 } from "../core/heif.js";
-import { injectAppleMakerNoteTag, extractAppleMakerNoteTag } from "../core/exif.js";
-import {parseBplist} from '../core/bplist.js';
+import { injectAppleMakerNoteTag, extractAppleMakerNoteTag, exifCameraModel } from "../core/exif.js";
+import {parseBplist,buildBplist,BplistReal} from '../core/bplist.js';
+import {editableTmapHeadroom} from './hdr-compatibility.js';
 import {
   addTextureItems, hasTexture, softSkinPeople, filmGrainSeed,
   CLASSIC_MATTE_EMPTY, CLASSIC_MATTE_HVCC,
@@ -67,7 +68,7 @@ export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
   // A capture can retain its selected Style even when an export omitted the
   // Styles auxiliary graph. Keep that selection when adding the missing graph.
-  let selection;
+  let selection,selectionCompatibility;
   try{selection=extractAppleMakerNoteTag(extractItem(targetData,td.iloc,td.exifItem));}
   catch(error){if(!error.message.includes('tag 0x54 not found'))throw error;}
   if(selection){
@@ -75,7 +76,23 @@ export async function patch(targetData, profile, opts = {}) {
     if(![1,7].includes(selection.type)||!(marker instanceof Map)||marker.get('0')!==1
       ||!Number.isInteger(marker.get('4'))||marker.get('4')<1
       ||!['1','2'].every(key=>Number.isFinite(marker.get(key))))throw Error(UNSUPPORTED);
-    profile={...profile,mn54:selection.payload,
+    let payload=selection.payload;
+    // Opt-in reconstruction only. K was phone-tested on an incomplete 16 Pro
+    // Bright export with these original adjustments and ISO HDR parameters.
+    // Complete native Styles and all other presets/cameras remain untouched.
+    if(opts.reconstructedBright===true&&td.stylesItem===null
+      &&exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))==='iPhone 16 Pro'
+      &&marker.get('4')===16&&marker.get('1')===-0.5&&marker.get('2')===0.5
+      &&editableTmapHeadroom(targetData,td)!==null){
+      const neutral=parseBplist(profile.mn54,{preserveReals:true});
+      if(neutral instanceof Map&&neutral.get('0')===1&&neutral.get('5')===1
+        &&neutral.get('6')===4&&neutral.get('7')===0){
+        neutral.set('4',16);neutral.set('1',new BplistReal(0));
+        neutral.set('2',new BplistReal(0));neutral.set('3',new BplistReal(0.7));
+        payload=buildBplist(neutral);selectionCompatibility='bright-palette70';
+      }
+    }
+    profile={...profile,mn54:payload,
       manifest:{...profile.manifest,smartstyle_makernote_type:selection.type}};
   }
   const hasHdr = td.hdrGrid !== null && (td.infos.get(td.hdrGrid)?.type === "hvc1" || td.hdrTiles.length > 0);
@@ -87,6 +104,7 @@ export async function patch(targetData, profile, opts = {}) {
     const out = await graftPatch(targetData, profile, opts);
     out.report.version = VERSION;
     out.report.experimental = opts.experimental === true;
+    if(selectionCompatibility)out.report.styleSelectionCompatibility=selectionCompatibility;
     return out;
   }
   
@@ -97,6 +115,7 @@ export async function patch(targetData, profile, opts = {}) {
   const { manifest } = profile;
   let meta = profile.meta;
   const report = { version: VERSION, warnings: [] };
+  if(selectionCompatibility)report.styleSelectionCompatibility=selectionCompatibility;
 
   if (td.primaryTiles.length !== manifest.primary_tile_count) throw new Error(UNSUPPORTED);
   if (td.hdrTiles.length !== manifest.hdr_tile_count) throw new Error(UNSUPPORTED);

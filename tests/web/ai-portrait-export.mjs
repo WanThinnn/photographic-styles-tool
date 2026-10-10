@@ -20,7 +20,7 @@ import {discoverHeic as discoverCoreHeic} from '../../web/src/core/heif.js';
 import {describeHeic} from '../../web/src/ui/result-metadata.js';
 import {tmapGainMap} from '../../web/src/core/gain-map.js';
 import {encodeTmapMetadata} from '../../web/src/raster/jpeg-hdr.js';
-import {registerTmapHdr} from '../../web/src/styles/hdr-compatibility.js';
+import {registerTmapHdr,editableTmapHeadroom} from '../../web/src/styles/hdr-compatibility.js';
 import {executeJob} from '../../web/src/media/heic-worker.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait/portrait-template.json',import.meta.url)));
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
@@ -249,6 +249,92 @@ test('unrelated or ambiguous tmap dependencies do not invent an HDR role',()=>{
   assert.equal(tmapGainMap(infos,new Map([[3,[1,1]]]),1),null);
   assert.equal(tmapGainMap(infos,new Map([[3,[1,99]]]),1),null);
   assert.equal(tmapGainMap(infos,new Map([[3,[1,2]],[4,[1,5]]]),1),null);
+});
+
+function incompleteBrightIso({model='iPhone 16 Pro',preset=16,complete=false,parameters={},mutate}={}){
+  let base=withCamera(withMarker(photo(4032,3024,'45-15'),
+    buildBplist(new Map([['3',1],['1',-.5],['4',preset],['2',.5],['0',1],['5',0]]))),model);
+  let d=discoverHeic(base);
+  const hdrSides=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(d.hdrGrid)).map(r=>r.from);
+  if(hdrSides.length)base=withoutThumbnail(base,hdrSides);
+  d=discoverHeic(base);
+  let meta=base.slice(d.meta.off,d.meta.off+d.meta.size),ids;
+  [meta,ids]=addItems(meta,[{key:'iso-hdr',itemType:'tmap',refType:'dimg',refTo:[d.primary,d.hdrGrid]}]);
+  const metadata=encodeTmapMetadata({baseHeadroom:0,alternateHeadroom:2,useBaseColorSpace:false,
+    channels:[{min:0,max:2,gamma:1,baseOffset:.005,alternateOffset:.005}],...parameters});
+  mutate?.(metadata);
+  const keep=d.props.associations.get(d.hdrGrid).filter(a=>d.props.properties[a.index-1].type!=='auxC').map(a=>[a.index,a.essential]);
+  meta=setItemPropertyAssociations(meta,d.hdrGrid,keep);
+  const ft=topBox(base,'ftyp');
+  base=rebuildHeic(base,d,base.slice(ft.off,ft.off+ft.size),meta,new Map([[ids.get('iso-hdr'),metadata]]));
+  if(complete)return base;
+  d=discoverHeic(base);
+  return withoutThumbnail(base,[d.stylesItem,d.deltaGrid,d.linearThumb]);
+}
+
+test('opt-in Bright reconstruction matches K and carries own HDR headroom without replacing samples',async()=>{
+  const source=incompleteBrightIso(),before=discoverHeic(source),profile=buildGeneratedProfile('48-12',assets);
+  const saved=profile.mn54.slice();
+  assert.equal(editableTmapHeadroom(source),4);
+  const output=await executeJob({operation:'patch',data:source,profile,opts:{reconstructedBright:true,experimental:true}});
+  const after=discoverHeic(output.data),marker=parseBplist(selectedStyle(output.data).payload);
+  assert.equal(output.report.styleSelectionCompatibility,'bright-palette70');
+  assert.deepEqual([marker.get('4'),marker.get('1'),marker.get('2'),marker.get('3')],[16,0,0,.7]);
+  assert.deepEqual(profile.mn54,saved);
+  const sides=after.refs.filter(r=>r.type==='cdsc'&&r.to.includes(after.hdrGrid));
+  const own=sides.map(r=>new TextDecoder().decode(extractItemData(output.data,after,r.from))).find(s=>s.includes('HDRGainMapHeadroom'));
+  assert.ok(own.includes('<HDRGainMap:HDRGainMapHeadroom>4.000000000</'));
+  for(const ids of ['primaryTiles','hdrTiles'])before[ids].forEach((id,i)=>
+    assert.deepEqual(extractItemData(output.data,after,after[ids][i]),extractItemData(source,before,id)));
+  const oldMap=[...before.infos].find(([,info])=>info.type==='tmap')[0];
+  const newMap=[...after.infos].find(([,info])=>info.type==='tmap')[0];
+  assert.deepEqual(extractItemData(output.data,after,newMap),extractItemData(source,before,oldMap));
+  assert.equal(registerTmapHdr(output.data,{headroom:true}),null);
+  const portrait=buildAiPortrait(output.data,depth,template).data,pd=discoverHeic(portrait);
+  const portraitSide=pd.refs.find(r=>r.type==='cdsc'&&r.to.includes(pd.hdrGrid));
+  assert.equal(new TextDecoder().decode(extractItemData(portrait,pd,portraitSide.from)),own);
+  assert.deepEqual(selectedStyle(portrait),selectedStyle(output.data));
+});
+
+test('Bright compatibility is never implicit or applied to complete native Styles or other cameras/presets',async()=>{
+  const profile=buildGeneratedProfile('48-12',assets);
+  for(const settings of [{},{model:'iPhone 13 Pro'},{model:'iPhone 17 Pro'},{preset:1},{complete:true}]){
+    const source=incompleteBrightIso(settings);
+    const output=await executeJob({operation:'patch',data:source,profile,
+      opts:{reconstructedBright:Object.keys(settings).length>0,experimental:true}});
+    assert.equal(output.report.styleSelectionCompatibility,undefined);
+    assert.deepEqual(selectedStyle(output.data),selectedStyle(source));
+  }
+});
+
+test('HDR headroom compatibility rejects unknown ISO headers and unsupported gain equations',()=>{
+  const rejected=[
+    {mutate:bytes=>bytes[0]=1},
+    {mutate:bytes=>bytes[2]=1},
+    {mutate:bytes=>bytes[4]=1},
+    {mutate:bytes=>bytes[5]=64},
+    {mutate:bytes=>bytes.fill(0,18,22)},
+    {parameters:{baseHeadroom:1}},
+    {parameters:{alternateHeadroom:17}},
+    {parameters:{channels:[{min:-1,max:2,gamma:1,baseOffset:.005,alternateOffset:.005}]}},
+    {parameters:{channels:[{min:0,max:2,gamma:2,baseOffset:.005,alternateOffset:.005}]}},
+    {parameters:{channels:[{min:0,max:2,gamma:1,baseOffset:.005,alternateOffset:.01}]}},
+  ];
+  for(const options of rejected){
+    const source=incompleteBrightIso(options);
+    assert.equal(editableTmapHeadroom(source),null);
+    const registered=registerTmapHdr(source,{headroom:true}),after=discoverHeic(registered);
+    assert.ok(![...after.infos].some(([id,info])=>info.type==='mime'
+      &&new TextDecoder().decode(extractItemData(registered,after,id)).includes('HDRGainMapHeadroom')));
+  }
+});
+
+test('headroom-only registration keeps all existing payloads and refuses to replace existing HDR metadata',()=>{
+  const source=incompleteBrightIso(),registered=registerTmapHdr(source),before=discoverHeic(registered);
+  assert.equal(registerTmapHdr(registered),null);
+  const output=registerTmapHdr(registered,{headroom:true}),after=discoverHeic(output);
+  for(const id of before.infos.keys())assert.deepEqual(extractItemData(output,after,id),extractItemData(registered,before,id));
+  assert.equal(registerTmapHdr(output,{headroom:true}),null);
 });
 
 test('unknown Styles contracts are preserved instead of silently downgraded into Portrait',()=>{

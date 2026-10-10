@@ -74,6 +74,57 @@ This guard does not recover missing native calibration or fix the existing colou
 change on entering Edit. Keeping the Bright selection in EXIF also does not,
 by itself, restore the Styles editor; the incomplete-input result says so beside
 its save actions.
+
+The private Shalielie comparison (V9) isolated the selected Style marker from
+the reconstructed graph. The profile ZIPs are identical to upstream. Using the
+same measured scene statistics, encoded thumbnail and marker, both graph writers
+produce byte-identical outputs. For the tested native Portrait-Off export:
+
+| Reconstructed selection | User-tested result in Photos Edit |
+| --- | --- |
+| Original Bright and original Tone/Colour | Correct controls, excessive colour |
+| Bright plus upstream marker defaults, original Tone/Colour | Same excessive colour |
+| Upstream Standard with neutral Tone/Colour | Normal colour, original preset lost |
+| Bright with neutral Tone/Colour | Normal colour, original numeric adjustments lost |
+
+All four Portrait-Off variants retained working aperture and Portrait Lighting
+through the explicit sharp-base adapter. The Portrait-On variants retained their
+already rendered blur and did not regain aperture/lighting editing. Both sets
+retained HDR when viewing and after saving, but the user reports an SDR preview
+inside Edit. Preserving gain-map bytes does not establish HDR editor parity.
+Neither neutral selection is a complete fix for preserving native Style controls,
+so these experiments are not selected by the website. A follow-up V10 probe
+changes only marker key `3`, keeping the Bright/Tone/Colour fields and all other
+assets exact. Phone testing confirmed this key controls Palette intensity: E
+shows 0 and F shows 50. Neither darkens the tested Portrait-Off photo, but both
+change the original Palette intensity of 100, so neither is a complete fix.
+Fresh imports of the original files still show HDR inside Edit, confirming that
+the SDR editor preview is an output regression rather than an original-file
+limitation. The private V11 G probe adds only an HDR headroom XMP sidecar to F,
+using that photo's own ISO gain-map headroom. Existing item payloads stay exact.
+Phone testing confirmed G restores HDR inside Edit on both samples, but the
+Portrait-Off sample darkens again while keeping Palette 50. It is not a combined
+colour/HDR fix. V12 keeps G's HDR registration exact and compares Palette 0 with
+neutral Tone/Colour at Palette 100. Phone testing found both still darken; the
+Palette-0 variant with original Tone/Colour is darker than the neutral variant.
+V13 reduces only the neutral variant's Palette to 85 or 70, preserving its HDR
+and depth data. The user found K (70) lighter than G and acceptable on this sample.
+Legacy/ISO rendering equivalence and general compatibility remain unverified.
+
+The website now uses K only for explicit Styles reconstruction of an incomplete
+iPhone 16 Pro Bright export with the tested original Tone -0.5 / Colour 0.5 and
+single-channel ISO HDR contract. It keeps Bright, resets Tone/Colour to neutral,
+sets Palette to 70 and adds headroom metadata derived from the photo's own ISO
+parameters. The result explains the changed settings. Complete native Styles,
+other presets/cameras, unsupported ISO versions and the default preserved-copy
+route do not use this adjustment. Portrait editing still requires a confirmed
+sharp base; already baked blur cannot be reversed through metadata.
+The actual browser output for IMG_1163 matches K's measured Styles, thumbnail,
+selection and HDR sidecar, with original RGB/HDR/depth samples exact. A complete
+native Bright input retains its own EXIF and Styles payloads exactly. This is a
+scoped compatibility compromise tested on one edited photo, not recovery of the
+missing native calibration or a universal colour correction.
+
 SkinSmoothFaceRoughness now uses local-detail residual variance: the user found variant D
 smoother than A/B/C/E/F/G on IMG_0783, with Glow/Film working. Eye statistics still use the
 previous face-wide variance; all colour fields remain unchanged. This result is device-tested

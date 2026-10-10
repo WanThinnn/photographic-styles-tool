@@ -6,8 +6,8 @@ import {describeHeic} from '../ui/result-metadata.js';
 import {installSoftSkin} from '../styles/soft-skin-container.js';
 import {registerTmapHdr} from '../styles/hdr-compatibility.js';
 
-function keepEditableHdr(output,source){
-  const fixed=registerTmapHdr(output.data||source);
+function keepEditableHdr(output,source,{headroom=false}={}){
+  const fixed=registerTmapHdr(output.data||source,{headroom});
   if(fixed){output.data=fixed;output.report={...output.report,hdrCompatibility:'registered-existing-tmap'};}
   return output;
 }
@@ -38,7 +38,7 @@ export async function executeJob(job, decode) {
     // Preserve native Portrait resources. An incomplete exported capture may
     // already contain blurred pixels; adding reference rendering metadata
     // exposes controls that apply a second blur and cannot turn the first off.
-    return keepEditableHdr(output,job.data);
+    return keepEditableHdr(output,job.data,{headroom:output.report.styleSelectionCompatibility==='bright-palette70'});
   }
   throw Error('Unknown HEIC operation');
 }

@@ -1,6 +1,9 @@
 export const AI_STRINGS={
   "vi": {
-    "toggle": "Hiệu ứng chiều sâu với AI",
+    "masterToggle": "Cải thiện ảnh thông minh bằng AI",
+    "toggle": "Xoá phông và ánh sáng chân dung",
+    "detailToggle": "Làm nét ảnh",
+    "detailHint": "Tăng độ rõ chi tiết và hạn chế viền sáng. Đang thử nghiệm; chưa áp dụng vào HEIC xuất ra.",
     "settings": "Tuỳ chọn AI",
     "model": "Model",
     "modelHint": "Chỉ tải model được chọn khi xử lý.",
@@ -12,7 +15,7 @@ export const AI_STRINGS={
     "acceleration": "Tăng tốc GPU",
     "accelerationHint": "Bật: GPU · Tắt: CPU. Áp dụng cho ảnh tiếp theo.",
     "inferenceCpu": "Đang tạo độ sâu trên CPU",
-    "hint": "Thêm Portrait để chỉnh ƒ và ánh sáng trong Ảnh. Giữ depth gốc nếu đã có. AI chạy trên thiết bị.",
+    "hint": "Thêm Portrait để chỉnh ƒ và ánh sáng trong Ảnh. Giữ depth gốc nếu đã có.",
     "loading": "Đang chuẩn bị AI",
     "download": "Đang tải AI",
     "modelLoading": "Đang chuẩn bị AI",
@@ -40,7 +43,10 @@ export const AI_STRINGS={
     "previewFailed": "Không hiển thị được preview. Bạn vẫn có thể chỉnh Portrait trong Ảnh."
   },
   "en": {
-    "toggle": "Depth Effect with AI",
+    "masterToggle": "Smart Enhance photo with AI",
+    "toggle": "Depth Effect with Portrait Lighting",
+    "detailToggle": "Sharpen Photo",
+    "detailHint": "Enhances fine details while limiting halos. Experimental; not yet applied to exported HEIC.",
     "settings": "AI settings",
     "model": "Model",
     "modelHint": "Downloads only the selected model when processing.",
@@ -52,7 +58,7 @@ export const AI_STRINGS={
     "acceleration": "GPU acceleration",
     "accelerationHint": "On: GPU · Off: CPU. Applies to the next photo.",
     "inferenceCpu": "Generating depth on CPU",
-    "hint": "Add Portrait to edit aperture and lighting in Photos. Existing depth is preserved. AI runs on your device.",
+    "hint": "Add Portrait to edit aperture and lighting in Photos. Existing depth is preserved.",
     "loading": "Preparing AI",
     "download": "Downloading AI",
     "modelLoading": "Preparing AI",
@@ -80,7 +86,10 @@ export const AI_STRINGS={
     "previewFailed": "Preview unavailable. You can still edit Portrait in Photos."
   },
   "zh": {
+    "masterToggle": "使用 AI 增强照片",
     "toggle": "AI 景深效果",
+    "detailToggle": "照片锐化",
+    "detailHint": "提升细节清晰度并减少光晕。实验功能；暂不应用于导出的 HEIC。",
     "settings": "AI 设置",
     "model": "模型",
     "modelHint": "处理时只下载所选模型。",

@@ -56,10 +56,10 @@
     <button id="ios-format-dismiss" type="button" data-i18n="tip.dismiss">Got it</button>
   </aside>
 
-  <section class="depth-options" aria-labelledby="ai-portrait-label">
+  <section class="depth-options" aria-labelledby="enhance-ai-label">
   <div class="portrait-option">
-    <label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
-    <input type="checkbox" id="ai-portrait" disabled role="switch" aria-describedby="ai-portrait-hint">
+    <label for="enhance-ai" id="enhance-ai-label">Enhance Photo with AI</label>
+    <input type="checkbox" id="enhance-ai" disabled role="switch">
   </div>
   <details id="ai-settings" class="ai-settings">
     <summary>
@@ -82,6 +82,18 @@
       </div>
     </div>
     <div class="portrait-option">
+      <div class="ai-option-copy"><label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
+      <p id="ai-portrait-hint" class="ai-hint"></p></div>
+      <input type="checkbox" id="ai-portrait" role="switch" disabled aria-describedby="ai-portrait-hint">
+    </div>
+    <div class="portrait-option detail-option">
+      <div class="ai-option-copy">
+        <label for="ai-detail" id="ai-detail-label">Sharpen Photo</label>
+        <p id="ai-detail-hint" class="ai-hint">Experimental: preserves the current editable HEIC output until compatibility is validated.</p>
+      </div>
+      <input type="checkbox" id="ai-detail" role="switch" disabled aria-describedby="ai-detail-hint">
+    </div>
+    <div class="portrait-option gpu-option">
       <div class="ai-option-copy">
       <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
       <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
@@ -91,7 +103,7 @@
     </div>
   </details>
   </section>
-  <p class="ai-hint"><span id="ai-portrait-hint" hidden></span> <span data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</span></p>
+  <p class="ai-hint"><span data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</span></p>
   </div>
 
   <div class="history-actions">

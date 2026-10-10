@@ -20,10 +20,11 @@ import {styleCapabilities} from './src/styles/style-capabilities.js';
 import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
 import {depthModel} from './src/portrait/depth-models.js';
 import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
+import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
-const aiPortrait = $("ai-portrait");
+const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), enhanceAi = $("enhance-ai");
 const gpuAcceleration=$('gpu-acceleration');
 const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
 const modelLevels=['lite','standard','pro'];
@@ -48,6 +49,11 @@ const clearHistory = $('clear-history');
 const resultUrls = new Set(), resultCleanups = new Set();
 const aiCandidates = [];
 let browserReady = false, pendingTasks = 0;
+const aiFeatures=createAiFeatureControls({
+  master:enhanceAi,
+  features:{portrait:aiPortrait,detail:aiDetail},
+  isAvailable:()=>browserReady&&!clearingAssets,
+});
 function refreshHistoryButton() {
   clearHistory.hidden = !list.childElementCount;
   clearHistory.disabled = pendingTasks > 0;
@@ -71,20 +77,24 @@ clearHistory.addEventListener('click', () => {
 clearAssets.addEventListener('click',async()=>{
   if(clearAssets.disabled)return;
   clearingAssets=true;assetStatus='cleaning';translateAi();refreshHistoryButton();
-  aiPortrait.disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
+  aiFeatures.sync();
+  modelSelector.disabled=gpuAcceleration.disabled=true;
   fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
   try{
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
     const {releaseOrtModels}=await import('./src/vision/ort-vision.js');await releaseOrtModels();
     await clearDownloadedAssets();assetStatus='cleaned';
   }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
-  finally{clearingAssets=false;aiPortrait.disabled=!browserReady;modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+  finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
 });
 const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
 function translateAi() {
+  $("enhance-ai-label").textContent = aiText().masterToggle;
   $("ai-portrait-label").textContent = aiText().toggle;
   $("ai-portrait-hint").textContent = aiText().hint;
-  $("ai-portrait-hint").hidden = !aiPortrait.checked;
+  $("ai-portrait-hint").hidden = false;
+  $("ai-detail-label").textContent = aiText().detailToggle;
+  $("ai-detail-hint").textContent = aiText().detailHint;
   $('ai-settings').hidden=false;
   $('ai-settings-label').textContent=aiText().settings;
   $('gpu-acceleration-label').textContent=aiText().acceleration;
@@ -100,7 +110,7 @@ function translateAi() {
 aiPortrait.addEventListener('change', () => {
   translateAi();
   for (const candidate of aiCandidates) {
-    if (!aiPortrait.checked) {
+    if (!aiFeatures.enabled('portrait')) {
       candidate.controller?.abort();
       candidate.ui.outputPending(false);
       candidate.ui.output(candidate.outputFile);
@@ -286,7 +296,7 @@ function row(name) {
       el.insertBefore(host,el.querySelector('.act'));
       try{
         this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{
-          this.portraitPending=pending;if(aiPortrait.checked)this.outputPending(pending);refreshHistoryButton();
+          this.portraitPending=pending;if(aiFeatures.enabled('portrait'))this.outputPending(pending);refreshHistoryButton();
         }}));
       }catch(error){host.remove();this.note(aiText().previewFailed,'preview');throw error;}
     },
@@ -389,7 +399,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, pr
   const candidate = {outputFile, sourceFile, ui, name, state: 'new',
     skip: preserveIncomplete ? 'unverified-styles' : source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
-  if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
+  if (aiFeatures.enabled('portrait')&&!candidate.skip) await runAiCandidate(candidate);
   else {
     if(candidate.skip){candidate.state='skipped';ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');}
     ui.output(outputFile);ui.aiBusy(false);
@@ -397,7 +407,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, pr
 }
 
 async function runAiCandidate(candidate) {
-  if (!aiPortrait.checked || !['new', 'failed'].includes(candidate.state)) return;
+  if (!aiFeatures.enabled('portrait') || !['new', 'failed'].includes(candidate.state)) return;
   const {ui, name, sourceFile} = candidate;
   if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
@@ -427,29 +437,29 @@ async function runAiCandidate(candidate) {
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     ui.cleanup(output.dispose);
     controller.signal.throwIfAborted();
-    if(!aiPortrait.checked)throw new DOMException('AI disabled','AbortError');
+    if(!aiFeatures.enabled('portrait'))throw new DOMException('AI disabled','AbortError');
     const date=photoCaptureDate(output.data);
     const publish=(data,metadata=true)=>{
       candidate.aiFile=new File([data],name.replace(/\.[^.]+$/,'')+'_Portrait.HEIC',{
         type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})});
-      if(aiPortrait.checked)ui.output(candidate.aiFile,{metadata});
+      if(aiFeatures.enabled('portrait'))ui.output(candidate.aiFile,{metadata});
     };
     publish(output.data);
     try{await ui.portraitPreview(result,async(settings,isCurrent)=>{const updated=await output.withSettings(settings);if(isCurrent())publish(updated.data,false);});}
     catch(error){console.warn('Portrait preview unavailable; edit focus in Photos',error);}
     candidate.state = 'done';
-    ui.aiView(aiPortrait.checked);
-    if(aiPortrait.checked){ui.aiState('');ui.note(aiText().ready,'ai');}
+    ui.aiView(aiFeatures.enabled('portrait'));
+    if(aiFeatures.enabled('portrait')){ui.aiState('');ui.note(aiText().ready,'ai');}
   } catch(error) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
-    ui.aiState(!aiPortrait.checked?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
-    if(aiPortrait.checked&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
+    ui.aiState(!aiFeatures.enabled('portrait')?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+    if(aiFeatures.enabled('portrait')&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
   } finally {
     clearTimeout(deadline);removeCancel();candidate.controller=null;
     // Publish the normal fallback only after AI failed/cancelled. Never expose
     // it between Styles processing and the requested Portrait result.
-    if(!candidate.aiFile||!aiPortrait.checked)ui.output(candidate.outputFile);
+    if(!candidate.aiFile||!aiFeatures.enabled('portrait'))ui.output(candidate.outputFile);
     ui.aiBusy(false);
   }
 }
@@ -717,7 +727,7 @@ function countVisit() {
     profileIndex = await response.json();
     browserReady = true;refreshHistoryButton();
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
-    aiPortrait.disabled=false;
+    aiFeatures.sync();
     $('boot').textContent = '';
     navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.

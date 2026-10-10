@@ -56,19 +56,25 @@
     <button id="ios-format-dismiss" type="button" data-i18n="tip.dismiss">Got it</button>
   </aside>
 
+  <section class="depth-options" aria-labelledby="ai-portrait-label">
   <div class="portrait-option">
     <label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
     <input type="checkbox" id="ai-portrait" disabled role="switch" aria-describedby="ai-portrait-hint">
   </div>
   <p id="ai-portrait-hint" class="ai-hint" hidden></p>
   <details id="ai-settings" class="ai-settings" hidden>
-    <summary id="ai-settings-label">AI settings</summary>
-    <div class="portrait-option">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h3m4 0h9M4 12h9m4 0h3M4 18h3m4 0h9"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg>
+      <span id="ai-settings-label" class="sr-only">AI settings</span>
+    </summary>
+    <div class="ai-settings-panel"><div class="portrait-option">
       <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
       <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
     </div>
-    <p id="gpu-acceleration-hint" class="ai-hint">Off uses CPU for depth AI. It may be slower and is not necessarily cooler.</p>
+    <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
+    </div>
   </details>
+  </section>
   <p class="ai-hint" data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</p>
   </div>
 

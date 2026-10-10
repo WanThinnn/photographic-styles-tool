@@ -6,6 +6,7 @@ import {MATTE_2026_URIS, URI_PERSON_INSTANCES, URI_TEXTURE_STYLES} from '../rast
 import {parseBplist, buildBplist, BplistReal} from '../core/bplist.js';
 import {applyPersonMetadata, setPersonMasksValid} from '../raster/styles.js';
 import {rebuildHeic} from './graft.js';
+import {preserveNativeStyles} from './style-preservation.js';
 
 const xml = text => new TextEncoder().encode('<x:xmpmeta xmlns:x="adobe:ns:meta/">'
   + '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
@@ -34,6 +35,10 @@ export function hasSoftSkinData(bytes) {
 export function installSoftSkin(bytes, result, {nativeStyles=false, sourceBytes=null}={}) {
   if (hasSoftSkinData(bytes) || result.state!=='generated' || !result.faces) return bytes;
   const d=discoverHeic(bytes), source=sourceBytes?discoverHeic(sourceBytes):null;
+  // An exported iPhone 16+ photo may have lost its Styles auxiliary graph while
+  // its RGB still carries the captured/edited Style. Missing auxiliaries do not
+  // authorize applying our generated person/skin colour statistics to it again.
+  const keepStyleMetadata=nativeStyles||Boolean(source&&preserveNativeStyles(sourceBytes,source));
   const texture=[...d.infos].find(([,i])=>i.uri===URI_TEXTURE_STYLES)?.[0];
   if (texture===undefined) throw Error('Soft Skin requires Texture metadata');
   let meta=bytes.slice(d.meta.off,d.meta.off+d.meta.size);
@@ -94,7 +99,7 @@ export function installSoftSkin(bytes, result, {nativeStyles=false, sourceBytes=
   });
   texturePlist.set('TextureStylePostProcessedPeopleData',people);
   payloads.set(texture,buildBplist(texturePlist));
-  if(!nativeStyles && result.personMetadata && d.stylesItem!==null){
+  if(!keepStyleMetadata && result.personMetadata && d.stylesItem!==null){
     let styles=extractItemData(bytes,d,d.stylesItem);
     [styles]=applyPersonMetadata(styles,result.personMetadata);
     [styles]=setPersonMasksValid(styles);

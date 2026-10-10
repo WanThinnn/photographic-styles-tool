@@ -539,7 +539,7 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
       suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
     }
     if (!preserveIncomplete)
-      data=await addMissingSoftSkin(data,file,ui,{nativeStyles:d.stylesItem!==null,sourceBytes:bytes});
+      data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});
     if(restorePortrait&&!preserveIncomplete){
       const restored=await restoreNativePortraitInWorker(data,{portraitOffConfirmed});
       if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
@@ -571,6 +571,7 @@ async function handleFile(file, {allowStyleRebuild = false, portraitOffConfirmed
       attachMovie(photo);
     }
     await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
+    if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));
     if(portraitState==='existing-renderer'&&preserveIncomplete){
       ui.portraitAdvice(T('warn.portraiton'));
       ui.rebuildStyle(() => queueTask(() => handleFile(file,{allowStyleRebuild:true})));

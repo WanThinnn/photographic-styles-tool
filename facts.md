@@ -2728,3 +2728,32 @@ parameters. The reconstructed 13 Pro file contains rendering parameters and
 Styles, but the updated result still needs physical Photos effect validation.
 Soft Skin is mocked as no-face only in the experimental reconstruction probe.
 Private V7 comparison files are not published or committed.
+
+### 10.56 Device feedback: preserved Bright versus restored editor (shell v93)
+
+The user confirms the 13 Pro Portrait-Off path works again. On the supplied
+16 Pro samples, saving the unchanged/default result keeps Bright in photo info,
+but the imported copy has no Styles/ƒ editor. Explicit Styles reconstruction
+allows Styles, and confirmed Portrait Off also allows ƒ/lighting, but the colour
+still deepens in Edit. This is not evidence that the preserved preset changed
+to Standard, nor evidence that turning Portrait off restores missing Styles data.
+
+The missing-graph reconstruction previously classified these native sources as
+non-native for automatic Soft Skin, allowing generated person/skin statistics
+to rewrite the new Styles plist. Both the caller and the worker installer now
+protect native iPhone 16+ sources independent of whether the source Styles URI
+exists. Texture masks/people may still be supplemented; source selection, RGB,
+HDR and the pre-supplementation Styles plist remain unchanged. A regression
+simulates missing editing resources and a misclassified caller, and verifies
+that older generated Styles still receive their measured statistics.
+
+Actual browser/model processing of IMG_1119/IMG_1120 reported no suitable face
+for either image. Their guarded outputs are byte-identical to the corresponding
+V7 reconstructions. Therefore this guard DOES NOT resolve the observed darkening
+on those examples, and these duplicate files should not be presented as a new
+colour test. The default incomplete result now visibly explains that saving it
+does not restore Styles/ƒ, and that reconstruction can still deepen colour even
+after Portrait Off. Native Styles coefficients in complete Bright captures
+IMG_0932 and IMG_1092 differ in 49,590 of 51,840 bytes; a universal replacement
+cannot be inferred from matching presets. No unrelated native calibration is
+copied, selection values are not neutralized, and no colour fix is claimed.

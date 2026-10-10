@@ -2597,3 +2597,94 @@ editing cannot be preserved. The web still warns when original Styles editing
 data is absent, and asks users to check colours and Portrait editing. All 102
 workflow regression cases complete with 92 passes, 10 optional private-fixture
 skips and no failures; PWA and three-language consistency checks pass. Shell v90.
+
+### 10.53 Native Portrait enable flag is not an editing-completeness test (2026-10-10)
+
+The user reports a new iPhone 16 Pro capture made in Camera's Portrait mode:
+IMG_1079 is the input and IMG_1080 its web output in private iCloud Photos (6).
+The output shows Portrait while viewing but has no aperture control in Edit;
+Bright is retained and the Style colour remains stronger. Both files have
+capture type 11, enable flag 0 and the same 576x768 camera depth. Neither has
+standalone depth RenderingParameters or the renderer MakerNote blob. The output
+has a reconstructed schema-14 Styles graph, while the input lacks that graph.
+Its HDR gain map is recognized by the corrected readers. The user-visible
+capture mode cannot be inferred from this exported enable flag alone.
+
+The prior repair skipped type-11/flag-0 exports as already working. The local
+adapter now accepts both known enable values for types 10/11 when supported
+Styles and a single supported camera depth/sidecar exist. Complete rendering
+graphs, unknown classifications/flags/Styles and unsupported depth streams stay
+unchanged. Existing-Styles and Texture repair jobs use the same native adapter
+as first-use Styles jobs, so re-upload does not skip an incomplete editor graph.
+
+Private NativePortrait_1079_V5/A_1080_NativePortraitRebuilt starts from IMG_1080
+and retains exact Bright selection, Styles, Texture/people, primary/delta/HDR
+payloads and original camera depth. It uses the previously accepted capture
+adapter, without inference or re-encoding. B is IMG_1080 unchanged. The production
+worker's repair-Texture route matches A byte for byte. All 103 workflow cases
+complete with 93 passes, 10 optional fixture skips and no failures; PWA/i18n
+checks pass. This local change is awaiting physical Photos aperture/lighting
+validation and is not yet deployed. Colour correction remains separate.
+
+### 10.54 Preserve native captures; reject double-blur reconstruction (2026-10-10)
+
+The user rejects V5 A as a correct repair: HDR and aperture controls are present,
+but Off still shows the old blur and aperture changes add another blur layer.
+Direct FFmpeg decoding of IMG_1079 shows that blur in the primary image itself.
+Its container has only one RGB image, native depth and the HDR map; every byte of
+mdat is referenced, with no hidden sharp image. Native enable flags cannot prove
+that the source base is sharp. The production worker no longer automatically
+calls the reference-capture adapter. That adapter is diagnostic only and returns
+null unless a caller explicitly confirms an unblurred base.
+
+User policy: native Portrait already on keeps its image, depth, metadata and
+viewing icon without trying to reconstruct aperture controls. Older inputs get
+Styles/Texture; iPhone 16+ gets Texture only. Existing working editing resources
+are retained, including the reported iPhone 13 Pro Max Portrait-off result.
+The newer-iPhone path now also covers exports missing their native Styles graph;
+it never recreates colour coefficients or modifies an existing Styles plist.
+Legacy tone-curve repair is disabled on this path. Complete native selection,
+HDR, depth and photographic payloads are byte-preserved, not normalized to a
+camera preset or software version.
+
+Private native-policy audits and browser processing of IMG_1092 verify all
+original external payloads, Styles, Exif, primary tiles and HDR are unchanged.
+IMG_1094 is already the processed/Photos-exported edited result, not the edited
+input before processing; retaining it does not undo colour baked in earlier.
+The source IMG_6246 and reported result IMG_1099 retain camera depth and a real
+HDR gain map. Missing Styles auxiliary data in a later Photos export must not be
+confused with whether the asset in the user's library offers editing controls.
+
+IMG_1472.JPEG and IMG_6565.HEIC (iPhone X) have source HDR headroom metadata but no
+HDR gain map. IMG_6565 has one 8-bit Display P3 RGB grid plus Exif. The reported
+IMG_1086 still has no gain map; it retains headroom 63809/37837 but has acquired
+a neutral HDRGain tag absent in the source. AI assembly now retains absence as
+well as valid values of source headroom/HDRGain rather than inventing a newer
+gain-map contract. This is a metadata correction, not a verified recovery of
+legacy Photos HDR display. No fake gain map is generated. Private V6 browser
+variants isolate Styles alone and Styles plus Portrait for physical testing.
+
+Google Photos IMG_0840 is an already blurred RGB image with HDR, without depth
+in the exported file. IMG_1087 also has a rendered blur in its RGB base and a
+1024-square relative disparity map, but no standalone Styles editing graph in
+that supplied export. These are visual references, not a matched comparison of
+two unblurred inputs and two editable depth maps. The existing map identifies
+the person; shoulder/collar depth transitions still need improvement.
+
+RGB guided refinement is added after inference releases GPU resources. Its
+coefficient grid is bounded to 256 pixels per edge, evaluated against full RGB,
+limited to transition regions, the local depth envelope and a maximum 24/255
+correction. Constant surfaces remain constant despite RGB texture. A synthetic
+ramp/known colour boundary test shows lower boundary leakage; refinement of the
+supplied 1024 map takes about 184 ms on the desktop, with mean absolute change
+0.972/255. These are not Safari timings or proof of Google Photos parity. No
+new model, CPU depth fallback or higher Safari inference budget is introduced.
+
+All 106 selected workflow cases complete: 96 passes, 10 optional private-fixture
+skips, no failures. PWA and 121-string three-language consistency checks pass.
+The real browser route also completes GPU depth inference and HEIC assembly on
+IMG_6565 (about 22.1 seconds total on this desktop); original primary compressed
+tiles are unchanged. The native IMG_1092 route completes without replacing its
+camera depth, with exact source Styles and Exif preserved. Soft Skin was mocked
+as no-face in this isolated browser probe. No Safari or Photos rendering claim
+is inferred from these desktop results. Shell v91.

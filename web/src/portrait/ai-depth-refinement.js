@@ -32,5 +32,68 @@ export function refineDepth(values,mw,mh,rgb,width,height){
       out[y*width+x]=Math.round(Math.max(0,Math.min(255,(sum/weight-min)*scale)));
     }
   }
+  return refineDepthEdges(out,rgb,width,height);
+}
+
+// Fast RGB guided filtering. Fit on a bounded grid, then evaluate against the
+// full-resolution colour image. Unlike blur/sharpen on depth alone, this can
+// align a gradual model boundary with a real colour edge. It cannot recover a
+// missed subject or replace semantic segmentation. Called after releasing GPU
+// tensors; scratch storage stays bounded even for large source photographs.
+export function refineDepthEdges(gray,rgb,width,height){
+  if(![width,height].every(n=>Number.isInteger(n)&&n>0)||gray.length!==width*height||rgb.length!==width*height*3)throw Error('Invalid depth edge geometry');
+  const scale=Math.min(1,256/Math.max(width,height)),w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale)),n=w*h;
+  const channels=Array.from({length:4},()=>new Float32Array(n));
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const sx=Math.min(width-1,Math.floor((x+.5)*width/w)),sy=Math.min(height-1,Math.floor((y+.5)*height/h)),p=sy*width+sx,i=y*w+x;
+    for(let c=0;c<3;c++)channels[c][i]=rgb[p*3+c]/255;
+    channels[3][i]=gray[p]/255;
+  }
+  const stride=w+1,integral=new Float64Array(stride*(h+1)),radius=4;
+  const mean=field=>{
+    integral.fill(0);const out=new Float32Array(n);
+    for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=field[y*w+x];integral[(y+1)*stride+x+1]=integral[y*stride+x+1]+row;}}
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const l=Math.max(0,x-radius),r=Math.min(w,x+radius+1),t=Math.max(0,y-radius),b=Math.min(h,y+radius+1);
+      out[y*w+x]=(integral[b*stride+r]-integral[t*stride+r]-integral[b*stride+l]+integral[t*stride+l])/((r-l)*(b-t));
+    }return out;
+  };
+  const averages=channels.map(mean),product=new Float32Array(n);
+  const covariance=(a,b)=>{for(let i=0;i<n;i++)product[i]=channels[a][i]*channels[b][i];const v=mean(product);for(let i=0;i<n;i++)v[i]-=averages[a][i]*averages[b][i];return v;};
+  const rr=covariance(0,0),rg=covariance(0,1),rb=covariance(0,2),gg=covariance(1,1),gb=covariance(1,2),bb=covariance(2,2);
+  const rp=covariance(0,3),gp=covariance(1,3),bp=covariance(2,3),coefficients=Array.from({length:4},()=>new Float32Array(n));
+  for(let i=0;i<n;i++){
+    const a=rr[i]+.0025,b=rg[i],c=rb[i],d=gg[i]+.0025,e=gb[i],f=bb[i]+.0025;
+    const xx=d*f-e*e,xy=c*e-b*f,xz=b*e-c*d,yy=a*f-c*c,yz=b*c-a*e,zz=a*d-b*b,det=a*xx+b*xy+c*xz;
+    coefficients[0][i]=(xx*rp[i]+xy*gp[i]+xz*bp[i])/det;
+    coefficients[1][i]=(xy*rp[i]+yy*gp[i]+yz*bp[i])/det;
+    coefficients[2][i]=(xz*rp[i]+yz*gp[i]+zz*bp[i])/det;
+    coefficients[3][i]=averages[3][i]-coefficients[0][i]*averages[0][i]-coefficients[1][i]*averages[1][i]-coefficients[2][i]*averages[2][i];
+  }
+  const smooth=coefficients.map(mean),out=new Uint8Array(gray.length),minimum=new Float32Array(n),maximum=new Float32Array(n);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let lo=1,hi=0;
+    for(let ay=Math.max(0,y-radius);ay<=Math.min(h-1,y+radius);ay++)for(let ax=Math.max(0,x-radius);ax<=Math.min(w-1,x+radius);ax++){
+      const value=channels[3][ay*w+ax];lo=Math.min(lo,value);hi=Math.max(hi,value);
+    }
+    minimum[y*w+x]=lo*255;maximum[y*w+x]=hi*255;
+  }
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    const sx=(x+.5)*w/width-.5,sy=(y+.5)*h/height-.5,ix=Math.floor(sx),iy=Math.floor(sy),p=y*width+x;
+    let fitted=0,lo=255,hi=0;
+    for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+      const ax=Math.max(0,Math.min(w-1,ix+dx)),ay=Math.max(0,Math.min(h-1,iy+dy)),i=ay*w+ax;
+      const weight=(dx?sx-ix:1-sx+ix)*(dy?sy-iy:1-sy+iy);
+      fitted+=weight*(smooth[3][i]+smooth[0][i]*rgb[p*3]/255+smooth[1][i]*rgb[p*3+1]/255+smooth[2][i]*rgb[p*3+2]/255);
+      // Restrict correction to the local depth envelope. A constant-depth
+      // surface stays constant even when its texture has strong RGB contrast.
+      lo=Math.min(lo,minimum[i]);hi=Math.max(hi,maximum[i]);
+    }
+    lo=Math.min(lo,gray[p]);hi=Math.max(hi,gray[p]);
+    // Refine transitions only; keep shallow gradients inside a surface and
+    // cap correction to avoid RGB texture punching deep holes in the subject.
+    const corrected=hi-lo<32?gray[p]:.8*fitted*255+.2*gray[p];
+    out[p]=Math.round(Math.max(lo,gray[p]-24,Math.min(hi,gray[p]+24,corrected)));
+  }
   return out;
 }

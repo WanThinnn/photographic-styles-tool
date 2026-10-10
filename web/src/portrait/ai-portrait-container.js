@@ -4,6 +4,25 @@ import {discoverHeic, auxUriForItem, DEPTH_URI, extractItem, addItems, parseIloc
   appendIpcoProperty,idatItemBytes} from '../core/heif.js';
 import {appleDepthAuxc,appleDepthXmp} from './apple-depth-metadata.js';
 import {styleCapabilities} from '../styles/style-capabilities.js';
+import {extractAppleMakerNoteTag,getMakerNoteBlob} from '../core/exif.js';
+
+// This detects missing edit resources, not whether pixels contain digital blur.
+// Capture/enable flags alone cannot prove that a base image is unblurred.
+export function nativePortraitSourceRisk(data,d=discoverHeic(data)){
+  const depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
+  if(depths.length!==1||d.exifItem===null)return null;
+  let classification;
+  try{
+    const exif=extractItem(data,d.iloc,d.exifItem),tag=extractAppleMakerNoteTag(exif,0x14);
+    if(![4,9].includes(tag.type)||tag.payload.length!==4)return null;
+    const little=String.fromCharCode(...getMakerNoteBlob(exif).slice(12,14))==='II';
+    classification=new DataView(tag.payload.buffer,tag.payload.byteOffset,4).getUint32(0,little);
+  }catch{return null;}
+  if(![10,11].includes(classification))return null;
+  const sidecars=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(depths[0])&&d.infos.get(r.from)?.type==='mime');
+  if(sidecars.some(r=>new TextDecoder().decode(extractItem(data,d.iloc,r.from)).includes('depthBlurEffect:RenderingParameters')))return null;
+  return 'missing-native-rendering';
+}
 
 export function portraitEligibility(data) {
   const d = discoverHeic(data);

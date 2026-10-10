@@ -529,6 +529,34 @@ Photos editor without changing the image, gain-map tiles, tone-map parameters or
 Style. Private phone tests confirm HDR and aperture/lighting editing for the tested
 native Portrait export; stronger Style colours on reconstructed exports remain unresolved.
 
+Native iPhone 16+ HEIC inputs use Texture-only processing, including edited exports
+that omit their original Styles auxiliary graph. Their existing Styles bytes,
+selection, primary images, depth and HDR resources are preserved; missing Styles
+are not recreated with reference-camera coefficients. Legacy tone-curve repair
+is disabled for this route. Texture controls still depend on the editing data
+that the source file actually contains.
+
+Existing native Portrait is preserved without automatic capture reconstruction.
+A Portrait export may already have blur baked into its primary pixels, and adding
+a reference renderer cannot make Off return a sharp image. Existing functional
+aperture/lighting resources remain unchanged, including the tested iPhone 13 case.
+The native reconstruction adapter is diagnostic only and requires an explicit
+verified unblurred base; capture flags alone cannot establish that condition.
+
+AI depth now includes bounded RGB guided edge refinement after GPU resources are
+released. Coefficients are computed on a grid no larger than 256 pixels per edge,
+evaluated against the full guidance image, and limited to a local depth envelope
+and 24 levels of correction. This reduces leakage at tested synthetic boundaries
+without creating depth on constant surfaces. It is not a new segmentation model
+or a claim of Google Photos parity. Safari inference remains 630 with a 518 GPU
+retry. Real Photos bokeh still requires device testing.
+
+AI assembly preserves both values and absence of source HDR headroom/gain tags.
+An older image with headroom alone does not receive an invented neutral HDRGain.
+The supplied iPhone X JPEG and HEIC contain headroom metadata but no gain map or
+HDR transfer function; preserving that metadata is verified, while reproducing
+their original Photos display brightness is still under investigation.
+
 **Experimental support for SDR and resized HEIC photos** is selected automatically
 when the file needs it; there is no checkbox to enable. Native style photos retain
 their original route. This mode adds Styles metadata to the original photo graph, with an estimated

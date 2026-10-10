@@ -8,7 +8,7 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/ui/i18n.
 import { photoContentIdentifier, moviePairingMetadata, createLivePhotoExport } from "./src/media/live-photo.js";
 import { RASTER_MIMES } from "./src/media/image-format.js";
 import { photoCaptureDate } from "./src/media/photo-date.js";
-import { styleReconstructionRisk } from "./src/styles/style-preservation.js";
+import { preserveNativeStyles, styleReconstructionRisk } from "./src/styles/style-preservation.js";
 import { AI_STRINGS } from "./src/ui/ai-strings.js";
 import {prepareBrowser} from './src/ui/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
@@ -400,8 +400,8 @@ async function runAiCandidate(candidate) {
   }
 }
 
-async function handleFile(file, {allowStyleRebuild = false, existingUi = null} = {}) {
-  const ui = existingUi || row(file.name);
+async function handleFile(file) {
+  const ui = row(file.name);
   const inputSize = file.size;
   try {
     ui.set(T("st.reading"));
@@ -460,32 +460,26 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
 
     const d = input.discovery;
-    if (!hasTexture(d.infos) && styleReconstructionRisk(bytes, d)) {
-      if (!allowStyleRebuild) {
-        ui.set(T("err.stylesmissing"), "info");
-        ui.rebuildStyle(() => {
-          queueTask(() => handleFile(file, {allowStyleRebuild: true, existingUi: ui}));
-        });
-        return;
-      }
-      ui.note(T("warn.stylerebuild"), 'style-rebuild');
-    }
+    const textureOnly = preserveNativeStyles(bytes,d);
+    const {nativePortraitSourceRisk}=await import('./src/portrait/ai-portrait-container.js');
+    if(nativePortraitSourceRisk(bytes,d))ui.note(T('warn.portraitsource'),'native-portrait-source');
+    if (styleReconstructionRisk(bytes,d)) ui.note(T('warn.textureonly'),'style-rebuild');
     const liveIdentifier = photoContentIdentifier(bytes);
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
     let data, bits, suffix;
-    if (d.stylesItem !== null) {
+    if (textureOnly || d.stylesItem !== null) {
       // A native iPhone 16/17 style photo is never re-ported (that would replace its real
       // style data); it only gets the iOS 27 Texture/Grain set added.
       ui.set(T("st.working"));
       if (hasTexture(d.infos)) {
-        ({data} = await repairTextureInWorker(bytes));
+        ({data} = await repairTextureInWorker(bytes,{preserveStyles:textureOnly}));
         // A complete Styles file can still be used as input for opt-in Portrait.
         bits = data ? [T('st.native'), T('st.texturerepaired')] : [T('st.native'),T('st.texture')];
         suffix = data ? '_TextureFixed.HEIC' : '_SoftSkin.HEIC';
         data ||= bytes;
       } else {
-        ({ data } = await addTextureInWorker(bytes));
+        ({ data } = await addTextureInWorker(bytes,{preserveStyles:textureOnly,allowMissingStyles:textureOnly}));
         bits = [T("st.native"), T("st.texture")];
         suffix = "_TextureGrain.HEIC";
       }
@@ -530,7 +524,7 @@ async function handleFile(file, {allowStyleRebuild = false, existingUi = null} =
       if (needsExperimental) bits.push(T("st.experimental"));
       suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
     }
-    data=await addMissingSoftSkin(data,file,ui,{nativeStyles:d.stylesItem!==null,sourceBytes:bytes});
+    data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});
     ui.readyNotice=`${T("st.ready")} — ${bits.join(sep)}`;
 
     const outName = file.name.replace(/\.[^.]+$/, "") + suffix;

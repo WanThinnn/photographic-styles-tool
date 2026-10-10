@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {refineDepth} from '../../web/src/portrait/ai-depth-refinement.js';
+import {refineDepth,refineDepthEdges} from '../../web/src/portrait/ai-depth-refinement.js';
 import {portraitAssembler} from '../../web/src/portrait/ai-portrait-assembler.js';
 import {inferDepth} from '../../web/src/portrait/ai-inference.js';
 
@@ -17,6 +17,21 @@ test('RGB-guided depth keeps a true silhouette sharp while preserving near/far d
   for(let y=0;y<h;y++)for(let x=0;x<12;x++)assert.equal(textured[y*w+x],0);
   assert.throws(()=>refineDepth(Float32Array.of(1,NaN),2,1,new Uint8Array(6),2,1),/Invalid AI/);
   assert.throws(()=>refineDepth(Float32Array.of(1,1),2,1,new Uint8Array(6),2,1),/flat/);
+});
+
+test('RGB edge refinement reduces depth bleeding without fabricating texture geometry',()=>{
+  const w=128,h=32,rgb=new Uint8Array(w*h*3),ramp=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    rgb.set(x<64?[18,35,190]:[200,40,20],(y*w+x)*3);
+    ramp[y*w+x]=Math.round(255*Math.max(0,Math.min(1,(x-57)/14)));
+  }
+  const refined=refineDepthEdges(ramp,rgb,w,h);
+  const error=map=>{let total=0;for(let y=0;y<h;y++)for(let x=61;x<=66;x++)total+=Math.abs(map[y*w+x]-(x<64?0:255));return total;};
+  assert.ok(error(refined)<error(ramp)*.85,`colour-guided boundary error ${error(refined)} vs ${error(ramp)}`);
+  for(let i=0;i<ramp.length;i++)assert.ok(Math.abs(refined[i]-ramp[i])<=24,'RGB textures cannot create a deep hole');
+  const constant=new Uint8Array(w*h).fill(132);
+  assert.deepEqual(refineDepthEdges(constant,rgb,w,h),constant,'a colour edge alone is not a depth boundary');
+  assert.deepEqual(ramp.slice(0,45),refined.slice(0,45),'distant flat background remains intact');
 });
 
 test('assembly worker abort/disposal rejects outstanding settings and releases buffers',async()=>{

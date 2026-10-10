@@ -21,7 +21,14 @@ async function loadTemplate(){
 function makerBlob(template,sourceMarker,sourceExif){
   const little=template.makerLittle,write=(n,size)=>little?be(n,size).reverse():be(n,size);
   // Live Photo identity belongs to the source, never the Portrait template.
-  const tags=template.maker.filter(tag=>tag.id!==0x11);
+  const hdrTags=new Map();
+  for(const id of [0x21,0x30])try{
+    const own=extractAppleMakerNoteTag(sourceExif,id);
+    if([5,10].includes(own.type)&&own.payload.length===8)hdrTags.set(id,own);
+  }catch{}
+  // Presence matters: older exports can have headroom without HDRGain. Do not
+  // turn that into the newer gain-map contract by inventing a neutral tag.
+  const tags=template.maker.filter(tag=>tag.id!==0x11&&(![0x21,0x30].includes(tag.id)||hdrTags.has(tag.id)));
   let identity;
   try{identity=extractAppleMakerNoteTag(sourceExif,0x11);}catch{}
   if(identity){
@@ -39,13 +46,10 @@ function makerBlob(template,sourceMarker,sourceExif){
     }
     // Source HDR headroom is independent of the capture template.
     if([0x21,0x30].includes(tag.id)){
-      try{
-        const own=extractAppleMakerNoteTag(sourceExif,tag.id),mn=getMakerNoteBlob(sourceExif);
-        if(![5,10].includes(own.type)||own.payload.length!==8)throw Error('Invalid HDR rational');
-        payload=own.payload.slice();type=own.type;count=1;
-        if((String.fromCharCode(mn[12],mn[13])==='II')!==little)
-          payload=concat([payload.slice(0,4).reverse(),payload.slice(4,8).reverse()]);
-      }catch{payload=concat([write(1,4),write(1,4)]);count=1;}
+      const own=hdrTags.get(tag.id),mn=getMakerNoteBlob(sourceExif);
+      payload=own.payload.slice();type=own.type;count=1;
+      if((String.fromCharCode(mn[12],mn[13])==='II')!==little)
+        payload=concat([payload.slice(0,4).reverse(),payload.slice(4,8).reverse()]);
     }
     if(tag.id===0x1f){payload=write(1,4);count=1;} // User explicitly enabled AI Portrait.
     entries.push(concat([write(tag.id,2),write(type,2),write(count,4),
@@ -217,8 +221,10 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   if(!bytesEqual(extractItemData(data,after,reference.stylesItem),extractItemData(source,d,d.stylesItem)))throw Error('Completed Styles changed');
   return {data,report:{mode:'editable-ai-portrait',relative:true,bakedBlur:false,referenceCalibration:true}};
 }
-/** Native Portrait V2 A: reuse the camera's exact encoded depth, without AI. */
-export async function restoreNativePortrait(source,template){
+/** Diagnostic adapter only: a verified unblurred base is required. Metadata
+ * cannot undo Portrait blur already present in the source image pixels. */
+export async function restoreNativePortrait(source,template,{unblurredBase=false}={}){
+  if(unblurredBase!==true)return null;
   const d=discoverHeic(source),depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
   if(depths.length!==1)return null;
   const ownExif=extractItemData(source,d,d.exifItem);
@@ -229,9 +235,10 @@ export async function restoreNativePortrait(source,template){
       return new DataView(tag.payload.buffer,tag.payload.byteOffset,4).getUint32(0,little);};
     capture=read(0x14);enabled=read(0x1f);
   }catch{return null;}
-  // Leave the already working next-generation Portrait-off route and complete
-  // capture graphs alone. Only the tested legacy/on capture contracts use V2 A.
-  if(capture!==10&&!(capture===11&&enabled===1))return null;
+  // An exported Portrait-mode photo can carry enabled=0 while lacking the
+  // standalone editor resources (IMG_1079/1080). The enable flag does not prove
+  // that its existing capture graph is editable. Keep complete/unknown graphs.
+  if(![10,11].includes(capture)||![0,1].includes(enabled)||!styleCapabilities(source).editable)return null;
   const id=depths[0],sidecars=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(id)&&d.infos.get(r.from)?.type==='mime');
   if(sidecars.length!==1||sidecars[0].to.length!==1)return null;
   const side=sidecars[0].from,xmp=new TextDecoder().decode(extractItemData(source,d,side));

@@ -73,8 +73,7 @@ function withStyles(source,blob){
   return rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.stylesItem,blob]]));
 }
 
-test('legacy native Portrait rebuild keeps encoded depth and imagery; leaves working off captures alone',async()=>{
-  function capture(source,classification,enabled){
+function capture(source,classification,enabled){
     const d=discoverHeic(source),ft=topBox(source,'ftyp');let exif=extractItemData(source,d,d.exifItem);
     const little=String.fromCharCode(...getMakerNoteBlob(exif).slice(12,14))==='II';
     for(const [id,value]of [[0x14,classification],[0x1f,enabled]]){
@@ -85,10 +84,12 @@ test('legacy native Portrait rebuild keeps encoded depth and imagery; leaves wor
         if(view.getUint16(at,little)===id)view.setUint32(at+4,1,little);}
     }
     return rebuildHeic(source,d,source.slice(0,ft.size),source.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.exifItem,exif]]));
-  }
-  for(const [classification,enabled]of [[10,0],[11,1]]){
+}
+test('diagnostic native rebuild requires explicit verified unblurred pixels regardless of flags',async()=>{
+  for(const [classification,enabled]of [[10,0],[11,1],[11,0]]){
     const source=capture(attachAiDepth(photo(900,600),depth),classification,enabled),before=discoverHeic(source),saved=source.slice();
-    const output=await restoreNativePortrait(source,template);assert.ok(output);assert.deepEqual(source,saved);
+    assert.equal(await restoreNativePortrait(source,template),null,'capture flags cannot prove a sharp base');
+    const output=await restoreNativePortrait(source,template,{unblurredBase:true});assert.ok(output);assert.deepEqual(source,saved);
     const after=discoverHeic(output.data),id=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
     assert.equal(output.report.modelInference,false);assert.equal(output.report.mode,'restored-native-portrait');
     assert.deepEqual(extractItemData(output.data,after,id),depth.payload);
@@ -97,9 +98,47 @@ test('legacy native Portrait rebuild keeps encoded depth and imagery; leaves wor
     before.primaryTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(output.data,after,after.primaryTiles[i])));
     assert.equal(await restoreNativePortrait(output.data,template),null,'accepted capture is not rebuilt twice');
   }
-  assert.equal(await restoreNativePortrait(capture(attachAiDepth(photo(900,600),depth),11,0),template),null);
+  assert.equal(await restoreNativePortrait(capture(attachAiDepth(photo(900,600),depth),11,99),template),null);
   assert.equal(await restoreNativePortrait(capture(attachAiDepth(photo(900,600),depth),99,1),template),null);
   assert.equal(await restoreNativePortrait(photo(900,600),template),null);
+});
+
+test('Texture routes preserve incomplete native Portrait without adding a second blur renderer',async()=>{
+  const source=capture(attachAiDepth(photo(900,600),depth),11,0),before=discoverHeic(source);
+  const saved=source.slice(),originalFetch=globalThis.fetch;
+  globalThis.fetch=async url=>{
+    throw Error(`Native Portrait must not fetch a capture template: ${url}`);
+  };
+  try{
+    for(const operation of ['texture','repair-texture']){
+      const texture=[...before.infos].find(([,info])=>info.uri==='tag:apple.com,2026:photo:metadata:texture_styles')[0];
+      const input=operation==='texture'?withoutThumbnail(source,[texture]):source;
+      const output=await executeJob({operation,data:input,opts:{preserveStyles:true}}),data=output.data||input,after=discoverHeic(data);
+      assert.equal(output.report?.nativePortrait,undefined);
+      assert.deepEqual(selectedStyle(data),selectedStyle(source));
+      assert.deepEqual(extractItemData(data,after,after.exifItem),extractItemData(source,before,before.exifItem));
+      assert.deepEqual(extractItemData(data,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+      before.primaryTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(data,after,after.primaryTiles[i])));
+      before.hdrTiles.forEach((id,i)=>assert.deepEqual(extractItemData(source,before,id),extractItemData(data,after,after.hdrTiles[i])));
+      const id=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+      assert.deepEqual(extractItemData(data,after,id),depth.payload);
+      assert.equal(await restoreNativePortrait(data,template),null,'native capture must stay unchanged');
+      assert.deepEqual(source,saved);
+    }
+    const unknown=withStyles(source,buildBplist(new Map([['0',999]])));
+    assert.equal(await restoreNativePortrait(unknown,template),null,'unknown Styles keep their additive route');
+  }finally{globalThis.fetch=originalFetch;}
+});
+
+test('Texture-only mode does not reconstruct missing native Styles or change capture resources',async()=>{
+  const base=capture(attachAiDepth(photo(900,600),depth),11,1),graph=discoverHeic(base);
+  const texture=[...graph.infos].find(([,info])=>info.uri==='tag:apple.com,2026:photo:metadata:texture_styles')[0];
+  const source=withoutThumbnail(base,[texture,graph.stylesItem,graph.deltaGrid,graph.linearThumb]),a=discoverHeic(source);
+  const out=await executeJob({operation:'texture',data:source,opts:{preserveStyles:true,allowMissingStyles:true}}),b=discoverHeic(out.data);
+  assert.equal(b.stylesItem,null);assert.ok(hasTexture(b.infos));
+  assert.equal(out.report.toneCurveAdded,false);
+  for(const [id]of a.iloc.items)assert.deepEqual(extractItemData(out.data,b,id),extractItemData(source,a,id));
+  for(const ref of a.refs)assert.ok(b.refs.some(r=>JSON.stringify(r)===JSON.stringify(ref)));
 });
 
 test('adding a missing Styles graph preserves an original six-key Bright selection instead of Standard',async()=>{
@@ -305,6 +344,19 @@ test('one-step generated Styles plus Portrait matches the successful re-upload r
   assert.deepEqual(direct,reuploaded);
   const after=discoverHeic(direct);
   assert.deepEqual(extractItemData(direct,after,after.stylesItem),extractItemData(source,d,d.stylesItem));
+});
+
+test('AI Portrait preserves original HDR tag presence instead of inventing a newer HDRGain',()=>{
+  const base=photo(900,600),d=discoverHeic(base),ft=topBox(base,'ftyp');
+  let exif=injectAppleMakerNoteTag(extractItemData(base,d,d.exifItem),concat([be(63809,4),be(37837,4)]),0x21,10);
+  const mn=getMakerNoteBlob(exif),little=mn[12]===73,v=new DataView(mn.buffer,mn.byteOffset,mn.byteLength);
+  for(let i=0;i<v.getUint16(14,little);i++){const p=16+12*i;if(v.getUint16(p,little)===0x21)v.setUint32(p+4,1,little);}
+  const source=rebuildHeic(base,d,base.slice(0,ft.size),base.slice(d.meta.off,d.meta.off+d.meta.size),new Map([[d.exifItem,exif]]));
+  const out=buildAiPortrait(source,depth,template).data,a=discoverHeic(out),outExif=extractItemData(out,a,a.exifItem);
+  assert.deepEqual(extractAppleMakerNoteTag(outExif,0x21).payload,extractAppleMakerNoteTag(exif,0x21).payload);
+  assert.throws(()=>extractAppleMakerNoteTag(outExif,0x30),/not found/,'absent HDRGain must stay absent');
+  const plain=buildAiPortrait(base,depth,template).data,b=discoverHeic(plain);
+  for(const id of [0x21,0x30])assert.throws(()=>extractAppleMakerNoteTag(extractItemData(plain,b,b.exifItem),id),/not found/);
 });
 
 test('exported depth uses the same ordered rotation/mirror transform as the primary',()=>{

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {be, concat} from '../../web/src/core/box.js';
 import {exifCameraModel} from '../../web/src/core/exif.js';
-import {styleReconstructionRisk} from '../../web/src/styles/style-preservation.js';
+import {styleReconstructionRisk,preserveNativeStyles} from '../../web/src/styles/style-preservation.js';
 import {discoverHeic, extractItem, idatItemBytes, propertyBoxBytes} from '../../web/src/core/heif.js';
 import {addTexture} from '../../web/src/styles/texture.js';
 
@@ -32,18 +32,21 @@ test('camera model reader handles both TIFF byte orders and malformed metadata',
   assert.equal(exifCameraModel(broken), null);
 });
 
-test('missing newer-iPhone Styles requires a reconstruction decision; native and older photos keep their routes', () => {
-  for (const model of ['iPhone 16 Pro', 'iPhone 17', 'iPhone 17 Pro Max']) {
+test('iPhone 16+ preserves native Styles even when exports omit editing resources', () => {
+  for (const model of ['iPhone 16 Pro', 'iPhone 17', 'iPhone 17 Pro Max', 'iPhone 18 Pro']) {
     const data = modelExif(model);
     assert.deepEqual(styleReconstructionRisk(data, discovery(data)), {
       cameraModel: model, nativeStylesMissing: true, hdrGainMapMissing: true,
     });
     assert.equal(styleReconstructionRisk(data, discovery(data, 2, 3)), null);
     assert.equal(styleReconstructionRisk(data, discovery(data, null, 3)).hdrGainMapMissing, false);
+    assert.equal(preserveNativeStyles(data,discovery(data)),true);
+    assert.equal(preserveNativeStyles(data,discovery(data,2,3)),true);
   }
-  for (const model of ['iPhone 15 Pro', 'iPhone 13', 'iPhone Air', 'iPhone 18 Pro', 'Android', 'iPhone 1600notamodel', '']) {
+  for (const model of ['iPhone 15 Pro', 'iPhone 13', 'iPhone Air', 'Android', 'iPhone 1600notamodel', '']) {
     const data = modelExif(model);
     assert.equal(styleReconstructionRisk(data, discovery(data)), null);
+    assert.equal(preserveNativeStyles(data,discovery(data)),false);
   }
 });
 

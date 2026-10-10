@@ -376,9 +376,9 @@ export function addTextureItems(meta, primary, people = null, grainSeed = null) 
  * receive only a neutral curve. Meta grows and every extent offset moves with it,
  * and the new payloads go into one mdat appended at the end.
  */
-export function addTexture(data) {
+export function addTexture(data, {preserveStyles = false, allowMissingStyles = false} = {}) {
   const d = discoverHeic(data);
-  if (d.stylesItem === null) throw new Error("no native Photographic Style");
+  if (d.stylesItem === null && !allowMissingStyles) throw new Error("no native Photographic Style");
   if (hasTexture(d.infos)) throw new Error("already has texture_styles");
   const iloc = d.iloc;
   if (iloc.version !== 1 || iloc.offsetSize !== 4 || iloc.lengthSize !== 4
@@ -395,7 +395,8 @@ export function addTexture(data) {
 
   const [newMeta, newPayloads, summary] = addTextureItems(data.slice(mo, mo + ms), d.primary,
     softSkinPeople(data, d), filmGrainSeed(data, d));
-  const toneCurve = ensureLegacyTextureToneCurve(extractItem(data, iloc, d.stylesItem));
+  const toneCurve = preserveStyles || d.stylesItem === null ? {added:false}
+    : ensureLegacyTextureToneCurve(extractItem(data, iloc, d.stylesItem));
   if (toneCurve.added) newPayloads.set(d.stylesItem, toneCurve.data);
   const delta = newMeta.length - ms;
   const metaOut = newMeta.slice();
@@ -434,7 +435,8 @@ export function addTexture(data) {
 }
 
 /** Repair a previously exported legacy file without adding duplicate Texture/mattes. */
-export function repairTextureCurve(data) {
+export function repairTextureCurve(data, {preserveStyles = false} = {}) {
+  if (preserveStyles) return {data:null};
   const d = discoverHeic(data);
   if (d.stylesItem === null || !hasTexture(d.infos)) return {data:null};
   const curve = ensureLegacyTextureToneCurve(extractItem(data,d.iloc,d.stylesItem));

@@ -34,8 +34,8 @@ function run(job, decode) {
   });
 }
 export const readImageFile = file => run({operation: 'read', file});
-export const addTextureInWorker = data => run({operation: 'texture', data});
-export const repairTextureInWorker = data => run({operation:'repair-texture',data});
+export const addTextureInWorker = (data, opts) => run({operation: 'texture', data, opts});
+export const repairTextureInWorker = (data, opts) => run({operation:'repair-texture',data,opts});
 export const describeInWorker = data => run({operation: 'metadata', data});
 export const installSoftSkinInWorker = (data,people,opts) => run({operation:'soft-skin',data,people,opts});
 export function patchInWorker(data, profile, opts = {}) {

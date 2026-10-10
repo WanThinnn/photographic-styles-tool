@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v100`;
+const CACHE_NAME = `${CACHE_PREFIX}v120`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -16,6 +16,13 @@ const APP_SHELL = [
   "./src/ui/page-bootstrap.js",
   "./src/ui/processing-scheduler.js",
   "./src/ui/ai-strings.js",
+  "./src/ui/ai-feature-controls.js",
+  "./src/detail/detail-processing.js",
+  "./src/detail/detail-models.js",
+  "./src/detail/detail-inference.js",
+  "./src/detail/detail-worker.js",
+  "./src/detail/detail-raster.js",
+  "./src/detail/detail-native-heic.js",
   "./src/portrait/ai-portrait.js",
   "./src/portrait/ai-inference.js",
   "./src/portrait/ai-inference-worker.js",
@@ -48,8 +55,14 @@ const APP_SHELL = [
   "./manifest.webmanifest",
   "./icons/photographic-styles.svg",
   "./icons/icon-180.png",
+  "./icons/apple-touch-icon.png",
+  "./icons/apple-touch-icon-v2.png",
   "./icons/icon-192.png",
+  "./icons/icon-192-v2.png",
   "./icons/icon-512.png",
+  "./icons/icon-512-v2.png",
+  "./icons/icon-512-maskable.png",
+  "./icons/icon-512-maskable-v2.png",
   "./profiles/index.json",
   "./profiles/45-15.zip",
   "./profiles/48-12.zip",
@@ -123,7 +136,7 @@ const BOOT_SHELL=['./','./index.html','./styles.css','./src/ui/page-bootstrap.js
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(BOOT_SHELL))
+      .then((cache)=>Promise.allSettled(BOOT_SHELL.map(path=>cache.addAll([path]))))
       .catch(error => console.warn('Offline cache unavailable:', error))
       .then(() => self.skipWaiting())
   );
@@ -134,10 +147,21 @@ self.addEventListener('message',event=>{
   if(event.data?.type!=='WARM_CACHE')return;
   warming??=(async()=>{
     const cache=await caches.open(CACHE_NAME),pending=APP_SHELL.slice();
-    // Run after the UI and converter are ready, with bounded parallel requests.
+    const warmOne=async path=>{
+      if(await cache.match(path))return;
+      let lastError;
+      for(let attempt=0;attempt<2;attempt++){
+        try{
+          const response=await fetch(path,{cache:attempt?'reload':'no-cache'});
+          if(response.ok){await cache.put(path,response);return;}
+          lastError=Error(`HTTP ${response.status} warming ${path}`);
+        }catch(error){lastError=error;}
+      }
+      console.warn('Offline asset unavailable:',path,lastError);
+    };
+    // A single stale/missing deployment asset must not abort the rest of the cache.
     await Promise.all(Array.from({length:4},async()=>{
-      while(pending.length){const path=pending.shift();if(await cache.match(path))continue;
-        const response=await fetch(path,{cache:'no-cache'});if(response.ok)await cache.put(path,response);}
+      while(pending.length)await warmOne(pending.shift());
     }));
   })().catch(error=>{warming=null;console.warn('Offline preparation unavailable:',error);});
   event.waitUntil(warming);
@@ -176,8 +200,15 @@ async function networkFirst(request) {
     // A navigation Request cannot be re-initialised, so it is refetched by URL.
     const response = await fetch(request.mode === "navigate" ? request.url : request,
                                  { cache: "no-cache" });
-    if (response.ok && cache) try { await cache.put(request, response.clone()); } catch {}
-    return isolated(response);
+    if(response.ok){
+      if(cache)try{await cache.put(request,response.clone());}catch{}
+      return isolated(response);
+    }
+    // Rolling deploys can briefly expose a 404 for one module while the previous
+    // complete app is still cached. Prefer that known-good copy instead of failing boot.
+    let cached;
+    try{cached=await cache?.match(request,{ignoreSearch:true});}catch{}
+    return isolated(cached||response);
   } catch (error) {
     let cached;
     try { cached = await cache?.match(request, { ignoreSearch: true }); } catch {}

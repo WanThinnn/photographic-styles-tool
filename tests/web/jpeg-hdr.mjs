@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {buildAiPortrait} from '../../web/src/portrait/ai-portrait-export.js';
 import {extractItemData} from '../../web/src/raster/heif.js';
-import {extractJpegHdr,parseAdaptiveHdrXmp,encodeTmapMetadata,yuv420Tile,iccColr} from '../../web/src/raster/jpeg-hdr.js';
+import {extractJpegHdr,parseAdaptiveHdrXmp,encodeTmapMetadata,yuv420Tile,iccColr,yuv420ToRgba,decodeGainLog,encodeGainLog,rebaseGainMapRgba,srgbToLinear,parseTmapMetadata} from '../../web/src/raster/jpeg-hdr.js';
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
@@ -101,12 +101,71 @@ test('tmap preserves signed per-channel ranges, headroom/gamma/offsets and names
   assert.equal(v.getInt32(p+24)/v.getUint32(p+28),.015625);
  }
 });
+test('tmap encode/parse round-trips single and RGB channel metadata',()=>{
+ const variants=[
+  {baseHeadroom:0,alternateHeadroom:3,channels:[{min:0,max:3,gamma:1,baseOffset:.015625,alternateOffset:.015625}],useBaseColorSpace:true},
+  {baseHeadroom:.25,alternateHeadroom:4.25,channels:[
+   {min:-1,max:3.1,gamma:1.2,baseOffset:.01,alternateOffset:.02},
+   {min:-.5,max:3.2,gamma:.9,baseOffset:.01,alternateOffset:.02},
+   {min:-.25,max:3.3,gamma:1.1,baseOffset:.01,alternateOffset:.02}],useBaseColorSpace:false},
+ ];
+ for(const metadata of variants){
+  const parsed=parseTmapMetadata(encodeTmapMetadata(metadata));
+  assert.equal(parsed.channels.length,metadata.channels.length);
+  assert.equal(parsed.useBaseColorSpace,metadata.useBaseColorSpace);
+  assert.ok(Math.abs(parsed.baseHeadroom-metadata.baseHeadroom)<1e-6);
+  assert.ok(Math.abs(parsed.alternateHeadroom-metadata.alternateHeadroom)<1e-6);
+  parsed.channels.forEach((channel,i)=>{
+   for(const key of ['min','max','gamma','baseOffset','alternateOffset'])
+    assert.ok(Math.abs(channel[key]-metadata.channels[i][key])<1e-6,`${key} mismatch`);
+  });
+ }
+});
+
 test('YUV tile extraction keeps all gain-map channels, placement and neutral padding',()=>{
  const w=6,h=4,y=Array.from({length:24},(_,i)=>i),u=[31,32,33,34,35,36],v=[71,72,73,74,75,76];
  const tile=yuv420Tile(Uint8Array.from([...y,...u,...v]),w,h,1,0,4);
  assert.deepEqual([...tile.subarray(0,4)],[4,5,0,0]);assert.deepEqual([...tile.subarray(12,16)],[22,23,0,0]);
  assert.deepEqual([...tile.subarray(16,20)],[33,128,36,128]);assert.deepEqual([...tile.subarray(20)],[73,128,76,128]);
 });
+
+test('gain-map gamma/log encoding round-trips ISO metadata values',()=>{
+ const channel={min:-1.25,max:3.5,gamma:1.7,baseOffset:.015625,alternateOffset:.015625};
+ for(const log of [-1.25,-.5,0,1.25,3.5]){
+  const sample=encodeGainLog(log,channel),decoded=decodeGainLog(sample,channel);
+  assert.ok(Math.abs(decoded-log)<1e-10,`${log} -> ${sample} -> ${decoded}`);
+ }
+ assert.equal(srgbToLinear(0),0);assert.equal(srgbToLinear(1),1);
+});
+
+test('rebasing gain map transfers AI linear detail while preserving the HDR solve',()=>{
+ const metadata={channels:[{min:-2,max:4,gamma:1.25,baseOffset:.015625,alternateOffset:.015625}]};
+ const original=new Uint8ClampedArray([80,120,180,255, 210,150,90,255]);
+ const restored=new Uint8ClampedArray([90,112,190,255, 202,160,96,255]);
+ const gain=new Uint8ClampedArray([120,120,120,255, 190,190,190,255]);
+ const result=rebaseGainMapRgba(original,restored,gain,metadata);
+ assert.equal(result.rgba.length,gain.length);assert.equal(result.clipped,0);
+ const meta=metadata.channels[0];
+ for(let p=0;p<gain.length;p+=4)for(let c=0;c<3;c++){
+  const oldSdr=srgbToLinear(original[p+c]/255),newSdr=srgbToLinear(restored[p+c]/255);
+  const oldHdr=(oldSdr+meta.baseOffset)*2**decodeGainLog(gain[p+c]/255,meta)-meta.alternateOffset;
+  const target=Math.max(0,oldHdr+newSdr-oldSdr);
+  const rebuilt=(newSdr+meta.baseOffset)*2**decodeGainLog(result.rgba[p+c]/255,meta)-meta.alternateOffset;
+  assert.ok(Math.abs(rebuilt-target)<.035,`HDR round-trip drift ${rebuilt-target}`);
+ }
+ assert.ok(result.maxError<.035);
+});
+
+test('full-range JPEG YUV gain samples convert back to neutral RGB',()=>{
+ const y=Uint8Array.from([0,64,128,255]),u=Uint8Array.of(128),v=Uint8Array.of(128);
+ const rgba=yuv420ToRgba(Uint8Array.from([...y,...u,...v]),2,2);
+ assert.deepEqual([...rgba.filter((_,i)=>i%4===3)],[255,255,255,255]);
+ for(let i=0;i<4;i++){
+  const p=i*4;
+  assert.ok(Math.max(Math.abs(rgba[p]-y[i]),Math.abs(rgba[p+1]-y[i]),Math.abs(rgba[p+2]-y[i]))<=1);
+ }
+});
+
 const fixture=JSON.parse(fs.readFileSync(new URL('./raster-hevc.fixture.json',import.meta.url)));
 const assets=await generateSyntheticHevc(null,async(_,options)=>{
  const a=options.pixelFormat!=='gray'?fixture.assets.delta:options.width===768?fixture.assets.textureMask:fixture.assets.mask;

@@ -1,6 +1,6 @@
 import { loadProfile } from "./src/core/zip.js";
 import { profileFor, VERSION, UNSUPPORTED } from "./src/styles/port.js";
-import { dimensionsForItem } from "./src/core/heif.js";
+import { dimensionsForItem, discoverHeic } from "./src/core/heif.js";
 import { styleDeltaSize } from "./src/styles/graft.js";
 import { hasTexture } from "./src/styles/texture.js";
 import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
@@ -8,9 +8,9 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/ui/i18n.
 import { photoContentIdentifier, moviePairingMetadata, createLivePhotoExport } from "./src/media/live-photo.js";
 import { RASTER_MIMES } from "./src/media/image-format.js";
 import { photoCaptureDate } from "./src/media/photo-date.js";
-import { preserveNativeStyles, styleReconstructionRisk } from "./src/styles/style-preservation.js";
+import { preserveNativeStyles, styleReconstructionRisk, nativeTextureCapture } from "./src/styles/style-preservation.js";
 import { AI_STRINGS } from "./src/ui/ai-strings.js";
-import {prepareBrowser} from './src/ui/startup.js';
+import {prepareBrowser,fetchJsonWithRetry} from './src/ui/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
 import {readImageFile, addTextureInWorker, repairTextureInWorker, restoreNativePortraitInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/media/heic-processing.js';
@@ -20,13 +20,29 @@ import {styleCapabilities} from './src/styles/style-capabilities.js';
 import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
 import {depthModel} from './src/portrait/depth-models.js';
 import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
+import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
+
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
-const aiPortrait = $("ai-portrait");
+const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), enhanceAi = $("enhance-ai");
 const gpuAcceleration=$('gpu-acceleration');
 const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
 const modelLevels=['lite','standard','pro'];
+const aiSettings=$('ai-settings');
+const aiSettingsSummary=aiSettings?.querySelector('summary');
+if(aiSettings&&aiSettingsSummary){
+  aiSettingsSummary.addEventListener('click',event=>{
+    if(!aiSettings.open||aiSettings.classList.contains('is-closing'))return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    event.preventDefault();
+    aiSettings.classList.add('is-closing');
+    const close=()=>{aiSettings.open=false;aiSettings.classList.remove('is-closing');};
+    aiSettings.querySelector('.ai-settings-panel')?.addEventListener('animationend',close,{once:true});
+    setTimeout(()=>{if(aiSettings.classList.contains('is-closing'))close();},220);
+  });
+}
+
 const selectedModel=()=>modelLevels[Number(modelSelector.value)];
 function renderModel(){
   const name=depthModel(selectedModel()).label;
@@ -36,6 +52,9 @@ function renderModel(){
 }
 let clearingAssets=false,assetStatus='';
 try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved);modelSelector.value=modelLevels.indexOf(saved);}catch{}
+
+
+
 renderModel();
 modelSelector.addEventListener('input',()=>{
   renderModel();try{localStorage.setItem('depth-model',selectedModel());}catch{}
@@ -48,6 +67,11 @@ const clearHistory = $('clear-history');
 const resultUrls = new Set(), resultCleanups = new Set();
 const aiCandidates = [];
 let browserReady = false, pendingTasks = 0;
+const aiFeatures=createAiFeatureControls({
+  master:enhanceAi,
+  features:{portrait:aiPortrait,detail:aiDetail},
+  isAvailable:()=>browserReady&&!clearingAssets,
+});
 function refreshHistoryButton() {
   clearHistory.hidden = !list.childElementCount;
   clearHistory.disabled = pendingTasks > 0;
@@ -66,25 +90,35 @@ clearHistory.addEventListener('click', () => {
   for (const url of resultUrls) URL.revokeObjectURL(url);
   resultUrls.clear(); livePhotos.length = 0; liveMovies.clear(); aiCandidates.length = 0;
   list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
-  releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor(); refreshHistoryButton();
+  releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor();
+  void import('./src/detail/detail-inference.js').then(({releaseDetailWorkers})=>releaseDetailWorkers()).catch(()=>{});
+  refreshHistoryButton();
 });
 clearAssets.addEventListener('click',async()=>{
   if(clearAssets.disabled)return;
   clearingAssets=true;assetStatus='cleaning';translateAi();refreshHistoryButton();
-  aiPortrait.disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
+  aiFeatures.sync();
+  modelSelector.disabled=gpuAcceleration.disabled=true;
   fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
   try{
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
-    const {releaseOrtModels}=await import('./src/vision/ort-vision.js');await releaseOrtModels();
+    const [{releaseOrtModels},{releaseDetailWorkers}]=await Promise.all([
+      import('./src/vision/ort-vision.js'),import('./src/detail/detail-inference.js')]);
+    releaseDetailWorkers();await releaseOrtModels();
     await clearDownloadedAssets();assetStatus='cleaned';
   }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
-  finally{clearingAssets=false;aiPortrait.disabled=!browserReady;modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+  finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
 });
 const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
 function translateAi() {
+  $("enhance-ai-label").textContent = aiText().masterToggle;
   $("ai-portrait-label").textContent = aiText().toggle;
   $("ai-portrait-hint").textContent = aiText().hint;
-  $("ai-portrait-hint").hidden = !aiPortrait.checked;
+  $("ai-portrait-hint").hidden = false;
+  $("ai-detail-label").textContent = aiText().detailToggle;
+  $("ai-detail-hint").textContent = aiText().detailHint;
+
+
   $('ai-settings').hidden=false;
   $('ai-settings-label').textContent=aiText().settings;
   $('gpu-acceleration-label').textContent=aiText().acceleration;
@@ -100,7 +134,7 @@ function translateAi() {
 aiPortrait.addEventListener('change', () => {
   translateAi();
   for (const candidate of aiCandidates) {
-    if (!aiPortrait.checked) {
+    if (!aiFeatures.enabled('portrait')) {
       candidate.controller?.abort();
       candidate.ui.outputPending(false);
       candidate.ui.output(candidate.outputFile);
@@ -173,10 +207,21 @@ async function handleMovie(file, bytes, ui) {
   }
 }
 
+let profileIndexPromise=null;
+async function ensureProfileIndex(){
+  if(profileIndex)return profileIndex;
+  if(!profileIndexPromise)profileIndexPromise=fetchJsonWithRetry('profiles/index.json')
+    .then(index=>profileIndex=index)
+    .finally(()=>{profileIndexPromise=null;});
+  return profileIndexPromise;
+}
 async function getProfile(name) {
   if (!profileCache.has(name)) {
-    const res = await fetch(`profiles/${profileIndex[name].file}`);
-    if (!res.ok) throw new Error(UNSUPPORTED);
+    const index=await ensureProfileIndex();
+    const entry=index?.[name];
+    if(!entry?.file)throw Object.assign(new Error('Profile index unavailable'),{code:'APP_RESOURCE_UNAVAILABLE'});
+    const res=await fetch(`profiles/${entry.file}`,{cache:'no-cache'});
+    if(!res.ok)throw Object.assign(new Error(`Profile unavailable: ${name}`),{code:'APP_RESOURCE_UNAVAILABLE'});
     profileCache.set(name, await loadProfile(new Uint8Array(await res.arrayBuffer())));
   }
   return profileCache.get(name);
@@ -286,7 +331,7 @@ function row(name) {
       el.insertBefore(host,el.querySelector('.act'));
       try{
         this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{
-          this.portraitPending=pending;if(aiPortrait.checked)this.outputPending(pending);refreshHistoryButton();
+          this.portraitPending=pending;if(aiFeatures.enabled('portrait'))this.outputPending(pending);refreshHistoryButton();
         }}));
       }catch(error){host.remove();this.note(aiText().previewFailed,'preview');throw error;}
     },
@@ -389,7 +434,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, pr
   const candidate = {outputFile, sourceFile, ui, name, state: 'new',
     skip: preserveIncomplete ? 'unverified-styles' : source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
-  if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
+  if (aiFeatures.enabled('portrait')&&!candidate.skip) await runAiCandidate(candidate);
   else {
     if(candidate.skip){candidate.state='skipped';ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');}
     ui.output(outputFile);ui.aiBusy(false);
@@ -397,7 +442,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, pr
 }
 
 async function runAiCandidate(candidate) {
-  if (!aiPortrait.checked || !['new', 'failed'].includes(candidate.state)) return;
+  if (!aiFeatures.enabled('portrait') || !['new', 'failed'].includes(candidate.state)) return;
   const {ui, name, sourceFile} = candidate;
   if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
@@ -427,31 +472,35 @@ async function runAiCandidate(candidate) {
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     ui.cleanup(output.dispose);
     controller.signal.throwIfAborted();
-    if(!aiPortrait.checked)throw new DOMException('AI disabled','AbortError');
+    if(!aiFeatures.enabled('portrait'))throw new DOMException('AI disabled','AbortError');
     const date=photoCaptureDate(output.data);
     const publish=(data,metadata=true)=>{
       candidate.aiFile=new File([data],name.replace(/\.[^.]+$/,'')+'_Portrait.HEIC',{
         type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})});
-      if(aiPortrait.checked)ui.output(candidate.aiFile,{metadata});
+      if(aiFeatures.enabled('portrait'))ui.output(candidate.aiFile,{metadata});
     };
     publish(output.data);
     try{await ui.portraitPreview(result,async(settings,isCurrent)=>{const updated=await output.withSettings(settings);if(isCurrent())publish(updated.data,false);});}
     catch(error){console.warn('Portrait preview unavailable; edit focus in Photos',error);}
     candidate.state = 'done';
-    ui.aiView(aiPortrait.checked);
-    if(aiPortrait.checked){ui.aiState('');ui.note(aiText().ready,'ai');}
+    ui.aiView(aiFeatures.enabled('portrait'));
+    if(aiFeatures.enabled('portrait')){ui.aiState('');ui.note(aiText().ready,'ai');}
   } catch(error) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
-    ui.aiState(!aiPortrait.checked?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
-    if(aiPortrait.checked&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
+    ui.aiState(!aiFeatures.enabled('portrait')?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+    if(aiFeatures.enabled('portrait')&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
   } finally {
     clearTimeout(deadline);removeCancel();candidate.controller=null;
     // Publish the normal fallback only after AI failed/cancelled. Never expose
     // it between Styles processing and the requested Portrait result.
-    if(!candidate.aiFile||!aiPortrait.checked)ui.output(candidate.outputFile);
+    if(!candidate.aiFile||!aiFeatures.enabled('portrait'))ui.output(candidate.outputFile);
     ui.aiBusy(false);
   }
+}
+
+function stagePercent(done,total){
+  return Number.isFinite(done)&&Number.isFinite(total)&&total>0 ? `${Math.min(100,Math.max(0,Math.round(done/total*100)))}%` : '';
 }
 
 async function handleFile(file) {
@@ -472,7 +521,7 @@ async function handleFile(file) {
       const {importDngFile}=await import('./src/dng/dng-import.js');
       try {file=await importDngFile(bytes,file.name,progress=>{
         const label=lang==='vi'?'Giải mã RAW':lang==='zh'?'解码 RAW':'Developing RAW';
-        ui.set(progress.total&&progress.done?`${label} ${progress.done}/${progress.total}`:label);
+        const percent=stagePercent(progress.done,progress.total);ui.set(percent?`${label} ${percent}`:label);
       });}catch(error){
         console.warn('DNG import failed',error);
         const reason=/JPEG XL/.test(error.message)?'JPEG XL':/large RAW/.test(error.message)?'oversized RAW':'decode';
@@ -483,6 +532,7 @@ async function handleFile(file) {
       ui.note(lang==='vi'?'DNG được giải mã thành ảnh sRGB để thêm Styles; bản xuất là HEIC, không còn RAW.':lang==='zh'?'DNG 转换为 sRGB 图像以添加风格；导出 HEIC，不保留 RAW。':'DNG is developed to sRGB for Styles; the HEIC output is no longer RAW.','raw');
     }
     if (RASTER_MIMES[format]) {
+
       if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
       const { importRaster } = await import("./src/raster/raster-import.js");
       let result;
@@ -491,15 +541,22 @@ async function handleFile(file) {
           null, progress => {
             if (progress.stage === "modelDownload")
               ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
-            else if (progress.stage === "main") ui.set(`${T("st.rastertiles")} ${progress.done}/${progress.total}`);
+            else if (progress.stage === "download" || progress.stage === "modelLoading")
+              ui.set(aiText().detailPreparing);
+            else if (progress.stage === "inference")
+              ui.set(stagePercent(progress.progress?.done,progress.progress?.total) ? `${aiText().detailWorking} ${stagePercent(progress.progress?.done,progress.progress?.total)}` : aiText().detailWorking);
+            else if (progress.stage === "main") ui.set(stagePercent(progress.done,progress.total) ? `${T("st.rastertiles")} ${stagePercent(progress.done,progress.total)}` : T("st.rastertiles"));
+            else if (progress.stage === "auxiliary") ui.set(stagePercent(progress.done,progress.total) ? `${aiText().detailHdrWorking} ${stagePercent(progress.done,progress.total)}` : aiText().detailHdrWorking);
             else ui.set(T("st.rasterworking"));
-          }, {analyze: true});
+          }, {analyze: true,detail:aiFeatures.enabled('detail')?{modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null});
       } catch (error) {
         console.error("Raster conversion failed", file.name, error);
         ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
         return;
       }
       const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
+      if(result.detailSkipped)ui.note(`${aiText().detailSkipped} ${result.detailSkipped}`,'detail');
+      else if(result.detailApplied)ui.note(aiText().detailApplied,'detail');
       result.data=await addMissingSoftSkin(result.data,file,ui);
       const date = photoCaptureDate(result.data);
       const output = new File([result.data], outName, {type: "image/heic",
@@ -512,9 +569,41 @@ async function handleFile(file) {
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
+    let d = input.discovery;
+    if(aiFeatures.enabled('detail')){
+      if(d.hdrGrid!==null&&d.hdrTiles?.length){
+        if(!globalThis.crossOriginIsolated){
+          ui.note(`${aiText().detailSkipped} ${T("err.reloadencoder")}`,'detail');
+        }else{
+          try{
+            const {enhanceNativeHdrHeic}=await import('./src/detail/detail-native-heic.js');
+            const enhanced=await enhanceNativeHdrHeic(bytes,{
+              modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
+            },{onProgress:progress=>{
+              if(progress.stage==='download'||progress.stage==='modelLoading')ui.set(aiText().detailPreparing);
+              else if(progress.stage==='inference'){
+                const percent=stagePercent(progress.progress?.done,progress.progress?.total);
+                ui.set(percent?`${aiText().detailWorking} ${percent}`:aiText().detailWorking);
+              }else if(/^hdr(Primary|Gain)(Decode|Encode)$/.test(progress.stage)){
+                const percent=stagePercent(progress.done,progress.total);
+                ui.set(percent?`${aiText().detailHdrWorking} ${percent}`:aiText().detailHdrWorking);
+              }
+              else if(progress.stage==='modelDownload')
+                ui.set(`${T("st.encoderload")} ${(progress.loaded/1048576).toFixed(1)} MB`);
+              else ui.set(aiText().detailHdrWorking);
+            }});
+            bytes=enhanced.data;d=discoverHeic(bytes);
+            ui.note(aiText().detailHdrApplied,'detail');
+          }catch(error){
+            console.warn('Native HDR AI detail unavailable; preserving original HEIC',error);
+            ui.note(`${aiText().detailSkipped} ${String(error?.message||error).slice(0,180)}`,'detail');
+          }
+        }
+      }else ui.note(aiText().detailHeic,'detail');
+    }
 
-    const d = input.discovery;
     const textureOnly = preserveNativeStyles(bytes,d);
+    const nativeTexture = nativeTextureCapture(bytes,d);
     const {nativePortraitBaseState}=await import('./src/portrait/ai-portrait-container.js');
     const portraitState=nativePortraitBaseState(bytes,d);
     const rebuildNativePortrait=textureOnly&&d.stylesItem===null&&portraitState!==null;
@@ -526,7 +615,14 @@ async function handleFile(file) {
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
     let data, bits, suffix;
-    if (preserveIncomplete) {
+    if (nativeTexture && !hasTexture(d.infos)) {
+      // iPhone 18+ native captures can expose Texture/Film through capture metadata
+      // without the grafted texture_styles/matte graph. Never graft a second Texture
+      // contract onto those files; Photos already owns the native render path.
+      data=bytes;
+      bits=[T('st.native'),T('st.texture')];
+      suffix='_Preserved.HEIC';
+    } else if (preserveIncomplete) {
       // A selected preset is not the Styles editing graph. Adding Texture alone
       // advertises a new renderer without the colour resources it needs. Keep
       // this incomplete native export intact and register only its own HDR map.
@@ -552,11 +648,13 @@ async function handleFile(file) {
     } else {
       const needsExperimental = d.hdrGrid === null
         || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));
-      const name = profileFor(profileIndex, d, needsExperimental);
+      const index=await ensureProfileIndex();
+      const name = profileFor(index, d, needsExperimental);
       const profile = await getProfile(name);
       // Start processing; if the thumbnail is missing, dynamically load the generator.
       let linearThumb = undefined;
       if (d.thumbnail === null) {
+
         if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
         const { generateLinearThumbnail } = await import("./src/codecs/linear-thumbnail.js");
         try {
@@ -646,7 +744,7 @@ async function handleFile(file) {
     // still goes to the console, because "unsupported" on every photo is exactly
     // how a bug elsewhere would look.
     console.error("could not port", file.name, e);
-    ui.set(T("err.unsupported"), "err");
+    ui.set(T(e?.code==="APP_RESOURCE_UNAVAILABLE"?"err.resources":"err.unsupported"), "err");
   } finally {
     // Samples belong to this serialized processing operation, not its history
     // row. Release them after export while retaining only the downloadable file.
@@ -711,21 +809,25 @@ function countVisit() {
   countVisit();
   $('boot').textContent = T('st.preparing');
   try {
-    if (await prepareBrowser() !== 'ready') return;
-    const response = await fetch('profiles/index.json');
-    if (!response.ok) throw Error('Profile index unavailable');
-    profileIndex = await response.json();
+    const browserMode=await prepareBrowser();
+    if(browserMode==='reloading')return;
+    // The profile index is only required by legacy/full reconstruction. A transient
+    // deploy/cache miss must not block native HEIC editing or the rest of the UI.
+    try{profileIndex=await fetchJsonWithRetry('profiles/index.json',{attempts:2});}
+    catch(error){console.warn('Profile index will be retried on demand',error);profileIndex=null;}
+
     browserReady = true;refreshHistoryButton();
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
-    aiPortrait.disabled=false;
+    aiFeatures.sync();
     $('boot').textContent = '';
     navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.
     // Conversion awaits the same promise, so it never races runtime loading.
-    prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
+    if(browserMode==='ready')prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
+    else console.warn('Running without cross-origin isolation; threaded HEVC/AI features will request isolation when used.');
   } catch (e) {
     console.error('Browser preparation failed', e);
-    $("boot").textContent = T('err.setup');
+    $("boot").textContent = T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources');
     $("boot").className = "err";
     const retry = document.createElement('button');
     retry.className = 'dl alt'; retry.type = 'button'; retry.textContent = T('btn.retry');

@@ -89,3 +89,9 @@ ref/
 web/vendor/ai-portrait/*.onnx
 web/vendor/ai-portrait/*.onnx_data
 web/vendor/ai-portrait/*.wasm
+
+# Hugging Face AI detail weights are downloaded to the user's local machine.
+# Verify licensing before distributing the model binaries with the public app.
+web/vendor/ai-detail/*.onnx
+web/vendor/ai-detail/*.onnx_data
+web/vendor/ai-detail/*.partial

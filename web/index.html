@@ -6,17 +6,17 @@
 <title>Next-generation Photographic Styles</title>
 <meta name="description" content="Adds the Photographic Styles palette, introduced with iPhone 16, to HEIC photos from earlier iPhones, plus the Texture and Grain controls on iOS 27. Runs entirely in your browser; photos are never uploaded.">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f7f8fc" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#101118" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Style Port">
 <meta property="og:title" content="Next-generation Photographic Styles">
 <meta property="og:description" content="Adds the Photographic Styles palette, introduced with iPhone 16, to HEIC photos from earlier iPhones, plus the Texture and Grain controls on iOS 27. Runs entirely in your browser; photos are never uploaded.">
 <meta property="og:type" content="website">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="icon" type="image/svg+xml" href="icons/photographic-styles.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-v2.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192-v2.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -56,10 +56,10 @@
     <button id="ios-format-dismiss" type="button" data-i18n="tip.dismiss">Got it</button>
   </aside>
 
-  <section class="depth-options" aria-labelledby="ai-portrait-label">
+  <section class="depth-options" aria-labelledby="enhance-ai-label">
   <div class="portrait-option">
-    <label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
-    <input type="checkbox" id="ai-portrait" disabled role="switch" aria-describedby="ai-portrait-hint">
+    <label for="enhance-ai" id="enhance-ai-label">Enhance Photo with AI</label>
+    <input type="checkbox" id="enhance-ai" disabled role="switch">
   </div>
   <details id="ai-settings" class="ai-settings">
     <summary>
@@ -67,6 +67,25 @@
       <span id="ai-settings-label" class="sr-only">AI settings</span>
     </summary>
     <div class="ai-settings-panel">
+    <div class="portrait-option">
+      <div class="ai-option-copy"><label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
+      <p id="ai-portrait-hint" class="ai-hint"></p></div>
+      <input type="checkbox" id="ai-portrait" role="switch" disabled aria-describedby="ai-portrait-hint">
+    </div>
+    <div class="portrait-option detail-option">
+      <div class="ai-option-copy">
+        <label for="ai-detail" id="ai-detail-label">Sharpen Photo</label>
+        <p id="ai-detail-hint" class="ai-hint">Experimental: preserves the current editable HEIC output until compatibility is validated.</p>
+      </div>
+      <input type="checkbox" id="ai-detail" role="switch" disabled aria-describedby="ai-detail-hint">
+    </div>
+    <div class="portrait-option gpu-option">
+      <div class="ai-option-copy">
+      <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
+      <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
+      </div>
+      <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
+    </div>
     <div class="depth-model-row portrait-option">
       <div class="ai-option-copy">
       <label for="depth-model" id="depth-model-label">Model</label>
@@ -81,17 +100,10 @@
         </div>
       </div>
     </div>
-    <div class="portrait-option">
-      <div class="ai-option-copy">
-      <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
-      <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
-      </div>
-      <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
-    </div>
     </div>
   </details>
   </section>
-  <p class="ai-hint"><span id="ai-portrait-hint" hidden></span> <span data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</span></p>
+  <p class="ai-hint"><span data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</span></p>
   </div>
 
   <div class="history-actions">

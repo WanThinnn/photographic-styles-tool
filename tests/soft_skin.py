@@ -225,8 +225,10 @@ sample = {"s": "Standard", "t": True, "f": False, "i": 3, "big": 300, "neg": -1,
 check("build_bplist round-trips through plistlib with types intact",
       plistlib.loads(p.build_bplist(sample)) == sample
       and isinstance(plistlib.loads(p.build_bplist(sample))["one"], float))
-check("build_bplist keeps the v0.5 header bytes' meaning",
+check("build_bplist keeps the Texture renderer header bytes' meaning",
       plistlib.loads(p.build_bplist(dict(p.TEXTURE_STYLES_HEADER))) == plistlib.loads(p.TEXTURE_STYLES_BLOB))
+check("Texture renderer keeps the native iPhone19,2 donor profile",
+      plistlib.loads(p.TEXTURE_STYLES_BLOB)["HardwareModel"] == "iPhone19,2")
 
 print("no people")
 for f in [ROOT / "Smartstyle" / "IMG_5096.HEIC", ROOT / "noSmartStyle" / "IMG_5037.HEIC"]:

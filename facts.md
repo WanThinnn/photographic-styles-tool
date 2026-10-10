@@ -2757,3 +2757,259 @@ after Portrait Off. Native Styles coefficients in complete Bright captures
 IMG_0932 and IMG_1092 differ in 49,590 of 51,840 bytes; a universal replacement
 cannot be inferred from matching presets. No unrelated native calibration is
 copied, selection values are not neutralized, and no colour fix is claimed.
+
+
+### 10.57 AI Detail HDR rebase experiment (feature/ai-ml-processing, 2026-10-11)
+
+The opt-in AI Detail preprocessing path now has an HDR-aware implementation instead
+of sharpening an SDR primary while leaving its gain map stale. For compatible ISO
+21496-1 gain maps the browser parses the existing tmap headroom, per-channel
+GainMapMin/GainMapMax, Gamma and SDR/HDR offsets. It reconstructs the original HDR
+alternate in linear light, transfers the AI restoration's per-channel linear detail
+delta to that alternate, then solves and quantizes a replacement gain map against
+the restored SDR/primary image. Existing tmap metadata is kept byte-exact. If more
+than 2% of gain components would exceed the declared min/max range, the AI path
+fails closed and the original image is retained.
+
+JPEG Adaptive HDR now uses this rebase before the existing generated HEIC/Styles
+assembly. Native HEIC HDR has a separate browser path that decodes the photo's own
+primary and gain-map grids, supports both RGB 4:2:0 gain maps and Apple's common
+monochrome HEVC gain maps, runs the selected Lite/Standard/Pro restoration model,
+re-encodes the primary/gain grids, regenerates the normal and linear thumbnails,
+and repacks only changed external payloads. Primary codec colour/range signalling
+is required to be explicit and is preserved; unsupported colour/tmap contracts
+fall back to the original HEIC. Monochrome gain maps preserve decoded gray samples
+and full/limited range; their primaries/transfer/matrix VUI may be absent after
+x265 because those tags do not affect gray numerical gain samples.
+
+Two real-browser Edge/WebGPU + FFmpeg.wasm end-to-end probes passed with the Lite
+SPAN model. HDR_Edit_Isolation_V21/A_V20_Control_AllFeatures_NoAIDepth (3024x4032,
+RGB P3/sRGB gain map) completed in ~36.4 s: 48 primary + 12 gain tiles and two
+thumbnail resources changed, 49 unrelated external payloads remained byte-exact,
+21 of 9,144,576 gain components clipped to the existing declared range. The
+native Portrait 5129 Styles+Texture fixture (4032x3024 primary, monochrome Apple
+gain map) completed in ~45.2 s: the same 62 image resources changed, 63 unrelated
+payloads including Styles/Exif/depth remained byte-exact, 663 of 9,144,576 gain
+components clipped, and maximum measured quantized linear-HDR solve error was
+~0.00362 in the probe. The output remains 48 primary + 12 HDR tiles with the
+original tmap values.
+
+A private phone-test artifact is written to
+tests/private-fixtures/AI_Detail_HDR_V1/IMG_5129_Lite_AI_HDR.HEIC. It is not
+published or committed. Desktop structural tests do NOT establish Apple Photos
+rendering/editability. The file still requires physical iPhone import, HDR display,
+Styles/Texture, aperture and Portrait Lighting checks, including Save -> reopen ->
+re-edit. Current full-resolution AI preprocessing is intentionally bounded to
+12.5 megapixels to avoid unsafe mobile memory peaks; larger native HDR photos fail
+closed until a streaming/tiled full-image implementation is validated.
+
+The selected browser regression set completes 140 cases: 125 passes, 15 optional
+private-fixture skips, no failures. PWA, module-path and three-language checks pass.
+
+
+### 10.58 AI Detail inference concurrency and progress optimization (2026-10-11)
+
+Performance profiling on the local Windows laptop showed that 256px tile count was
+not the only bottleneck. ONNX Runtime WebGPU does not allow concurrent
+`InferenceSession.run()` calls from multiple sessions in one JS realm (it throws
+"Session already started"), so true concurrent inference requires separate
+DedicatedWorker realms, each with its own ORT session. The production detail path
+now uses a SharedArrayBuffer-backed global input/output image and assigns disjoint
+global tile indices to workers. Tile cores do not overlap, so workers write
+separate output regions and no band seam/stitching approximation is introduced.
+
+Measured policy:
+- Lite / SPAN: 384px tiles, up to 2 WebGPU workers.
+- Standard / RT-Focuser 2025: 512px tiles, 32px overlap, 25% output blend,
+  up to 4 WebGPU workers.
+- Pro / Fatality DeBlur: 256px tiles, exactly 1 WebGPU worker; two workers were
+  slower in the measured workload.
+- Desktop auto-scaling: <8 logical CPUs = 1 worker; 8-11 = at most 2 workers;
+  >=12 = at most 4 workers, still capped by the per-model value above.
+- WASM/CPU remains one inference worker but ORT may use up to 4 WASM threads on
+  cross-origin-isolated pages, avoiding nested worker oversubscription.
+
+Historical direct WebGPU measurements for the former RPLKSR-S Standard were
+256/384/512 = 2394/5659/9668 ms. After replacing Standard with RT-Focuser 2025,
+the same browser measured about 156/217/325 ms at 256/384/512 after warmup,
+which makes 512px tiles practical. Lite remained about 78/117/258 ms.
+
+The former RPLKSR-S 768x768 Standard path measured 82.6 s with one worker and
+26.1 s with four. The RT-Focuser Standard browser smoke now measures about
+12.1 s on the first 4-worker pass and 7.6 s on a second pass with retained
+sessions. Four remains the desktop cap; session workers are retained briefly
+and released after 90 seconds or explicit cache/history cleanup.
+An earlier worker-isolation benchmark also measured Pro at ~21.4 s with one worker
+versus ~24.9 s with two, confirming the single-worker Pro policy.
+
+On the real 3024x4032 Adaptive HDR JPEG
+`tests/private-fixtures/HDR_Input/IDG_20251020_121945_809.JPEG`, the Lite
+end-to-end browser/WebGPU/FFmpeg.wasm path dropped from ~57.3 s before this change
+to ~31.4 s after 384px + two-worker inference, about a 45% wall-time reduction.
+HDR remained enabled; 48 primary + 12 gain tiles and the original tmap
+(headroom 0 -> 3.83289) were preserved structurally. Gain-map rebasing remained
+21 clipped components out of 9,144,576 with the same measured maximum solve error.
+
+AI Detail/HDR progress shown in the UI now uses percentages instead of raw
+`done/total` counters for inference, primary/raster tile encoding, auxiliary HDR
+gain-map encoding, and native HDR decode/encode phases. Service-worker shell cache
+is v107.
+
+The selected browser regression set now completes 142 cases: 127 passes,
+15 optional private-fixture skips, no failures. PWA, module-path and three-language
+checks pass.
+
+
+### 10.59 Film final-render red-highlight overflow mitigation (2026-10-11; superseded by §10.61)
+
+Upstream issue #8 reports that iOS 27 Photos previews the Film texture normally
+but, after tapping Done, the saved/final render can produce severe red highlight
+halation. The same behavior was reported from the Swift port, which shares the
+same Texture metadata contract, so this is treated as a renderer-metadata
+compatibility issue rather than a browser-only pixel bug.
+
+A repository scan of 241 private HEIC fixtures containing
+`texture_styles` found two renderer profiles in historical/generated outputs:
+182 with `HardwareModel=iPhone19,2` and 59 with `iPhone19,7`. The raster
+Texture baseline already declared `iPhone19,7`, but its production add-texture
+path immediately overwrote that field back to `iPhone19,2`; the native-style
+web path and Python path also wrote `iPhone19,2`.
+
+New outputs now consistently use `iPhone19,7` in `texture_styles`:
+- `web/src/styles/texture.js`: baseline blob and per-photo rebuilt header.
+- `web/src/raster/texture.js`: the old forced `iPhone19,2` override is removed.
+- `photographic_style_port.py`: baseline blob and header are kept in parity.
+
+This is a compatibility mitigation for issue #8, not proof that iOS' final
+renderer bug is fully characterized. `iPhone16,1` remains rejected because
+earlier phone testing produced a separate white-highlight glow. Existing native
+photos are never auto-migrated solely because they contain `iPhone19,2`, since
+that value also occurs in genuine native Texture metadata. Existing app-generated
+files should be regenerated to receive the new renderer profile.
+
+Regression tests parse both web Texture baselines and an actual raster
+add-texture output and require `HardwareModel=iPhone19,7`; the Python plist
+test requires the same value. Service-worker shell cache is v110.
+
+
+### 10.60 Device feedback: iPhone19,7 experiment (2026-10-11; rejected in §10.61)
+
+Device testing of the `iPhone19,7` Texture renderer mitigation reports that
+Film's red highlight halation is visibly lighter than before, but the user cannot
+yet confirm whether that lighter amount matches a native iPhone 18 Pro capture.
+More importantly, Photos preview becomes non-monotonic near maximum strength:
+the red halation is still visible around 97 but disappears again by 100. This
+means `iPhone19,7` is only a symptom-reducing compatibility mitigation, not a
+validated native-equivalent fix.
+
+Existing project evidence already shows native iPhone 16/17 Texture/Styles files
+using `iPhone19,2` do not reproduce the reconstructed-photo maximum-strength
+red/orange problem. Therefore `HardwareModel` alone cannot explain the bug; it
+interacts with reconstructed Styles/render resources or selects a different
+renderer response curve.
+
+Production remains temporarily on `iPhone19,7` while a strict same-file A/B/C
+probe is tested. `tools/film-halation-variants.mjs` creates three variants from
+the reconstructed `IMG_0783_Web_Default_D.HEIC`, changing only the
+`texture_styles` HardwareModel payload:
+A = `iPhone19,2`, B = `iPhone19,7`, C = field removed. The HEIC rebuild
+self-check preserves every other original external payload byte-exact. Outputs
+are under `tests/private-fixtures/Film_Halation_V1/`; device comparison should
+check Film preview at 90/94/97/98/99/100 and the saved result after Done.
+
+
+### 10.61 iPhone19,7 rejected; native renderer profile restored; Bright preservation control (2026-10-11)
+
+Device A/B testing reports A (`iPhone19,2`) and B (`iPhone19,7`) have the
+same Film halation, while C (no HardwareModel) renders with severe blown/incorrect
+colour. The `iPhone19,7` mitigation therefore does not solve upstream issue #8.
+It also introduced a new regression on some captures: a source selected as Bright
+could reopen as Standard after the tool, whereas this did not occur before the
+renderer-profile experiment.
+
+The production Texture renderer profile is restored to the native donor value
+`iPhone19,2` in web native-style, web raster and Python paths. The raster baseline
+constant is also restored to `iPhone19,2`; no hidden `iPhone19,7` production
+override remains. The no-HardwareModel variant is rejected.
+
+`tests/private-fixtures/Film_Halation_V1/IMG_7864.HEIC` is a useful street-light
+positive control. It is an iPhone 16 Pro native Styles image (schema 131087).
+Current add-Texture output preserves the original Styles payload byte-exact and
+the complete Exif/MakerNote payload byte-exact, while adding only Texture/mattes.
+A regression test now enforces this and requires the generated Texture item to use
+`HardwareModel=iPhone19,2`.
+
+A separate native Bright+Texture fixture
+`NativePortrait_Bright_HDR_V4/E_CompleteBright_HDR.HEIC` confirms that Apple
+itself stores `texture_styles.Preset=Standard` together with a working Bright
+Styles/MakerNote state and `HardwareModel=iPhone19,2`. Therefore the Texture
+`Preset` string is not the Photographic Style selector and must not be rewritten
+to Bright. The Bright regression was caused by the renderer-profile experiment,
+not by direct replacement of the native Styles payload.
+
+For phone comparison, `IMG_7864_Texture_iPhone19,2.HEIC` and the generated
+`IMG_7864_AB/` variants provide a same-photo street-light Film test. Film issue
+#8 remains unresolved after rejecting the HardwareModel hypothesis; the next
+useful evidence is whether this native-Styles positive control shows the same
+preview-vs-Done red overflow after Texture is added.
+
+
+### 10.62 Native iPhone 18 Pro Film path differs from the grafted Texture graph (2026-10-11)
+
+Two user-supplied native iPhone 18 Pro captures were inspected:
+`tests/private-fixtures/Film_Halation_V1/IMG_0240.HEIC` and
+`IMG_0243.HEIC`. Both expose Texture/Film in Photos on-device, but their HEIC
+containers contain no 2023 Styles URI item, no `texture_styles` URI item, no
+2026 matte set, no linearthumbnail and no style delta map. This proves native
+iPhone 18 Pro Texture/Film can be enabled through a capture-generation path that
+is distinct from the older-device graft used by this tool.
+
+Both iPhone 18 Pro Exif MakerNotes contain private tag `0x65` (UNDEFINED,
+binary plist, 74 bytes). A scan of the available private HEIC corpus found:
+- iPhone 18 Pro: 2/2 files contain `0x65`.
+- iPhone 16 Pro: 0/219.
+- iPhone 13 Pro Max: 0/8.
+- iPhone 11 Pro Max: 0/18.
+- iPhone X / iPhone 7: 0/all tested.
+
+The two observed native payloads are:
+- IMG_0243 neutral-looking: `{0:0, 1:0, 2:0.0, 3:1}`.
+- IMG_0240: `{0:1, 1:54, 2:0.20462970435619354, 3:1}`.
+
+The semantic meaning of tag `0x65` is unknown. It is therefore not injected by
+production code yet. A strict same-file diagnostic set was generated at
+`tests/private-fixtures/Film_Halation_V1/IMG_7864_65/`:
+A = current control with no tag 0x65; B = only the neutral 0x65 payload from
+IMG_0243; C = only the 0x65 payload from IMG_0240. Styles, Texture resources and
+pixels remain unchanged; only the Exif/MakerNote item is rebuilt. The phone test
+should compare Film preview at 90/96/97/100 and the saved result after Done.
+If B aligns saved Film strength with preview, neutral 0x65 becomes the leading
+candidate for a production compatibility marker on grafted Texture photos.
+
+
+### 10.63 Film preview-vs-Done mismatch confirmed as a native iOS 27 Photos bug (2026-10-11)
+
+Device testing of the strict MakerNote-0x65 variants on IMG_7864 found A/B/C visually
+identical. Injecting either observed iPhone 18 Pro 0x65 payload therefore does not change
+the Film preview/final mismatch and 0x65 is rejected as a compatibility fix.
+
+More importantly, the untouched native iPhone 18 Pro capture
+`tests/private-fixtures/Film_Halation_V1/IMG_0243.HEIC` reproduces the exact bug on
+iOS 27 Photos: while editing, moving the Film slider shows little/no red halation, but
+after tapping Done the saved Photos render shows the red Film halation. This file was
+captured by an iPhone 18 Pro with Exif Software `27.0`; it has not passed through this
+tool. Its container has no 2023 Styles URI item, no grafted `texture_styles`, no 2026
+matte set, no linearthumbnail and no style delta map. The same Photos preview-vs-final
+mismatch therefore exists on Apple's native capture/render path.
+
+This evidence rules out the tool's HardwareModel choice, FilmGrainSeed and MakerNote
+0x65 as root causes for issue #8. A file-side metadata mutation cannot be claimed as a
+correct fix while an untouched native Apple file exhibits the same renderer mismatch.
+Any attempt to pre-compensate the saved result would deliberately diverge from native
+Apple semantics and would make the edit preview less trustworthy.
+
+The web app now detects the native iPhone 18+ capture path conservatively as
+`camera generation >= 18` plus Apple MakerNote tag `0x65`. Such files are preserved
+without grafting a second Texture contract when no grafted `texture_styles` exists.
+A private regression asserts IMG_0243 is detected as native Texture while IMG_7864
+(iPhone 16 Pro) is not. Service-worker shell cache is v112.

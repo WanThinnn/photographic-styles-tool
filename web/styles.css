@@ -163,6 +163,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding-top:0;margin-
  .help{padding-top:0}
  footer{margin-top:-20px}
 }
+.help[open]+footer{margin-top:0}
 [hidden]{display:none!important}
 #drop[aria-disabled="true"]{cursor:wait;opacity:.65}
 #boot{text-align:center;color:var(--muted)}#boot.err{color:var(--err)}

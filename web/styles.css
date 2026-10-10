@@ -1012,7 +1012,12 @@ code {
    background: var(--surface);
    color: var(--muted);
    cursor: pointer;
-   list-style: none
+   list-style: none;
+   transition: color .16s ease, border-color .16s ease, background-color .16s ease, transform .12s ease, box-shadow .16s ease
+}
+
+.ai-settings summary:active {
+   transform: scale(.95)
 }
 
 .ai-settings summary::-webkit-details-marker {

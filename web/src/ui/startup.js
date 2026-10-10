@@ -28,9 +28,11 @@ export async function prepareBrowser({
       })(),
       new Promise((_, reject) => { timer = setTimeout(() => reject(Error('BROWSER_SETUP_TIMEOUT')), timeoutMs); }),
     ]);
-    // A controller already serving this navigation without isolation indicates
-    // unsupported headers/browser settings. Do not enter an automatic reload loop.
-    if (alreadyControlled) throw Error('BROWSER_SETUP_UNAVAILABLE');
+    // Some WebKit/iOS builds can be controlled by the service worker yet still
+    // refuse cross-origin isolation synthesized by a fetch handler. That is not a
+    // network/setup failure: allow the app to start in compatibility mode and
+    // gate only the features that truly require SharedArrayBuffer/threads.
+    if (alreadyControlled) return 'ready-limited';
     reload();
     return 'reloading';
   } finally {

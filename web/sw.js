@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v107`;
+const CACHE_NAME = `${CACHE_PREFIX}v109`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -55,8 +55,10 @@ const APP_SHELL = [
   "./manifest.webmanifest",
   "./icons/photographic-styles.svg",
   "./icons/icon-180.png",
+  "./icons/icon-180-ios.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./icons/icon-512-maskable.png",
   "./profiles/index.json",
   "./profiles/45-15.zip",
   "./profiles/48-12.zip",

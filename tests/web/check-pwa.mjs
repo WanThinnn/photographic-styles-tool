@@ -40,10 +40,13 @@ if (!startup.includes("serviceWorker?.register('./sw.js'") || !app.includes('awa
   errors.push("app.js does not register the service worker with a relative URL");
 }
 
-function pngDimensions(path) {
+function pngInfo(path) {
   const data = readFileSync(path);
-  if (data.length < 24 || data.toString("ascii", 1, 4) !== "PNG") return null;
-  return [data.readUInt32BE(16), data.readUInt32BE(20)];
+  if (data.length < 26 || data.toString("ascii", 1, 4) !== "PNG") return null;
+  return {width:data.readUInt32BE(16),height:data.readUInt32BE(20),colorType:data[25]};
+}
+function pngDimensions(path) {
+  const info=pngInfo(path);return info?[info.width,info.height]:null;
 }
 
 const declaredSizes = new Set((manifest.icons || []).map((icon) => icon.sizes));
@@ -57,19 +60,29 @@ for (const icon of manifest.icons || []) {
     errors.push(`missing manifest icon: ${icon.src}`);
     continue;
   }
-  const actual = pngDimensions(path);
+  const actual = pngDimensions(path),info=pngInfo(path);
   const expected = icon.sizes.split("x").map(Number);
   if (!actual || actual[0] !== expected[0] || actual[1] !== expected[1]) {
     errors.push(`${icon.src} is not a ${icon.sizes} PNG`);
   }
+  const purpose=String(icon.purpose||"any");
+  if (purpose.includes("maskable") && info && [4,6].includes(info.colorType))
+    errors.push(`${icon.src} must be opaque for maskable/iOS-style appearance treatment`);
+}
+if (!(manifest.icons || []).some(icon=>icon.sizes==='512x512'&&String(icon.purpose||'').includes('maskable'))) {
+  errors.push('manifest 512x512 icon must remain maskable');
+}
+if (!(manifest.icons || []).some(icon=>icon.sizes==='512x512'&&String(icon.purpose||'').split(/\s+/).includes('any'))) {
+  errors.push('manifest must retain a separate 512x512 any icon for Windows/desktop');
 }
 
-const touchIcon = join(WEB, "icons", "icon-180.png");
-if (!html.includes('rel="apple-touch-icon" href="icons/icon-180.png"')) {
-  errors.push("index.html does not link the Apple touch icon");
+const touchIcon = join(WEB, "icons", "icon-180-ios.png");
+if (!html.includes('rel="apple-touch-icon" href="icons/icon-180-ios.png"')) {
+  errors.push("index.html does not link the dedicated iOS Apple touch icon");
 } else if (pngDimensions(touchIcon)?.join("x") !== "180x180") {
-  errors.push("icons/icon-180.png is not a 180x180 PNG");
+  errors.push("icons/icon-180-ios.png is not a 180x180 PNG");
 }
+if ([4,6].includes(pngInfo(touchIcon)?.colorType)) errors.push("icons/icon-180-ios.png must be opaque so iOS can apply Home Screen appearance treatments");
 
 const shellMatch = worker.match(/const APP_SHELL = (\[[\s\S]*?\n\]);/);
 if (!shellMatch) {

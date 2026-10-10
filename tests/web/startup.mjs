@@ -19,7 +19,7 @@ test('fresh visit claims the page and reloads before photo selection', async () 
   const options = {isolated: () => false, secure: true, serviceWorker, reload: () => reloads++};
   assert.equal(await prepareBrowser(options), 'reloading');
   assert.equal(reloads, 1); assert.equal(listeners.size, 0);
-  await assert.rejects(prepareBrowser(options), /BROWSER_SETUP_UNAVAILABLE/);
+  assert.equal(await prepareBrowser(options), 'ready-limited');
   assert.equal(reloads, 1, 'unsupported isolation cannot loop');
   assert.equal(await prepareBrowser({...options, isolated: () => true}), 'ready');
 });

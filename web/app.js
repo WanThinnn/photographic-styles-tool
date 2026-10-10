@@ -29,6 +29,20 @@ const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), enhanceAi = $("e
 const gpuAcceleration=$('gpu-acceleration');
 const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
 const modelLevels=['lite','standard','pro'];
+const aiSettings=$('ai-settings');
+const aiSettingsSummary=aiSettings?.querySelector('summary');
+if(aiSettings&&aiSettingsSummary){
+  aiSettingsSummary.addEventListener('click',event=>{
+    if(!aiSettings.open||aiSettings.classList.contains('is-closing'))return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    event.preventDefault();
+    aiSettings.classList.add('is-closing');
+    const close=()=>{aiSettings.open=false;aiSettings.classList.remove('is-closing');};
+    aiSettings.querySelector('.ai-settings-panel')?.addEventListener('animationend',close,{once:true});
+    setTimeout(()=>{if(aiSettings.classList.contains('is-closing'))close();},220);
+  });
+}
+
 const selectedModel=()=>modelLevels[Number(modelSelector.value)];
 function renderModel(){
   const name=depthModel(selectedModel()).label;
@@ -503,6 +517,7 @@ async function handleFile(file) {
       ui.note(lang==='vi'?'DNG được giải mã thành ảnh sRGB để thêm Styles; bản xuất là HEIC, không còn RAW.':lang==='zh'?'DNG 转换为 sRGB 图像以添加风格；导出 HEIC，不保留 RAW。':'DNG is developed to sRGB for Styles; the HEIC output is no longer RAW.','raw');
     }
     if (RASTER_MIMES[format]) {
+
       if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
       const { importRaster } = await import("./src/raster/raster-import.js");
       let result;
@@ -615,6 +630,7 @@ async function handleFile(file) {
       // Start processing; if the thumbnail is missing, dynamically load the generator.
       let linearThumb = undefined;
       if (d.thumbnail === null) {
+
         if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
         const { generateLinearThumbnail } = await import("./src/codecs/linear-thumbnail.js");
         try {
@@ -769,8 +785,9 @@ function countVisit() {
   countVisit();
   $('boot').textContent = T('st.preparing');
   try {
-    if (await prepareBrowser() !== 'ready') return;
-    const response = await fetch('profiles/index.json');
+    const browserMode=await prepareBrowser();
+    if(browserMode==='reloading')return;
+    const response = await fetch('profiles/index.json',{cache:'no-cache'});
     if (!response.ok) throw Error('Profile index unavailable');
     profileIndex = await response.json();
     browserReady = true;refreshHistoryButton();
@@ -780,7 +797,8 @@ function countVisit() {
     navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.
     // Conversion awaits the same promise, so it never races runtime loading.
-    prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
+    if(browserMode==='ready')prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
+    else console.warn('Running without cross-origin isolation; threaded HEVC/AI features will request isolation when used.');
   } catch (e) {
     console.error('Browser preparation failed', e);
     $("boot").textContent = T('err.setup');

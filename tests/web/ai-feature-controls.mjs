@@ -88,6 +88,10 @@ test('Detail switch matches the existing settings layout and has accessible loca
   assert.doesNotMatch(app,/detailSelector|selectedDetailModel|renderDetailModel/);
   assert.match(html,/id="ai-detail"[^>]+role="switch"[^>]+aria-describedby="ai-detail-hint"/);
   assert.match(css,/\.ai-settings :is\(\.detail-option, \.gpu-option\)/);
+  assert.match(css,/@keyframes ai-settings-in/);
+  assert.match(css,/@keyframes ai-settings-out/);
+  assert.match(css,/prefers-reduced-motion: reduce/);
+  assert.match(app,/aiSettings\.classList\.add\('is-closing'\)/);
   assert.match(css,/:is\(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration\)/);
   assert.match(app,/features:\{portrait:aiPortrait,detail:aiDetail\}/);
   assert.match(app,/function stagePercent\(/);

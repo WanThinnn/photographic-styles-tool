@@ -1,5 +1,5 @@
-// Geometry and compositing for local skin segmentation. These routines do not
-// amplify confidence or change photo pixels; only auxiliary masks are refined.
+// Geometry and compositing for auxiliary masks. Skin refinement blends model
+// confidence; person opacity is calibrated separately. Photo pixels stay intact.
 export function faceCropRect(rect, width, height, padding = 1.65) {
   if (![width,height,padding,rect.x,rect.y,rect.width,rect.height].every(Number.isFinite)
       || width < 1 || height < 1 || rect.width <= 0 || rect.height <= 0 || padding < 1)
@@ -56,4 +56,12 @@ export function skinDetailVariance(luma, alpha, width, height) {
     sum+=value;squared+=value*value;count++;
   }
   return count?Math.max(0,squared/count-(sum/count)**2):0;
+}
+
+// Classifier confidence is not physical opacity. The pinned selfie model leaves
+// a low person-confidence floor on background pixels, which otherwise survives
+// Stage Light as visible grey. Keep a smooth transition for uncertain edges.
+export function personMatteAlpha(confidence) {
+  const t=Math.max(0,Math.min(1,(confidence-32)/192));
+  return Math.round(255*t*t*(3-2*t));
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {faceCropRect,blendFaceConfidence,skinDetailVariance} from '../../web/src/vision/face-refinement.js';
+import {faceCropRect,blendFaceConfidence,skinDetailVariance,personMatteAlpha} from '../../web/src/vision/face-refinement.js';
 import {peopleEntry} from '../../web/src/vision/face-mattes.js';
 
 test('face crops are square in pixels, bounded and include edge faces without coordinate stretching',()=>{
@@ -51,4 +51,14 @@ test('D roughness changes only the smoothing scalar while keeping face colour an
   assert.deepEqual(restored,legacy);
   const flat=peopleEntry(landmarks,{...stats,detailRoughness:0},'FSINCInstanceMask9',0,null);
   assert.equal(flat.get('imageStats').get('SkinSmoothingStandalone').get('SkinSmoothFaceRoughness'),0);
+});
+test('generated person opacity removes the background confidence floor without a hard edge',()=>{
+  for(const value of [0,9,21,32])assert.equal(personMatteAlpha(value),0);
+  for(const value of [224,251,255])assert.equal(personMatteAlpha(value),255);
+  assert.equal(personMatteAlpha(128),128);
+  const values=Array.from({length:256},(_,i)=>personMatteAlpha(i));
+  for(let i=1;i<values.length;i++){
+    assert.ok(values[i]>=values[i-1]);
+    assert.ok(values[i]-values[i-1]<=2,'preserve a gradual hair/edge transition');
+  }
 });

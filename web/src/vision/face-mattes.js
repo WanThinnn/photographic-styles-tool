@@ -13,7 +13,7 @@ import { displayPointToStored, itemOrientation,
 import { MATTE_2026_URIS, URI_PERSON_INSTANCES } from "../raster/texture.js";
 import { srgbToLinear, statsBlock } from "../raster/styles.js";
 import {loadOrtLandmarker, loadOrtSegmenter, releaseOrtModels} from './ort-vision.js';
-import {faceCropRect, blendFaceConfidence, skinDetailVariance} from './face-refinement.js';
+import {faceCropRect, blendFaceConfidence, skinDetailVariance, personMatteAlpha} from './face-refinement.js';
 
 // A promise alone does not let the browser render between synchronous WASM calls.
 const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -740,6 +740,19 @@ function opaqueMask(source) {
   return out;
 }
 
+const PERSON_ALPHA_LUT=Uint8Array.from({length:256},(_,i)=>personMatteAlpha(i));
+async function encodePortraitMatte(source,angle,mirror,onProgress) {
+  // Calibrate generated person masks only. Native masks bypass this function;
+  // skin/face confidence and the model's detection data remain unchanged.
+  const opaque=opaqueMask(source),stored=matteToStored(opaque,angle,mirror);
+  try{
+    const ctx=stored.getContext('2d',{willReadFrequently:true}),image=ctx.getImageData(0,0,stored.width,stored.height);
+    for(let i=0;i<image.data.length;i+=4){const value=PERSON_ALPHA_LUT[image.data[i]];image.data[i]=image.data[i+1]=image.data[i+2]=value;}
+    ctx.putImageData(image,0,0);
+    return await encodeFaceMatte(stored,onProgress);
+  }finally{opaque.width=opaque.height=stored.width=stored.height=0;}
+}
+
 function drawTint(ctx, mask, color, alpha) {
   const tint = canvas(mask.width, mask.height);
   const tctx = tint.getContext("2d");
@@ -907,7 +920,7 @@ async function generateFaceMattesFromDisplay(display, angle, mirror, options = {
     return result;
   }
   if(!review.portraitEncoded)await reportProgress(options, "matte", {matte: "portraiteffectsmatte"});
-  const portraitEncoded=review.portraitEncoded||await encodeFaceMatte(matteToStored(opaqueMask(segmented.person),angle,mirror), options.onProgress);
+  const portraitEncoded=review.portraitEncoded||await encodePortraitMatte(segmented.person,angle,mirror,options.onProgress);
   const portraitOverride={...portraitEncoded,pixi:FACE_MATTE_PIXI};
   return {state:portraitOnly?'skipped':'none',overrides:new Map([[MATTE_URIS.portraiteffectsmatte,portraitOverride]]),faces:0,portraitGenerated:true};
 }
@@ -940,8 +953,8 @@ export async function rebuildFaceMattes(review, excludedIds = [], options = {}) 
   let portraitEncoded = review.portraitEncoded;
   if (!portraitEncoded) {
     await reportProgress(options, "matte", {matte: "portraiteffectsmatte"});
-    portraitEncoded = review.portraitEncoded = await encodeFaceMatte(
-      matteToStored(opaqueMask(segmented.person), angle, mirror), options.onProgress);
+    portraitEncoded = review.portraitEncoded = await encodePortraitMatte(
+      segmented.person,angle,mirror,options.onProgress);
   }
   const portraitOverride = {...portraitEncoded, pixi: FACE_MATTE_PIXI};
   const builders = {
@@ -985,7 +998,7 @@ export async function rebuildFaceMattes(review, excludedIds = [], options = {}) 
       await reportProgress(options, "matte", {matte: "personInstance", index: i + 1, total: faces.length});
       personInstances ||= partitionMaskByFaces(segmented.person, faces);
     }
-    const encoded = faces.length === 1 ? encodedPerson : await encodeMask(personInstances[i]);
+    const encoded = faces.length === 1 ? encodedPerson : await encodePortraitMatte(personInstances[i],angle,mirror,options.onProgress);
     instances.push({ ...encoded, pixi: FACE_MATTE_PIXI, referenceKey: referenceKeys[i] });
   }
   const byName = new Map(MATTE_2026_URIS.map((uri) => [uri.split(":").pop(), uri]));

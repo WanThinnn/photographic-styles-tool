@@ -40,7 +40,7 @@ An original Style selection stored in MakerNote 0x54 survives adding a missing
 Styles graph, including Bright and the original Tone/Colour values.
 
 Depth Anything V2 Small runs locally through ONNX Runtime WebGPU by default.
-The optional AI settings disclosure lets users turn GPU acceleration off to use
+The circular settings control beside the Depth switch lets users turn GPU acceleration off to use
 single-thread WASM CPU inference. This applies to the next operation, uses the
 same model and refinement, and does not change the GPU preview. CPU is slower
 on the measured desktop and is not a guarantee of lower device temperature.
@@ -94,6 +94,11 @@ the photo's matte or the one already generated for Soft Skin, without a second
 segmentation inference. The same corrected depth feeds preview and export.
 Generated Portrait mattes receive a dedicated `PortraitEffectsMatteVersion`
 descriptor (65537) and pixel-data type, rather than Texture's FSINC descriptor.
+Generated person opacity uses a smooth 32–224 confidence remap: low-confidence
+background becomes zero, confident interiors become opaque, and uncertain edges
+remain gradual. Portrait/person/one-person instance mattes share the same encode;
+skin confidence is unchanged and no additional inference runs. Device tests on
+the reported Stage Light sample confirmed a black background with this remap.
 Native mattes are preserved. Apple Photos lighting and bokeh still require device
 validation; metadata and lossless codec checks do not prove visual parity.
 Complete model downloads are SHA-256 verified and cached by content hash;

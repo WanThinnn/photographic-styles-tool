@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {STYLE_EMBEDDING_DIMENSIONS} from '../../web/src/recommend/style-reference-bank.js';
 import {STYLE_MODEL_ID,STYLE_MODEL_REVISION} from '../../web/src/recommend/style-model.js';
 import {SEMANTIC_AXIS_IDS,validateSemanticAxes} from '../../web/src/recommend/style-semantic-axes.js';
-import {recommendStyle} from '../../web/src/recommend/style-recommender.js';
+import {recommendStyle,SUGGESTED_STYLE_PALETTE_MAX} from '../../web/src/recommend/style-recommender.js';
 
 const unit=index=>{const value=new Float32Array(STYLE_EMBEDDING_DIMENSIONS);value[index]=1;return value;};
 function axes(){
@@ -24,7 +24,14 @@ test('scene-aware recommender is deterministic and metadata-bounded',()=>{
   assert.ok(first.styleId>=1&&first.styleId<=16);
   assert.ok(first.tone>=-1&&first.tone<=1);
   assert.ok(first.color>=-1&&first.color<=1);
-  assert.ok(first.palette>=0&&first.palette<=1);
+  assert.ok(first.palette>=0&&first.palette<=SUGGESTED_STYLE_PALETTE_MAX);
+});
+
+test('automatic injected Styles keep a conservative Palette ceiling',()=>{
+  for(const embedding of [unit(0),unit(4),unit(14)]){
+    const result=recommendStyle({axes:axes(),level:'standard',embeddings:Array(5).fill(embedding),statistics:neutralStats});
+    assert.ok(result.palette<=.70);
+  }
 });
 
 test('low-confidence semantic disagreement fails closed to Standard',()=>{

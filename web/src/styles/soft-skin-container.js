@@ -37,8 +37,8 @@ export function installSoftSkin(bytes, result, {nativeStyles=false, sourceBytes=
   if (hasSoftSkinData(bytes) || result.state!=='generated' || !result.faces) return bytes;
   const d=discoverHeic(bytes), source=sourceBytes?discoverHeic(sourceBytes):null;
   // An exported iPhone 16+ photo may have lost its Styles auxiliary graph while
-  // its RGB still carries the captured/edited Style. Missing auxiliaries do not
-  // authorize applying our generated person/skin colour statistics to it again.
+  // its validated 0x54 selection proves the RGB still carries the captured Style.
+  // Missing auxiliaries do not authorize applying our generated statistics again.
   const keepStyleMetadata=nativeStyles||Boolean(source&&preserveNativeStyles(sourceBytes,source));
   const texture=[...d.infos].find(([,i])=>i.uri===URI_TEXTURE_STYLES)?.[0];
   if (texture===undefined) throw Error('Soft Skin requires Texture metadata');

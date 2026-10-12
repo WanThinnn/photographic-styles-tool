@@ -16,6 +16,7 @@ import {
 import { injectAppleMakerNoteTag, extractAppleMakerNoteTag, exifCameraModel } from "../core/exif.js";
 import {parseBplist,buildBplist,BplistReal} from '../core/bplist.js';
 import {editableTmapHeadroom} from './hdr-compatibility.js';
+import {preserveNativeStyles} from './style-preservation.js';
 import {nativePortraitBaseState} from '../portrait/ai-portrait-container.js';
 import {buildStyleMarker,validateStyleRecommendation} from '../recommend/style-selection.js';
 import {
@@ -69,12 +70,12 @@ export function profileFor(index, d, experimental = false) {
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
   const cameraModel=td.exifItem===null?'':(exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))||'');
-  const modernNativeCamera=/^iPhone (1[6-9]|[2-9]\d)(?:\s|$)/.test(cameraModel);
+  const nativeStyleCapture=preserveNativeStyles(targetData,td);
   const styleRecommendation=opts.styleRecommendation===undefined||opts.styleRecommendation===null
     ?null:validateStyleRecommendation(opts.styleRecommendation);
   let styleRecommendationApplied=false;
   const nativePortraitRebuild=opts.portraitStyleRebuild===true&&td.stylesItem===null
-    &&modernNativeCamera
+    &&nativeStyleCapture
     &&nativePortraitBaseState(targetData,td)!==null;
   const evidence=opts.sharpBackgroundEvidence;
   const measuredSharp=evidence?.method==='native-background-detail-v1'
@@ -116,9 +117,9 @@ export async function patch(targetData, profile, opts = {}) {
   }
   else if(nativePortraitRebuild)selectionCompatibility='portrait-standard';
   // Suggested Styles v1 is strictly for legacy/non-native graph construction.
-  // iPhone 16+ capture selections are protected even when their exported graph is incomplete.
+  // A real native capture selection is protected even when its exported graph is incomplete.
   // Older iPhones may carry a legacy 0x54 selection; the explicit recommendation replaces it.
-  if(styleRecommendation&&!nativePortraitRebuild&&!modernNativeCamera){
+  if(styleRecommendation&&!nativePortraitRebuild&&!nativeStyleCapture){
     profile={...profile,mn54:buildStyleMarker(styleRecommendation,profile.mn54),
       manifest:{...profile.manifest,smartstyle_makernote_type:profile.manifest.smartstyle_makernote_type??7}};
     styleRecommendationApplied=true;

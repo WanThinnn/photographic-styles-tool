@@ -50,12 +50,12 @@ async function renderItem(data,d,iid,recommendation,onProgress){
 /**
  * Bake a lightweight display rendition into the ordinary primary/thumbnail only.
  * The linear thumbnail, StyleDeltaMap, Styles plist and 0x54 selection stay intact,
- * so Photos Edit continues to use the editable Styles graph. This is intentionally
- * restricted to SDR sources; HDR requires gain-map rebasing.
+ * so Photos Edit continues to use the editable Styles graph. For HDR, the original
+ * gain map remains attached to the newly styled SDR base; this makes the suggestion
+ * visible immediately while retaining the source highlight modulation and headroom.
  */
-export async function renderSuggestedStyleDisplay(data,recommendation,{sourceHdr=false,onProgress=()=>{}}={}){
+export async function renderSuggestedStyleDisplay(data,recommendation,{onProgress=()=>{}}={}){
   if(!shouldRenderStyleDisplay(recommendation))return {data,rendered:false,reason:'neutral'};
-  if(sourceHdr)return {data,rendered:false,reason:'hdr'};
   const d=discoverHeic(data);
   if(!d.primaryTiles?.length)return {data,rendered:false,reason:'primary'};
   let meta=data.slice(d.meta.off,d.meta.off+d.meta.size);

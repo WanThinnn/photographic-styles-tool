@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {be, concat} from '../../web/src/core/box.js';
-import {exifCameraModel} from '../../web/src/core/exif.js';
+import {exifCameraModel,injectAppleMakerNoteTag} from '../../web/src/core/exif.js';
+import {buildBplist,BplistReal} from '../../web/src/core/bplist.js';
 import {styleReconstructionRisk,preserveNativeStyles,nativeTextureCapture} from '../../web/src/styles/style-preservation.js';
 import {discoverHeic, extractItem, idatItemBytes, propertyBoxBytes} from '../../web/src/core/heif.js';
 import {addTexture} from '../../web/src/styles/texture.js';
@@ -14,6 +15,27 @@ function modelExif(model, little = false) {
     number(1, 2), number(0x0110, 2), number(2, 2), number(value.length, 4), number(26, 4),
     new Uint8Array(4), value]);
   return concat([be(6, 4), new TextEncoder().encode('Exif\0\0'), tiff]);
+}
+
+function nativeStyleExif(model) {
+  const value=new TextEncoder().encode(model+'\0');
+  const signature=new TextEncoder().encode('Apple iOS');
+  const maker=concat([signature,new Uint8Array(3),new TextEncoder().encode('MM'),be(0,2),new Uint8Array(4)]);
+  const tiff=concat([
+    new TextEncoder().encode('MM'),be(42,2),be(8,4),
+    be(2,2),
+    be(0x0110,2),be(2,2),be(value.length,4),be(76,4),
+    be(0x8769,2),be(4,2),be(1,4),be(38,4),
+    new Uint8Array(4),
+    be(1,2),be(0x927c,2),be(7,2),be(maker.length,4),be(56,4),new Uint8Array(4),
+    maker,value,
+  ]);
+  const base=concat([be(6,4),new TextEncoder().encode('Exif\0\0'),tiff]);
+  const marker=buildBplist(new Map([
+    ['0',1],['1',new BplistReal(0)],['2',new BplistReal(0)],['3',new BplistReal(1)],
+    ['4',1],['5',1],['6',4],['7',0],
+  ]));
+  return injectAppleMakerNoteTag(base,marker,0x54,7);
 }
 
 function discovery(payload, stylesItem = null, hdrGrid = null) {
@@ -32,16 +54,21 @@ test('camera model reader handles both TIFF byte orders and malformed metadata',
   assert.equal(exifCameraModel(broken), null);
 });
 
-test('iPhone 16+ preserves native Styles even when exports omit editing resources', () => {
+test('iPhone 16+ requires real native Styles evidence instead of the camera model alone', () => {
   for (const model of ['iPhone 16 Pro', 'iPhone 17', 'iPhone 17 Pro Max', 'iPhone 18 Pro']) {
-    const data = modelExif(model);
-    assert.deepEqual(styleReconstructionRisk(data, discovery(data)), {
+    const thirdParty = modelExif(model);
+    assert.equal(preserveNativeStyles(thirdParty,discovery(thirdParty)),false);
+    assert.equal(styleReconstructionRisk(thirdParty,discovery(thirdParty)),null);
+    assert.equal(preserveNativeStyles(thirdParty,discovery(thirdParty,2,3)),true);
+
+    const data=nativeStyleExif(model);
+    assert.equal(exifCameraModel(data),model);
+    assert.deepEqual(styleReconstructionRisk(data,discovery(data)), {
       cameraModel: model, nativeStylesMissing: true, hdrGainMapMissing: true,
     });
-    assert.equal(styleReconstructionRisk(data, discovery(data, 2, 3)), null);
-    assert.equal(styleReconstructionRisk(data, discovery(data, null, 3)).hdrGainMapMissing, false);
+    assert.equal(styleReconstructionRisk(data,discovery(data,2,3)),null);
+    assert.equal(styleReconstructionRisk(data,discovery(data,null,3)).hdrGainMapMissing,false);
     assert.equal(preserveNativeStyles(data,discovery(data)),true);
-    assert.equal(preserveNativeStyles(data,discovery(data,2,3)),true);
   }
   for (const model of ['iPhone 15 Pro', 'iPhone 13', 'iPhone Air', 'Android', 'iPhone 1600notamodel', '']) {
     const data = modelExif(model);

@@ -24,13 +24,26 @@ test('balanced scene policy selects expressive styles only with coherent evidenc
   assert.equal(decide({energetic:.9,colorful:.95,dramatic:.2},
     stats({saturationMedian:.62,chromaMedian:.48,contrast:.5})).winner.styleName,'Vibrant');
   assert.equal(decide({colorful:-.95,dramatic:.9,airy:-.35},
-    stats({saturationMedian:.03,chromaMedian:.02,contrast:.78})).winner.styleName,'Stark B&W');
+    stats({saturationMedian:.03,chromaMedian:.02,contrast:.78})).winner.styleName,'Dramatic');
+});
+
+test('automatic recommendations never select either destructive B&W preset',()=>{
+  const cases=[
+    [{colorful:-1,dramatic:1,airy:-.5},stats({saturationMedian:0,chromaMedian:0,contrast:.9})],
+    [{colorful:-1,dramatic:-.4,airy:.3,dreamy:.2},stats({saturationMedian:0,chromaMedian:0,contrast:.15})],
+  ];
+  for(const [semantic,statistics] of cases){
+    const result=decide(semantic,statistics);
+    assert.ok(![13,15].includes(result.winner.styleId));
+    assert.ok(result.scores.every(style=>![13,15].includes(style.styleId)));
+  }
 });
 
 test('ambiguous evidence stays in the natural-looking family',()=>{
   const result=decide({});
   assert.ok(['Standard','Natural','Neutral','Luminous'].includes(result.winner.styleName));
   assert.ok(result.scores[0].score>=result.scores[1].score);
+  assert.equal(result.ambiguous,false,'a close but internally coherent choice is still actionable');
 });
 
 test('coherent multi-view evidence is not rejected only because absolute TinyCLIP scores are modest',()=>{

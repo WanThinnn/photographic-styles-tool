@@ -1,7 +1,6 @@
 import { loadProfile } from "./src/core/zip.js";
 import { profileFor, VERSION, UNSUPPORTED } from "./src/styles/port.js";
-import { dimensionsForItem, discoverHeic, extractItem } from "./src/core/heif.js";
-import {exifCameraModel} from "./src/core/exif.js";
+import { dimensionsForItem, discoverHeic } from "./src/core/heif.js";
 import { styleDeltaSize } from "./src/styles/graft.js";
 import { hasTexture } from "./src/styles/texture.js";
 import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
@@ -530,18 +529,8 @@ function styleResultNote(ui,recommendation,error=null){
   const signed=value=>`${value>=0?'+':''}${Number(value).toFixed(2)}`;
   ui.note(`${aiText().styleApplied}: ${recommendation.styleName} · Tone ${signed(recommendation.tone)} · Color ${signed(recommendation.color)} · Palette ${Number(recommendation.palette).toFixed(2)}`,'style-ai');
 }
-function modernNativeCamera(bytes,d){
-  if(d.exifItem===null)return false;
-  try{
-    const model=exifCameraModel(extractItem(bytes,d.iloc,d.exifItem))||'';
-    return /^iPhone (1[6-9]|[2-9]\d)(?:\s|$)/.test(model);
-  }catch(error){
-    console.warn('Could not classify camera for Suggested Styles; preserving source Style metadata',error);
-    return true;
-  }
-}
 async function recommendHeicStyle(bytes,d,ui){
-  if(!aiFeatures.enabled('style')||modernNativeCamera(bytes,d))return null;
+  if(!aiFeatures.enabled('style')||preserveNativeStyles(bytes,d))return null;
   try{
     ui.set(aiText().styleAnalyzing);
     const [{recommendStyleRgb},{orientStyleImage},rasterHeif]=await Promise.all([
@@ -757,21 +746,28 @@ async function handleFile(file) {
         : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
       opts.portraitStyleRebuild=rebuildNativePortrait;
       opts.sharpBackgroundEvidence=sharpBackgroundEvidence;
-      if(aiFeatures.enabled('style')&&!rebuildNativePortrait&&!modernNativeCamera(bytes,d))opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);
+      if(aiFeatures.enabled('style')&&!rebuildNativePortrait)opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
-      // The library viewer normally shows the HEIC primary, while Photos Edit
-      // evaluates the editable Styles graph. Bake a matching SDR display rendition
-      // so the suggestion is visible immediately without a dummy edit+save.
-      if(report.styleRecommendation&&d.hdrGrid===null){
+      // The library viewer normally shows the HEIC primary (plus its HDR gain map),
+      // while Photos Edit evaluates the editable Styles graph. Bake the matching
+      // display base for SDR and HDR so no dummy edit+save is needed.
+      if(report.styleRecommendation){
+        const needsStyledDisplay=!report.styleRecommendation.fallback
+          &&report.styleRecommendation.styleId!==1&&report.styleRecommendation.palette>.01;
         try{
           const {renderSuggestedStyleDisplay}=await import('./src/recommend/style-display-heic.js');
-          const rendered=await renderSuggestedStyleDisplay(data,report.styleRecommendation,{sourceHdr:false,
+          const rendered=await renderSuggestedStyleDisplay(data,report.styleRecommendation,{
             onProgress:progress=>{if(progress?.stage==='styleDisplay')ui.set(T('st.working'));}});
+          if(needsStyledDisplay&&!rendered.rendered)
+            throw Error(`Suggested Style display rendition was not written (${rendered.reason||'unknown'})`);
           data=rendered.data;report.styleDisplayRendered=rendered.rendered;
         }catch(error){
           report.styleDisplayError=String(error?.message||error);
-          console.warn('Suggested Style display rendition unavailable; editable Style metadata is retained',error);
+          console.error('Suggested Style display rendition unavailable',error);
+          // Metadata alone previews only inside Photos Edit and disappears on
+          // Cancel. Never publish that misleading half-applied result.
+          if(needsStyledDisplay)throw error;
         }
       }
       // patch() degrades rather than failing when the decoder misbehaves, so trust

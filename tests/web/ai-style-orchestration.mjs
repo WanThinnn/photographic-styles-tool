@@ -6,7 +6,7 @@ const app=readFileSync(new URL('../../web/app.js',import.meta.url),'utf8');
 const raster=readFileSync(new URL('../../web/src/raster/raster-import.js',import.meta.url),'utf8');
 
 test('Suggested Styles stays lazy when the independent feature is disabled',()=>{
-  assert.match(app,/async function recommendHeicStyle[\s\S]*if\(!aiFeatures\.enabled\('style'\)\|\|modernNativeCamera\(bytes,d\)\)return null;[\s\S]*import\('\.\/src\/recommend\/style-runtime\.js'\)/);
+  assert.match(app,/async function recommendHeicStyle[\s\S]*if\(!aiFeatures\.enabled\('style'\)\|\|preserveNativeStyles\(bytes,d\)\)return null;[\s\S]*import\('\.\/src\/recommend\/style-runtime\.js'\)/);
   assert.match(raster,/async function suggestStyleForImage\(image,request,onProgress\)\{\s*if\(!request\)return \{recommendation:null,error:null\};[\s\S]*import\('\.\.\/recommend\/style-runtime\.js'\)/);
   assert.match(app,/styleSuggestion:aiFeatures\.enabled\('style'\)\?\{level:selectedAiLevel\(\),provider:/);
 });
@@ -19,8 +19,9 @@ test('native preservation classification happens before any HEIC recommendation'
   assert.ok(classify>=0&&classify<nativeBranch&&nativeBranch<patchBranch&&patchBranch<recommend);
   assert.equal((app.match(/opts\.styleRecommendation=await recommendHeicStyle/g)||[]).length,1);
   const helper=app.slice(app.indexOf('async function recommendHeicStyle'),app.indexOf('async function handleFile'));
-  const bypass=helper.indexOf("modernNativeCamera(bytes,d))return null"),load=helper.indexOf("import('./src/recommend/style-runtime.js')");
-  assert.ok(bypass>=0&&load>=0&&bypass<load,'iPhone 16+ must return before loading the recommender');
+  const bypass=helper.indexOf("preserveNativeStyles(bytes,d))return null"),load=helper.indexOf("import('./src/recommend/style-runtime.js')");
+  assert.ok(bypass>=0&&load>=0&&bypass<load,'a native Style marker/graph must return before loading the recommender');
+  assert.doesNotMatch(app,/modernNativeCamera/,'camera model alone must not bypass third-party iPhone photos');
 });
 
 test('raster Detail changes pixels before Suggested Styles analyzes them',()=>{
@@ -39,11 +40,14 @@ test('shared AI level and GPU toggle are forwarded to both raster and HEIC recom
   assert.match(app,/recommendStyleRgb\([\s\S]*level:selectedAiLevel\(\),provider:gpuAcceleration\.checked\?'webgpu':'wasm'/);
 });
 
-test('Suggested Styles bakes only the ordinary SDR display rendition while retaining editable metadata',()=>{
+test('Suggested Styles bakes SDR and HDR display bases while retaining editable metadata',()=>{
   const patch=app.indexOf('await patchInWorker(bytes, profile, opts)');
   const display=app.indexOf("import('./src/recommend/style-display-heic.js')",patch);
   assert.ok(patch>=0&&display>patch);
-  assert.match(app,/if\(report\.styleRecommendation&&d\.hdrGrid===null\)[\s\S]*renderSuggestedStyleDisplay\(data,report\.styleRecommendation/);
+  assert.match(app,/if\(report\.styleRecommendation\)[\s\S]*renderSuggestedStyleDisplay\(data,report\.styleRecommendation/);
+  assert.doesNotMatch(app,/report\.styleRecommendation&&d\.hdrGrid===null/);
+  assert.match(app,/if\(needsStyledDisplay&&!rendered\.rendered\)[\s\S]*if\(needsStyledDisplay\)throw error;/,
+    'metadata-only recommendations must not be published as successfully applied Styles');
   const linear=raster.indexOf('const linearThumbnail = await encodeLinearThumbnail(image');
   const render=raster.indexOf('const styleDisplayRendered=',linear);
   assert.ok(linear>=0&&render>linear,'linear thumbnail stays based on the unbaked editable source');

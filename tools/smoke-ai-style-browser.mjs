@@ -114,7 +114,7 @@ try{
       ]);
       const input=new Uint8Array(await fetch('http://127.0.0.1:${port}/__style_display_input__').then(r=>r.arrayBuffer()));
       const before=discoverHeic(input),dramatic={styleId:11,tone:-.75,color:.2,palette:.99,confidence:.9,level:'standard'};
-      const rendered=await renderSuggestedStyleDisplay(input,dramatic,{sourceHdr:false});
+      const rendered=await renderSuggestedStyleDisplay(input,dramatic);
       const after=discoverHeic(rendered.data);let changed=0,unchanged=0;
       for(const [id,item] of before.iloc.items){
         if(item.constructionMethod!==0||!item.extents.length)continue;
@@ -122,7 +122,16 @@ try{
         let same=a.length===b.length;if(same)for(let i=0;i<a.length;i++)if(a[i]!==b[i]){same=false;break;}
         same?unchanged++:changed++;
       }
-      display={rendered:rendered.rendered,primaryTiles:before.primaryTiles.length,changed,unchanged,bytes:[input.length,rendered.data.length]};
+      const beforeHdr=[...new Set([...before.hdrTiles,...(before.hdrGrid!==null?[before.hdrGrid]:[])])];
+      const afterHdr=[...new Set([...after.hdrTiles,...(after.hdrGrid!==null?[after.hdrGrid]:[])])];
+      let hdrUnchanged=0;
+      beforeHdr.forEach((id,index)=>{
+        const a=extractItem(input,before.iloc,id),b=extractItem(rendered.data,after.iloc,afterHdr[index]);
+        let same=a.length===b.length;if(same)for(let i=0;i<a.length;i++)if(a[i]!==b[i]){same=false;break;}
+        if(same)hdrUnchanged++;
+      });
+      display={rendered:rendered.rendered,primaryTiles:before.primaryTiles.length,hdrItems:beforeHdr.length,
+        hdrUnchanged,changed,unchanged,bytes:[input.length,rendered.data.length]};
     }
     return {provider:'${provider}',level:'${level}',views:embeddings.length,dimensions:embeddings[0].length,norms,head,ms,
       recommendation,display,webgpu:Boolean(navigator.gpu)};
@@ -134,7 +143,8 @@ try{
     ||value.norms.some(norm=>Math.abs(norm-1)>1e-3)||value.head.some(v=>!Number.isFinite(v))
     ||!Number.isInteger(value.recommendation?.styleId)||value.recommendation.styleId<1||value.recommendation.styleId>16
     ||![value.recommendation.tone,value.recommendation.color,value.recommendation.palette,value.recommendation.confidence].every(Number.isFinite)
-    ||(heicPath&&(!value.display?.rendered||value.display.changed<value.display.primaryTiles)))
+    ||(heicPath&&(!value.display?.rendered||value.display.changed<value.display.primaryTiles
+      ||value.display.hdrUnchanged!==value.display.hdrItems)))
     throw Error('Invalid browser TinyCLIP/recommender result: '+JSON.stringify(value));
   console.log('SUGGESTED STYLES BROWSER INFERENCE PASS '+JSON.stringify(value));
 }finally{

@@ -1,6 +1,7 @@
 import { loadProfile } from "./src/core/zip.js";
 import { profileFor, VERSION, UNSUPPORTED } from "./src/styles/port.js";
-import { dimensionsForItem, discoverHeic } from "./src/core/heif.js";
+import { dimensionsForItem, discoverHeic, extractItem } from "./src/core/heif.js";
+import {exifCameraModel} from "./src/core/exif.js";
 import { styleDeltaSize } from "./src/styles/graft.js";
 import { hasTexture } from "./src/styles/texture.js";
 import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
@@ -25,7 +26,7 @@ import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
-const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), enhanceAi = $("enhance-ai");
+const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), aiStyleSuggest=$("ai-style-suggest"), enhanceAi = $("enhance-ai");
 const gpuAcceleration=$('gpu-acceleration');
 const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
 const modelLevels=['lite','standard','pro'];
@@ -43,9 +44,9 @@ if(aiSettings&&aiSettingsSummary){
   });
 }
 
-const selectedModel=()=>modelLevels[Number(modelSelector.value)];
+const selectedAiLevel=()=>modelLevels[Number(modelSelector.value)];
 function renderModel(){
-  const name=depthModel(selectedModel()).label;
+  const name=depthModel(selectedAiLevel()).label;
   $('depth-model-value').textContent=name;modelSelector.setAttribute('aria-valuetext',name);
   modelSelector.parentElement.style.setProperty('--model-position',['14px','50%','calc(100% - 14px)'][Number(modelSelector.value)]);
   modelSelector.parentElement.dataset.level=modelSelector.value;
@@ -57,7 +58,7 @@ try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved
 
 renderModel();
 modelSelector.addEventListener('input',()=>{
-  renderModel();try{localStorage.setItem('depth-model',selectedModel());}catch{}
+  renderModel();try{localStorage.setItem('depth-model',selectedAiLevel());}catch{}
 });
 try{gpuAcceleration.checked=localStorage.getItem('depth-gpu-acceleration')!=='off';}catch{}
 gpuAcceleration.addEventListener('change',()=>{
@@ -69,7 +70,7 @@ const aiCandidates = [];
 let browserReady = false, pendingTasks = 0;
 const aiFeatures=createAiFeatureControls({
   master:enhanceAi,
-  features:{portrait:aiPortrait,detail:aiDetail},
+  features:{portrait:aiPortrait,detail:aiDetail,style:aiStyleSuggest},
   isAvailable:()=>browserReady&&!clearingAssets,
 });
 function refreshHistoryButton() {
@@ -92,6 +93,7 @@ clearHistory.addEventListener('click', () => {
   list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
   releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor();
   void import('./src/detail/detail-inference.js').then(({releaseDetailWorkers})=>releaseDetailWorkers()).catch(()=>{});
+  void import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
   refreshHistoryButton();
 });
 clearAssets.addEventListener('click',async()=>{
@@ -102,9 +104,9 @@ clearAssets.addEventListener('click',async()=>{
   fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
   try{
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
-    const [{releaseOrtModels},{releaseDetailWorkers}]=await Promise.all([
-      import('./src/vision/ort-vision.js'),import('./src/detail/detail-inference.js')]);
-    releaseDetailWorkers();await releaseOrtModels();
+    const [{releaseOrtModels},{releaseDetailWorkers},{releaseStyleRecommender}]=await Promise.all([
+      import('./src/vision/ort-vision.js'),import('./src/detail/detail-inference.js'),import('./src/recommend/style-runtime.js')]);
+    releaseDetailWorkers();releaseStyleRecommender();await releaseOrtModels();
     await clearDownloadedAssets();assetStatus='cleaned';
   }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
   finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
@@ -117,6 +119,8 @@ function translateAi() {
   $("ai-portrait-hint").hidden = false;
   $("ai-detail-label").textContent = aiText().detailToggle;
   $("ai-detail-hint").textContent = aiText().detailHint;
+  $('ai-style-suggest-label').textContent=aiText().styleToggle;
+  $('ai-style-suggest-hint').textContent=aiText().styleHint;
 
 
   $('ai-settings').hidden=false;
@@ -148,6 +152,11 @@ aiPortrait.addEventListener('change', () => {
       queueTask(() => runAiCandidate(candidate));
     }
   }
+});
+
+aiStyleSuggest.addEventListener('change',()=>{
+  if(aiStyleSuggest.checked)return;
+  void import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
 });
 
 // Fetch the decoder while the visitor is still choosing a photo,
@@ -454,7 +463,7 @@ async function runAiCandidate(candidate) {
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
   let lastStage='loading';
   const provider=gpuAcceleration.checked?'webgpu':'wasm';
-  const modelId=selectedModel();
+  const modelId=selectedAiLevel();
   try {
     const {createAiPortrait} = await import('./src/portrait/ai-portrait.js');
     const {exportAiPortrait} = await import('./src/portrait/ai-portrait-export.js');
@@ -462,6 +471,9 @@ async function runAiCandidate(candidate) {
     // These serialized conversion jobs are finished. Free their WASM heaps
     // before loading the GPU model, especially after JPEG/PNG or thumbnails.
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
+    // Suggested Styles uses its own ORT/WebGPU session. Never keep that session
+    // alive while loading the much larger depth model, especially on Safari.
+    if(aiFeatures.enabled('style'))await import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
     const result = await createAiPortrait(data,(stage,progress)=>{
       lastStage=stage;
       if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
@@ -502,6 +514,58 @@ async function runAiCandidate(candidate) {
 function stagePercent(done,total){
   return Number.isFinite(done)&&Number.isFinite(total)&&total>0 ? `${Math.min(100,Math.max(0,Math.round(done/total*100)))}%` : '';
 }
+function styleProgress(ui,progress){
+  const stage=progress.styleStage||progress.stage;
+  if(['download','modelDownload','modelLoading','styleSemantics','styleCpuFallback'].includes(stage)){ui.set(aiText().stylePreparing);return;}
+  if(stage==='inference'){
+    const percent=stagePercent(progress.progress?.done,progress.progress?.total);
+    ui.set(percent?`${aiText().styleAnalyzing} ${percent}`:aiText().styleAnalyzing);return;
+  }
+  ui.set(aiText().styleAnalyzing);
+}
+function styleResultNote(ui,recommendation,error=null){
+  if(error){ui.note(`${aiText().styleUnavailable} ${String(error).slice(0,140)}`,'style-ai');return;}
+  if(!recommendation)return;
+  if(recommendation.fallback){ui.note(aiText().styleFallback,'style-ai');return;}
+  const signed=value=>`${value>=0?'+':''}${Number(value).toFixed(2)}`;
+  ui.note(`${aiText().styleApplied}: ${recommendation.styleName} · Tone ${signed(recommendation.tone)} · Color ${signed(recommendation.color)} · Palette ${Number(recommendation.palette).toFixed(2)}`,'style-ai');
+}
+function modernNativeCamera(bytes,d){
+  if(d.exifItem===null)return false;
+  try{
+    const model=exifCameraModel(extractItem(bytes,d.iloc,d.exifItem))||'';
+    return /^iPhone (1[6-9]|[2-9]\d)(?:\s|$)/.test(model);
+  }catch(error){
+    console.warn('Could not classify camera for Suggested Styles; preserving source Style metadata',error);
+    return true;
+  }
+}
+async function recommendHeicStyle(bytes,d,ui){
+  if(!aiFeatures.enabled('style')||modernNativeCamera(bytes,d))return null;
+  try{
+    ui.set(aiText().styleAnalyzing);
+    const [{recommendStyleRgb},{orientStyleImage},rasterHeif]=await Promise.all([
+      import('./src/recommend/style-runtime.js'),
+      import('./src/recommend/style-analysis.js'),
+      import('./src/raster/heif.js'),
+    ]);
+    const rd=rasterHeif.discoverHeic(bytes),[width,height]=rasterHeif.dimensionsForItem(rd.props,rd.primary);
+    const scale=Math.min(1,640/Math.max(width,height));
+    const sampleWidth=Math.max(1,Math.round(width*scale)),sampleHeight=Math.max(1,Math.round(height*scale));
+    const orientation=rasterHeif.itemOrientation(bytes,rd.props,rd.primary);
+    const rgb=await decodeToRgb(bytes,{width:sampleWidth,height:sampleHeight,...orientation});
+    const display=orientStyleImage({data:rgb,width:sampleWidth,height:sampleHeight},orientation);
+    const recommendation=await recommendStyleRgb(display,{
+      level:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm',
+      onProgress:progress=>styleProgress(ui,progress),
+    });
+    return recommendation;
+  }catch(error){
+    console.warn('Suggested Styles unavailable; retaining Standard',error);
+    styleResultNote(ui,null,error?.message||error);
+    return null;
+  }
+}
 
 async function handleFile(file) {
   const ui = row(file.name);
@@ -539,6 +603,7 @@ async function handleFile(file) {
       try {
         result = await importRaster(new File([bytes], file.name, {type: RASTER_MIMES[format]}),
           null, progress => {
+            if(progress.stage==='styleSuggestion'){styleProgress(ui,progress);return;}
             if (progress.stage === "modelDownload")
               ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
             else if (progress.stage === "download" || progress.stage === "modelLoading")
@@ -548,7 +613,11 @@ async function handleFile(file) {
             else if (progress.stage === "main") ui.set(stagePercent(progress.done,progress.total) ? `${T("st.rastertiles")} ${stagePercent(progress.done,progress.total)}` : T("st.rastertiles"));
             else if (progress.stage === "auxiliary") ui.set(stagePercent(progress.done,progress.total) ? `${aiText().detailHdrWorking} ${stagePercent(progress.done,progress.total)}` : aiText().detailHdrWorking);
             else ui.set(T("st.rasterworking"));
-          }, {analyze: true,detail:aiFeatures.enabled('detail')?{modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null});
+          }, {
+            analyze:true,
+            detail:aiFeatures.enabled('detail')?{modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null,
+            styleSuggestion:aiFeatures.enabled('style')?{level:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null,
+          });
       } catch (error) {
         console.error("Raster conversion failed", file.name, error);
         ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
@@ -557,6 +626,7 @@ async function handleFile(file) {
       const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
       if(result.detailSkipped)ui.note(`${aiText().detailSkipped} ${result.detailSkipped}`,'detail');
       else if(result.detailApplied)ui.note(aiText().detailApplied,'detail');
+      if(aiFeatures.enabled('style'))styleResultNote(ui,result.styleRecommendation,result.styleSuggestionError);
       result.data=await addMissingSoftSkin(result.data,file,ui);
       const date = photoCaptureDate(result.data);
       const output = new File([result.data], outName, {type: "image/heic",
@@ -578,7 +648,7 @@ async function handleFile(file) {
           try{
             const {enhanceNativeHdrHeic}=await import('./src/detail/detail-native-heic.js');
             const enhanced=await enhanceNativeHdrHeic(bytes,{
-              modelId:selectedModel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
+              modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
             },{onProgress:progress=>{
               if(progress.stage==='download'||progress.stage==='modelLoading')ui.set(aiText().detailPreparing);
               else if(progress.stage==='inference'){
@@ -687,13 +757,29 @@ async function handleFile(file) {
         : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
       opts.portraitStyleRebuild=rebuildNativePortrait;
       opts.sharpBackgroundEvidence=sharpBackgroundEvidence;
+      if(aiFeatures.enabled('style')&&!rebuildNativePortrait&&!modernNativeCamera(bytes,d))opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
+      // The library viewer normally shows the HEIC primary, while Photos Edit
+      // evaluates the editable Styles graph. Bake a matching SDR display rendition
+      // so the suggestion is visible immediately without a dummy edit+save.
+      if(report.styleRecommendation&&d.hdrGrid===null){
+        try{
+          const {renderSuggestedStyleDisplay}=await import('./src/recommend/style-display-heic.js');
+          const rendered=await renderSuggestedStyleDisplay(data,report.styleRecommendation,{sourceHdr:false,
+            onProgress:progress=>{if(progress?.stage==='styleDisplay')ui.set(T('st.working'));}});
+          data=rendered.data;report.styleDisplayRendered=rendered.rendered;
+        }catch(error){
+          report.styleDisplayError=String(error?.message||error);
+          console.warn('Suggested Style display rendition unavailable; editable Style metadata is retained',error);
+        }
+      }
       // patch() degrades rather than failing when the decoder misbehaves, so trust
       // what it reports it actually did, not what we asked for.
       if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
       if(report.styleSelectionCompatibility==='portrait-standard')ui.note(T('warn.portraitstandard'),'style-rebuild');
       else if(report.styleSelectionCompatibility==='bright-palette70')ui.note(T('warn.brightcompat'),'style-rebuild');
+      if(report.styleRecommendation)styleResultNote(ui,report.styleRecommendation);
 
       bits = [T(report.decoded ? "st.matched" : "st.neutral")];
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));

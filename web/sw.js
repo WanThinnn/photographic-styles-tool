@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v120`;
+const CACHE_NAME = `${CACHE_PREFIX}v124`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -23,6 +23,21 @@ const APP_SHELL = [
   "./src/detail/detail-worker.js",
   "./src/detail/detail-raster.js",
   "./src/detail/detail-native-heic.js",
+  "./src/recommend/style-selection.js",
+  "./src/recommend/style-quality.js",
+  "./src/recommend/style-reference-bank.js",
+  "./src/recommend/style-analysis.js",
+  "./src/recommend/style-semantic-axes.js",
+  "./src/recommend/style-profile-matrix.js",
+  "./src/recommend/style-scene-decision.js",
+  "./src/recommend/style-recommender.js",
+  "./src/recommend/style-display-render.js",
+  "./src/recommend/style-display-heic.js",
+  "./src/recommend/style-model.js",
+  "./src/recommend/style-preprocess.js",
+  "./src/recommend/style-inference.js",
+  "./src/recommend/style-inference-worker.js",
+  "./src/recommend/style-runtime.js",
   "./src/portrait/ai-portrait.js",
   "./src/portrait/ai-inference.js",
   "./src/portrait/ai-inference-worker.js",
@@ -225,6 +240,16 @@ self.addEventListener("fetch", (event) => {
   // Third-party requests (the optional decoder and anonymous visit counter)
   // retain their existing failure behavior and are never persisted here.
   if (url.origin !== self.location.origin) return;
+
+  if(url.pathname.includes('/vendor/ai-style/')){
+    // Large Suggested Styles ONNX files belong exclusively to the verified
+    // model downloader cache. Keep the small manifest/semantic axes/reference
+    // diagnostics on the normal versioned app cache so offline re-use does not duplicate weights.
+    if(/\.onnx$/.test(url.pathname)){
+      event.respondWith(fetch(request).then(isolated));
+    }else event.respondWith(networkFirst(request));
+    return;
+  }
 
   if (url.pathname.includes('/vendor/ai-portrait/')) {
     // Opt-in assets are immutable for this app version. Cache once, and tolerate

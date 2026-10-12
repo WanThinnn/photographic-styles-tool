@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "axes": {
+    "dramatic": {
+      "positive": [
+        "a dramatic moody high contrast photograph",
+        "a cinematic low key photograph with strong shadows",
+        "an intense atmospheric photograph",
+        "a bold dramatic photographic scene"
+      ],
+      "negative": [
+        "a soft gentle understated photograph",
+        "a delicate low contrast photograph",
+        "a calm subtle photographic scene",
+        "a mild neutral photograph"
+      ]
+    },
+    "airy": {
+      "positive": [
+        "a bright airy luminous photograph",
+        "a light open photograph with glowing daylight",
+        "a high key photograph with soft bright light",
+        "a clean radiant photographic scene"
+      ],
+      "negative": [
+        "a dark low key shadowy photograph",
+        "a dim photograph with deep shadows",
+        "a dark enclosed photographic scene",
+        "a low light moody photograph"
+      ]
+    },
+    "energetic": {
+      "positive": [
+        "an energetic lively dynamic photograph",
+        "a vivid active exciting photographic scene",
+        "a playful vibrant photograph full of motion",
+        "a bold lively photograph"
+      ],
+      "negative": [
+        "a calm quiet peaceful photograph",
+        "a still restrained contemplative scene",
+        "a serene gentle photograph",
+        "a subdued quiet photographic scene"
+      ]
+    },
+    "warmMood": {
+      "positive": [
+        "a warm cozy intimate golden photograph",
+        "a comforting warm photograph with golden light",
+        "a cozy inviting photographic scene",
+        "a warm amber toned photograph"
+      ],
+      "negative": [
+        "a cool crisp detached blue toned photograph",
+        "a cool clean photographic scene",
+        "a cold blue atmosphere in a photograph",
+        "a cool neutral photograph"
+      ]
+    },
+    "dreamy": {
+      "positive": [
+        "an ethereal dreamy delicate photograph",
+        "a romantic soft dreamlike photographic scene",
+        "a hazy whimsical photograph",
+        "a delicate otherworldly photograph"
+      ],
+      "negative": [
+        "a grounded crisp realistic photograph",
+        "a clear documentary photograph",
+        "a direct factual photographic scene",
+        "a sharp realistic photograph"
+      ]
+    },
+    "natural": {
+      "positive": [
+        "a natural realistic authentic photograph",
+        "an unstyled documentary photograph",
+        "a realistic natural photographic scene",
+        "a natural looking photograph"
+      ],
+      "negative": [
+        "a heavily stylized cinematic photograph",
+        "an artistic processed photographic scene",
+        "a strongly graded stylized photograph",
+        "a highly cinematic edited photograph"
+      ]
+    },
+    "people": {
+      "positive": [
+        "a portrait photograph of a person",
+        "a photograph focused on a human face",
+        "a photograph of people",
+        "a human subject portrait photo"
+      ],
+      "negative": [
+        "a landscape photograph without people",
+        "an architecture photograph without people",
+        "a still life photograph without people",
+        "a scenery photograph with no human subject"
+      ]
+    },
+    "colorful": {
+      "positive": [
+        "a rich colorful chromatic photograph",
+        "a photograph with vivid varied colors",
+        "a strongly colorful photographic scene",
+        "a vibrant color photograph"
+      ],
+      "negative": [
+        "a monochrome black and white photograph",
+        "a nearly colorless desaturated photograph",
+        "a grayscale photographic scene",
+        "a muted monochromatic photograph"
+      ]
+    }
+  }
+}

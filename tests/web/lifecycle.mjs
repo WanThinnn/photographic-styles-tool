@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inferDepth,awaitAiSource,depthWorkerFailure,canRetryDepth} from '../../web/src/portrait/ai-inference.js';
+import {inferDepth,awaitAiSource,depthWorkerFailure,canRetryDepth,canFallbackDepthToCpu} from '../../web/src/portrait/ai-inference.js';
 import {releaseLibheif} from '../../web/src/codecs/libheif-lifecycle.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
@@ -9,21 +9,28 @@ import {clearDownloadedAssets} from '../../web/src/core/cache-cleanup.js';
 import {MODEL_CACHE_NAME} from '../../web/src/core/model-download.js';
 import {depthModel,asDisparity} from '../../web/src/portrait/depth-models.js';
 
+
 test('download cleanup is scoped and preserves photos, shell, and sibling projects',async()=>{
   const entries=new Map([
     [MODEL_CACHE_NAME,new Map([
       ['https://example.com/tool/vendor/ai-portrait/pro-model.onnx_data?sha256=p',new Response('weights',{headers:{'content-length':'7'}})],
+      ['https://example.com/tool/vendor/ai-style/tinyclip-image-int8.onnx',new Response('style-weights',{headers:{'content-length':'13'}})],
       ['https://example.com/other/vendor/ai-portrait/model.onnx',new Response('other')],
       ['https://example.com/tool/photo.heic',new Response('photo')],
     ])],
-    ['photographic-style-port-v100',new Map([['https://example.com/tool/index.html',new Response('shell')]])],
+    ['photographic-style-port-v100',new Map([
+      ['https://example.com/tool/index.html',new Response('shell')],
+      ['https://example.com/tool/vendor/ai-style/reference-bank.json',new Response('{"version":1}')],
+      ['https://example.com/tool/vendor/ai-style/semantic-axes.json',new Response('{"schema":1}')],
+      ['https://example.com/tool/vendor/ai-style/assets.json',new Response('{"ok":1}',{headers:{'content-length':'8'}})],
+    ])],
     ['unrelated-app',new Map([['https://example.com/tool/vendor/ai-portrait/model.onnx',new Response('other cache')]])],
   ]);
   const cacheStorage={keys:async()=>[...entries.keys()],open:async name=>{
     const map=entries.get(name);return {keys:async()=>[...map.keys()].map(url=>({url})),match:async r=>map.get(r.url),delete:async r=>map.delete(r.url)};
   }};
-  assert.deepEqual(await clearDownloadedAssets({cacheStorage,base:'https://example.com/tool/'}),{count:1,bytes:7});
-  assert.equal(entries.get(MODEL_CACHE_NAME).size,2);assert.equal(entries.get('photographic-style-port-v100').size,1);assert.equal(entries.get('unrelated-app').size,1);
+  assert.deepEqual(await clearDownloadedAssets({cacheStorage,base:'https://example.com/tool/'}),{count:3,bytes:28});
+  assert.equal(entries.get(MODEL_CACHE_NAME).size,2);assert.equal(entries.get('photographic-style-port-v100').size,3);assert.equal(entries.get('unrelated-app').size,1);
   assert.deepEqual(await clearDownloadedAssets({cacheStorage,base:'https://example.com/tool/'}),{count:0,bytes:0});
   await assert.rejects(clearDownloadedAssets({cacheStorage:null}),/unavailable/);
 });
@@ -80,6 +87,8 @@ test('depth errors retain runtime codes and retry only inference/resource failur
   assert.ok(canRetryDepth(Object.assign(Error('Buffer allocation failed'),{stage:'modelLoading'})));
   assert.ok(!canRetryDepth(Object.assign(Error('AI model integrity check failed'),{stage:'download'})));
   assert.ok(!canRetryDepth(Object.assign(Error('model unsupported'),{stage:'modelLoading'})));
+  const oom=Object.assign(Error('no available backend found. ERR: [webgpu] RangeError: Out of memory'),{stage:'modelLoading'});
+  assert.ok(canRetryDepth(oom));assert.ok(canFallbackDepthToCpu(oom,'webgpu'));assert.ok(!canFallbackDepthToCpu(oom,'wasm'));
   assert.ok(!canRetryDepth(Object.assign(Error('WEBGPU'),{stage:'inference'})));
   for(const name of ['AbortError','TimeoutError'])assert.ok(!canRetryDepth(Object.assign(Error('failed'),{stage:'inference',name})));
 });
@@ -114,7 +123,7 @@ test('network responses and isolation survive denied cache or quota failures',as
   }
 });
 
-test('UI updates retain pinned depth dependencies without caching a second model copy',async()=>{
+test('UI updates retain pinned AI dependencies without caching duplicate model weights',async()=>{
   const events={},opened=[],deleted=[],fetched=[];
   const dependency='photographic-style-depth-assets-4472b736-ort-1.22.0';
   runInNewContext(readFileSync(new URL('../../web/sw.js',import.meta.url),'utf8'),{
@@ -132,4 +141,14 @@ test('UI updates retain pinned depth dependencies without caching a second model
   assert.deepEqual(opened,[dependency],'model storage belongs to the downloader, not a duplicate SW cache');
   events.fetch({request:request('assets.json'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'network');
   assert.equal(fetched.length,2,'manifest revalidates instead of trusting old dependency metadata');
+
+  const styleRequest=filename=>({method:'GET',url:'https://example.com/vendor/ai-style/'+filename,mode:'cors'});
+  const beforeStyleModel=opened.length;
+  events.fetch({request:styleRequest('tinyclip-image-int8.onnx?sha256=known'),respondWith:p=>pending=p});
+  assert.equal(await(await pending).text(),'network');
+  assert.equal(opened.length,beforeStyleModel,'Suggested Styles weights belong only to the verified model cache');
+  events.fetch({request:styleRequest('assets.json'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'network');
+  events.fetch({request:styleRequest('semantic-axes.json'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'network');
+  events.fetch({request:styleRequest('reference-bank.json'),respondWith:p=>pending=p});assert.equal(await(await pending).text(),'network');
+  assert.ok(opened.filter(name=>name.startsWith('photographic-style-port-')).length>=2,'small style metadata uses the versioned app cache');
 });

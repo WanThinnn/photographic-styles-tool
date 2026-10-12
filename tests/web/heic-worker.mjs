@@ -19,6 +19,12 @@ function job(payload) {
     worker.postMessage(payload);
   }).finally(() => worker.terminate());
 }
+test('worker boundary rejects malformed Suggested Styles metadata before graph mutation',async()=>{
+  await assert.rejects(job({operation:'patch',data:new Uint8Array(),profile:{},opts:{
+    styleRecommendation:{styleId:99,tone:0,color:0,palette:1,confidence:1,level:'standard'},
+  }}),/Unsupported Photographic Style/);
+});
+
 test('worker preserves the native Texture output byte for byte', {skip: !fs.existsSync(directory+'IMG_0714.HEIC')}, async () => {
   const data = new Uint8Array(fs.readFileSync(directory+'IMG_0714.HEIC'));
   assert.deepEqual((await job({operation: 'texture', data})).data, addTexture(data).data);

@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "model": "tinyclip-vit-8m-16-image",
+  "revision": "9463a9c508a344c837ffefe9d724f3827bf2dc79",
+  "input": {
+    "size": 224,
+    "channels": 3,
+    "layout": "nchw-rgb",
+    "shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "inputName": "pixel_values",
+    "outputName": "image_embeds",
+    "embeddingDimensions": 512,
+    "mean": [
+      0.48145466,
+      0.4578275,
+      0.40821073
+    ],
+    "std": [
+      0.26862954,
+      0.26130258,
+      0.27577711
+    ]
+  },
+  "models": {
+    "wasm": {
+      "file": "tinyclip-image-int8.onnx",
+      "precision": "int8",
+      "bytes": 9513822,
+      "sha256": "baab630e96d8ab3611e63fed4a731a56cf0bb5a252e3867de8ca2fd627e08a9f",
+      "inputName": "pixel_values",
+      "inputShape": [
+        1,
+        3,
+        224,
+        224
+      ],
+      "outputName": "image_embeds",
+      "embeddingDimensions": 512
+    },
+    "webgpu": {
+      "file": "tinyclip-image-fp16.onnx",
+      "precision": "fp16",
+      "bytes": 16748352,
+      "sha256": "6e3d08d8a557fce41b7ff2d596c901ac8fb1bead1d51237b8ee542253c01dbab",
+      "inputName": "pixel_values",
+      "inputShape": [
+        1,
+        3,
+        224,
+        224
+      ],
+      "outputName": "image_embeds",
+      "embeddingDimensions": 512
+    }
+  }
+}

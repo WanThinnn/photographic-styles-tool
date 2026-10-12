@@ -17,6 +17,7 @@ import { injectAppleMakerNoteTag, extractAppleMakerNoteTag, exifCameraModel } fr
 import {parseBplist,buildBplist,BplistReal} from '../core/bplist.js';
 import {editableTmapHeadroom} from './hdr-compatibility.js';
 import {nativePortraitBaseState} from '../portrait/ai-portrait-container.js';
+import {buildStyleMarker,validateStyleRecommendation} from '../recommend/style-selection.js';
 import {
   addTextureItems, hasTexture, softSkinPeople, filmGrainSeed,
   CLASSIC_MATTE_EMPTY, CLASSIC_MATTE_HVCC,
@@ -67,8 +68,13 @@ export function profileFor(index, d, experimental = false) {
  */
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
+  const cameraModel=td.exifItem===null?'':(exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))||'');
+  const modernNativeCamera=/^iPhone (1[6-9]|[2-9]\d)(?:\s|$)/.test(cameraModel);
+  const styleRecommendation=opts.styleRecommendation===undefined||opts.styleRecommendation===null
+    ?null:validateStyleRecommendation(opts.styleRecommendation);
+  let styleRecommendationApplied=false;
   const nativePortraitRebuild=opts.portraitStyleRebuild===true&&td.stylesItem===null
-    &&/^iPhone (1[6-9]|[2-9]\d)(?:\s|$)/.test(exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))||'')
+    &&modernNativeCamera
     &&nativePortraitBaseState(targetData,td)!==null;
   const evidence=opts.sharpBackgroundEvidence;
   const measuredSharp=evidence?.method==='native-background-detail-v1'
@@ -89,7 +95,7 @@ export async function patch(targetData, profile, opts = {}) {
     // adjustments and ISO HDR parameters. Automatic use requires measured
     // sharp-background evidence; diagnostic callers can explicitly request it.
     if((opts.reconstructedBright===true||(nativePortraitRebuild&&measuredSharp))&&td.stylesItem===null
-      &&exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))==='iPhone 16 Pro'
+      &&cameraModel==='iPhone 16 Pro'
       &&marker.get('4')===16&&marker.get('1')===-0.5&&marker.get('2')===0.5
       &&editableTmapHeadroom(targetData,td)!==null){
       const neutral=parseBplist(profile.mn54,{preserveReals:true});
@@ -109,6 +115,14 @@ export async function patch(targetData, profile, opts = {}) {
         ?profile.manifest.smartstyle_makernote_type??7:selection.type}};
   }
   else if(nativePortraitRebuild)selectionCompatibility='portrait-standard';
+  // Suggested Styles v1 is strictly for legacy/non-native graph construction.
+  // iPhone 16+ capture selections are protected even when their exported graph is incomplete.
+  // Older iPhones may carry a legacy 0x54 selection; the explicit recommendation replaces it.
+  if(styleRecommendation&&!nativePortraitRebuild&&!modernNativeCamera){
+    profile={...profile,mn54:buildStyleMarker(styleRecommendation,profile.mn54),
+      manifest:{...profile.manifest,smartstyle_makernote_type:profile.manifest.smartstyle_makernote_type??7}};
+    styleRecommendationApplied=true;
+  }
   const hasHdr = td.hdrGrid !== null && (td.infos.get(td.hdrGrid)?.type === "hvc1" || td.hdrTiles.length > 0);
   if (!hasHdr && !opts.experimental) throw new Error(UNSUPPORTED);
   if ((td.thumbnail === null && !opts.linearThumb) || td.exifItem === null) throw new Error(UNSUPPORTED);
@@ -119,6 +133,7 @@ export async function patch(targetData, profile, opts = {}) {
     out.report.version = VERSION;
     out.report.experimental = opts.experimental === true;
     if(selectionCompatibility)out.report.styleSelectionCompatibility=selectionCompatibility;
+    if(styleRecommendationApplied)out.report.styleRecommendation=styleRecommendation;
     return out;
   }
   
@@ -130,6 +145,7 @@ export async function patch(targetData, profile, opts = {}) {
   let meta = profile.meta;
   const report = { version: VERSION, warnings: [] };
   if(selectionCompatibility)report.styleSelectionCompatibility=selectionCompatibility;
+  if(styleRecommendationApplied)report.styleRecommendation=styleRecommendation;
 
   if (td.primaryTiles.length !== manifest.primary_tile_count) throw new Error(UNSUPPORTED);
   if (td.hdrTiles.length !== manifest.hdr_tile_count) throw new Error(UNSUPPORTED);

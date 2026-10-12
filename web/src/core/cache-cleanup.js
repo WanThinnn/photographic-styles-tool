@@ -7,13 +7,16 @@ const dependencies=new Set([...ORT_ASSETS,...FFMPEG_ASSETS,...DNG_ASSETS].map(as
 // preferences, photos, or the small offline UI shell.
 export async function clearDownloadedAssets({cacheStorage=globalThis.caches,base=new URL('../../',import.meta.url)}={}){
   if(!cacheStorage)throw Error('Cache storage unavailable');
-  const scope=new URL(base),prefix=new URL('vendor/ai-portrait/',scope).pathname;
+  const scope=new URL(base),prefix=new URL('vendor/ai-portrait/',scope).pathname,
+    stylePrefix=new URL('vendor/ai-style/',scope).pathname;
   let count=0,bytes=0;
   for(const name of await cacheStorage.keys()){
     if(name!==MODEL_CACHE_NAME&&!name.startsWith('photographic-style-depth-assets-')&&!name.startsWith('photographic-style-port-'))continue;
     const cache=await cacheStorage.open(name);
     for(const request of await cache.keys()){
-      const url=new URL(request.url),local=url.origin===scope.origin&&url.pathname.startsWith(prefix);
+      const url=new URL(request.url),local=url.origin===scope.origin
+        &&(url.pathname.startsWith(prefix)||(url.pathname.startsWith(stylePrefix)
+          &&!url.pathname.endsWith('/reference-bank.json')&&!url.pathname.endsWith('/semantic-axes.json')));
       const remote=name===MODEL_CACHE_NAME&&dependencies.has(url.href);
       if(!local&&!remote)continue;
       const response=await cache.match(request),length=Number(response?.headers.get('content-length'));

@@ -710,7 +710,7 @@ code {
    color: var(--accent-text)
 }
 
-:is(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration) {
+:is(#enhance-ai, #ai-portrait, #ai-detail, #ai-style-suggest, #gpu-acceleration) {
    appearance: none;
    -webkit-appearance: none;
    width: 42px;
@@ -723,7 +723,7 @@ code {
    cursor: pointer
 }
 
-:is(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration)::after {
+:is(#enhance-ai, #ai-portrait, #ai-detail, #ai-style-suggest, #gpu-acceleration)::after {
    content: "";
    position: absolute;
    top: 3px;
@@ -736,11 +736,11 @@ code {
    transition: transform .2s
 }
 
-:is(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration):checked {
+:is(#enhance-ai, #ai-portrait, #ai-detail, #ai-style-suggest, #gpu-acceleration):checked {
    background: var(--ai-blue)
 }
 
-:is(#enhance-ai, #ai-portrait, #ai-detail, #gpu-acceleration):checked::after {
+:is(#enhance-ai, #ai-portrait, #ai-detail, #ai-style-suggest, #gpu-acceleration):checked::after {
    transform: translateX(16px)
 }
 
@@ -1077,7 +1077,7 @@ code {
    border: 0
 }
 
-.ai-settings :is(.detail-option, .gpu-option) {
+.ai-settings :is(.detail-option, .style-option, .gpu-option) {
    border-top: 1px solid var(--line);
    padding-top: 12px;
    margin-top: 12px

@@ -90,6 +90,9 @@ web/vendor/ai-portrait/*.onnx
 web/vendor/ai-portrait/*.onnx_data
 web/vendor/ai-portrait/*.wasm
 
+# Suggested Styles intentionally ships its compact, image-only ONNX package under
+# web/vendor/ai-style/. Do not add a blanket *.onnx ignore above this point.
+#
 # Hugging Face AI detail weights are downloaded to the user's local machine.
 # Verify licensing before distributing the model binaries with the public app.
 web/vendor/ai-detail/*.onnx

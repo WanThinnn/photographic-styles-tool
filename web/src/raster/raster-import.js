@@ -24,6 +24,8 @@ import {ensureHevcEncoder, encodeHevcPixels,decodeJpegYuv} from './ffmpeg-hevc.j
 import {extractJpegHdr,encodeTmapMetadata,iccColr,yuv420Tile,hdrJpegError,yuv420ToRgba,rebaseGainMapRgba} from './jpeg-hdr.js';
 import {rgbaToI420} from './raster-color.js';
 import {generateSyntheticHevc} from './synthetic-hevc.js';
+import {buildStyleMarker,validateStyleRecommendation} from '../recommend/style-selection.js';
+import {applyStyleDisplayRgba,shouldRenderStyleDisplay} from '../recommend/style-display-render.js';
 
 const TILE = 512, MAX_PRIMARY_TILES = 48;
 const THUMB_W = 416, THUMB_H = 312;
@@ -593,15 +595,58 @@ export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult 
 }
 
 
+export function applyRasterStyleRecommendation(profile,value){
+  if(value===undefined||value===null)return {profile,recommendation:null,error:null};
+  try{
+    const recommendation=validateStyleRecommendation(value);
+    return {profile:{...profile,mn54:buildStyleMarker(recommendation,profile.mn54)},recommendation,error:null};
+  }catch(error){
+    console.warn('Invalid Suggested Styles recommendation; retaining Standard',error);
+    return {profile,recommendation:null,error:`Invalid recommendation: ${String(error?.message||error)}`};
+  }
+}
+
+function renderStyleDisplayCanvas(ctx,width,height,recommendation){
+  if(!recommendation||!shouldRenderStyleDisplay(recommendation))return false;
+  const pixels=ctx.getImageData(0,0,width,height),styled=applyStyleDisplayRgba(pixels.data,recommendation);
+  pixels.data.set(styled);ctx.putImageData(pixels,0,0);return true;
+}
+
+function styleAnalysisImage(source,maxSide=640){
+  const scale=Math.min(1,maxSide/Math.max(source.width,source.height));
+  const width=Math.max(1,Math.round(source.width*scale)),height=Math.max(1,Math.round(source.height*scale));
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace:'srgb'});
+  if(!ctx)throw Error('Suggested Styles analysis canvas unavailable');
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,width,height);
+  const rgba=new Uint8ClampedArray(ctx.getImageData(0,0,width,height).data);
+  canvas.width=canvas.height=0;
+  return {data:rgba,width,height};
+}
+async function suggestStyleForImage(image,request,onProgress){
+  if(!request)return {recommendation:null,error:null};
+  try{
+    const {recommendStyleRgb}=await import('../recommend/style-runtime.js');
+    const sample=styleAnalysisImage(image);
+    const recommendation=await recommendStyleRgb(sample,{...request,
+      onProgress:progress=>onProgress?.({...progress,styleStage:progress.stage,stage:'styleSuggestion'})});
+    return {recommendation,error:null};
+  }catch(error){
+    console.warn('Suggested Styles unavailable; retaining Standard',error);
+    return {recommendation:null,error:String(error?.message||error)};
+  }
+}
+
 /** Browser-decoded still image -> new HEIC. No source HEIC graph is re-encoded here. */
-export async function importRaster(file, profile, onProgress = () => {}, {analyze = true, detail = null} = {}) {
+export async function importRaster(file, profile, onProgress = () => {},
+  {analyze = true, detail = null, styleRecommendation = null, styleSuggestion = null} = {}) {
   // Independent Main10 auxiliary/masks always require the verified WASM encoder.
   let opened, stored, enhanced;
   let detailSkipped = null;
   try {
     const sourceBytes=new Uint8Array(await file.arrayBuffer());
     const sourceHdr=extractJpegHdr(sourceBytes);
-    if(sourceHdr)return await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze,detail});
+    if(sourceHdr)return await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze,detail,styleRecommendation,styleSuggestion});
     const sourceExif = extractRasterExif(sourceBytes);
     opened = await openBrowserImage(file, onProgress);
     let image = opened.image;
@@ -616,22 +661,30 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
         console.warn('AI detail unavailable, preserving unchanged raster input',error);
       }
     }
+    const suggested=styleRecommendation!==undefined&&styleRecommendation!==null
+      ?{recommendation:styleRecommendation,error:null}
+      :await suggestStyleForImage(image,styleSuggestion,onProgress);
     await ensureHevcEncoder(onProgress);
     const geometry = targetGeometry(image);
     onProgress({stage: 'prepare', ...geometry});
     const assets = await generateSyntheticHevc(onProgress);
     // Construct neutral maps and scene metadata rather than borrowing another photo.
     profile = buildGeneratedProfile('48-12', assets);
+    const styled=applyRasterStyleRecommendation(profile,suggested.recommendation);
+    profile=styled.profile;
     const linearThumbnail = await encodeLinearThumbnail(image, {angle: 270}, onProgress);
     stored = storedCanvas(image, geometry);
+    const styleDisplayRendered=Boolean(styled.recommendation&&shouldRenderStyleDisplay(styled.recommendation));
     const main = await encodeCanvases(TILE, TILE, geometry.primaryTiles, (ctx, i) => {
       ctx.fillStyle = 'black'; ctx.fillRect(0, 0, TILE, TILE);
       ctx.drawImage(stored, -(i % geometry.primaryColumns) * TILE,
         -Math.floor(i / geometry.primaryColumns) * TILE);
+      if(styleDisplayRendered)renderStyleDisplayCanvas(ctx,TILE,TILE,styled.recommendation);
     }, 3_000_000, (done, total) => onProgress({stage: 'main', done, total}), onProgress);
     onProgress({stage: 'auxiliary'});
     const thumb = await encodeCanvases(geometry.thumbWidth, geometry.thumbHeight, 1,
-      ctx => ctx.drawImage(stored, 0, 0, geometry.thumbWidth, geometry.thumbHeight),
+      ctx => {ctx.drawImage(stored, 0, 0, geometry.thumbWidth, geometry.thumbHeight);
+        if(styleDisplayRendered)renderStyleDisplayCanvas(ctx,geometry.thumbWidth,geometry.thumbHeight,styled.recommendation);},
       800_000, undefined, onProgress);
     // A neutral auxiliary is compatibility data, not recovered HDR from an SDR input.
     const hdr = await encodeCanvases(TILE, TILE, 1, ctx => {
@@ -646,7 +699,9 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
       // Like the HEIC route, spatial maps follow the primary's stored orientation.
       lightMaps: analyze ? buildLightMaps(sampleRasterLuma(stored, 32, 32)) : null,
     }, analyze ? Array.from(sampleRasterLuma(image)).sort((a, b) => a - b) : null, null, geometry);
-    return {data, geometry, detailApplied:Boolean(enhanced), detailSkipped};
+    return {data, geometry, detailApplied:Boolean(enhanced), detailSkipped,styleDisplayRendered,
+      ...(styled.recommendation?{styleRecommendation:styled.recommendation}:{}),
+      ...((suggested.error||styled.error)?{styleSuggestionError:suggested.error||styled.error}:{})};
   } finally {
     opened?.close();
     if (stored) stored.width = stored.height = 0;
@@ -704,7 +759,7 @@ async function encodeYuvGrid(yuv,width,height,columns,rows,color,stage,onProgres
   return {chunks,hvcc};
 }
 
-async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null}) {
+async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null,styleRecommendation=null,styleSuggestion=null}) {
   let opened,enhanced;
   try {
     const sourceExif=extractRasterExif(sourceBytes),orientation=readExifOrientation(sourceExif??new Uint8Array())||1;
@@ -718,7 +773,8 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null}) {
     geometry.primaryTiles=geometry.primaryColumns*geometry.primaryRows;
     if(geometry.primaryTiles>48||geometry.hdrColumns*geometry.hdrRows>12)throw hdrJpegError('HDR JPEG exceeds the preserved-image tile budget');
     await ensureHevcEncoder(onProgress);
-    const assets=await generateSyntheticHevc(onProgress),profile=buildGeneratedProfile('48-12',assets);
+    const assets=await generateSyntheticHevc(onProgress);
+    let profile=buildGeneratedProfile('48-12',assets);
     // The dedicated JPEG route encodes normalized upright planes, not the SDR
     // canvas route's 270-degree stored image. All template items share this irot.
     const pd=discoverHeic(profile.meta);
@@ -748,6 +804,10 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null}) {
         enhanced=null;rebase=null;working=opened.image;
       }
     }
+    const suggested=styleRecommendation!==undefined&&styleRecommendation!==null
+      ?{recommendation:styleRecommendation,error:null}
+      :await suggestStyleForImage(working,styleSuggestion,onProgress);
+    const styled=applyRasterStyleRecommendation(profile,suggested.recommendation);profile=styled.profile;
     const linearThumbnail=await encodeLinearThumbnail(working,{angle:0},onProgress);
     const thumb=await encodeCanvases(geometry.thumbWidth,geometry.thumbHeight,1,
       ctx=>ctx.drawImage(working,0,0,geometry.thumbWidth,geometry.thumbHeight),800_000,undefined,onProgress);
@@ -777,7 +837,9 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null}) {
       hdrMetadata:hdr.metadata,hdrXmp:hdr.xmp,hdrAlternateColr:hdr.alternateIcc?iccColr(hdr.alternateIcc):nclx(hdr.primaries==='smpte432'?12:1,8,0,true),sourceExif,
       lightMaps:analyze?buildLightMaps(sampleRasterLuma(working,32,32)):null,
     },analyze?Array.from(sampleRasterLuma(working)).sort((a,b)=>a-b):null,null,geometry);
-    const result={data,geometry,hdr:true,detailApplied:Boolean(enhanced&&rebase),detailSkipped};
+    const result={data,geometry,hdr:true,detailApplied:Boolean(enhanced&&rebase),detailSkipped,
+      ...(styled.recommendation?{styleRecommendation:styled.recommendation}:{}),
+      ...((suggested.error||styled.error)?{styleSuggestionError:suggested.error||styled.error}:{})};
     if(rebase)result.hdrDetail={clipped:rebase.clipped,components:rebase.components,maxError:rebase.maxError};
     if(enhanced)enhanced.width=enhanced.height=0;
     return result;

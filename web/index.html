@@ -79,6 +79,13 @@
       </div>
       <input type="checkbox" id="ai-detail" role="switch" disabled aria-describedby="ai-detail-hint">
     </div>
+    <div class="portrait-option style-option">
+      <div class="ai-option-copy">
+        <label for="ai-style-suggest" id="ai-style-suggest-label">Suggested Styles</label>
+        <p id="ai-style-suggest-hint" class="ai-hint">Analyzes this photo on device and chooses an editable Style starting point.</p>
+      </div>
+      <input type="checkbox" id="ai-style-suggest" role="switch" disabled aria-describedby="ai-style-suggest-hint">
+    </div>
     <div class="portrait-option gpu-option">
       <div class="ai-option-copy">
       <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
@@ -89,7 +96,7 @@
     <div class="depth-model-row portrait-option">
       <div class="ai-option-copy">
       <label for="depth-model" id="depth-model-label">Model</label>
-      <p id="depth-model-hint" class="ai-hint">Downloads only the selected model when processing.</p>
+      <p id="depth-model-hint" class="ai-hint">Lite is faster; Pro analyzes more deeply for finer AI results and better Style suggestions.</p>
       </div>
       <div class="depth-model-control">
         <output id="depth-model-value" for="depth-model">Standard</output>

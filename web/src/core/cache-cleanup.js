@@ -16,7 +16,8 @@ export async function clearDownloadedAssets({cacheStorage=globalThis.caches,base
     for(const request of await cache.keys()){
       const url=new URL(request.url),local=url.origin===scope.origin
         &&(url.pathname.startsWith(prefix)||(url.pathname.startsWith(stylePrefix)
-          &&!url.pathname.endsWith('/reference-bank.json')&&!url.pathname.endsWith('/semantic-axes.json')));
+          &&!url.pathname.endsWith('/reference-bank.json')&&!url.pathname.endsWith('/semantic-axes.json')
+          &&!url.pathname.includes('/style-prototypes-')));
       const remote=name===MODEL_CACHE_NAME&&dependencies.has(url.href);
       if(!local&&!remote)continue;
       const response=await cache.match(request),length=Number(response?.headers.get('content-length'));

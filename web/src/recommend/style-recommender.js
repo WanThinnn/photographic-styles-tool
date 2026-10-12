@@ -1,6 +1,6 @@
 import {STYLE_PARAMETER_BOUNDS,styleSelection,validateStyleRecommendation} from './style-selection.js';
-import {semanticAxisFeatures} from './style-semantic-axes.js';
-import {scoreStyleScene} from './style-scene-decision.js';
+import {scoreStylePrototypes} from './style-prototypes.js';
+import {styleQuality} from './style-quality.js';
 
 const clamp=(value,{min,max})=>Math.min(max,Math.max(min,value));
 const bounded=(value,limit)=>Math.min(limit,Math.max(-limit,value));
@@ -32,15 +32,10 @@ function fallback(level,stats,confidence){
   return validateStyleRecommendation({styleId:1,...adjusted,confidence,fallback:true,level});
 }
 
-export function recommendStyle({axes,level='standard',embeddings,statistics=null}){
-  const semantic=semanticAxisFeatures(embeddings,axes);
-  const decision=scoreStyleScene({
-    semantic:semantic.values,
-    semanticViews:semantic.perView,
-    statistics,
-    level,
-    meanDispersion:semantic.meanDispersion,
-    maxDispersion:semantic.maxDispersion,
+export function recommendStyle({prototypes,level='standard',embeddings,statistics=null}){
+  const quality=styleQuality(level);
+  const decision=scoreStylePrototypes({
+    prototypes,embeddings,level,minSupport:quality.minSupport,minScoreMargin:quality.minScoreMargin,
   });
   if(decision.ambiguous)return fallback(level,statistics,decision.confidence);
   const preset=styleSelection(decision.winner.styleId);

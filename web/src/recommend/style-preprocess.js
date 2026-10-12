@@ -16,7 +16,7 @@ function sample(data,width,height,channels,x,y,c){
   const a=p(x0,y0)*(1-fx)+p(x1,y0)*fx,b=p(x0,y1)*(1-fx)+p(x1,y1)*fx;
   return a*(1-fy)+b*fy;
 }
-export function preprocessClipView(image,rect,{size=STYLE_MODEL_INPUT.size}={}){
+export function preprocessClipView(image,rect,{input=STYLE_MODEL_INPUT,size=input.size}={}){
   const channels=validateImage(image);
   if(!rect||![rect.x,rect.y,rect.width,rect.height].every(Number.isFinite)||rect.width<=0||rect.height<=0)
     throw new TypeError('Invalid Suggested Styles view');
@@ -28,7 +28,7 @@ export function preprocessClipView(image,rect,{size=STYLE_MODEL_INPUT.size}={}){
     const sx=left+(ox+.5)*side/size-.5,sy=top+(oy+.5)*side/size-.5,q=oy*size+ox;
     for(let c=0;c<3;c++){
       const value=sample(image.data,image.width,image.height,channels,sx,sy,c)/255;
-      tensor[c*plane+q]=(value-STYLE_MODEL_INPUT.mean[c])/STYLE_MODEL_INPUT.std[c];
+      tensor[c*plane+q]=(value-input.mean[c])/input.std[c];
     }
   }
   return tensor;

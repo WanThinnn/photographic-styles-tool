@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {inferStyleEmbeddings,shouldRetainStyleWorker,canRetryStyleOnCpu} from '../../web/src/recommend/style-inference.js';
 import {STYLE_EMBEDDING_DIMENSIONS} from '../../web/src/recommend/style-reference-bank.js';
+import {styleModelSpec} from '../../web/src/recommend/style-model.js';
 
 const image={width:4,height:3,data:new Uint8Array(4*3*3).fill(127)};
 const workerSource=readFileSync(new URL('../../web/src/recommend/style-inference-worker.js',import.meta.url),'utf8');
@@ -39,18 +40,28 @@ test('Safari and iOS do not retain the TinyCLIP worker beside later AI models',(
 test('inference transports shared provider/level budget and accepts normalized embeddings',async()=>{
   const fake=respondingWorker(payload=>payload.views.map((_,index)=>oneHot(index)));
   const result=await inferStyleEmbeddings(image,{level:'standard',provider:'wasm',workerFactory:()=>fake.worker});
-  assert.equal(result.length,5);
+  assert.equal(result.length,9);
   assert.equal(fake.message.provider,'wasm');
-  assert.equal(fake.message.views.length,5);
+  assert.equal(fake.message.level,'standard');
+  assert.equal(fake.message.views.length,9);
   assert.equal(fake.message.rgb.length,image.data.length);
   assert.equal(fake.terminated,1);
 });
 
+test('Pro accepts SigLIP2 768-dimensional embeddings',async()=>{
+  const dimensions=styleModelSpec('pro').input.embeddingDimensions;
+  const fake=respondingWorker(payload=>payload.views.map((_,index)=>{
+    const value=new Float32Array(dimensions);value[index%dimensions]=1;return value;
+  }));
+  const result=await inferStyleEmbeddings(image,{level:'pro',provider:'wasm',workerFactory:()=>fake.worker});
+  assert.equal(result.length,fake.message.views.length);assert.ok(result.length>9);assert.equal(result[0].length,768);
+});
+
 test('invalid worker embedding shape or normalization fails closed',async()=>{
   for(const bad of [
-    [new Float32Array(12)],
-    [new Float32Array(STYLE_EMBEDDING_DIMENSIONS)],
-    [Float32Array.from({length:STYLE_EMBEDDING_DIMENSIONS},()=>NaN)],
+    Array(3).fill(null).map(()=>new Float32Array(12)),
+    Array(3).fill(null).map(()=>new Float32Array(STYLE_EMBEDDING_DIMENSIONS)),
+    Array(3).fill(null).map(()=>Float32Array.from({length:STYLE_EMBEDDING_DIMENSIONS},()=>NaN)),
   ]){
     const fake=respondingWorker(()=>bad);
     await assert.rejects(inferStyleEmbeddings(image,{level:'lite',workerFactory:()=>fake.worker}),/embedding|normalized/i);

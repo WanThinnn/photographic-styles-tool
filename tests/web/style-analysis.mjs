@@ -22,9 +22,11 @@ test('stored HEIF samples are deterministically mapped to display orientation be
 test('quality levels increase spatial analysis without leaving portrait, landscape, square or tiny images',()=>{
   for(const [width,height] of [[4032,3024],[3024,4032],[512,512],[3,2]]){
     const lite=styleViewRects(width,height,'lite'),standard=styleViewRects(width,height,'standard'),pro=styleViewRects(width,height,'pro');
-    assert.equal(lite.length,1);assert.equal(standard.length,5);assert.equal(pro.length,9);
+    assert.ok(lite.length<=3&&lite.length>=1);assert.ok(standard.length<=9&&standard.length>=lite.length);
+    assert.ok(pro.length<=17&&pro.length>=standard.length);
     for(const rect of pro)assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=width&&rect.y+rect.height<=height);
   }
+  assert.deepEqual(['lite','standard','pro'].map(level=>styleViewRects(4032,3024,level).length),[3,9,17]);
 });
 test('image statistics preserve expected brightness and warmth ordering',()=>{
   const dark=styleImageStatistics(solid(32,32,20,20,20));

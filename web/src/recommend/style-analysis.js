@@ -32,22 +32,26 @@ export function orientStyleImage(image,{angle=0,mirror=null}={}){
 export function styleViewRects(width,height,level='standard'){
   if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw new TypeError('Invalid image geometry');
   const budget=styleQuality(level),rects=[Object.freeze({x:0,y:0,width,height,kind:'global'})];
-  if(budget.views===1)return Object.freeze(rects);
   const minSide=Math.min(width,height);
+  const seen=new Set();
   const add=(cx,cy,scale,kind)=>{
     const side=Math.max(1,Math.min(minSide,Math.round(minSide*scale)));
     const x=clamp(Math.round(cx*width-side/2),0,width-side);
     const y=clamp(Math.round(cy*height-side/2),0,height-side);
+    const key=`${x}:${y}:${side}`;if(seen.has(key))return;seen.add(key);
     rects.push(Object.freeze({x,y,width:side,height:side,kind}));
   };
-  for(const [cx,cy,kind] of [[.27,.27,'top-left'],[.73,.27,'top-right'],[.27,.73,'bottom-left'],[.73,.73,'bottom-right']])
-    add(cx,cy,.72,kind);
-  if(budget.views>5){
-    add(.5,.5,.78,'center');
-    add(.5,.22,.64,'top');
-    add(.22,.5,.64,'left');
-    add(.78,.5,.64,'right');
-  }
+  if(width>=height){add(0,.5,1,'leading');add(1,.5,1,'trailing');}
+  else{add(.5,0,1,'leading');add(.5,1,1,'trailing');}
+  for(const [cx,cy,scale,kind] of [
+    [.5,.5,.78,'center'],[.22,.22,.70,'top-left'],[.78,.22,.70,'top-right'],
+    [.22,.78,.70,'bottom-left'],[.78,.78,.70,'bottom-right'],[.5,.18,.62,'top'],
+    [.18,.5,.62,'left'],[.82,.5,.62,'right'],[.5,.82,.62,'bottom'],
+    [.33,.33,.50,'inner-top-left'],[.67,.33,.50,'inner-top-right'],
+    [.33,.67,.50,'inner-bottom-left'],[.67,.67,.50,'inner-bottom-right'],
+    [.5,.5,.48,'detail-center'],[.5,.10,.44,'detail-top'],[.5,.90,.44,'detail-bottom'],
+    [.10,.5,.44,'detail-left'],[.90,.5,.44,'detail-right'],
+  ])add(cx,cy,scale,kind);
   return Object.freeze(rects.slice(0,budget.views));
 }
 

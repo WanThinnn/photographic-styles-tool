@@ -1,12 +1,11 @@
 import {styleQuality} from './style-quality.js';
 import {styleImageStatistics} from './style-analysis.js';
-import {validateSemanticAxes} from './style-semantic-axes.js';
+import {validateStylePrototypes} from './style-prototypes.js';
 import {inferStyleEmbeddings,releaseStyleRecommender as releaseInference,canRetryStyleOnCpu} from './style-inference.js';
 import {recommendStyle} from './style-recommender.js';
 
 const ASSET_ROOT=new URL('../../vendor/ai-style/',import.meta.url);
-const AXES_URL=new URL('semantic-axes.json',ASSET_ROOT);
-let axesPromise=null;
+const prototypePromises=new Map();
 
 export class StyleRecommendationError extends Error{
   constructor(message,cause){
@@ -14,20 +13,20 @@ export class StyleRecommendationError extends Error{
   }
 }
 
-async function loadAxes(){
-  if(!axesPromise)axesPromise=(async()=>{
-    const response=await fetch(AXES_URL,{cache:'no-cache'});
-    if(!response.ok)throw Error('Suggested Styles semantic axes are not installed');
-    return validateSemanticAxes(await response.json());
-  })().catch(error=>{axesPromise=null;throw error;});
-  return axesPromise;
+async function loadPrototypes(level){
+  if(!prototypePromises.has(level))prototypePromises.set(level,(async()=>{
+    const response=await fetch(new URL(`style-prototypes-${level}.json`,ASSET_ROOT),{cache:'no-cache'});
+    if(!response.ok)throw Error(`Suggested Styles ${level} prototypes are not installed`);
+    return validateStylePrototypes(await response.json(),level);
+  })().catch(error=>{prototypePromises.delete(level);throw error;}));
+  return prototypePromises.get(level);
 }
 
 export async function recommendStyleRgb(image,{level='standard',provider='wasm',signal,onProgress=()=>{}}={}){
   try{
     const quality=styleQuality(level);
     onProgress({stage:'styleSemantics'});
-    const axes=await loadAxes();
+    const prototypes=await loadPrototypes(level);
     signal?.throwIfAborted?.();
     let embeddings;
     try{embeddings=await inferStyleEmbeddings(image,{level,provider,signal,onProgress});}
@@ -38,7 +37,7 @@ export async function recommendStyleRgb(image,{level='standard',provider='wasm',
     }
     signal?.throwIfAborted?.();
     const statistics=styleImageStatistics(image,{sampleSize:quality.statsSize});
-    return recommendStyle({axes,level,embeddings,statistics});
+    return recommendStyle({prototypes,level,embeddings,statistics});
   }catch(error){
     if(error?.name==='AbortError'||error?.name==='TimeoutError'||error instanceof StyleRecommendationError)throw error;
     throw new StyleRecommendationError(String(error?.message||error),error);
@@ -46,5 +45,5 @@ export async function recommendStyleRgb(image,{level='standard',provider='wasm',
 }
 
 export function releaseStyleRecommender(){
-  releaseInference();axesPromise=null;
+  releaseInference();prototypePromises.clear();
 }

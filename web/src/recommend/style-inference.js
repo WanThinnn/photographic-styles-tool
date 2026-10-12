@@ -1,6 +1,6 @@
 import {styleViewRects} from './style-analysis.js';
 import {styleQuality} from './style-quality.js';
-import {STYLE_MODEL_INPUT} from './style-model.js';
+import {styleModelSpec} from './style-model.js';
 
 const makeWorker=()=>new Worker(new URL('./style-inference-worker.js',import.meta.url),{type:'module'});
 let retained=null,retainTimer=null;
@@ -25,10 +25,10 @@ function worker(){
   retained??=makeWorker();return retained;
 }
 function keepWarm(){clearTimeout(retainTimer);retainTimer=setTimeout(releaseStyleRecommender,RETAIN_MS);}
-function validateEmbeddings(values,expected){
+function validateEmbeddings(values,expected,dimensions){
   if(!Array.isArray(values)||values.length!==expected)throw Error('Suggested Styles worker returned the wrong view count');
   return values.map(value=>{
-    if(!(value instanceof Float32Array)||value.length!==STYLE_MODEL_INPUT.embeddingDimensions)throw Error('Suggested Styles worker returned an invalid embedding');
+    if(!(value instanceof Float32Array)||value.length!==dimensions)throw Error('Suggested Styles worker returned an invalid embedding');
     let norm2=0;for(const item of value){if(!Number.isFinite(item))throw Error('Suggested Styles worker returned non-finite embedding');norm2+=item*item;}
     const norm=Math.sqrt(norm2);if(!Number.isFinite(norm)||Math.abs(norm-1)>1e-3)throw Error('Suggested Styles worker returned an unnormalized embedding');
     return value;
@@ -45,6 +45,7 @@ export function inferStyleEmbeddings(image,{level='standard',provider='wasm',sig
   }catch(error){return Promise.reject(error);}
   if(signal?.aborted)return Promise.reject(signal.reason||new DOMException('Aborted','AbortError'));
   const views=styleViewRects(image.width,image.height,level);
+  const dimensions=styleModelSpec(level).input.embeddingDimensions;
   return new Promise((resolve,reject)=>{
     const current=workerFactory(),persistent=workerFactory===worker;let timer,settled=false;
     const finish=(error,result)=>{
@@ -63,11 +64,11 @@ export function inferStyleEmbeddings(image,{level='standard',provider='wasm',sig
     current.onmessage=({data})=>{
       if(data.stage){arm();onProgress(data);return;}
       if(data.error){finish(Error(data.error));return;}
-      if(data.result){try{finish(null,validateEmbeddings(data.result.embeddings,views.length));}catch(error){finish(error);}return;}
+      if(data.result){try{finish(null,validateEmbeddings(data.result.embeddings,views.length,dimensions));}catch(error){finish(error);}return;}
     };
     const rgb=image.data instanceof Uint8Array||image.data instanceof Uint8ClampedArray
       ?new Uint8Array(image.data):Uint8Array.from(image.data||[]);
-    try{current.postMessage({provider,width:image.width,height:image.height,rgb,views},[rgb.buffer]);}
+    try{current.postMessage({level,provider,width:image.width,height:image.height,rgb,views},[rgb.buffer]);}
     catch(error){finish(error);}
   });
 }

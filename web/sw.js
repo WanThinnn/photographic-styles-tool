@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v125`;
+const CACHE_NAME = `${CACHE_PREFIX}v127`;
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -27,6 +27,7 @@ const APP_SHELL = [
   "./src/recommend/style-quality.js",
   "./src/recommend/style-reference-bank.js",
   "./src/recommend/style-analysis.js",
+  "./src/recommend/style-prototypes.js",
   "./src/recommend/style-semantic-axes.js",
   "./src/recommend/style-profile-matrix.js",
   "./src/recommend/style-scene-decision.js",
@@ -38,6 +39,9 @@ const APP_SHELL = [
   "./src/recommend/style-inference.js",
   "./src/recommend/style-inference-worker.js",
   "./src/recommend/style-runtime.js",
+  "./vendor/ai-style/style-prototypes-lite.json",
+  "./vendor/ai-style/style-prototypes-standard.json",
+  "./vendor/ai-style/style-prototypes-pro.json",
   "./src/portrait/ai-portrait.js",
   "./src/portrait/ai-inference.js",
   "./src/portrait/ai-inference-worker.js",

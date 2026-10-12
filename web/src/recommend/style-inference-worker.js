@@ -1,5 +1,5 @@
 import {downloadModelBytes,MODEL_CACHE_NAME} from '../core/model-download.js';
-import {styleModel,STYLE_MODEL_INPUT} from './style-model.js';
+import {styleModel} from './style-model.js';
 import {preprocessClipView} from './style-preprocess.js';
 
 const ORT_ROOT=new URL('../../vendor/ai-portrait/',import.meta.url);
@@ -12,13 +12,13 @@ async function sha256(bytes){
 async function releaseRuntime(){
   await runtime?.session?.release?.();runtime=null;
 }
-async function ensureRuntime(provider){
-  if(runtime?.provider===provider)return runtime;
+async function ensureRuntime(level,provider){
+  if(runtime?.provider===provider&&runtime?.level===level)return runtime;
   if(provider==='webgpu'&&!self.navigator.gpu)throw Error('WebGPU is unavailable');
   await releaseRuntime();
   const response=await fetch(new URL('assets.json',ASSET_ROOT),{cache:'no-store'});
-  if(!response.ok)throw Error('Suggested Styles image-only TinyCLIP assets are not packaged');
-  const manifest=await response.json(),asset=styleModel(provider,manifest),modelUrl=new URL(asset.file,ASSET_ROOT);
+  if(!response.ok)throw Error('Suggested Styles image-only assets are not packaged');
+  const manifest=await response.json(),asset=styleModel(level,provider,manifest),modelUrl=new URL(asset.file,ASSET_ROOT);
   modelUrl.searchParams.set('sha256',asset.sha256);const url=modelUrl.href;
   self.postMessage({stage:'download'});
   const bytes=await downloadModelBytes(url,{onProgress:progress=>self.postMessage({stage:'modelDownload',progress})});
@@ -39,24 +39,24 @@ async function ensureRuntime(provider){
     await session.release?.();
     throw Error('Suggested Styles packaged ONNX I/O contract mismatch');
   }
-  runtime={provider,asset,ort,session};return runtime;
+  runtime={level,provider,asset,ort,session};return runtime;
 }
-function normalized(values){
-  if(values.length!==STYLE_MODEL_INPUT.embeddingDimensions)throw Error('Unexpected TinyCLIP embedding dimensions');
+function normalized(values,dimensions){
+  if(values.length!==dimensions)throw Error('Unexpected Suggested Styles embedding dimensions');
   const out=Float32Array.from(values);let norm2=0;
   for(const value of out){if(!Number.isFinite(value))throw Error('Suggested Styles produced non-finite embedding');norm2+=value*value;}
   if(!(norm2>1e-12))throw Error('Suggested Styles produced a zero embedding');
   const inv=1/Math.sqrt(norm2);for(let i=0;i<out.length;i++)out[i]*=inv;return out;
 }
 async function inferOne(rt,image,rect){
-  const pixelValues=preprocessClipView(image,rect),input=new rt.ort.Tensor('float32',pixelValues,rt.asset.inputShape);
+  const pixelValues=preprocessClipView(image,rect,{input:rt.asset.input}),input=new rt.ort.Tensor('float32',pixelValues,rt.asset.inputShape);
   let outputs;
   try{
     outputs=await rt.session.run({[rt.asset.inputName]:input},[rt.asset.outputName]);
     const output=outputs[rt.asset.outputName];
-    if(!output||output.dims?.length!==2||output.dims[0]!==1||output.dims[1]!==STYLE_MODEL_INPUT.embeddingDimensions)
-      throw Error('Unexpected TinyCLIP image embedding output shape');
-    return normalized(await output.getData());
+    if(!output||output.dims?.length!==2||output.dims[0]!==1||output.dims[1]!==rt.asset.input.embeddingDimensions)
+      throw Error('Unexpected Suggested Styles image embedding output shape');
+    return normalized(await output.getData(),rt.asset.input.embeddingDimensions);
   }finally{
     input.dispose?.();
     if(outputs)for(const tensor of Object.values(outputs))tensor.dispose?.();
@@ -65,12 +65,12 @@ async function inferOne(rt,image,rect){
 async function run(message){
   if(busy)throw Error('Suggested Styles worker is busy');busy=true;
   try{
-    const {provider='wasm',width,height,rgb,views}=message;
-    if(!['wasm','webgpu'].includes(provider)||!Number.isInteger(width)||!Number.isInteger(height)||!rgb||!Array.isArray(views)||!views.length)
+    const {level='standard',provider='wasm',width,height,rgb,views}=message;
+    if(!['lite','standard','pro'].includes(level)||!['wasm','webgpu'].includes(provider)||!Number.isInteger(width)||!Number.isInteger(height)||!rgb||!Array.isArray(views)||!views.length)
       throw Error('Invalid Suggested Styles inference request');
     const channels=rgb.length===width*height*3?3:rgb.length===width*height*4?4:0;
     if(!channels)throw Error('Invalid Suggested Styles pixel buffer');
-    const rt=await ensureRuntime(provider),image={data:rgb,width,height},embeddings=[];
+    const rt=await ensureRuntime(level,provider),image={data:rgb,width,height},embeddings=[];
     for(let i=0;i<views.length;i++){
       embeddings.push(await inferOne(rt,image,views[i]));
       self.postMessage({stage:'inference',progress:{done:i+1,total:views.length}});

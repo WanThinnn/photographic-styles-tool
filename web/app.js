@@ -20,7 +20,7 @@ import {styleCapabilities} from './src/styles/style-capabilities.js';
 import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
 import {depthModel} from './src/portrait/depth-models.js';
 import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
-import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
+import {createAiFeatureControls,showAiSettingsHintOnce} from './src/ui/ai-feature-controls.js';
 import {shouldRenderStyleDisplay} from './src/recommend/style-display-render.js';
 
 
@@ -125,6 +125,7 @@ function translateAi() {
 
   $('ai-settings').hidden=false;
   $('ai-settings-label').textContent=aiText().settings;
+  $('ai-settings-discovery-copy').textContent=aiText().settingsDiscovery;
   $('gpu-acceleration-label').textContent=aiText().acceleration;
   $('gpu-acceleration-hint').textContent=aiText().accelerationHint;
   $('depth-model-label').textContent=aiText().model;
@@ -924,6 +925,7 @@ function countVisit() {
     browserReady = true;refreshHistoryButton();
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
     aiFeatures.sync();
+    showAiSettingsHintOnce({hint:$('ai-settings-discovery'),settings:aiSettings});
     $('boot').textContent = '';
     navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.

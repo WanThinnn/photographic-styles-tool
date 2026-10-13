@@ -1,8 +1,6 @@
 /**
- * Independent, opt-in AI feature switches.
- *
- * The master switch grants access to the group; it must NEVER select an effect.
- * Each effect must be explicitly selected. Turning the group off clears enabled
+ * The master switch starts Portrait by default. Other effects are opt-in.
+ * Turning the group off clears enabled
  * effects and dispatches their change handlers so running jobs can be cancelled.
  */
 export function createAiFeatureControls({master,features,isAvailable=()=>true}){
@@ -19,7 +17,13 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
     for(const control of controls.values())control.disabled=!available||!master.checked;
   };
   master.addEventListener('change',()=>{
-    if(!master.checked){
+    if(master.checked){
+      const portrait=controls.get('portrait');
+      if(portrait&&!portrait.checked){
+        portrait.checked=true;
+        portrait.dispatchEvent(new Event('change'));
+      }
+    }else{
       for(const control of controls.values()){
         if(!control.checked)continue;
         control.checked=false;
@@ -31,4 +35,20 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
   });
   sync();
   return {enabled,sync};
+}
+
+export function showAiSettingsHintOnce({hint,settings,storage}){
+  const key='stylio-ai-settings-hint-v1';
+  try{
+    storage??=globalThis.localStorage;
+    if(storage?.getItem(key)==='shown')return;
+    storage?.setItem(key,'shown');
+  }catch{} // Storage restrictions must not break the AI controls.
+  hint.hidden=false;
+  const summary=settings.querySelector('summary');
+  summary.setAttribute('aria-describedby',hint.id);
+  summary.addEventListener('click',()=>{
+    hint.hidden=true;
+    summary.removeAttribute('aria-describedby');
+  },{once:true});
 }

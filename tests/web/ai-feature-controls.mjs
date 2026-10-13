@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {AI_STRINGS} from '../../web/src/ui/ai-strings.js';
-import {createAiFeatureControls} from '../../web/src/ui/ai-feature-controls.js';
+import {createAiFeatureControls,showAiSettingsHintOnce} from '../../web/src/ui/ai-feature-controls.js';
 
 function switchControl(checked=false){
   const control=new EventTarget();
@@ -16,7 +16,7 @@ function switchControl(checked=false){
   return control;
 }
 
-test('enabling the AI group never auto-selects Portrait or other effects',()=>{
+test('enabling Smart Enhance selects Portrait and leaves other effects opt-in',()=>{
   const master=switchControl(),portrait=switchControl(),detail=switchControl(),style=switchControl();
   const state=createAiFeatureControls({master,features:{portrait,detail,style}});
   assert.equal(portrait.disabled,true);
@@ -25,15 +25,15 @@ test('enabling the AI group never auto-selects Portrait or other effects',()=>{
   assert.equal(portrait.disabled,false);
   assert.equal(detail.disabled,false);
   assert.equal(style.disabled,false);
-  assert.equal(portrait.checked,false);
+  assert.equal(portrait.checked,true);
   assert.equal(detail.checked,false);
   assert.equal(style.checked,false);
-  assert.equal(state.enabled('portrait'),false);
+  assert.equal(state.enabled('portrait'),true);
   assert.equal(state.enabled('detail'),false);
   assert.equal(state.enabled('style'),false);
 });
 
-test('every effect is independently opt-in, and group off cancels all active features',()=>{
+test('Portrait can be disabled independently, and group off cancels all active features',()=>{
   const master=switchControl(),portrait=switchControl(),detail=switchControl(),style=switchControl();
   const events={portrait:0,detail:0,style:0};
   portrait.addEventListener('change',()=>events.portrait++);
@@ -41,11 +41,14 @@ test('every effect is independently opt-in, and group off cancels all active fea
   style.addEventListener('change',()=>events.style++);
   const state=createAiFeatureControls({master,features:{portrait,detail,style}});
   master.toggle();
+  assert.equal(state.enabled('portrait'),true);
+  portrait.toggle();
+  assert.equal(state.enabled('portrait'),false);
   portrait.toggle();
   assert.equal(state.enabled('portrait'),true);
   assert.equal(state.enabled('detail'),false);
   assert.equal(state.enabled('style'),false);
-  assert.deepEqual(events,{portrait:1,detail:0,style:0});
+  assert.deepEqual(events,{portrait:3,detail:0,style:0});
   detail.toggle();
   style.toggle();
   assert.equal(state.enabled('detail'),true);
@@ -54,13 +57,13 @@ test('every effect is independently opt-in, and group off cancels all active fea
   assert.equal(state.enabled('portrait'),false);
   assert.equal(state.enabled('detail'),false);
   assert.equal(state.enabled('style'),false);
-  assert.deepEqual(events,{portrait:2,detail:2,style:2});
+  assert.deepEqual(events,{portrait:4,detail:2,style:2});
   assert.equal(portrait.checked,false);
   assert.equal(detail.checked,false);
   assert.equal(style.checked,false);
   assert.equal(portrait.disabled,true);
   master.toggle();
-  assert.equal(portrait.checked,false);
+  assert.equal(portrait.checked,true);
   assert.equal(detail.checked,false);
   assert.equal(style.checked,false);
 });
@@ -73,7 +76,7 @@ test('readiness temporarily locks settings without selecting or clearing effects
   master.toggle();
   assert.equal(master.checked,false);
   ready=true;state.sync();
-  master.toggle();portrait.toggle();
+  master.toggle();
   assert.equal(state.enabled('portrait'),true);
   ready=false;state.sync();
   assert.equal(master.disabled,true);
@@ -81,6 +84,20 @@ test('readiness temporarily locks settings without selecting or clearing effects
   assert.equal(portrait.checked,true);
   ready=true;state.sync();
   assert.equal(state.enabled('portrait'),true);
+});
+
+test('AI settings discovery hint appears on the first visit only and hides on opening settings',()=>{
+  const values=new Map(),storage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
+  const summary=new EventTarget(),attrs=new Map();
+  summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);
+  const settings={querySelector:()=>summary},hint={id:'discovery',hidden:true};
+  showAiSettingsHintOnce({hint,settings,storage});
+  assert.equal(hint.hidden,false);assert.equal(attrs.get('aria-describedby'),'discovery');
+  summary.dispatchEvent(new Event('click'));
+  assert.equal(hint.hidden,true);assert.equal(attrs.has('aria-describedby'),false);
+  const nextVisit={id:'discovery',hidden:true};
+  showAiSettingsHintOnce({hint:nextVisit,settings,storage});assert.equal(nextVisit.hidden,true);
+  assert.doesNotThrow(()=>showAiSettingsHintOnce({hint,settings,storage:{getItem(){throw Error('denied');}}}));
 });
 
 test('AI switches share one quality control and have accessible localized copy',()=>{

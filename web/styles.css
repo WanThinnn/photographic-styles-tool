@@ -1012,6 +1012,23 @@ code {
    font-size: 12px
 }
 
+.ai-settings-discovery:not([hidden]) {
+   display: flex;
+   justify-content: flex-end;
+   align-items: center;
+   gap: 6px;
+   margin: 0 10px 10px 0;
+   color: var(--accent-text);
+   font-size: 12px;
+   line-height: 1.4
+}
+
+.ai-settings-discovery svg {
+   width: 22px;
+   height: 22px;
+   flex: none
+}
+
 .ai-settings summary {
    position: absolute;
    top: 8px;

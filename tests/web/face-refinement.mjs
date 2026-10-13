@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {faceCropRect,blendFaceConfidence,skinDetailVariance,personMatteAlpha} from '../../web/src/vision/face-refinement.js';
-import {peopleEntry} from '../../web/src/vision/face-mattes.js';
+import {peopleEntry,MIN_TEXTURE_SKIN_ROUGHNESS,safeTextureSkinRoughness} from '../../web/src/vision/face-mattes.js';
 
 test('face crops are square in pixels, bounded and include edge faces without coordinate stretching',()=>{
   for(const [width,height] of [[1024,768],[768,1024]])for(const x of [0,.4,.85]){
@@ -50,7 +50,14 @@ test('D roughness changes only the smoothing scalar while keeping face colour an
   restored.get('imageStats').get('SkinSmoothingStandalone').set('SkinSmoothFaceRoughness',stats.roughness);
   assert.deepEqual(restored,legacy);
   const flat=peopleEntry(landmarks,{...stats,detailRoughness:0},'FSINCInstanceMask9',0,null);
-  assert.equal(flat.get('imageStats').get('SkinSmoothingStandalone').get('SkinSmoothFaceRoughness'),0);
+  assert.equal(flat.get('imageStats').get('SkinSmoothingStandalone').get('SkinSmoothFaceRoughness'),MIN_TEXTURE_SKIN_ROUGHNESS);
+});
+
+test('Texture serialization never emits zero/non-finite Soft Skin roughness',()=>{
+  assert.equal(safeTextureSkinRoughness({detailRoughness:0,roughness:.02}),MIN_TEXTURE_SKIN_ROUGHNESS);
+  assert.equal(safeTextureSkinRoughness({detailRoughness:1e-8,roughness:.02}),MIN_TEXTURE_SKIN_ROUGHNESS);
+  assert.equal(safeTextureSkinRoughness({detailRoughness:NaN,roughness:0}),MIN_TEXTURE_SKIN_ROUGHNESS);
+  assert.equal(safeTextureSkinRoughness({detailRoughness:.0002,roughness:.02}),.0002);
 });
 test('generated person opacity removes the background confidence floor without a hard edge',()=>{
   for(const value of [0,9,21,32])assert.equal(personMatteAlpha(value),0);

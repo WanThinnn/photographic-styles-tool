@@ -191,15 +191,25 @@ test('Texture-only mode does not reconstruct missing native Styles or change cap
   for(const ref of a.refs)assert.ok(b.refs.some(r=>JSON.stringify(r)===JSON.stringify(ref)));
 });
 
-test('adding a missing Styles graph preserves an original six-key Bright selection instead of Standard',async()=>{
+test('adding a missing Styles graph preserves a real iPhone 13-15 six-key Bright selection instead of Standard',async()=>{
   const base=photo(900,600),marker=buildBplist(new Map([['3',1],['1',-.5],['4',16],['2',.5],['0',1],['5',0]]));
   const graph=discoverHeic(base);
-  const source=withoutThumbnail(withMarker(base,marker),[graph.stylesItem,graph.deltaGrid,graph.linearThumb]);
+  const source=withCamera(withoutThumbnail(withMarker(base,marker),[graph.stylesItem,graph.deltaGrid,graph.linearThumb]),'iPhone 15 Pro');
   assert.equal(discoverHeic(source).stylesItem,null);
   const originalProfile=buildGeneratedProfile('48-12',assets),saved=originalProfile.mn54.slice();
   const output=await patch(source,originalProfile,{experimental:true});
   assert.deepEqual(selectedStyle(output.data),selectedStyle(source));
   assert.deepEqual(originalProfile.mn54,saved,'cached neutral profile must not inherit another photo selection');
+});
+
+test('pre-Photographic-Styles iPhones ignore reused 0x54 blobs and receive the generated Standard marker',async()=>{
+  const base=photo(900,600),legacy=buildBplist(new Map([['3',1],['1',.18],['4',16],['2',0],['0',1],['5',0]]));
+  const graph=discoverHeic(base);
+  const source=withCamera(withoutThumbnail(withMarker(base,legacy),[graph.stylesItem,graph.deltaGrid,graph.linearThumb]),'iPhone 7');
+  const profile=buildGeneratedProfile('48-12',assets),output=await patch(source,profile,{experimental:true});
+  const selected=parseBplist(selectedStyle(output.data).payload);
+  assert.deepEqual([selected.get('0'),selected.get('1'),selected.get('2'),selected.get('3'),selected.get('4'),selected.get('5'),selected.get('6'),selected.get('7')],
+    [1,0,0,1,1,1,4,0]);
 });
 
 test('Suggested Styles overrides legacy iPhone 15 selection but never mutates incomplete iPhone 16+ capture selection',async()=>{

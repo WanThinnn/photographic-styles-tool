@@ -3013,3 +3013,33 @@ The web app now detects the native iPhone 18+ capture path conservatively as
 without grafting a second Texture contract when no grafted `texture_styles` exists.
 A private regression asserts IMG_0243 is detected as native Texture while IMG_7864
 (iPhone 16 Pro) is not. Service-worker shell cache is v112.
+
+
+### 10.64 Legacy 0x54 collision and Soft Skin/Glow black-render regression (2026-10-13)
+
+The reported `C:/Users/WanThinnn/Downloads/IMG_1382.HEIC` is an iPhone 7 capture
+(Exif Software 14.2). It has no Photographic Styles auxiliary graph, but its Apple
+MakerNote contains a six-key 0x54 bplist with `0=1, 1=0.18, 2=0, 3=1, 4=16, 5=0`.
+iPhone 7 predates Photographic Styles, so this older 0x54 payload must not be treated
+as a captured Style selector merely because its private blob resembles the later schema.
+
+The port path previously preserved any syntactically valid 0x54 selector before grafting
+Styles. On pre-Styles cameras this could carry the unrelated legacy payload into the
+generated Styles/Texture renderer. The port now interprets source 0x54 as a Photographic
+Style selection only for iPhone generation 13 or newer. iPhone 13–15 still preserve a
+real legacy Style selection, Suggested Styles can still replace it, and iPhone 16+
+native selections remain protected. Pre-iPhone-13 inputs receive the generated neutral
+eight-key Standard selector instead.
+
+The exact IMG_1382 browser workflow was re-run end to end after the fix. Its output has
+the neutral eight-key marker `{0:1,1:0,2:0,3:1,4:1,5:1,6:4,7:0}`, schema-14 Styles
+with a 516-byte tone curve, one generated Texture people entry, and positive
+`SkinSmoothFaceRoughness=0.00010525344350426256`. This also proves the earlier V13
+zero-roughness failure is not the primary cause for this particular photo. The serializer
+still clamps zero/non-finite generated roughness to the smallest previously device-tested
+non-black value as a separate safety guard.
+
+Portable regressions cover the iPhone 7 0x54 collision, iPhone 13–15 preservation,
+iPhone 16+ protection and nonzero Texture roughness. The real browser IMG_1382 check,
+AI Portrait export tests, Texture compatibility tests and Soft Skin tests all pass.
+Service-worker shell cache is v142.

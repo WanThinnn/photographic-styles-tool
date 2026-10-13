@@ -659,6 +659,17 @@ function analyzeMasked(display, mask) {
   };
 }
 
+// V13 phone testing established that a real-valued zero
+// SkinSmoothFaceRoughness can blacken the person and break Glow/Soft Skin.
+// Use the smallest device-tested non-black value as a serialization floor.
+// Keep the raw estimator unchanged for diagnostics; only Texture metadata is clamped.
+export const MIN_TEXTURE_SKIN_ROUGHNESS = 0.00001650231649452065;
+export function safeTextureSkinRoughness(faceStats) {
+  const measured = Number.isFinite(faceStats?.detailRoughness)
+    ? faceStats.detailRoughness : faceStats?.roughness;
+  return Math.max(MIN_TEXTURE_SKIN_ROUGHNESS, Number.isFinite(measured) ? measured : 0);
+}
+
 export function peopleEntry(landmarks, faceStats, referenceKey, angle, mirror,
   pose = { yaw: 0, pitch: 0, roll: 0 }) {
   const skin = bounds(landmarks);
@@ -685,7 +696,7 @@ export function peopleEntry(landmarks, faceStats, referenceKey, angle, mirror,
         ["faceID", 0], ["AverageFaceColor", faceStats.averageColor]])],
       ["SkinSmoothingStandalone", new Map([["faceID", 0],
         ["SkinSmoothAverageFaceColour", faceStats.averageColor],
-        ["SkinSmoothSkipPerson", false], ["SkinSmoothFaceRoughness", faceStats.detailRoughness ?? faceStats.roughness]])],
+        ["SkinSmoothSkipPerson", false], ["SkinSmoothFaceRoughness", safeTextureSkinRoughness(faceStats)]])],
       ["UnderEyeBrightening", new Map([["faceID", 0],
         ["RightEyeIsBiModal", false], ["LeftEyeLumaVariance", faceStats.roughness],
         ["LeftEyeIsBiModal", false], ["LeftEyeAverageColor", faceStats.averageColor],

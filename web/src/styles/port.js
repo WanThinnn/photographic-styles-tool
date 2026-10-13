@@ -70,6 +70,11 @@ export function profileFor(index, d, experimental = false) {
 export async function patch(targetData, profile, opts = {}) {
   const td = discoverHeic(targetData);
   const cameraModel=td.exifItem===null?'':(exifCameraModel(extractItem(targetData,td.iloc,td.exifItem))||'');
+  const generationMatch=/^iPhone (\d+)(?:\s|$)/.exec(cameraModel);
+  const cameraGeneration=generationMatch?Number(generationMatch[1]):null;
+  // MakerNote 0x54 predates Photographic Styles and is reused on older iPhones.
+  // Only iPhone 13+ can treat a matching six/eight-key blob as a Style selection.
+  const canCarryStyleSelection=Number.isInteger(cameraGeneration)&&cameraGeneration>=13;
   const nativeStyleCapture=preserveNativeStyles(targetData,td);
   const styleRecommendation=opts.styleRecommendation===undefined||opts.styleRecommendation===null
     ?null:validateStyleRecommendation(opts.styleRecommendation);
@@ -84,8 +89,10 @@ export async function patch(targetData, profile, opts = {}) {
   // A capture can retain its selected Style even when an export omitted the
   // Styles auxiliary graph. Keep that selection when adding the missing graph.
   let selection,selectionCompatibility;
-  try{selection=extractAppleMakerNoteTag(extractItem(targetData,td.iloc,td.exifItem));}
-  catch(error){if(!error.message.includes('tag 0x54 not found'))throw error;}
+  if(canCarryStyleSelection){
+    try{selection=extractAppleMakerNoteTag(extractItem(targetData,td.iloc,td.exifItem));}
+    catch(error){if(!error.message.includes('tag 0x54 not found'))throw error;}
+  }
   if(selection){
     const marker=parseBplist(selection.payload);
     if(![1,7].includes(selection.type)||!(marker instanceof Map)||marker.get('0')!==1

@@ -8,6 +8,32 @@ function range(min,max) {
     throw Error('Invalid relative disparity range');
 }
 
+/** Read the tested 8-bit camera-disparity XMP subset without DOM APIs (workers).
+ * Ambiguous namespaces/values are unsupported, never an implicit AI 0..1 range. */
+export function readAppleDepthRange(xmp) {
+  if(typeof xmp!=='string'||/<!DOCTYPE|<!ENTITY/i.test(xmp))return null;
+  const declarations=[...xmp.matchAll(/xmlns:([A-Za-z_][\w.-]*)\s*=\s*["']([^"']+)["']/g)];
+  const own=declarations.filter(([,prefix,uri])=>uri==='http://ns.apple.com/pixeldatainfo/1.0/');
+  if(own.length!==1)return null;
+  const prefix=own[0][1];
+  if(declarations.filter(([,name])=>name===prefix).length!==1)return null;
+  const escaped=prefix.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const value=name=>{
+    const key=escaped+':'+name;
+    const elements=[...xmp.matchAll(new RegExp('<'+key+'\\s*>\\s*([^<]*)</'+key+'\\s*>','g'))].map(m=>m[1].trim());
+    const attributes=[...xmp.matchAll(new RegExp('\\s'+key+'\\s*=\\s*["\']([^"\']*)["\']','g'))].map(m=>m[1].trim());
+    const values=[...elements,...attributes];return values.length===1?values[0]:null;
+  };
+  if(value('AuxiliaryImageType')!=='disparity'||value('NativeFormat')!=='1751411059'
+    ||value('StoredFormat')!=='1278226488'||value('IntMinValue')!=='0'||value('IntMaxValue')!=='255')return null;
+  const min=value('FloatMinValue'),max=value('FloatMaxValue');
+  const numeric=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+  if(min===null||max===null||!numeric.test(min)||!numeric.test(max))return null;
+  const floatMin=Number(min),floatMax=Number(max);
+  try{range(floatMin,floatMax);}catch{return null;}
+  return {floatMin,floatMax};
+}
+
 export function depthRepresentationSubtype(min,max) {
   range(min,max);
   const bits=[];

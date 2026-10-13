@@ -6,7 +6,7 @@ import {discoverHeic,extractItemData,parseIloc,replaceIdatItem,removeItems,setIt
 import {buildAppleStyleExif,preserveRasterExif,readExifOrientation} from '../raster/exif.js';
 import {getMakerNoteBlob,extractAppleMakerNoteTag} from '../core/exif.js';
 import {parseBplist} from '../core/bplist.js';
-import {appleDepthAuxc} from './apple-depth-metadata.js';
+import {appleDepthAuxc,readAppleDepthRange} from './apple-depth-metadata.js';
 import {portraitAssembler} from './ai-portrait-assembler.js';
 import {styleCapabilities} from '../styles/style-capabilities.js';
 import {normalizeLegacyPortraitHdrGain,promoteLegacyPortraitHdr} from '../styles/hdr-compatibility.js';
@@ -186,8 +186,11 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   });
   meta=box('meta',concat([meta.slice(rm.off+rm.hdr,rm.off+rm.hdr+4),
     ...[...boxes(meta,rm.off+rm.hdr+4,rm.off+rm.size)].filter(b=>b.type!=='grpl').map(b=>meta.slice(b.off,b.off+b.size)),...groups]));
+  // Camera samples retain their original descriptor; AI samples use the range
+  // declared by their encoder. Validate either range before writing metadata.
+  const generatedAuxc=appleDepthAuxc(depth);
   const depthProps=[box('ispe',concat([new Uint8Array(4),be(depth.width,4),be(depth.height,4)])),
-    box('pixi',new Uint8Array([0,0,0,0,1,8])),depth.hvcc,appleDepthAuxc({floatMax:depth.floatMax??1}),
+    box('pixi',new Uint8Array([0,0,0,0,1,8])),depth.hvcc,depth.nativeAuxc??generatedAuxc,
     ...(d.props.associations.get(d.primary)||[]).map(a=>d.props.properties[a.index-1])
       .filter(p=>['irot','imir'].includes(p.type)).map(p=>source.slice(p.box.off,p.box.off+p.box.size))];
   const associations=[];for(const p of depthProps){let index;[meta,index]=appendIpcoProperty(meta,p);associations.push([index,!['ispe','pixi'].includes(String.fromCharCode(...p.slice(4,8)))]);}
@@ -195,7 +198,8 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   if(![focusX,focusY,aperture].every(Number.isFinite)||focusX<0||focusX>1||focusY<0||focusY>1||aperture<1||aperture>22)
     throw Error('Invalid Portrait focus/aperture');
   payloads.set(depthId,depth.payload);
-  payloads.set(depthSide,xml(template.depthXmp.replace(/(<apdi:FloatMaxValue>)[^<]+(<\/apdi:FloatMaxValue>)/,
+  payloads.set(depthSide,xml(template.depthXmp.replace(/(<apdi:FloatMinValue>)[^<]+(<\/apdi:FloatMinValue>)/,
+    (_,a,b)=>a+(depth.floatMin??0)+b).replace(/(<apdi:FloatMaxValue>)[^<]+(<\/apdi:FloatMaxValue>)/,
     (_,a,b)=>a+(depth.floatMax??1)+b).replace(/(<depthBlurEffect:SimulatedAperture>)[^<]+(<\/depthBlurEffect:SimulatedAperture>)/,
     (_,a,b)=>a+aperture.toFixed(6)+b)));
   const ownExif=extractItemData(source,d,d.exifItem),[w,h]=dimensionsForItem(d.props,d.primary);
@@ -233,7 +237,7 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
 }
 /** Diagnostic adapter only: a verified unblurred base is required. Metadata
  * cannot undo Portrait blur already present in the source image pixels. */
-export async function restoreNativePortrait(source,template,{unblurredBase=false}={}){
+export async function restoreNativePortrait(source,template,{unblurredBase=false,hdrCodec=null}={}){
   if(unblurredBase!==true)return null;
   const d=discoverHeic(source),depths=[...d.infos.keys()].filter(id=>auxUriForItem(d.props,id)===DEPTH_URI);
   if(depths.length!==1)return null;
@@ -252,20 +256,30 @@ export async function restoreNativePortrait(source,template,{unblurredBase=false
   if(sidecars.length!==1||sidecars[0].to.length!==1)return null;
   const side=sidecars[0].from,xmp=new TextDecoder().decode(extractItemData(source,d,side));
   if(xmp.includes('depthBlurEffect:RenderingParameters'))return null;
+  const nativeRange=readAppleDepthRange(xmp);
+  if(!nativeRange)return null;
   const [width,height]=dimensionsForItem(d.props,id),hvcc=propertyBoxBytes(source,d.props,id,'hvcC');
   // The accepted rendering metadata expects the tested 8-bit disparity stream.
   const pixi=propertyBoxBytes(source,d.props,id,'pixi');
   if(d.infos.get(id)?.type!=='hvc1'||!hvcc||!pixi||pixi[12]!==1||pixi[13]!==8)return null;
-  const depth={width,height,hvcc,payload:extractItemData(source,d,id)};
+  const nativeAuxc=propertyBoxBytes(source,d.props,id,'auxC');
+  const depth={width,height,hvcc,payload:extractItemData(source,d,id),nativeAuxc,...nativeRange};
   const meta=removeItems(source.slice(d.meta.off,d.meta.off+d.meta.size),[id,side]),graph=discoverHeic(meta);
   const payloads=new Map([...graph.infos.keys()].filter(key=>graph.iloc.items.get(key)?.constructionMethod!==1)
     .map(key=>[key,extractItemData(source,d,key)]));
   const ft=topBox(source,'ftyp'),prepared=assemble(meta,payloads,source.slice(ft.off,ft.off+ft.size));
   template??=await loadTemplate();
-  const output=buildAiPortrait(prepared,depth,template);
+  // Native camera depth takes this adapter, not exportAiPortrait(). It needs
+  // the same HDR preparation before adopting the newer Portrait renderer:
+  // raw Apple Rec.709 gain must not be interpreted as logarithmic ISO gain.
+  const legacyHdr=await normalizeLegacyPortraitHdrGain(prepared,{codec:hdrCodec});
+  const output=buildAiPortrait(legacyHdr?.data||prepared,depth,template,
+    {legacyHdrNormalized:Boolean(legacyHdr)});
   const after=discoverHeic(output.data),newId=[...after.infos.keys()].find(key=>auxUriForItem(after.props,key)===DEPTH_URI);
   if(!bytesEqual(extractItemData(output.data,after,newId),depth.payload))throw Error('Native depth changed');
+  if(!bytesEqual(propertyBoxBytes(output.data,after.props,newId,'auxC'),nativeAuxc))throw Error('Native depth descriptor changed');
   output.report.mode='restored-native-portrait';output.report.modelInference=false;
+  output.report.nativeDepthRangePreserved=true;
   return output;
 }
 export async function exportAiPortrait(result,onProgress=()=>{},{signal}={}){

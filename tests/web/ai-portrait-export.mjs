@@ -154,6 +154,53 @@ test('diagnostic native rebuild requires explicit verified unblurred pixels rega
   assert.equal(await restoreNativePortrait(photo(900,600),template),null);
 });
 
+test('native restoration preserves camera disparity range and exact auxC, not the AI unit range',async()=>{
+  // The actual Portrait-off 7094 and 5202 ranges. Their encoded pixels did not
+  // change, but the old adapter incorrectly described both planes as 0..1.
+  for(const [floatMin,floatMax]of [[.043335,1.615234],[.110901,.750488]]){
+    const source=capture(attachAiDepth(photo(900,600),{...depth,floatMin,floatMax}),10,0);
+    const saved=source.slice(),before=discoverHeic(source);
+    const oldId=[...before.infos.keys()].find(id=>auxUriForItem(before.props,id)===DEPTH_URI);
+    const output=await restoreNativePortrait(source,template,{unblurredBase:true});assert.ok(output);
+    const after=discoverHeic(output.data),id=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+    assert.deepEqual(propertyBoxBytes(output.data,after.props,id,'auxC'),propertyBoxBytes(source,before.props,oldId,'auxC'));
+    const side=after.refs.find(r=>r.type==='cdsc'&&r.to.includes(id)&&after.infos.get(r.from)?.type==='mime');
+    const xmp=new TextDecoder().decode(extractItemData(output.data,after,side.from));
+    assert.ok(xmp.includes(`<apdi:FloatMinValue>${floatMin}</apdi:FloatMinValue>`));
+    assert.ok(xmp.includes(`<apdi:FloatMaxValue>${floatMax}</apdi:FloatMaxValue>`));
+    assert.deepEqual(extractItemData(output.data,after,id),extractItemData(source,before,oldId));
+    assert.deepEqual(extractItemData(output.data,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+    before.primaryTiles.forEach((key,i)=>assert.deepEqual(extractItemData(output.data,after,after.primaryTiles[i]),extractItemData(source,before,key)));
+    assert.deepEqual(source,saved);
+  }
+});
+
+test('native restoration refuses missing, ambiguous or invalid disparity ranges instead of guessing 0..1',async()=>{
+  const base=capture(attachAiDepth(photo(900,600),{...depth,floatMin:.043335,floatMax:1.615234}),10,0);
+  const d=discoverHeic(base),id=[...d.infos.keys()].find(id=>auxUriForItem(d.props,id)===DEPTH_URI);
+  const side=d.refs.find(r=>r.type==='cdsc'&&r.to.includes(id)&&d.infos.get(r.from)?.type==='mime').from;
+  const original=new TextDecoder().decode(extractItemData(base,d,side)),ft=topBox(base,'ftyp');
+  const changed=xmp=>rebuildHeic(base,d,base.slice(ft.off,ft.off+ft.size),base.slice(d.meta.off,d.meta.off+d.meta.size),
+    new Map([[side,new TextEncoder().encode(xmp)]]));
+  for(const xmp of [
+    original.replace(/<pixel:FloatMinValue>[^<]+<\/pixel:FloatMinValue>/,''),
+    original.replace('>0.043335<','><'),
+    original.replace('>0.043335<','>-0.043335<'),
+    original.replace('>1.615234<','>0.01<'),
+    original.replace('>1.615234<','>NaN<'),
+    original.replace('>1.615234<','>Infinity<'),
+    original.replace('>1.615234<','>2000000000<'),
+    original.replace('</pixel:FloatMaxValue>','</pixel:FloatMaxValue><pixel:FloatMaxValue>2</pixel:FloatMaxValue>'),
+    original.replace('http://ns.apple.com/pixeldatainfo/1.0/','https://example.invalid/depth/'),
+  ])assert.equal(await restoreNativePortrait(changed(xmp),template,{unblurredBase:true}),null);
+  // XMP prefixes are aliases; real camera exports use apdi, generated ones pixel.
+  for(const xmp of [original.replaceAll('pixel:','apdi:').replace('xmlns:pixel=','xmlns:apdi='),
+    original.replace('<pixel:FloatMinValue>0.043335</pixel:FloatMinValue>','')
+      .replace('xmlns:pixel=', 'pixel:FloatMinValue="0.043335" xmlns:pixel=')]){
+    assert.ok(await restoreNativePortrait(changed(xmp),template,{unblurredBase:true}));
+  }
+});
+
 test('Texture routes preserve incomplete native Portrait without adding a second blur renderer',async()=>{
   const source=capture(attachAiDepth(photo(900,600),depth),11,0),before=discoverHeic(source);
   const saved=source.slice(),originalFetch=globalThis.fetch;
@@ -360,6 +407,95 @@ test('Apple legacy Rec.709 gain samples are converted to the equivalent ISO loga
   for(let i=0;i<256;i++)maxError=Math.max(maxError,Math.abs(
     1+(headroom-1)*linear(i/255)-2**((output[i]/255)*stops)));
   assert.ok(maxError<.006,`legacy-to-ISO gain error ${maxError}`);
+});
+
+function maker33LegacyHdr({numerator=28718,denominator=31509,maker48=null,withMaker33=true}={}){
+  let source=withCamera(capture(attachAiDepth(photo(900,600),depth),10,0),'iPhone 13 Pro Max');
+  const d=discoverHeic(source),ft=topBox(source,'ftyp');
+  let meta=source.slice(d.meta.off,d.meta.off+d.meta.size),index,ids;
+  for(const id of d.hdrTiles.length?d.hdrTiles:[d.hdrGrid])
+    meta=replaceItemPropertyWithSource(meta,id,'hvcC',assets.mask.hvcc);
+  [meta,index]=appendIpcoProperty(meta,box('colr',concat([new TextEncoder().encode('nclx'),be(12,2),be(1,2),be(1,2),Uint8Array.of(128)])));
+  const kept=d.props.associations.get(d.primary).filter(a=>d.props.properties[a.index-1].type!=='colr');
+  meta=setItemPropertyAssociations(meta,d.primary,[...kept.map(a=>[a.index,a.essential]),[index,false]]);
+  [meta,ids]=addItems(meta,[{key:'legacy-hdr-xmp',itemType:'mime',contentType:'application/rdf+xml',refType:'cdsc',refTo:[d.hdrGrid]}]);
+  let exif=extractItemData(source,d,d.exifItem);
+  const little=getMakerNoteBlob(exif)[12]===73;
+  const scalar=(id,payload,type)=>{
+    if(little)payload=concat([payload.slice(0,4).reverse(),payload.slice(4,8).reverse()]);
+    exif=injectAppleMakerNoteTag(exif,payload,id,type);
+    const mn=getMakerNoteBlob(exif),view=new DataView(mn.buffer,mn.byteOffset,mn.byteLength);
+    for(let i=0;i<view.getUint16(14,little);i++){
+      const pos=16+12*i;if(view.getUint16(pos,little)===id)view.setUint32(pos+4,1,little);
+    }
+  };
+  if(withMaker33)scalar(0x21,concat([be(numerator,4),be(denominator,4)]),10);
+  if(maker48)scalar(0x30,maker48.payload,maker48.type);
+  const xml=new TextEncoder().encode('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:HDRGainMap="http://ns.apple.com/HDRGainMap/1.0/"><HDRGainMap:HDRGainMapVersion>65536</HDRGainMap:HDRGainMapVersion></rdf:Description></rdf:RDF></x:xmpmeta>');
+  return rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),meta,new Map([[d.exifItem,exif],[ids.get('legacy-hdr-xmp'),xml]]));
+}
+
+test('native Portrait-off restores camera depth with normalized HDR even without Maker48',async()=>{
+  // Actual reported captures: IMG_5202/1412 and IMG_7094/1415, Maker48 absent.
+  for(const [numerator,denominator,stops]of [[28718,31509,1.8],[39391,27267,3]]){
+    const source=maker33LegacyHdr({numerator,denominator}),saved=source.slice(),before=discoverHeic(source);
+    const oldDepth=[...before.infos.keys()].find(id=>auxUriForItem(before.props,id)===DEPTH_URI);
+    let decodes=0,encodes=0;
+    const codec={
+      decodeHevcLuma:async(_record,_payload,{width,height})=>{
+        decodes++;return {bytes:Uint8Array.from({length:width*height},(_,i)=>i%256),width,height};
+      },
+      encodeHevcPixels:async samples=>{
+        encodes++;
+        assert.deepEqual(samples.slice(0,256),normalizeAppleLegacyGainSamples(Uint8Array.from({length:256},(_,i)=>i),2**stops));
+        return {payload:Uint8Array.of(encodes,samples[64],samples[128],samples[255]),hvcc:assets.mask.hvcc,
+          sps:{chroma:0,luma:8,chromaDepth:8,fullRange:true}};
+      },
+    };
+    const output=await restoreNativePortrait(source,template,{unblurredBase:true,hdrCodec:codec});
+    assert.deepEqual(source,saved);
+    assert.equal(output.report.mode,'restored-native-portrait');
+    assert.equal(output.report.modelInference,false);
+    assert.equal(output.report.legacyHdrCompatibility,'normalized-portrait-tmap');
+    assert.equal(decodes,before.hdrTiles.length);assert.equal(encodes,decodes);
+    const after=discoverHeic(output.data),tmap=[...after.infos].find(([,info])=>info.type==='tmap')?.[0];
+    const newDepth=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+    assert.deepEqual(extractItemData(output.data,after,newDepth),extractItemData(source,before,oldDepth));
+    before.primaryTiles.forEach((id,i)=>assert.deepEqual(extractItemData(output.data,after,after.primaryTiles[i]),extractItemData(source,before,id)));
+    assert.deepEqual(extractItemData(output.data,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
+    assert.deepEqual(selectedStyle(output.data),selectedStyle(source));
+    assert.deepEqual(after.refs.find(r=>r.type==='auxl'&&r.from===newDepth).to,[after.primary,tmap]);
+    const parameters=parseTmapMetadata(extractItemData(output.data,after,tmap));
+    assert.ok(Math.abs(parameters.alternateHeadroom-stops)<1e-6);
+    const side=after.refs.find(r=>r.type==='cdsc'&&r.to.includes(after.hdrGrid));
+    const xml=new TextDecoder().decode(extractItemData(output.data,after,side.from));
+    assert.match(xml,/<HDRGainMap:HDRGainMapVersion>131072</);
+    assert.ok(xml.includes((2**stops).toFixed(9)));
+    assert.throws(()=>extractAppleMakerNoteTag(extractItemData(output.data,after,after.exifItem),0x30),/not found/);
+    assert.equal(await restoreNativePortrait(output.data,template,{unblurredBase:true,hdrCodec:codec}),null);
+    assert.equal(encodes,decodes,'a complete native renderer must not normalize twice');
+  }
+});
+
+test('missing Maker48 default never masks malformed HDR metadata or a missing Maker33',async()=>{
+  const codec={decodeHevcLuma:async()=>{throw Error('invalid metadata must not allocate codec');}};
+  for(const options of [{withMaker33:false},{denominator:0},{denominator:0xffffffff},
+    {maker48:{type:9,payload:be(1,4)}},{maker48:{type:10,payload:concat([be(1,4),be(0,4)])}},
+    {maker48:{type:10,payload:concat([be(1,4),be(0xffffffff,4)])}}]){
+    assert.equal(await normalizeLegacyPortraitHdrGain(maker33LegacyHdr(options),{codec}),null);
+  }
+});
+
+test('legacy gain normalization preserves highlight multipliers for the reported 33-only headrooms',()=>{
+  const samples=Uint8Array.from({length:256},(_,i)=>i);
+  const linear=x=>x<.081?x/4.5:((x+.099)/1.099)**(1/.45);
+  for(const stops of [1.8,3]){
+    const headroom=2**stops,normalized=normalizeAppleLegacyGainSamples(samples,headroom);
+    for(let i=0;i<256;i++){
+      const original=1+(headroom-1)*linear(i/255),reconstructed=2**(normalized[i]/255*stops);
+      assert.ok(Math.abs(reconstructed-original)/original<.005,'must not introduce a highlight boost');
+    }
+  }
 });
 
 test('AI Portrait promotes prepared ISO HDR after depth exists using the migrated legacy headroom',()=>{

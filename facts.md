@@ -3231,3 +3231,276 @@ depth and editing resources target `[primary,tmap]`. This file still needs a fre
 iPhone import/edit/export check, specifically verifying that Photos retains the tmap rather
 than producing the rejected primary-only graph seen in IMG_1401. Service-worker shell cache
 is v146.
+
+### 10.69 Native Portrait restoration needs the same HDR preparation (2026-10-13)
+
+The user reports that the previous HDR blur/bokeh fix now works, but restoring Portrait
+on some native-depth inputs introduces glaring HDR highlights. Their workflow is native
+Portrait ON -> Photos Edit -> Portrait OFF -> upload -> process -> import -> Portrait ON.
+The post-import examples are IMG_1412 and IMG_1415. IMG_5202 and IMG_7094 in
+`C:/Users/WanThinnn/Downloads/iCloud Photos/iCloud Photos` are the original Portrait-ON
+files, not the uploaded sharp bases. The user subsequently supplied the actual Portrait-OFF
+uploads under `C:/Users/WanThinnn/Downloads/iCloud Photos (1)/iCloud Photos` with the same
+two filenames. Comparison confirms identical gain-map/depth payloads between ON and OFF,
+but different primary payloads; generating a test from the ON originals would risk double
+blur and would not reproduce the upload workflow.
+
+Both actual uploads are iPhone 13 Pro Max HEICs with 3024x4032 primary grids, 1512x2016
+12-tile monochrome Apple gain maps, native 576x768 depth, HDRGainMapVersion=65536,
+and no explicit HDRGainMapHeadroom or ISO tmap. Their Apple MakerNote contains tag 33
+but no tag 48. IMG_5202 has maker33=28718/31509; IMG_7094 has maker33=39391/27267.
+The headroom probe previously required both tags and therefore skipped these inputs.
+Skia's Apple HDR decoder explicitly handles this older 33-only layout by defaulting an
+absent tag 48 to zero:
+https://skia.googlesource.com/skia/+/main/src/codec/SkExif.cpp
+Applying that convention to Apple's piecewise equation gives 1.8 stops (~3.4822x) and
+3 stops (8x), respectively. Only an absent tag 48 uses the default; a missing tag 33,
+wrong tag type, zero denominator or negative signed-rational denominator still rejects
+the conversion. No missing MakerNote tag is synthesized into the output.
+
+The second gap was pipeline-specific: native-depth restoration uses restoreNativePortrait(),
+not exportAiPortrait(), so the normalization and atomic sidecar migration from 10.67/10.68
+never ran before installing the newer Portrait renderer. Native restoration now uses the
+same HDR preparation, converts legacy Rec.709 gain samples to the matching logarithmic
+representation, migrates the sidecar to version 131072 with explicit source-derived
+headroom, and attaches a matching tmap after restoring the camera depth. Depth and editing
+resources target both primary and tmap. Existing ISO HDR remains unconverted, completed
+Portrait graphs are not rebuilt, and the normalization helper releases its encoder when
+it owns the codec. This does not change the existing native-depth calibration or blur
+algorithm and does not replace the camera depth with AI depth.
+
+A real local Chrome run processed both actual OFF uploads through the web app. Results
+are saved privately in `tests/private-fixtures/HDR_Portrait_Highlights/`:
+
+- IMG_5202_HDR_Portrait_HighlightFix.HEIC (4,997,008 bytes).
+- IMG_7094_HDR_Portrait_HighlightFix.HEIC (3,266,619 bytes).
+- verify-browser.mjs and verification.json record the reproduction and checks.
+
+For each output, every primary tile and the native depth payload remain byte-exact.
+Independent FFmpeg decoding of all 12 output gain tiles exactly matches the normalized
+plane. Across 3,145,728 samples per photo, the maximum relative multiplier error versus
+the original Apple equation is 0.244833% for IMG_5202 and 0.408426% for IMG_7094. Both
+files contain the expected source-derived tmap headroom and dual-target depth relationship.
+These checks establish container and gain-equation consistency, not physical Photos
+rendering: the remaining blown-highlight symptom still needs a fresh iPhone import and
+Portrait/HDR ON/OFF comparison before it can be marked device-proven.
+
+Portable native-restoration regressions cover the two 33-only metadata patterns,
+primary/Styles/depth preservation, malformed metadata rejection, idempotence and all 256
+gain code values. The focused export suite is 40 pass / 0 fail; the combined relevant
+Portrait/HDR/worker/Styles suites are 80 pass / 2 optional skips / 0 fail. PWA and i18n
+validation pass. Service-worker shell cache is v148. No UI redesign was implemented.
+
+### 10.70 v148 physical feedback: 7094 sky still blows out; split-reader diagnostics (2026-10-13)
+
+The user tested both 10.69 outputs on iPhone. IMG_5202 is broadly acceptable but its HDR
+also increases slightly. IMG_7094_HDR_Portrait_HighlightFix.HEIC blows out the entire HDR
+sky. Thus v148 is **not a device-proven general fix**, despite its passing sample-equation
+and preservation checks. Do not treat 5202 as evidence that every legacy HDR capture works.
+The user supplied the actual Photos-rendered exports:
+
+- `C:/Users/WanThinnn/Downloads/IMG_1431.HEIC`: failed 7094 rendition.
+- `C:/Users/WanThinnn/Downloads/IMG_1428.HEIC`: broadly acceptable 5202 rendition.
+
+Both exports omit the input tmap and Styles graph, retain the same 1,352-byte Portrait
+REND blob, and carry version-131072 Apple HDR auxiliary maps. 1431 explicitly declares
+headroom 8; 1428 declares 3.4822022914886475. Their depth payload hashes match the older
+1415/1412 Photos renders. The absence of tmap is therefore not by itself sufficient to
+explain failure: it occurs in both the broadly acceptable and failed outputs.
+
+Independent FFmpeg luma decoding compares a fixed sky rectangle (normalized x .53-.87,
+y .10-.33). For 7094 its gain median is 183 in the source Apple map, 188 in the direct
+v148 logarithmic map, and 188 in 1431 after Photos. The source ON/OFF gain planes are
+identical. 1415, the pre-normalization render, has median 183. The analogous sampled
+5202 medians are 11 (source), 5 (direct v148) and 6 (1428). These values demonstrate
+which numerical planes survive rendering, not the correct visible HDR result. The agent
+cannot execute the physical iPhone Photos renderer in this Windows environment.
+
+One prior contract assumption needs qualification: an Apple HDRGainMapVersion=131072
+declaration alone does **not establish ISO logarithmic sample semantics for every reader**.
+Skia's Apple XMP reader accepts any version and still chooses its Apple gain-map decoding
+type (https://skia.googlesource.com/skia/+/main/src/codec/SkXmp.cpp). This is evidence about
+that reader, not proof of which internal iOS path causes 1431. A single plane offered as
+both Apple auxiliary HDR and ISO tmap input leaves reader-selection ambiguity after
+Photos removes tmap. Existing automatic version-131072 handling is not broadened here.
+
+Two immutable **diagnostic-only** 7094 variants are generated by the private
+`tests/private-fixtures/HDR_Portrait_Highlights/contract-trials.mjs`:
+
+- `IMG_7094_HDR_Portrait_ISOOnlyTrial.HEIC`: the same normalized gain and tmap, without
+  the Apple HDR auxiliary label or Apple XMP sidecar on that numerical plane.
+- `IMG_7094_HDR_Portrait_DualContractTrial.HEIC`: the same ISO-only plane/tmap plus a
+  separate byte-exact copy of the source Apple gain grid/tiles/XMP linked to the primary.
+  ISO reconstruction consumes the normalized plane; an Apple auxiliary reader can consume
+  only the untouched Apple plane. Both headroom equations retain the source-derived range;
+  no arbitrary brightness clamp, SDR-only conversion or guessed headroom is introduced.
+
+Every surviving baseline item payload is asserted byte-identical in both variants,
+including primary, depth, Styles, Texture, normalized gain, tmap and REND sidecar. The
+dual-contract variant additionally asserts every imported Apple payload against the source.
+The ordinary discoverHeic() hdrGrid selector prefers the Apple auxiliary in that variant,
+so simple audits comparing tmap input to d.hdrGrid report no matching tmap even though
+the tmap item and its original [primary, normalizedGain] inputs remain present. This is
+another reason these diagnostics are not yet adopted into the application pipeline.
+
+A human-in-the-loop harness adapted from the diagnosing-bugs skill is saved privately as
+`hitl-7094.sh`. Replaying **only the user's already reported observations** from
+`7094-user-observation.txt` returns VERDICT=RED for the v148 file and records IMG_1431 as
+the exported artifact. It does not represent a new agent-run iPhone test. Unknown OFF,
+revert and bokeh observations remain unknown rather than being inferred. The loop requires
+actual HDR retained, no sky clipping with Portrait OFF/ON, and working HDR bokeh to accept
+a new output; losing HDR cannot count as success. The two trial variants still need fresh
+device observations and post-Done HEIC exports. No new runtime or cache change is made;
+production remains at v148 until a rendering-specific comparison supports the next fix.
+
+### 10.71 Native camera disparity range must survive Portrait restoration (2026-10-13)
+
+Physical feedback for the 10.70 variants: ISOOnly still clips the HDR sky, less glaringly
+than HighlightFix, but gives stronger blur and nicer bokeh. DualContract clips least but
+still does not match the original, with lighter blur/bokeh than ISOOnly. At the same f/1.4,
+the original native Portrait is lighter and has less bokeh than these reconstructions.
+Neither diagnostic is therefore accepted as a complete physical-device fix.
+
+A separate deterministic bug is confirmed in the native-depth adapter. It retained the
+compressed disparity payload but discarded the camera's FloatMinValue/FloatMaxValue and
+auxC depth representation descriptor, replacing both with the AI default range 0..1.
+The actual Portrait-OFF 7094 range is 0.043335..1.615234; 5202 is 0.110901..0.750488.
+Preserving encoded pixels alone does not preserve how those pixels are interpreted.
+The 10.69 statement that calibration was unchanged only described that patch's delta;
+the pre-existing adapter was already replacing the native range. It must not be read as
+evidence that the native calibration was preserved correctly.
+
+restoreNativePortrait now reads the unambiguous 8-bit disparity range from the camera XMP,
+retains the exact camera auxC property, and supplies both bounds to the Portrait assembler.
+The new sidecar writes the same bounds, and assembly asserts that the native descriptor
+and encoded depth remain byte-identical. Missing/invalid/duplicate ranges and unsupported
+namespaces/formats are declined instead of silently guessing 0..1. The worker-safe parser
+supports namespace aliases and either element or attribute values. Generated AI depth
+still defaults to minimum zero and its own supplied maximum; no AI range is changed.
+
+This fixes the range bug, not a proven cause of the remaining HDR clipping. The native
+uploads do not provide their own camera matrix/lens fields; the existing reference
+calibration and REND blob are still used. No invented replacement calibration, brightness
+clamp, SDR fallback or new HDR-contract selection is introduced. DualContract remains
+diagnostic-only because its two gain roles still need explicit pipeline support.
+
+Two immutable metadata-only 7094 trials are generated by the private
+`tests/private-fixtures/HDR_Portrait_Highlights/native-range-trials.mjs`:
+
+- IMG_7094_HDR_Portrait_ISOOnly_NativeRange.HEIC (3,271,916 bytes).
+- IMG_7094_HDR_Portrait_DualContract_NativeRange.HEIC (3,396,608 bytes).
+
+Each differs from its corresponding 10.70 trial only in the native depth auxC and the
+two sidecar range values. All image/depth/HDR/Styles/REND payloads, remaining properties,
+graph references, HDR headroom and gain contracts are asserted unchanged. Generation
+performs no decoding or encoding and never overwrites prior trials. Physical iPhone
+comparison at f/1.4 is still required before concluding whether clipping or bokeh improves.
+
+Verification was deliberately kept lightweight following the user's SSD-load report.
+Direct single-process execution (not the child-process `node --test` runner) passes all
+42 Portrait export regressions in ~2.6 seconds and the two small parser tests in ~14 ms.
+PWA and i18n checks pass; cache is v149. No browser run, image transcoding, repeated
+background test launches, commit, push or UI redesign was performed in this follow-up.
+
+### 10.72 DualContract feedback and native capture-measurement ownership (2026-10-13)
+
+Physical results for 10.71: ISOOnly_NativeRange still blows out the sky.
+DualContract_NativeRange is temporarily acceptable but remains slightly clipped compared
+with the original. The user additionally identifies the older DualContractTrial (unit
+depth range) as the least clipped variant, with lighter background blur/bokeh. Do not
+hide clipping by reverting the corrected native range or treating weaker blur as a fix.
+
+The user supplied `C:/Users/WanThinnn/Downloads/IMG_1437.HEIC`, exported after enabling
+Portrait on DualContract_NativeRange. It contains an Apple auxiliary HDR map declared
+version 65536 without explicit headroom, not the version-131072 declaration retained by
+the failed 1431. Photos removed the tmap and Styles graph again. The native depth range
+0.043335..1.615234 and the same 1,352-byte template REND blob survive. The gain payload
+hash changes during the Photos export, so the retained version declaration alone is not
+proof of byte-exact or sample-exact gain preservation. No new gain-plane decode was run.
+
+Another deterministic adapter bug is verified: makerBlob replaced camera scene
+measurements with the Portrait template's observations. For 7094 this changes:
+
+| Measurement | Uploaded camera source | Previous DualContract / IMG_1437 |
+| --- | --- | --- |
+| AE target / average | 189 / 264 | 184 / 185 |
+| Focus distance range | 0.35546875..0.55859375 | 1.04296875..1.078125 |
+| Luminance noise amplitude | 0.01041538455 | 0.02036245540 |
+| Signal-to-noise ratio | 56.93239207 | 28.23365786 |
+| Colour temperature | 5385 | 5237 |
+| Focus position | 69 | 74 |
+| Lux level | 25926 | 62 |
+
+1437 retains these foreign measurements, not the source's. Names and source ownership
+are informed by the primary ExifTool implementation:
+https://raw.githubusercontent.com/exiftool/exiftool/master/lib/Image/ExifTool/Apple.pm
+This proves metadata substitution, not that any particular field causes Photos clipping.
+Opaque REND semantics are still not known, and those values are not adjusted by guessing.
+
+Native restoration now preserves the source's whitelisted AE/colour/noise/focus
+observations via native-capture-metadata.js. Missing measurements remain absent instead
+of borrowing them from another photograph. Source count/type are retained; typed TIFF
+words are adapted to the destination byte order (each rational's 32-bit numerator and
+denominator separately), while undefined/plist payloads stay byte-exact. Renderer/feature
+flags, HDR headroom/gain, selected Styles and Live Photo identity remain separate existing
+contracts. The generated AI-depth route is unchanged; this ownership fix is restricted to
+the native-depth restoration branch. Reference camera matrices and REND remain estimates.
+
+A single immutable diagnostic is saved as
+`tests/private-fixtures/HDR_Portrait_Highlights/IMG_7094_HDR_Portrait_DualContract_SourceCapture.HEIC`
+(3,406,366 bytes). The private source-capture-trial.mjs changes only the native scene
+measurement entries in the DualContract_NativeRange Exif MakerNote. All non-Exif item
+payloads, graph references/property associations, REND, depth, HDR planes/contract/headroom,
+Styles and primary pixels are asserted unchanged. All other MakerNote entries retain
+their exact type/payload, including renderer flags and Styles. It uses the correct native
+range, not the older unit-range diagnostic. No image decode/encode, brightness clamp or
+HDR removal is performed. This trial still needs an actual iPhone comparison at f/1.4.
+DualContract is not yet silently adopted as the production HDR graph.
+
+The new integration regression was run directly as one Node process: RED before the
+fix (source AE matrix was replaced with the 512-byte template matrix), then GREEN.
+All 43 Portrait export regressions pass in ~2.6 seconds; a small endian/count regression
+passes for all four source/destination byte-order combinations. PWA and module-path
+checks pass; cache is v150. No browser run, background child-test runner, image
+transcoding, commit, push or UI redesign was performed in this follow-up.
+
+### 10.73 SourceCapture rejection and renderer-owned depth-range diagnostic (2026-10-14)
+
+Physical iPhone testing rejects the 10.72 SourceCapture hypothesis. The user reports
+`IMG_7094_HDR_Portrait_DualContract_SourceCapture.HEIC` is more clipped than even
+`IMG_7094_HDR_Portrait_ISOOnly_NativeRange.HEIC`. Preserving 7094's AE/noise/focus
+observations while retaining the foreign REND/calibration therefore worsens this device
+result; metadata ownership was a real structural mismatch but is not a safe HDR fix.
+The runtime import, MakerNote substitution, report flag, regression and PWA asset added
+for that experiment are reverted. Cache returns to v149 and the direct integration suite
+returns to 42 passing tests. Section 10.72 remains historical evidence, not the current
+implementation or a successful fix.
+
+The ordering across the tested files is now significant: the unit-range
+DualContractTrial remains the least clipped but has lighter blur/bokeh, while the
+source-native 0.043335..1.615234 range produces stronger blur and more clipping. This is
+consistent with, but does not prove, a mismatch between Portrait's processed SDR base
+and the separate Apple HDR auxiliary result. It does not justify clamping gain, changing
+headroom, weakening depth, or claiming that native source range is compatible with a
+renderer borrowed from another capture.
+
+The borrowed REND/calibration originates from the 5129 native reference, whose own depth
+descriptor and sidecar declare 0.735840..1.607422. A single metadata-only diagnostic was
+therefore generated from DualContract_NativeRange:
+
+`tests/private-fixtures/HDR_Portrait_Highlights/IMG_7094_HDR_Portrait_DualContract_RendererRange.HEIC`
+(3,402,536 bytes).
+
+It changes only the depth auxC property and the XMP FloatMin/FloatMax pair to the exact
+5129 renderer-owned values. The primary image, both HDR gain representations, depth
+payload, Styles resources, REND blob, all graph references, and all other properties and
+payloads are asserted byte-identical to DualContract_NativeRange. The private
+`renderer-range-trial.mjs` performs no decode, encode, pixel edit, brightness clamp or
+overwrite. Audit confirms the 7094 depth hash and Apple gain hash remain unchanged and
+the REND hash is still the 5129 renderer. This is a focused device diagnostic, not a
+production adoption or a claim of final correctness.
+
+Verification remained deliberately light: one direct single-process Portrait suite
+passes 42/42 in about three seconds; the depth-range parser passes 2/2; PWA and module
+path checks pass. No browser, FFmpeg/image transcoding, background child runner, commit,
+push or UI redesign was used.

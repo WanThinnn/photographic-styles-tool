@@ -43,14 +43,21 @@ function appleLegacyHeadroom(data,d){
   try{
     const exif=extractItemData(data,d,d.exifItem),mn=getMakerNoteBlob(exif);
     const little=String.fromCharCode(mn[12],mn[13])==='II';
-    const rational=id=>{
-      const tag=extractAppleMakerNoteTag(exif,id);
+    const rational=(id,missing=null)=>{
+      let tag;
+      try{tag=extractAppleMakerNoteTag(exif,id);}catch(error){
+        if(/not found/i.test(String(error?.message)))return missing;
+        throw error;
+      }
       if(tag.type!==10||tag.payload.length!==8)return null;
       const v=new DataView(tag.payload.buffer,tag.payload.byteOffset,tag.payload.byteLength);
-      const den=v.getUint32(4,little);if(!den)return null;
+      const den=v.getInt32(4,little);if(den<=0)return null;
       return v.getInt32(0,little)/den;
     };
-    const maker33=rational(0x21),maker48=rational(0x30);
+    // Older Portrait-off exports have Maker33 but no Maker48. Skia's Apple
+    // headroom decoder treats only an absent Maker48 as zero; a malformed
+    // present tag must not silently select that maximum-headroom branch.
+    const maker33=rational(0x21),maker48=rational(0x30,0);
     if(!Number.isFinite(maker33)||!Number.isFinite(maker48))return null;
     let stops;
     if(maker33<1)stops=maker48<=0.01?-20*maker48+1.8:-0.101*maker48+1.601;
@@ -133,38 +140,41 @@ export async function normalizeLegacyPortraitHdrGain(data,{onProgress=()=>{},cod
   if(legacy.version!==65536)return null;
   const items=d.hdrTiles.length?d.hdrTiles:[d.hdrGrid];
   if(items.some(id=>d.infos.get(id)?.type!=='hvc1'))return null;
+  const ownsCodec=!codec;
   codec??=await import('../raster/ffmpeg-hevc.js');
-  let meta=data.slice(d.meta.off,d.meta.off+d.meta.size);
-  const payloads=new Map();let maxError=0;
-  for(let i=0;i<items.length;i++){
-    const id=items[i],[width,height]=dimensionsForItem(d.props,id);
-    if(![width,height].every(n=>Number.isInteger(n)&&n>=2&&n<=8192&&n%2===0))
-      throw Error('Unsupported legacy HDR gain-map geometry');
-    const hvcc=propertyBoxBytes(data,d.props,id,'hvcC');
-    if(!hvcc)throw Error('Legacy HDR gain map has no decoder configuration');
-    const record=hvccRecord(hvcc),sps=hevcSpsColor(record);
-    if(sps.chroma!==0||sps.luma!==8||sps.chromaDepth!==8||sps.fullRange!==true)
-      throw Error('Unsupported legacy HDR gain-map encoding');
-    const decoded=await codec.decodeHevcLuma(record,extractItemData(data,d,id),{width,height},onProgress);
-    const normalized=normalizeAppleLegacyGainSamples(decoded.bytes,legacy.headroom);
-    const encoded=await codec.encodeHevcPixels(normalized,{width,height,pixelFormat:'gray',
-      primaries:'unspecified',transfer:'unspecified',matrix:'unspecified',fullRange:true,lossless:true},onProgress);
-    if(encoded.sps?.chroma!==0||encoded.sps?.luma!==8||encoded.sps?.fullRange!==true)
-      throw Error('Legacy HDR gain-map encoder changed the sample contract');
-    payloads.set(id,encoded.payload);meta=replaceItemPropertyWithSource(meta,id,'hvcC',encoded.hvcc);
-    for(let p=0;p<decoded.bytes.length;p++){
-      const apple=1+(legacy.headroom-1)*bt709ToLinear(decoded.bytes[p]/255);
-      const iso=2**((normalized[p]/255)*Math.log2(legacy.headroom));
-      maxError=Math.max(maxError,Math.abs(apple-iso));
+  try{
+    let meta=data.slice(d.meta.off,d.meta.off+d.meta.size);
+    const payloads=new Map();let maxError=0;
+    for(let i=0;i<items.length;i++){
+      const id=items[i],[width,height]=dimensionsForItem(d.props,id);
+      if(![width,height].every(n=>Number.isInteger(n)&&n>=2&&n<=8192&&n%2===0))
+        throw Error('Unsupported legacy HDR gain-map geometry');
+      const hvcc=propertyBoxBytes(data,d.props,id,'hvcC');
+      if(!hvcc)throw Error('Legacy HDR gain map has no decoder configuration');
+      const record=hvccRecord(hvcc),sps=hevcSpsColor(record);
+      if(sps.chroma!==0||sps.luma!==8||sps.chromaDepth!==8||sps.fullRange!==true)
+        throw Error('Unsupported legacy HDR gain-map encoding');
+      const decoded=await codec.decodeHevcLuma(record,extractItemData(data,d,id),{width,height},onProgress);
+      const normalized=normalizeAppleLegacyGainSamples(decoded.bytes,legacy.headroom);
+      const encoded=await codec.encodeHevcPixels(normalized,{width,height,pixelFormat:'gray',
+        primaries:'unspecified',transfer:'unspecified',matrix:'unspecified',fullRange:true,lossless:true},onProgress);
+      if(encoded.sps?.chroma!==0||encoded.sps?.luma!==8||encoded.sps?.fullRange!==true)
+        throw Error('Legacy HDR gain-map encoder changed the sample contract');
+      payloads.set(id,encoded.payload);meta=replaceItemPropertyWithSource(meta,id,'hvcC',encoded.hvcc);
+      for(let p=0;p<decoded.bytes.length;p++){
+        const apple=1+(legacy.headroom-1)*bt709ToLinear(decoded.bytes[p]/255);
+        const iso=2**((normalized[p]/255)*Math.log2(legacy.headroom));
+        maxError=Math.max(maxError,Math.abs(apple-iso));
+      }
+      onProgress({stage:'legacyHdrNormalize',done:i+1,total:items.length});
     }
-    onProgress({stage:'legacyHdrNormalize',done:i+1,total:items.length});
-  }
-  // The representation and its declaration are one contract. Leaving 0x10000
-  // here makes Photos interpret the already-logarithmic samples as legacy
-  // Rec.709 gain and can make it discard the editable tmap on import.
-  payloads.set(legacy.id,isoHdrGainMapXmp(legacy));
-  const ft=topBox(data,'ftyp'),output=rebuildHeic(data,d,data.slice(ft.off,ft.off+ft.size),meta,payloads);
-  return {data:output,headroom:legacy.headroom,maxError,changedItems:items};
+    // The representation and its declaration are one contract. Leaving 0x10000
+    // here makes Photos interpret the already-logarithmic samples as legacy
+    // Rec.709 gain and can make it discard the editable tmap on import.
+    payloads.set(legacy.id,isoHdrGainMapXmp(legacy));
+    const ft=topBox(data,'ftyp'),output=rebuildHeic(data,d,data.slice(ft.off,ft.off+ft.size),meta,payloads);
+    return {data:output,headroom:legacy.headroom,maxError,changedItems:items};
+  }finally{if(ownsCodec)codec.releaseHevcEncoder();}
 }
 
 /**

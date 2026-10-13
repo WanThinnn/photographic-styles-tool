@@ -1100,6 +1100,26 @@ code {
    }
 }
 
+/* iPhone Pro Max-class viewports are wider than 430 CSS px. Keep the
+   mobile AI discovery treatment through 480px without changing the rest of
+   the compact-phone layout. */
+@media(max-width:480px) {
+   .ai-settings-discovery:not([hidden]) {
+      display: none
+   }
+
+   .ai-settings-discovery:not([hidden])+.ai-settings summary {
+      border: 2px solid transparent;
+      background: linear-gradient(var(--surface), var(--surface)) padding-box,
+         var(--ring-gradient) border-box;
+      color: var(--fg);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 5%, transparent),
+         0 0 14px #0894ff22, 0 0 16px #c959dd1c, 0 0 18px #ff2e5418;
+      animation: ai-settings-target-bounce .78s cubic-bezier(.34,1.56,.64,1) .42s 3,
+         ai-ring-spin 2.8s linear infinite
+   }
+}
+
 @media(max-width:430px) {
    body {
       --page-gutter: 14px;
@@ -1205,23 +1225,6 @@ code {
       top: 4px;
       width: 42px;
       height: 42px
-   }
-
-   /* Mobile discovery is visual-only: keep the DOM hint for state/a11y,
-      but point to AI Settings with an Apple Intelligence-style ring instead of copy. */
-   .ai-settings-discovery:not([hidden]) {
-      display: none
-   }
-
-   .ai-settings-discovery:not([hidden])+.ai-settings summary {
-      border: 2px solid transparent;
-      background: linear-gradient(var(--surface), var(--surface)) padding-box,
-         var(--ring-gradient) border-box;
-      color: var(--fg);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 5%, transparent),
-         0 0 14px #0894ff22, 0 0 16px #c959dd1c, 0 0 18px #ff2e5418;
-      animation: ai-settings-target-bounce .78s cubic-bezier(.34,1.56,.64,1) .42s 3,
-         ai-ring-spin 2.8s linear infinite
    }
 
    .workspace>.ai-hint {

@@ -14,7 +14,7 @@ import {prepareBrowser,fetchJsonWithRetry} from './src/ui/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
 import {readImageFile, addTextureInWorker, repairTextureInWorker, restoreNativePortraitInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/media/heic-processing.js';
-import {formatBytes} from './src/ui/result-metadata.js';
+import {formatBytes,formatStyleParameters} from './src/ui/result-metadata.js';
 import {hasSoftSkinData} from './src/styles/soft-skin-container.js';
 import {styleCapabilities} from './src/styles/style-capabilities.js';
 import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
@@ -542,8 +542,7 @@ function styleResultNote(ui,recommendation,error=null){
   if(error){ui.note(`${aiText().styleUnavailable} ${String(error).slice(0,140)}`,'style-ai');return;}
   if(!recommendation)return;
   if(recommendation.fallback){ui.note(aiText().styleFallback,'style-ai');return;}
-  const signed=value=>`${value>=0?'+':''}${Number(value).toFixed(2)}`;
-  ui.note(`${aiText().styleApplied}: ${recommendation.styleName} · Tone ${signed(recommendation.tone)} · Color ${signed(recommendation.color)} · Palette ${Number(recommendation.palette).toFixed(2)}`,'style-ai');
+  ui.note(`${aiText().styleApplied}: ${formatStyleParameters(recommendation)}`,'style-ai');
 }
 function adaptiveStyleCompletionNotice(ui,recommendation){
   if(!aiFeatures.enabled('style')||!recommendation)return;

@@ -20,6 +20,18 @@ test('only a genuinely neutral Standard skips the display rendition',()=>{
   assert.notDeepEqual(applyStyleDisplayRgba(pixels,fallback),pixels);
 });
 
+test('Standard display strength is independent of legacy or absent Palette',()=>{
+  const tuned=rec(1,.18,-.12,1);
+  for(const palette of [undefined,0,.01,.7,1]){
+    const value={...tuned,palette};
+    assert.equal(shouldRenderStyleDisplay(value),true);
+    assert.equal(styleDisplayParameters(value).strength,1);
+    assert.deepEqual(applyStyleDisplayRgba(pixels,value),applyStyleDisplayRgba(pixels,tuned));
+  }
+  assert.equal(shouldRenderStyleDisplay(rec(11,-.75,.2,0)),false);
+  assert.deepEqual(applyStyleDisplayRgba(pixels,rec(11,-.75,.2,0)),pixels);
+});
+
 test('Dramatic display rendition is deterministic, bounded and keeps black padding black',()=>{
   const dramatic=rec(11,-.75,.2,.99);
   assert.equal(shouldRenderStyleDisplay(dramatic),true);

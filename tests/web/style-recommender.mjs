@@ -26,11 +26,25 @@ test('zero-shot recommender is deterministic, color-only and metadata-bounded',(
   assert.ok(first.palette>=0&&first.palette<=SUGGESTED_STYLE_PALETTE_MAX);
 });
 
-test('automatic injected Styles keep a conservative Palette ceiling',()=>{
+test('automatic injected non-Standard Styles keep a conservative Palette ceiling',()=>{
   const model=prototypes();
-  for(const index of [0,4,10]){
+  for(const index of IDS.map((id,index)=>id===1?null:index).filter(index=>index!==null)){
     const result=recommendStyle({prototypes:model,level:'standard',embeddings:Array(9).fill(Float32Array.from(unit(index))),statistics:neutralStats});
+    assert.equal(result.styleId,IDS[index]);
     assert.ok(result.palette<=.70);
+  }
+});
+
+test('Standard wins without tuning Palette, while Tone and Color still adapt',()=>{
+  for(const level of ['lite','standard','pro']){
+    const model=prototypes(level),dimensions=styleModelSpec(level).input.embeddingDimensions;
+    const result=recommendStyle({prototypes:model,level,embeddings:Array(17).fill(Float32Array.from(unit(IDS.indexOf(1),dimensions))),
+      statistics:{...neutralStats,p50:.08,saturationMedian:.20}});
+    assert.equal(result.styleId,1);
+    assert.equal(result.fallback,false);
+    assert.equal(result.palette,1);
+    assert.notEqual(result.tone,0);
+    assert.notEqual(result.color,0);
   }
 });
 
@@ -49,6 +63,7 @@ test('genuine cross-view disagreement fails closed to Standard',()=>{
   const model=prototypes(),embeddings=Array.from({length:9},(_,index)=>Float32Array.from(unit(index)));
   const result=recommendStyle({prototypes:model,level:'standard',embeddings,statistics:neutralStats});
   assert.equal(result.styleId,1);assert.equal(result.fallback,true);
+  assert.equal(result.palette,1);
 });
 
 test('Pro validates and scores 768-dimensional SigLIP2 prototypes',()=>{

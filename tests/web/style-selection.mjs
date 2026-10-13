@@ -40,6 +40,32 @@ test('project-proven Standard and Bright ids remain stable',()=>{
   assert.deepEqual([STYLE_SELECTIONS[16].tone,STYLE_SELECTIONS[16].color,STYLE_SELECTIONS[16].palette],[-.5,.5,1]);
 });
 
+test('Standard excludes Palette but retains the neutral eight-key marker',()=>{
+  for(const palette of [undefined,0,.7,1]){
+    const value={styleId:1,tone:.02,color:.01,...(palette===undefined?{}:{palette})};
+    const recommendation=validateStyleRecommendation(value);
+    assert.equal(recommendation.palette,1);
+    assert.equal(recommendation.tone,.02);
+    assert.equal(recommendation.color,.01);
+    const marker=parseBplist(buildStyleMarker(value));
+    assert.equal(marker.size,8);
+    assert.equal(marker.get('3'),1);
+    assert.equal(marker.get('1'),.02);
+    assert.equal(marker.get('2'),.01);
+  }
+});
+
+test('all other Styles, including B&W, retain their Palette parameter',()=>{
+  for(const id of STYLE_IDS){
+    assert.equal(styleSelection(id).hasPalette,id!==1);
+    if(id===1)continue;
+    const value={styleId:id,tone:0,color:0,palette:.37};
+    assert.equal(validateStyleRecommendation(value).palette,.37);
+    assert.equal(parseBplist(buildStyleMarker(value)).get('3'),.37);
+    assert.throws(()=>validateStyleRecommendation({...value,palette:undefined}),RangeError);
+  }
+});
+
 test('recommendation validation rejects unsupported or unsafe values',()=>{
   assert.throws(()=>validateStyleRecommendation({styleId:17,tone:0,color:0,palette:1}),RangeError);
   assert.throws(()=>validateStyleRecommendation({styleId:1,tone:Infinity,color:0,palette:1}),RangeError);

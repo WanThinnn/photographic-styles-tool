@@ -22,7 +22,7 @@ const PROFILES=Object.freeze({
 
 export function shouldRenderStyleDisplay(value){
   const recommendation=validateStyleRecommendation(value);
-  if(recommendation.palette<=0.01)return false;
+  if(styleSelection(recommendation.styleId).hasPalette&&recommendation.palette<=0.01)return false;
   const parameters=styleDisplayParameters(recommendation);
   return parameters.mono||['exposure','contrast','saturation','warmth','tint','fade']
     .some(key=>Math.abs(parameters[key])>1e-6);
@@ -33,7 +33,7 @@ export function styleDisplayParameters(value){
   const base=PROFILES[recommendation.styleId]||{};
   const toneDelta=recommendation.tone-preset.tone,colorDelta=recommendation.color-preset.color;
   const paletteBase=Math.max(.25,preset.palette);
-  const strength=clamp(.22+.78*clamp(recommendation.palette/paletteBase));
+  const strength=preset.hasPalette?clamp(.22+.78*clamp(recommendation.palette/paletteBase)):1;
   return Object.freeze({
     strength,
     exposure:(base.exposure||0)+toneDelta*.11,

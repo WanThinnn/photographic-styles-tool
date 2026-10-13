@@ -9,7 +9,8 @@ const bounded=(value,limit)=>Math.min(limit,Math.max(-limit,value));
 // on top of colour already rendered into the source photo.
 export const SUGGESTED_STYLE_PALETTE_MAX=.70;
 
-function refine(parameters,stats){
+function refine(preset,stats){
+  const parameters={tone:preset.tone,color:preset.color,palette:preset.palette};
   if(!stats)return parameters;
   const stat=(name,fallback)=>Number.isFinite(stats[name])?stats[name]:fallback;
   const p50=stat('p50',.18),shadow=stat('shadowRatio',0),highlight=stat('highlightRatio',0);
@@ -17,8 +18,8 @@ function refine(parameters,stats){
   const contrast=stat('contrast',.35),iqr=stat('lumaIqr',.18);
   const tone=parameters.tone+bounded((.18-p50)*.22+(shadow-highlight)*.03,.07);
   const color=parameters.color+bounded((.32-saturation)*.08+(.22-chroma)*.05-warmth*.02,.05);
-  const palette=Math.min(SUGGESTED_STYLE_PALETTE_MAX,
-    parameters.palette+bounded((.35-contrast)*.05+(.18-iqr)*.04,.04));
+  const palette=preset.hasPalette?Math.min(SUGGESTED_STYLE_PALETTE_MAX,
+    parameters.palette+bounded((.35-contrast)*.05+(.18-iqr)*.04,.04)):preset.palette;
   return {
     tone:clamp(tone,STYLE_PARAMETER_BOUNDS.tone),
     color:clamp(color,STYLE_PARAMETER_BOUNDS.color),
@@ -28,7 +29,7 @@ function refine(parameters,stats){
 
 function fallback(level,stats,confidence){
   const p=styleSelection(1);
-  const adjusted=refine({tone:p.tone,color:p.color,palette:p.palette},stats);
+  const adjusted=refine(p,stats);
   return validateStyleRecommendation({styleId:1,...adjusted,confidence,fallback:true,level});
 }
 
@@ -39,7 +40,7 @@ export function recommendStyle({prototypes,level='standard',embeddings,statistic
   });
   if(decision.ambiguous)return fallback(level,statistics,decision.confidence);
   const preset=styleSelection(decision.winner.styleId);
-  const adjusted=refine({tone:preset.tone,color:preset.color,palette:preset.palette},statistics);
+  const adjusted=refine(preset,statistics);
   return validateStyleRecommendation({
     styleId:preset.id,
     ...adjusted,

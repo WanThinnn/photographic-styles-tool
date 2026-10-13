@@ -26,7 +26,7 @@ const entries=[
 ];
 
 export const STYLE_SELECTIONS=Object.freeze(Object.fromEntries(entries.map(([id,name,tone,color,palette])=>[
-  id,Object.freeze({id,name,tone,color,palette}),
+  id,Object.freeze({id,name,tone,color,palette,hasPalette:id!==1}),
 ])));
 export const STYLE_IDS=Object.freeze(entries.map(([id])=>id));
 
@@ -46,7 +46,11 @@ export function validateStyleRecommendation(value){
   const selection=styleSelection(Number(value.styleId));
   const tone=finiteInRange(Number(value.tone),STYLE_PARAMETER_BOUNDS.tone,'tone');
   const color=finiteInRange(Number(value.color),STYLE_PARAMETER_BOUNDS.color,'color');
-  const palette=finiteInRange(Number(value.palette),STYLE_PARAMETER_BOUNDS.palette,'palette');
+  // Standard has Tone/Color only. Keep key 3 neutral in the eight-key Apple
+  // marker, including when older callers supply an automatically tuned Palette.
+  const suppliedPalette=value.palette===undefined&&!selection.hasPalette?selection.palette:value.palette;
+  const validatedPalette=finiteInRange(Number(suppliedPalette),STYLE_PARAMETER_BOUNDS.palette,'palette');
+  const palette=selection.hasPalette?validatedPalette:selection.palette;
   const level=value.level??'standard';
   if(!['lite','standard','pro'].includes(level))throw new RangeError('Unsupported AI level');
   const confidence=value.confidence===undefined?0:Number(value.confidence);

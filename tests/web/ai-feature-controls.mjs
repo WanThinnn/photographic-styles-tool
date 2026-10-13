@@ -86,18 +86,26 @@ test('readiness temporarily locks settings without selecting or clearing effects
   assert.equal(state.enabled('portrait'),true);
 });
 
-test('AI settings discovery hint appears on the first visit only and hides on opening settings',()=>{
+test('AI settings discovery hint persists across visits until settings is opened',()=>{
   const values=new Map(),storage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
-  const summary=new EventTarget(),attrs=new Map();
-  summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);
-  const settings={querySelector:()=>summary},hint={id:'discovery',hidden:true};
-  showAiSettingsHintOnce({hint,settings,storage});
-  assert.equal(hint.hidden,false);assert.equal(attrs.get('aria-describedby'),'discovery');
-  summary.dispatchEvent(new Event('click'));
-  assert.equal(hint.hidden,true);assert.equal(attrs.has('aria-describedby'),false);
-  const nextVisit={id:'discovery',hidden:true};
-  showAiSettingsHintOnce({hint:nextVisit,settings,storage});assert.equal(nextVisit.hidden,true);
-  assert.doesNotThrow(()=>showAiSettingsHintOnce({hint,settings,storage:{getItem(){throw Error('denied');}}}));
+  const makeVisit=()=>{
+    const summary=new EventTarget(),attrs=new Map(),hint={id:'discovery',hidden:true};
+    summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);
+    const settings={querySelector:()=>summary};
+    showAiSettingsHintOnce({hint,settings,storage});
+    return {summary,attrs,hint};
+  };
+  const first=makeVisit();
+  assert.equal(first.hint.hidden,false);assert.equal(first.attrs.get('aria-describedby'),'discovery');
+  assert.equal(values.size,0,'merely seeing the hint must not persist dismissal');
+  const second=makeVisit();
+  assert.equal(second.hint.hidden,false,'an unclicked hint must return on the next visit');
+  second.summary.dispatchEvent(new Event('click'));
+  assert.equal(second.hint.hidden,true);assert.equal(second.attrs.has('aria-describedby'),false);
+  assert.equal(values.get('stylio-ai-settings-hint-v2'),'opened');
+  const third=makeVisit();
+  assert.equal(third.hint.hidden,true,'opening settings dismisses the hint for future visits');
+  assert.doesNotThrow(()=>showAiSettingsHintOnce({hint:first.hint,settings:{querySelector:()=>first.summary},storage:{getItem(){throw Error('denied');}}}));
 });
 
 test('AI switches share one quality control and have accessible localized copy',()=>{

@@ -1013,20 +1013,105 @@ code {
 }
 
 .ai-settings-discovery:not([hidden]) {
+   position: absolute;
+   top: 14px;
+   right: 54px;
+   z-index: 2;
    display: flex;
-   justify-content: flex-end;
    align-items: center;
-   gap: 6px;
-   margin: 0 10px 10px 0;
-   color: var(--accent-text);
-   font-size: 12px;
-   line-height: 1.4
+   width: max-content;
+   max-width: calc(100% - 112px);
+   margin: 0;
+   padding: 6px 10px;
+   border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+   border-radius: 999px;
+   background: color-mix(in srgb, var(--surface) 94%, transparent);
+   color: var(--muted);
+   box-shadow: 0 6px 18px #00000012;
+   -webkit-backdrop-filter: saturate(180%) blur(18px);
+   backdrop-filter: saturate(180%) blur(18px);
+   font-size: 11px;
+   font-weight: 600;
+   letter-spacing: -.01em;
+   line-height: 1.2;
+   white-space: nowrap;
+   animation: ai-settings-discovery-in .28s cubic-bezier(.2,.8,.2,1) both,
+      ai-settings-discovery-bounce .78s cubic-bezier(.34,1.56,.64,1) .42s 3
 }
 
-.ai-settings-discovery svg {
-   width: 22px;
-   height: 22px;
-   flex: none
+.ai-settings-discovery-copy,
+#ai-settings-discovery-copy {
+   display: inline-block;
+   background: var(--gradient);
+   background-clip: text;
+   -webkit-background-clip: text;
+   color: transparent;
+   -webkit-text-fill-color: transparent
+}
+
+.ai-settings-discovery:not([hidden])::after {
+   content: "";
+   position: absolute;
+   top: 50%;
+   right: -5px;
+   width: 9px;
+   height: 9px;
+   border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+   border-right: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+   background: color-mix(in srgb, var(--surface) 94%, transparent);
+   transform: translateY(-50%) rotate(45deg)
+}
+
+.ai-settings-discovery:not([hidden])+.ai-settings summary {
+   color: var(--fg);
+   border-color: color-mix(in srgb, var(--fg) 12%, transparent);
+   box-shadow: 0 4px 14px #0000000d;
+   animation: ai-settings-target-bounce .78s cubic-bezier(.34,1.56,.64,1) .42s 3
+}
+
+@keyframes ai-settings-discovery-in {
+   from {
+      opacity: 0;
+      transform: translateX(5px) scale(.97)
+   }
+   to {
+      opacity: 1;
+      transform: translateX(0) scale(1)
+   }
+}
+
+@keyframes ai-settings-discovery-bounce {
+   0%, 100% { translate: 0 0 }
+   46% { translate: 6px 0 }
+   72% { translate: 1px 0 }
+}
+
+@keyframes ai-settings-target-bounce {
+   0%, 100% { transform: scale(1) }
+   46% { transform: scale(1.07) }
+   72% { transform: scale(.985) }
+}
+
+@media(prefers-reduced-motion: reduce) {
+   .ai-settings-discovery:not([hidden]),
+   .ai-settings-discovery:not([hidden])::after,
+   .ai-settings-discovery:not([hidden])+.ai-settings summary {
+      animation: none
+   }
+}
+
+@media(max-width:430px) {
+   .ai-settings-discovery:not([hidden]) {
+      position: relative;
+      top: auto;
+      right: auto;
+      max-width: calc(100% - 56px);
+      margin: -2px 56px 10px auto
+   }
+
+   .ai-settings-discovery:not([hidden])::after {
+      display: none
+   }
 }
 
 .ai-settings summary {

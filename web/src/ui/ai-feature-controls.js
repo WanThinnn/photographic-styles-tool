@@ -38,11 +38,12 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
 }
 
 export function showAiSettingsHintOnce({hint,settings,storage}){
-  const key='stylio-ai-settings-hint-v1';
+  // Persist only after the user actually discovers/opens AI Settings. Merely
+  // seeing the hint must not dismiss it across visits.
+  const key='stylio-ai-settings-hint-v2';
   try{
     storage??=globalThis.localStorage;
-    if(storage?.getItem(key)==='shown')return;
-    storage?.setItem(key,'shown');
+    if(storage?.getItem(key)==='opened')return;
   }catch{} // Storage restrictions must not break the AI controls.
   hint.hidden=false;
   const summary=settings.querySelector('summary');
@@ -50,5 +51,6 @@ export function showAiSettingsHintOnce({hint,settings,storage}){
   summary.addEventListener('click',()=>{
     hint.hidden=true;
     summary.removeAttribute('aria-describedby');
+    try{storage?.setItem(key,'opened');}catch{}
   },{once:true});
 }

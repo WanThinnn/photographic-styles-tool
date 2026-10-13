@@ -9,6 +9,7 @@ import {parseBplist} from '../core/bplist.js';
 import {appleDepthAuxc} from './apple-depth-metadata.js';
 import {portraitAssembler} from './ai-portrait-assembler.js';
 import {styleCapabilities} from '../styles/style-capabilities.js';
+import {normalizeLegacyPortraitHdrGain,promoteLegacyPortraitHdr} from '../styles/hdr-compatibility.js';
 const decode=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const xml=s=>new TextEncoder().encode(s);
 let templatePromise;
@@ -84,7 +85,7 @@ function assemble(meta,payloads,ftyp){
   return concat([ftyp,meta,box('mdat',concat(chunks))]);
 }
 /** Pure assembly seam, also used by regression tests. No decode/re-encode. */
-export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,aperture=4.5}={}){
+export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,aperture=4.5,legacyHdrNormalized=false}={}){
   if(!styleCapabilities(source).editable)throw Error('Unsupported Styles schema for Portrait');
   const d=discoverHeic(source);
   if([...d.infos.keys()].some(id=>auxUriForItem(d.props,id)===DEPTH_URI))throw Error('Existing depth must not be replaced');
@@ -213,14 +214,22 @@ export function buildAiPortrait(source,depth,template,{focusX=.5,focusY=.5,apert
   // Drop unused reference codecs/profiles and deduplicate imported properties.
   meta=compactItemProperties(meta).meta;
   // Compatible capture brands travel with the accepted Portrait structure.
-  const data=assemble(meta,payloads,decode(template.ftyp));
+  const assembled=assemble(meta,payloads,decode(template.ftyp));
+  // Legacy iPhones can carry Apple HDR gain maps without an ISO tmap. The async
+  // export entry point converts those samples from Apple's multiplier equation to
+  // ISO logarithmic gain before this worker starts. Once depth exists, add the
+  // matching derived rendition and target the same editable graph at SDR and HDR.
+  // Existing ISO-HDR files remain unchanged.
+  const legacyHdr=promoteLegacyPortraitHdr(assembled,{normalizedGain:legacyHdrNormalized});
+  const data=legacyHdr?.data||assembled;
   const after=discoverHeic(data);
   const finalMarker=extractAppleMakerNoteTag(extractItemData(data,after,after.exifItem));
   parseBplist(finalMarker.payload);
   if(finalMarker.type!==sourceMarker.type||!bytesEqual(finalMarker.payload,sourceMarker.payload))throw Error('Selected Styles changed');
   for(const[id,p]of copied)if(![reference.exifItem,reference.stylesItem].includes(id)&&!bytesEqual(extractItemData(data,after,id),p))throw Error('Portrait source preservation failed');
   if(!bytesEqual(extractItemData(data,after,reference.stylesItem),extractItemData(source,d,d.stylesItem)))throw Error('Completed Styles changed');
-  return {data,report:{mode:'editable-ai-portrait',relative:true,bakedBlur:false,referenceCalibration:true}};
+  return {data,report:{mode:'editable-ai-portrait',relative:true,bakedBlur:false,referenceCalibration:true,
+    ...(legacyHdr?{legacyHdrCompatibility:'normalized-portrait-tmap'}:{})}};
 }
 /** Diagnostic adapter only: a verified unblurred base is required. Metadata
  * cannot undo Portrait blur already present in the source image pixels. */
@@ -261,13 +270,17 @@ export async function restoreNativePortrait(source,template,{unblurredBase=false
 }
 export async function exportAiPortrait(result,onProgress=()=>{},{signal}={}){
   signal?.throwIfAborted();const template=await loadTemplate();signal?.throwIfAborted();
-  const {encodeHevcPixels,releaseHevcEncoder}=await import('../raster/ffmpeg-hevc.js');
+  const {decodeHevcLuma,encodeHevcPixels,releaseHevcEncoder}=await import('../raster/ffmpeg-hevc.js');
   const abort=()=>releaseHevcEncoder();signal?.addEventListener('abort',abort,{once:true});
   try{
+    const legacyHdr=await normalizeLegacyPortraitHdrGain(result.sourceData,{onProgress,
+      codec:{decodeHevcLuma,encodeHevcPixels}});
+    signal?.throwIfAborted();
     const encoded=await encodeHevcPixels(result.gray,{width:result.width,height:result.height,pixelFormat:'gray',fullRange:true,lossless:true},onProgress);
     signal?.throwIfAborted();
     const depth={...encoded,width:result.width,height:result.height,floatMax:result.disparityMax??1};
-    const assembler=portraitAssembler(result.sourceData,depth,template,{signal});
+    const assembler=portraitAssembler(legacyHdr?.data||result.sourceData,depth,template,{signal,
+      legacyHdrNormalized:Boolean(legacyHdr)});
     try{return {...await assembler.build(),withSettings:assembler.build,dispose:assembler.dispose};}
     catch(error){assembler.dispose();throw error;}
   }catch(error){if(signal?.aborted)throw signal.reason;throw error;}

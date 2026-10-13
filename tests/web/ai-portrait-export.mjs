@@ -6,7 +6,7 @@ import {portraitEligibility,attachAiDepth,nativePortraitBaseState} from '../../w
 import {buildRasterHeic,targetGeometry} from '../../web/src/raster/raster-import.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
 import {buildGeneratedProfile} from '../../web/src/raster/generated-profile.js';
-import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations,removeItems,addItems} from '../../web/src/raster/heif.js';
+import {discoverHeic,extractItemData,propertyBoxBytes,auxUriForItem,DEPTH_URI,dimensionsForItem,itemOrientation,appendIpcoProperty,setItemPropertyAssociations,removeItems,addItems,replaceItemPropertyWithSource} from '../../web/src/raster/heif.js';
 import {hasTexture} from '../../web/src/raster/texture.js';
 import {extractAppleMakerNoteTag,injectAppleMakerNoteTag,exifCameraModel,getMakerNoteBlob} from '../../web/src/core/exif.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
@@ -19,8 +19,9 @@ import {patch} from '../../web/src/styles/port.js';
 import {discoverHeic as discoverCoreHeic} from '../../web/src/core/heif.js';
 import {describeHeic} from '../../web/src/ui/result-metadata.js';
 import {tmapGainMap} from '../../web/src/core/gain-map.js';
-import {encodeTmapMetadata} from '../../web/src/raster/jpeg-hdr.js';
-import {registerTmapHdr,editableTmapHeadroom} from '../../web/src/styles/hdr-compatibility.js';
+import {encodeTmapMetadata,parseTmapMetadata} from '../../web/src/raster/jpeg-hdr.js';
+import {registerTmapHdr,editableTmapHeadroom,normalizeAppleLegacyGainSamples,
+  normalizeLegacyPortraitHdrGain,promoteLegacyPortraitHdr} from '../../web/src/styles/hdr-compatibility.js';
 import {executeJob} from '../../web/src/media/heic-worker.js';
 import {appleDepthAuxc} from '../../web/src/portrait/apple-depth-metadata.js';
 const template=JSON.parse(fs.readFileSync(new URL('../../web/src/portrait/portrait-template.json',import.meta.url)));
@@ -287,6 +288,122 @@ test('ISO-only tmap gain maps are reported and preserved as HDR when adding Port
   after.hdrTiles.forEach((id,i)=>assert.deepEqual(extractItemData(worker.data,wd,wd.hdrTiles[i]),extractItemData(output,after,id)));
 });
 
+
+test('legacy Apple gain-map HDR is normalized before Portrait/Styles target the HDR rendition',async()=>{
+  const headroom=3.0177927017211914,enc=new TextEncoder();
+  let source=attachAiDepth(photo(900,600),depth),d=discoverHeic(source);
+  let meta=source.slice(d.meta.off,d.meta.off+d.meta.size),ids,p3;
+  for(const id of d.hdrTiles.length?d.hdrTiles:[d.hdrGrid])meta=replaceItemPropertyWithSource(meta,id,'hvcC',assets.mask.hvcc);
+  const p3Colr=box('colr',concat([new TextEncoder().encode('nclx'),be(12,2),be(1,2),be(1,2),new Uint8Array([128])]));
+  [meta,p3]=appendIpcoProperty(meta,p3Colr);
+  const primaryProps=d.props.associations.get(d.primary).filter(a=>d.props.properties[a.index-1].type!=='colr').map(a=>[a.index,a.essential]);
+  meta=setItemPropertyAssociations(meta,d.primary,[...primaryProps,[p3,false]]);
+  [meta,ids]=addItems(meta,[{key:'legacy-hdr-xmp',itemType:'mime',contentType:'application/rdf+xml',
+    refType:'cdsc',refTo:[d.hdrGrid]}]);
+  const sideId=ids.get('legacy-hdr-xmp');
+  const xmp=enc.encode(`<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:HDRGainMap="http://ns.apple.com/HDRGainMap/1.0/"><HDRGainMap:HDRGainMapHeadroom>${headroom}</HDRGainMap:HDRGainMapHeadroom><HDRGainMap:HDRGainMapVersion>65536</HDRGainMap:HDRGainMapVersion></rdf:Description></rdf:RDF></x:xmpmeta>`);
+  const ft=topBox(source,'ftyp');
+  source=rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),meta,new Map([[ids.get('legacy-hdr-xmp'),xmp]]));
+  d=discoverHeic(source);
+  const originals=new Map([...d.infos.keys()].map(id=>[id,extractItemData(source,d,id)]));
+
+  assert.equal(promoteLegacyPortraitHdr(source),null,'raw Apple samples must never receive metadata-only ISO promotion');
+  assert.equal(promoteLegacyPortraitHdr(source,{normalizedGain:true}),null,
+    'a caller flag cannot override a legacy 0x10000 sidecar');
+  const gainItems=d.hdrTiles.length?d.hdrTiles:[d.hdrGrid];
+  const firstHvcc=propertyBoxBytes(source,d.props,gainItems[0],'hvcC');let encodedIndex=0;
+  const normalized=await normalizeLegacyPortraitHdrGain(source,{codec:{
+    decodeHevcLuma:async(_record,_payload,{width,height})=>({bytes:new Uint8Array(width*height).map((_,i)=>i%256),width,height}),
+    encodeHevcPixels:async(samples)=>({payload:new Uint8Array([++encodedIndex,samples[1],samples[255]]),hvcc:firstHvcc,
+      sps:{chroma:0,luma:8,chromaDepth:8,fullRange:true}}),
+  }});
+  assert.ok(normalized);assert.equal(normalized.changedItems.length,gainItems.length);
+  assert.ok(normalized.maxError<.006);
+  const normalizedGraph=discoverHeic(normalized.data);
+  const normalizedXmp=new TextDecoder().decode(extractItemData(normalized.data,normalizedGraph,sideId));
+  assert.match(normalizedXmp,/<HDRGainMap:HDRGainMapVersion>131072<\//);
+  assert.match(normalizedXmp,/<HDRGainMap:HDRGainMapHeadroom>3\.017792702<\//);
+  const again=await normalizeLegacyPortraitHdrGain(normalized.data,{codec:{
+    decodeHevcLuma:async()=>{throw Error('already normalized gain must not decode again');},
+    encodeHevcPixels:async()=>{throw Error('already normalized gain must not encode again');},
+  }});
+  assert.equal(again.alreadyNormalized,true);assert.equal(again.data,normalized.data);
+  const promoted=promoteLegacyPortraitHdr(normalized.data,{normalizedGain:true});
+  assert.ok(promoted);const after=discoverHeic(promoted.data);
+  const tmap=[...after.infos].find(([,info])=>info.type==='tmap')?.[0];
+  assert.ok(tmap);
+  assert.deepEqual(after.refs.find(r=>r.type==='dimg'&&r.from===tmap)?.to,[after.primary,after.hdrGrid]);
+  const params=parseTmapMetadata(extractItemData(promoted.data,after,tmap));
+  assert.ok(Math.abs(params.alternateHeadroom-Math.log2(headroom))<1e-6);
+  assert.equal(params.channels.length,1);assert.equal(params.channels[0].gamma,1);
+  assert.equal(params.channels[0].baseOffset,0);assert.equal(params.channels[0].alternateOffset,0);
+  assert.equal(params.useBaseColorSpace,true);
+  assert.ok(Math.abs(editableTmapHeadroom(promoted.data)-headroom)<1e-5);
+
+  const depthId=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+  assert.deepEqual(after.refs.find(r=>r.type==='auxl'&&r.from===depthId)?.to,[after.primary,tmap]);
+  assert.deepEqual(after.refs.find(r=>r.type==='auxl'&&r.from===after.hdrGrid)?.to,[after.primary]);
+  for(const [id,type] of [[after.linearThumb,'auxl'],[after.deltaGrid,'auxl'],[after.stylesItem,'cdsc']])
+    assert.deepEqual(after.refs.find(r=>r.type===type&&r.from===id)?.to,[after.primary,tmap]);
+  for(const [id,payload] of originals)if(!gainItems.includes(id)&&id!==sideId)
+    assert.deepEqual(extractItemData(promoted.data,after,id),payload);
+  assert.equal(promoteLegacyPortraitHdr(promoted.data),null,'promotion must be idempotent');
+});
+
+test('Apple legacy Rec.709 gain samples are converted to the equivalent ISO logarithmic gain',()=>{
+  const headroom=3.0177927017211914,input=Uint8Array.from({length:256},(_,i)=>i);
+  const output=normalizeAppleLegacyGainSamples(input,headroom),stops=Math.log2(headroom);
+  assert.equal(output[0],0);assert.equal(output[255],255);
+  for(let i=1;i<output.length;i++)assert.ok(output[i]>=output[i-1]);
+  const linear=x=>x<.081?x/4.5:((x+.099)/1.099)**(1/.45);
+  let maxError=0;
+  for(let i=0;i<256;i++)maxError=Math.max(maxError,Math.abs(
+    1+(headroom-1)*linear(i/255)-2**((output[i]/255)*stops)));
+  assert.ok(maxError<.006,`legacy-to-ISO gain error ${maxError}`);
+});
+
+test('AI Portrait promotes prepared ISO HDR after depth exists using the migrated legacy headroom',()=>{
+  let source=photo(900,600),d=discoverHeic(source);
+  assert.equal([...d.infos.keys()].some(id=>auxUriForItem(d.props,id)===DEPTH_URI),false);
+  const gainBefore=extractItemData(source,d,d.hdrGrid);
+  let exif=extractItemData(source,d,d.exifItem);
+  const rational=(num,den)=>{
+    const mn=getMakerNoteBlob(exif),little=String.fromCharCode(mn[12],mn[13])==='II';
+    const out=new Uint8Array(8),v=new DataView(out.buffer);
+    v.setInt32(0,num,little);v.setUint32(4,den,little);return out;
+  };
+  const fixCount=(bytes,id)=>{
+    const mn=getMakerNoteBlob(bytes),little=String.fromCharCode(mn[12],mn[13])==='II',v=new DataView(mn.buffer,mn.byteOffset,mn.byteLength);
+    for(let i=0;i<v.getUint16(14,little);i++){const p=16+12*i;if(v.getUint16(p,little)===id){v.setUint32(p+4,1,little);return bytes;}}
+    throw Error('MakerNote tag missing');
+  };
+  exif=fixCount(injectAppleMakerNoteTag(exif,rational(52489,79007),0x21,10),0x21);
+  exif=fixCount(injectAppleMakerNoteTag(exif,rational(11443,153779),0x30,10),0x30);
+  let meta=source.slice(d.meta.off,d.meta.off+d.meta.size),ids,p3;
+  // Legacy Apple HEICs can carry an ICC profile whose desc payload is ASCII "Display P3".
+  const p3Colr=box('colr',concat([new TextEncoder().encode('prof'),new TextEncoder().encode('Display P3')]));
+  [meta,p3]=appendIpcoProperty(meta,p3Colr);
+  const primaryProps=d.props.associations.get(d.primary).filter(a=>d.props.properties[a.index-1].type!=='colr').map(a=>[a.index,a.essential]);
+  meta=setItemPropertyAssociations(meta,d.primary,[...primaryProps,[p3,false]]);
+  [meta,ids]=addItems(meta,[{key:'legacy-65536-xmp',itemType:'mime',contentType:'application/rdf+xml',refType:'cdsc',refTo:[d.hdrGrid]}]);
+  const maker48=11443/153779,expectedStops=-0.101*maker48+1.601;
+  const xmp=new TextEncoder().encode(`<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:HDRGainMap="http://ns.apple.com/HDRGainMap/1.0/"><HDRGainMap:HDRGainMapVersion>131072</HDRGainMap:HDRGainMapVersion><HDRGainMap:HDRGainMapHeadroom>${2**expectedStops}</HDRGainMap:HDRGainMapHeadroom></rdf:Description></rdf:RDF></x:xmpmeta>`);
+  const ft=topBox(source,'ftyp');
+  source=rebuildHeic(source,d,source.slice(ft.off,ft.off+ft.size),meta,new Map([[ids.get('legacy-65536-xmp'),xmp],[d.exifItem,exif]]));
+  d=discoverHeic(source);
+  const result=buildAiPortrait(source,depth,template,{legacyHdrNormalized:true}),after=discoverHeic(result.data);
+  assert.equal(result.report.legacyHdrCompatibility,'normalized-portrait-tmap');
+  const tmap=[...after.infos].find(([,info])=>info.type==='tmap')?.[0];
+  assert.ok(tmap);
+  const params=parseTmapMetadata(extractItemData(result.data,after,tmap));
+  assert.ok(Math.abs(params.alternateHeadroom-expectedStops)<1e-6);
+  assert.equal(params.useBaseColorSpace,true);
+  assert.equal(params.channels[0].baseOffset,0);
+  const depthId=[...after.infos.keys()].find(id=>auxUriForItem(after.props,id)===DEPTH_URI);
+  assert.deepEqual(after.refs.find(r=>r.type==='auxl'&&r.from===depthId)?.to,[after.primary,tmap]);
+  assert.deepEqual(extractItemData(result.data,after,after.hdrGrid),gainBefore,'HDR gain map must remain byte-exact');
+});
+
 test('unrelated or ambiguous tmap dependencies do not invent an HDR role',()=>{
   const infos=new Map([[1,{type:'grid'}],[2,{type:'hvc1'}],[3,{type:'tmap'}],[4,{type:'tmap'}],[5,{type:'hvc1'}]]);
   assert.equal(tmapGainMap(infos,new Map([[3,[1,2]]]),1),2);
@@ -402,7 +519,7 @@ test('HDR headroom compatibility rejects unknown ISO headers and unsupported gai
     {mutate:bytes=>bytes[0]=1},
     {mutate:bytes=>bytes[2]=1},
     {mutate:bytes=>bytes[4]=1},
-    {mutate:bytes=>bytes[5]=64},
+    {mutate:bytes=>bytes[5]=32},
     {mutate:bytes=>bytes.fill(0,18,22)},
     {parameters:{baseHeadroom:1}},
     {parameters:{alternateHeadroom:17}},

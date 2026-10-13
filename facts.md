@@ -3043,3 +3043,191 @@ Portable regressions cover the iPhone 7 0x54 collision, iPhone 13–15 preservat
 iPhone 16+ protection and nonzero Texture roughness. The real browser IMG_1382 check,
 AI Portrait export tests, Texture compatibility tests and Soft Skin tests all pass.
 Service-worker shell cache is v142.
+
+### 10.65 Legacy HDR gain map must join the editable Portrait rendition (2026-10-13)
+
+The reported `C:/Users/WanThinnn/Downloads/IMG_1388.HEIC` is an iPhone 12 mini
+front-camera HEIC (Software 15.4.1). It carries a 4032x3024 SDR primary, a
+2016x1512 Apple legacy HDR gain-map grid, and a 1024x768 relative disparity
+image. The gain-map XMP declares `HDRGainMapHeadroom=3.0177927017211914`;
+there is no ISO `tmap`, Styles graph, StyleDeltaMap, or linear thumbnail in
+the source.
+
+Device feedback distinguishes the failure by display mode: with HDR display
+suppressed (for example Low Power Mode), Portrait blur/bokeh looks uniform;
+with HDR display active, bright HDR regions regain visible detail and therefore
+look less blurred than the surrounding SDR rendition. The source graph links
+both the gain map and disparity only to the SDR primary. In contrast, the
+project's working modern native HDR+Portrait references use an ISO `tmap`
+derived from `[primary, gainMap]`, and link depth/Styles/mattes to both
+`[primary, tmap]`. The same structure was previously device-accepted in the
+NativePortrait_Bright_HDR_V4 D/E tests.
+
+The web port now conservatively promotes this older Apple HDR layout before
+adding Styles/Texture when all of the following are true: exactly one native
+depth item exists, the HDR item has Apple's 2020 gain-map auxiliary role, no
+`tmap` already exists, one valid Apple HDRGainMap 1.0 sidecar supplies finite
+headroom, and the SDR primary is Display P3. Promotion does not alter or
+re-encode the primary, gain-map, depth, or their XMP payloads. It adds a
+one-channel ISO `tmap` whose alternate headroom is `log2(sourceHeadroom)`,
+using the same P3/PQ tmap properties and simple offset/gamma contract as the
+device-accepted V4 D/E graph. The HDR derived rendition is preferred through an
+`altr` group, while the original SDR primary remains the fallback.
+
+For IMG_1388 the generated tmap uses alternate headroom 1.593494 (rounding the
+source log2 value), consumes `[primary 49, gain-map 64]`, and the native
+disparity relationship becomes `[primary 49, tmap 68]`. Newly generated
+linear-thumbnail, StyleDeltaMap, Styles metadata, Texture and semantic mattes
+also target both renditions. The gain-map auxiliary itself remains linked only
+to the primary, matching the modern native graph. Full browser processing keeps
+the original primary tiles, gain-map grid/tiles/XMP and depth/XMP byte-exact.
+
+A portable regression verifies the tmap parameters, relationship graph,
+idempotence and byte preservation. **Device test on 2026-10-13 failed:** the
+original IMG_6321.HEIC, its IMG_1388.HEIC derivative and the generated
+IMG_1388_HDRPortraitFix.HEIC still exhibit reduced blur / lost bokeh in HDR
+highlight regions with HDR display enabled. Therefore tmap/altr/dual-target
+relationships are **not a verified fix** for this legacy capture, and the
+prior assumption that Photos would necessarily apply Portrait blur after HDR
+reconstruction is not supported by the physical observation. No gain-map pixels
+were modified, so the portable tests could not detect this perceptual failure.
+Next work must compare actual on-device SDR/HDR Portrait renderings and isolate
+whether the gain map itself needs depth-aware processing, whether the editor
+selects a different rendition/adjustment path, or whether an Apple-private
+rendering contract differs. Any blur-aware gain-map rewrite must account for
+aperture re-editability and changing Portrait Lighting; dropping HDR is only a
+separate SDR-compatibility fallback, not an HDR-preserving fix. Service-worker
+shell cache is v143.
+
+### 10.66 AI Portrait must promote legacy Apple HDR after depth generation (2026-10-13)
+
+A direct comparison of the user's true source IMG_6321.HEIC against the derived
+IMG_1388.HEIC exposed two facts that the earlier investigation missed. The original
+iPhone 12 mini file has **no depth item at all**. Its HDR gain map is one 2016x1512
+hvc1 auxiliary image with HDRGainMapVersion=65536, while IMG_1388 contains the
+AI-generated 1024x768 disparity and a later 12-tile gain-map grid. Therefore repairing
+IMG_1388 only operates on an already transformed Portrait container; it does not test
+the original legacy-HDR -> AI-Portrait path.
+
+Apple HDRGainMap version 65536 does not need an explicit XMP headroom field. For this
+capture the source Apple MakerNote contains signed-rational tag 33 (0x21) =
+52489/79007 and tag 48 (0x30) = 11443/153779. Applying Apple's documented
+piecewise headroom equation selects the maker33 < 1 && maker48 > 0.01 branch and
+gives 1.5934843899 stops, or approximately 3.0177732x linear headroom. This is
+within ~0.00002 of the later IMG_1388 sidecar value 3.0177927017, independently
+confirming the same source HDR range.
+
+Two implementation gaps blocked the original photo. First, the source Display-P3 ICC
+profile stores its desc string as ordinary ASCII Display P3; the compatibility probe
+previously only recognized nclx primaries=12 or UTF-16 profile names. Second,
+promoteLegacyPortraitHdr() previously understood only version 131072 with an
+explicit HDRGainMapHeadroom. It now also accepts version 65536 when tags 33/48 are
+valid signed rationals and derives headroom from those source values. No HDR pixel or
+gain-map sample is synthesized from this metadata.
+
+The ordering bug was equally important. patch() runs before optional AI Portrait, so
+IMG_6321 has no depth when its Styles graph is created and HDR promotion correctly
+skips at that point. Previously buildAiPortrait() added depth and returned immediately,
+meaning the now-eligible legacy HDR was never promoted. buildAiPortrait() now runs the
+legacy HDR promotion **after** attaching the editable disparity. Existing files that
+already have ISO HDR remain unchanged because the promotion is idempotent and refuses
+an existing tmap.
+
+An exact reconstruction was produced from IMG_6321.HEIC while reusing the already
+computed depth payload from IMG_1388.HEIC so this test changes the HDR/container path,
+not the AI depth model. The output
+C:/Users/WanThinnn/Downloads/IMG_6321_HDR_Portrait_Legacy65536Fix.HEIC keeps the
+original single-image 2016x1512 gain map as hvc1 byte-for-byte, adds a 4032x3024
+tmap with alternate headroom 1.593484, keeps 1024x768 editable depth, and targets
+that depth plus Styles/Texture resources at both [primary, tmap]. The gain map is not
+retiled or re-encoded.
+
+A portable regression now covers the version-65536 path, MakerNote 33/48 headroom
+calculation, ASCII Display-P3 ICC identification, the post-depth promotion ordering,
+dual-target depth relationship, and gain-map byte preservation. The relevant suite is
+36 pass / 0 fail. This fixes the identified container/pipeline defect; the perceptual
+HDR+bokeh result still requires the generated file to be checked in Photos on a physical
+iPhone before marking the rendering symptom device-proven. Service-worker shell cache
+is v144.
+
+### 10.67 Legacy Apple gain samples must be converted before ISO Portrait promotion (2026-10-13)
+
+Physical-device feedback rejected the metadata-only output from section 10.66. Its HDR
+highlight regions still reduced the visible Portrait blur/bokeh, and the promoted graph
+could also make the depth result look wrong compared with the last committed build. The
+post-depth ordering fix was necessary but not sufficient; preserving the old gain-map
+bytes while declaring them to be a simple ISO logarithmic gain map was itself invalid.
+
+Apple's documented legacy equation first decodes each 8-bit gain sample with the Rec.709
+inverse transfer and then applies `1 + (headroom - 1) * gain`. ISO 21496-1 instead decodes
+a normalized log2 gain using the tmap min/max/gamma fields. The rejected implementation
+declared the untouched Apple bytes as `logGain = sample * log2(headroom)`, with 0.005
+offsets and the alternate colour space. Those equations are not equivalent, so the tmap
+could overstate spatial highlight detail even though the item graph and headroom scalar
+looked correct in structural tests.
+
+The AI Portrait route now converts every legacy monochrome gain sample before assembly:
+
+`isoSample = log2(1 + (headroom - 1) * Rec709ToLinear(appleSample)) / log2(headroom)`
+
+The converted plane is encoded losslessly as full-range 8-bit monochrome HEVC. Its ISO
+tmap uses `min=0`, `max=log2(headroom)`, `gamma=1`, zero offsets, and applies gain in the
+base colour space. Endpoints remain exact; exhaustive 8-bit calibration at the reported
+3.01779x headroom has less than 0.006 absolute multiplier error (below 0.2% of peak).
+Primary pixels, AI depth, Styles, Texture and all unrelated payloads remain byte-exact;
+only the gain-map representation and its matching decoder configuration change.
+
+The legacy promotion is now explicitly gated on that conversion. `patch()` no longer
+promotes an existing legacy HDR+depth file, restoring the previous non-mutating behavior
+for incomplete/native Portrait inputs and preventing the failed metadata-only experiment
+from changing their blur path. AI export performs the conversion once before the reusable
+Portrait assembly worker; focus/aperture updates reuse the converted gain map and do not
+decode or encode it again. Existing ISO tmap HDR files remain unchanged.
+
+Portable regression now rejects metadata-only promotion of raw Apple samples, validates
+the Apple-to-ISO equation over all 256 code values, checks base-colour/zero-offset tmap
+metadata, preserves every unrelated item, and covers version 65536 plus MakerNote 33/48.
+The focused suite is 37 pass / 0 fail; adjacent Portrait, JPEG HDR, thumbnail and worker
+tests are 29 pass / 1 optional private-fixture skip / 0 fail. PWA validation passes.
+The perceptual result still requires a fresh physical-iPhone check before this is marked
+device-proven. Service-worker shell cache is v145.
+
+### 10.68 Legacy-to-ISO conversion must migrate the HDR sidecar atomically (2026-10-13)
+
+The user's physical-iPhone comparison supplied the post-import `IMG_1401.HEIC` plus HDR
+and SDR screenshots `IMG_1402.JPEG` / `IMG_1403.JPEG`. The SDR screenshot retains the
+expected background blur and round bokeh, while HDR restores hard detail in the bright
+tree/courtyard regions. This confirms that the disparity result itself is usable and that
+the visible regression is introduced only by the HDR rendition.
+
+The previous direct output contained the intended `tmap` and targeted depth/Styles at both
+the SDR primary and HDR rendition. After Photos/iCloud canonicalized it into `IMG_1401`,
+however, the `tmap` item was gone, depth targeted only the SDR primary, and the still-sharp
+gain map remained auxiliary to that primary. HDR display could therefore reintroduce
+high-frequency highlight detail after the SDR Portrait blur. Photos converted the gain map
+to a 12-tile grid and emitted `HDRGainMapVersion=131072` with explicit headroom, showing
+that it did not accept the input as one internally consistent editable HDR graph.
+
+The v145 preparation had an additional deterministic contract bug: it converted 0x10000
+(`65536`) Apple Rec.709 gain samples to ISO logarithmic samples but preserved the old
+0x10000 XMP declaration. A caller boolean was then sufficient to add an ISO `tmap` despite
+that contradictory sidecar. On import, Photos could interpret or migrate the already
+converted samples again, or reject the derived rendition.
+
+Gain conversion and metadata migration are now atomic. A 0x10000 input is re-encoded once,
+its same HDR XMP item is changed to version 0x20000 (`131072`), and its source-derived
+headroom is written explicitly. `promoteLegacyPortraitHdr()` additionally requires that
+0x20000 declaration; its caller flag can no longer promote raw legacy metadata. A subsequent
+pass recognizes the migrated representation and skips decoding/encoding, preventing a
+Photos round-trip from being converted twice. The tmap continues to use the algebraically
+matching one-channel log2 contract (`min=0`, `max=log2(headroom)`, `gamma=1`, zero offsets,
+base colour space).
+
+A reconstructed diagnostic for the exact IMG_6321 image is saved as
+`tests/private-fixtures/HDR_Portrait_IMG6321/IMG_6321_HDR_Portrait_ISOContractFix.HEIC`.
+It contains the 4032x3024 primary, normalized 2016x1512 gain map, 1024x768 editable depth,
+version-131072 sidecar with headroom 3.017773211, and a tmap derived from `[primary,gain]`;
+depth and editing resources target `[primary,tmap]`. This file still needs a fresh physical
+iPhone import/edit/export check, specifically verifying that Photos retains the tmap rather
+than producing the rejected primary-only graph seen in IMG_1401. Service-worker shell cache
+is v146.

@@ -19,7 +19,8 @@ export function latestSettingsWriter(write){
 
 // The worker owns source/depth buffers until the result is removed. Focus edits
 // never parse/copy large HEIC containers on the UI thread.
-export function portraitAssembler(source,depth,template,{signal,workerFactory=()=>new Worker(new URL('./ai-portrait-export-worker.js',import.meta.url),{type:'module'})}={}){
+export function portraitAssembler(source,depth,template,{signal,legacyHdrNormalized=false,
+  workerFactory=()=>new Worker(new URL('./ai-portrait-export-worker.js',import.meta.url),{type:'module'})}={}){
   const worker=workerFactory(),pending=new Map();let next=0,closed=false;
   const dispose=(error=new DOMException('Portrait result released','AbortError'))=>{
     if(closed)return;closed=true;worker.terminate();signal?.removeEventListener('abort',abort);
@@ -38,6 +39,6 @@ export function portraitAssembler(source,depth,template,{signal,workerFactory=()
   });
   signal?.addEventListener('abort',abort,{once:true});
   if(signal?.aborted){dispose(signal.reason);return {build,dispose};}
-  try{worker.postMessage({source,depth,template},[...new Set([source.buffer,depth.payload.buffer,depth.hvcc.buffer])]);}catch(error){dispose(error);}
+  try{worker.postMessage({source,depth,template,legacyHdrNormalized},[...new Set([source.buffer,depth.payload.buffer,depth.hvcc.buffer])]);}catch(error){dispose(error);}
   return {build,dispose};
 }

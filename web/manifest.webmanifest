@@ -7,7 +7,7 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f6f8",
+  "background_color": "#f7f8fc",
   "theme_color": "#0062cc",
   "categories": ["photo", "utilities"],
   "icons": [

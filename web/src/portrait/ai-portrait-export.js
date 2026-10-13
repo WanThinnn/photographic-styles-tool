@@ -10,6 +10,7 @@ import {appleDepthAuxc,readAppleDepthRange} from './apple-depth-metadata.js';
 import {portraitAssembler} from './ai-portrait-assembler.js';
 import {styleCapabilities} from '../styles/style-capabilities.js';
 import {normalizeLegacyPortraitHdrGain,promoteLegacyPortraitHdr} from '../styles/hdr-compatibility.js';
+import {supportsNativePortraitRestore} from './native-portrait-contract.js';
 const decode=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const xml=s=>new TextEncoder().encode(s);
 let templatePromise;
@@ -251,7 +252,7 @@ export async function restoreNativePortrait(source,template,{unblurredBase=false
   }catch{return null;}
   // Feature flags are not the Portrait toggle. An explicit sharp-base
   // confirmation is required above; the capture class only scopes this adapter.
-  if(![2,10,11,12].includes(capture)||!styleCapabilities(source).editable)return null;
+  if(!supportsNativePortraitRestore(capture)||!styleCapabilities(source).editable)return null;
   const id=depths[0],sidecars=d.refs.filter(r=>r.type==='cdsc'&&r.to.includes(id)&&d.infos.get(r.from)?.type==='mime');
   if(sidecars.length!==1||sidecars[0].to.length!==1)return null;
   const side=sidecars[0].from,xmp=new TextDecoder().decode(extractItemData(source,d,side));

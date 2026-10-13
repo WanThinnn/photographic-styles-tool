@@ -38,7 +38,7 @@ tile 布局即可）拍摄的 HEIC 照片补上 iPhone 16/17 照片所携带的�
 缺少 HEIC 缩略图时可用已校验的 WASM 编码器在本地生成，首次访问会自动准备环境，详见 [web/README.md](web/README.md)。
 普通图像和 DNG 转为 HEIC；支持的 JPEG HDR 增益图会转移，DNG 开发输出为 SDR。
 HEIC 路径保留原主图、HDR 和风格数据。可选 AI 人像需要 WebGPU，在已测试的“照片”版本中
-可编辑光圈 ƒ 和人像光效。人像默认为关闭，保存后在“照片”中开启；详见 [web/AI-PORTRAIT.md](web/AI-PORTRAIT.md)。
+可编辑光圈 ƒ 和人像光效。人像默认为关闭，保存后在“照片”中开启；详见 [处理指南](docs/web/processing-guide.md)。
 
 网页版与 命令行/Python 工具使用同一套移植逻辑，见 [`web/README.md`](web/README.md)。
 批量处理或需要基于编码器，需要生成内嵌缩略图时请用 命令行/Python 版本。

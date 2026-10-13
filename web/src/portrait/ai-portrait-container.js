@@ -5,6 +5,7 @@ import {discoverHeic, auxUriForItem, DEPTH_URI, extractItem, addItems, parseIloc
 import {appleDepthAuxc,appleDepthXmp} from './apple-depth-metadata.js';
 import {styleCapabilities} from '../styles/style-capabilities.js';
 import {extractAppleMakerNoteTag,getMakerNoteBlob,exifCameraModel} from '../core/exif.js';
+import {isKnownSharpPortraitOffBase} from './native-portrait-contract.js';
 
 // 0x1f is PhotosAppFeatureFlags, not Portrait On/Off. Do not use it to
 // classify blur. The tested legacy Photo capture with native depth uses a
@@ -23,7 +24,7 @@ export function nativePortraitBaseState(data,d=discoverHeic(data)){
     if(![4,9].includes(tag.type)||tag.payload.length!==4)return 'unknown-base';
     const little=getMakerNoteBlob(exif)[12]===73;
     const capture=new DataView(tag.payload.buffer,tag.payload.byteOffset,4).getUint32(0,little);
-    if(capture===10&&Number(model[1])<16)return 'legacy-photo-base';
+    if(isKnownSharpPortraitOffBase(capture,Number(model[1])))return 'legacy-photo-base';
     if(capture===2)return 'portrait-capture';
   }catch{}
   return 'unknown-base';

@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {readApplicationSource} from './helpers/application-source.mjs';
 
-const app=readFileSync(new URL('../../web/app.js',import.meta.url),'utf8');
+const app=readApplicationSource();
 const raster=readFileSync(new URL('../../web/src/raster/raster-import.js',import.meta.url),'utf8');
 
 test('Suggested Styles stays lazy when the independent feature is disabled',()=>{
-  assert.match(app,/async function recommendHeicStyle[\s\S]*if\(!aiFeatures\.enabled\('style'\)\|\|preserveNativeStyles\(bytes,d\)\)return null;[\s\S]*import\('\.\/src\/recommend\/style-runtime\.js'\)/);
+  assert.match(app,/async function recommendHeicStyle[\s\S]*if\(!aiFeatures\.enabled\('style'\)\|\|preserveNativeStyles\(bytes,d\)\)return null;[\s\S]*import\('\.\.\/\.\.\/recommend\/style-runtime\.js'\)/);
   assert.match(raster,/async function suggestStyleForImage\(image,request,onProgress\)\{\s*if\(!request\)return \{recommendation:null,error:null\};[\s\S]*import\('\.\.\/recommend\/style-runtime\.js'\)/);
   assert.match(app,/styleSuggestion:aiFeatures\.enabled\('style'\)\?\{level:selectedAiLevel\(\),provider:/);
 });
@@ -19,7 +20,7 @@ test('native preservation classification happens before any HEIC recommendation'
   assert.ok(classify>=0&&classify<nativeBranch&&nativeBranch<patchBranch&&patchBranch<recommend);
   assert.equal((app.match(/opts\.styleRecommendation=await recommendHeicStyle/g)||[]).length,1);
   const helper=app.slice(app.indexOf('async function recommendHeicStyle'),app.indexOf('async function handleFile'));
-  const bypass=helper.indexOf("preserveNativeStyles(bytes,d))return null"),load=helper.indexOf("import('./src/recommend/style-runtime.js')");
+  const bypass=helper.indexOf("preserveNativeStyles(bytes,d))return null"),load=helper.indexOf("import('../../recommend/style-runtime.js')");
   assert.ok(bypass>=0&&load>=0&&bypass<load,'a native Style marker/graph must return before loading the recommender');
   assert.doesNotMatch(app,/modernNativeCamera/,'camera model alone must not bypass third-party iPhone photos');
 });
@@ -52,7 +53,7 @@ test('Suggested Styles bakes SDR and HDR display bases while retaining editable 
   const patch=app.indexOf('await patchInWorker(bytes, profile, opts)');
   const softSkin=app.indexOf('data=await addMissingSoftSkin(data,file,ui',patch);
   const restore=app.indexOf('restoreNativePortraitInWorker(data',softSkin);
-  const display=app.indexOf("import('./src/recommend/style-display-heic.js')",restore);
+  const display=app.indexOf("import('../../recommend/style-display-heic.js')",restore);
   const publish=app.indexOf('const shareFile = new File([data]',display);
   assert.ok(patch>=0&&softSkin>patch&&restore>softSkin&&display>restore&&publish>display,
     'the display rendition must be the final HEIC pixel operation before publishing');

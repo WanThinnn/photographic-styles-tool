@@ -56,7 +56,7 @@ Optional AI Portrait defaults to WebGPU, with an explicit CPU option in AI setti
 and adds editable aperture ƒ and Portrait Lighting
 on the tested Photos versions. Portrait starts off: enable it in Photos after saving.
 The website offers one combined output after focus/aperture adjustments. See
-[web/AI-PORTRAIT.md](web/AI-PORTRAIT.md) for compatibility and model limitations.
+[processing guide](docs/web/processing-guide.md) for compatibility and model limitations.
 The web aperture ruler uses fixed f/1.4–f/16 stops and Off. Tested legacy Portrait
 exports regain aperture/lighting through a native-depth compatibility repair;
 their existing Style selection, including Bright, is preserved when adding Styles.

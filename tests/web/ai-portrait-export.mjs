@@ -202,6 +202,29 @@ test('adding a missing Styles graph preserves an original six-key Bright selecti
   assert.deepEqual(originalProfile.mn54,saved,'cached neutral profile must not inherit another photo selection');
 });
 
+test('Suggested Styles overrides legacy iPhone 15 selection but never mutates incomplete iPhone 16+ capture selection',async()=>{
+  const marker=buildBplist(new Map([['0',1],['1',new BplistReal(-.5)],['2',new BplistReal(.5)],
+    ['3',new BplistReal(.7)],['4',16],['5',1],['6',4],['7',0]]));
+  const base=photo(900,600),graph=discoverHeic(base);
+  const incomplete=withoutThumbnail(withMarker(base,marker),[graph.stylesItem,graph.deltaGrid,graph.linearThumb]);
+  const recommendation={styleId:11,tone:-.42,color:.16,palette:.88,confidence:.82,level:'pro'};
+  const profile15=buildGeneratedProfile('48-12',assets);
+  const oldSource=withCamera(incomplete,'iPhone 15 Pro');
+  const oldOut=await patch(oldSource,profile15,{experimental:true,styleRecommendation:recommendation});
+  const oldSelected=parseBplist(selectedStyle(oldOut.data).payload);
+  assert.deepEqual([oldSelected.get('4'),oldSelected.get('1'),oldSelected.get('2'),oldSelected.get('3')],
+    [11,-.42,.16,.88]);
+  assert.equal(oldOut.report.styleRecommendation.styleName,'Dramatic');
+  const portrait=buildAiPortrait(oldOut.data,depth,template).data;
+  assert.deepEqual(selectedStyle(portrait),selectedStyle(oldOut.data),'AI Portrait must preserve the suggested Style marker');
+
+  const profile16=buildGeneratedProfile('48-12',assets);
+  const modernSource=withCamera(incomplete,'iPhone 16 Pro');
+  const modernOut=await patch(modernSource,profile16,{experimental:true,styleRecommendation:recommendation});
+  assert.deepEqual(selectedStyle(modernOut.data),selectedStyle(modernSource));
+  assert.equal(modernOut.report.styleRecommendation,undefined);
+});
+
 test('ISO-only tmap gain maps are reported and preserved as HDR when adding Portrait',async()=>{
   const base=photo(4032,3024,'45-15'),d=discoverHeic(base),ft=topBox(base,'ftyp');
   assert.ok(d.hdrGrid!==null);

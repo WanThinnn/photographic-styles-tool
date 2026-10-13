@@ -13,7 +13,10 @@ export function depthWorkerFailure(error,stage){
 }
 export function canRetryDepth(error){
   if(['AbortError','TimeoutError'].includes(error.name)||error.message==='WEBGPU')return false;
-  return error.stage==='inference'||/(out.of.memory|allocat|buffer.*(size|limit|failed)|device.*lost|AI worker failed)/i.test(error.message);
+  return error.stage==='inference'||/(out.of.memory|memory allocation failed|no available backend|backend.*found|allocat|buffer.*(size|limit|failed)|device.*lost|AI worker failed)/i.test(error.message);
+}
+export function canFallbackDepthToCpu(error,provider='webgpu'){
+  return provider==='webgpu'&&canRetryDepth(error);
 }
 export function awaitAiSource(create, signal) {
   if (!signal) return create();

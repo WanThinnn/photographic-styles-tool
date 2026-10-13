@@ -1,6 +1,6 @@
 import { loadProfile } from "./src/core/zip.js";
 import { profileFor, VERSION, UNSUPPORTED } from "./src/styles/port.js";
-import { dimensionsForItem } from "./src/core/heif.js";
+import { dimensionsForItem, discoverHeic } from "./src/core/heif.js";
 import { styleDeltaSize } from "./src/styles/graft.js";
 import { hasTexture } from "./src/styles/texture.js";
 import { decodeToRgb, loadLibheif, releaseDecodeCache } from "./src/media/decode.js";
@@ -8,9 +8,9 @@ import { pickLanguage, rememberLanguage, applyLanguage, t } from "./src/ui/i18n.
 import { photoContentIdentifier, moviePairingMetadata, createLivePhotoExport } from "./src/media/live-photo.js";
 import { RASTER_MIMES } from "./src/media/image-format.js";
 import { photoCaptureDate } from "./src/media/photo-date.js";
-import { preserveNativeStyles, styleReconstructionRisk } from "./src/styles/style-preservation.js";
+import { preserveNativeStyles, styleReconstructionRisk, nativeTextureCapture } from "./src/styles/style-preservation.js";
 import { AI_STRINGS } from "./src/ui/ai-strings.js";
-import {prepareBrowser} from './src/ui/startup.js';
+import {prepareBrowser,fetchJsonWithRetry} from './src/ui/startup.js';
 import {prepareHevcAssets, releaseHevcEncoder} from './src/codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from './src/raster/ffmpeg-hevc.js';
 import {readImageFile, addTextureInWorker, repairTextureInWorker, restoreNativePortraitInWorker, patchInWorker, releaseHeicProcessor, describeInWorker} from './src/media/heic-processing.js';
@@ -20,25 +20,45 @@ import {styleCapabilities} from './src/styles/style-capabilities.js';
 import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
 import {depthModel} from './src/portrait/depth-models.js';
 import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
+import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
+import {shouldRenderStyleDisplay} from './src/recommend/style-display-render.js';
+
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $("file"), drop = $("drop"), list = $("list");
-const aiPortrait = $("ai-portrait");
+const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), aiStyleSuggest=$("ai-style-suggest"), enhanceAi = $("enhance-ai");
 const gpuAcceleration=$('gpu-acceleration');
 const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
 const modelLevels=['lite','standard','pro'];
-const selectedModel=()=>modelLevels[Number(modelSelector.value)];
+const aiSettings=$('ai-settings');
+const aiSettingsSummary=aiSettings?.querySelector('summary');
+if(aiSettings&&aiSettingsSummary){
+  aiSettingsSummary.addEventListener('click',event=>{
+    if(!aiSettings.open||aiSettings.classList.contains('is-closing'))return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    event.preventDefault();
+    aiSettings.classList.add('is-closing');
+    const close=()=>{aiSettings.open=false;aiSettings.classList.remove('is-closing');};
+    aiSettings.querySelector('.ai-settings-panel')?.addEventListener('animationend',close,{once:true});
+    setTimeout(()=>{if(aiSettings.classList.contains('is-closing'))close();},220);
+  });
+}
+
+const selectedAiLevel=()=>modelLevels[Number(modelSelector.value)];
 function renderModel(){
-  const name=depthModel(selectedModel()).label;
+  const name=depthModel(selectedAiLevel()).label;
   $('depth-model-value').textContent=name;modelSelector.setAttribute('aria-valuetext',name);
   modelSelector.parentElement.style.setProperty('--model-position',['14px','50%','calc(100% - 14px)'][Number(modelSelector.value)]);
   modelSelector.parentElement.dataset.level=modelSelector.value;
 }
 let clearingAssets=false,assetStatus='';
 try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved);modelSelector.value=modelLevels.indexOf(saved);}catch{}
+
+
+
 renderModel();
 modelSelector.addEventListener('input',()=>{
-  renderModel();try{localStorage.setItem('depth-model',selectedModel());}catch{}
+  renderModel();try{localStorage.setItem('depth-model',selectedAiLevel());}catch{}
 });
 try{gpuAcceleration.checked=localStorage.getItem('depth-gpu-acceleration')!=='off';}catch{}
 gpuAcceleration.addEventListener('change',()=>{
@@ -48,6 +68,11 @@ const clearHistory = $('clear-history');
 const resultUrls = new Set(), resultCleanups = new Set();
 const aiCandidates = [];
 let browserReady = false, pendingTasks = 0;
+const aiFeatures=createAiFeatureControls({
+  master:enhanceAi,
+  features:{portrait:aiPortrait,detail:aiDetail,style:aiStyleSuggest},
+  isAvailable:()=>browserReady&&!clearingAssets,
+});
 function refreshHistoryButton() {
   clearHistory.hidden = !list.childElementCount;
   clearHistory.disabled = pendingTasks > 0;
@@ -66,25 +91,38 @@ clearHistory.addEventListener('click', () => {
   for (const url of resultUrls) URL.revokeObjectURL(url);
   resultUrls.clear(); livePhotos.length = 0; liveMovies.clear(); aiCandidates.length = 0;
   list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
-  releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor(); refreshHistoryButton();
+  releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor();
+  void import('./src/detail/detail-inference.js').then(({releaseDetailWorkers})=>releaseDetailWorkers()).catch(()=>{});
+  void import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
+  refreshHistoryButton();
 });
 clearAssets.addEventListener('click',async()=>{
   if(clearAssets.disabled)return;
   clearingAssets=true;assetStatus='cleaning';translateAi();refreshHistoryButton();
-  aiPortrait.disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
+  aiFeatures.sync();
+  modelSelector.disabled=gpuAcceleration.disabled=true;
   fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
   try{
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
-    const {releaseOrtModels}=await import('./src/vision/ort-vision.js');await releaseOrtModels();
+    const [{releaseOrtModels},{releaseDetailWorkers},{releaseStyleRecommender}]=await Promise.all([
+      import('./src/vision/ort-vision.js'),import('./src/detail/detail-inference.js'),import('./src/recommend/style-runtime.js')]);
+    releaseDetailWorkers();releaseStyleRecommender();await releaseOrtModels();
     await clearDownloadedAssets();assetStatus='cleaned';
   }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
-  finally{clearingAssets=false;aiPortrait.disabled=!browserReady;modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+  finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
 });
 const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
 function translateAi() {
+  $("enhance-ai-label").textContent = aiText().masterToggle;
   $("ai-portrait-label").textContent = aiText().toggle;
   $("ai-portrait-hint").textContent = aiText().hint;
-  $("ai-portrait-hint").hidden = !aiPortrait.checked;
+  $("ai-portrait-hint").hidden = false;
+  $("ai-detail-label").textContent = aiText().detailToggle;
+  $("ai-detail-hint").textContent = aiText().detailHint;
+  $('ai-style-suggest-label').textContent=aiText().styleToggle;
+  $('ai-style-suggest-hint').textContent=aiText().styleHint;
+
+
   $('ai-settings').hidden=false;
   $('ai-settings-label').textContent=aiText().settings;
   $('gpu-acceleration-label').textContent=aiText().acceleration;
@@ -100,7 +138,7 @@ function translateAi() {
 aiPortrait.addEventListener('change', () => {
   translateAi();
   for (const candidate of aiCandidates) {
-    if (!aiPortrait.checked) {
+    if (!aiFeatures.enabled('portrait')) {
       candidate.controller?.abort();
       candidate.ui.outputPending(false);
       candidate.ui.output(candidate.outputFile);
@@ -114,6 +152,11 @@ aiPortrait.addEventListener('change', () => {
       queueTask(() => runAiCandidate(candidate));
     }
   }
+});
+
+aiStyleSuggest.addEventListener('change',()=>{
+  if(aiStyleSuggest.checked)return;
+  void import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
 });
 
 // Fetch the decoder while the visitor is still choosing a photo,
@@ -173,10 +216,21 @@ async function handleMovie(file, bytes, ui) {
   }
 }
 
+let profileIndexPromise=null;
+async function ensureProfileIndex(){
+  if(profileIndex)return profileIndex;
+  if(!profileIndexPromise)profileIndexPromise=fetchJsonWithRetry('profiles/index.json')
+    .then(index=>profileIndex=index)
+    .finally(()=>{profileIndexPromise=null;});
+  return profileIndexPromise;
+}
 async function getProfile(name) {
   if (!profileCache.has(name)) {
-    const res = await fetch(`profiles/${profileIndex[name].file}`);
-    if (!res.ok) throw new Error(UNSUPPORTED);
+    const index=await ensureProfileIndex();
+    const entry=index?.[name];
+    if(!entry?.file)throw Object.assign(new Error('Profile index unavailable'),{code:'APP_RESOURCE_UNAVAILABLE'});
+    const res=await fetch(`profiles/${entry.file}`,{cache:'no-cache'});
+    if(!res.ok)throw Object.assign(new Error(`Profile unavailable: ${name}`),{code:'APP_RESOURCE_UNAVAILABLE'});
     profileCache.set(name, await loadProfile(new Uint8Array(await res.arrayBuffer())));
   }
   return profileCache.get(name);
@@ -286,7 +340,7 @@ function row(name) {
       el.insertBefore(host,el.querySelector('.act'));
       try{
         this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{
-          this.portraitPending=pending;if(aiPortrait.checked)this.outputPending(pending);refreshHistoryButton();
+          this.portraitPending=pending;if(aiFeatures.enabled('portrait'))this.outputPending(pending);refreshHistoryButton();
         }}));
       }catch(error){host.remove();this.note(aiText().previewFailed,'preview');throw error;}
     },
@@ -363,6 +417,15 @@ function row(name) {
       const advice=document.createElement('p');advice.className='portrait-advice';advice.textContent=text;
       el.insertBefore(advice,el.querySelector('.act'));
     },
+    adaptiveStyleAdvice(text) {
+      let advice=el.querySelector('.adaptive-style-advice');
+      if(!advice){
+        advice=document.createElement('p');advice.className='adaptive-style-advice';
+        advice.setAttribute('role','status');advice.setAttribute('aria-live','polite');
+        el.insertBefore(advice,el.querySelector('.act'));
+      }
+      advice.textContent=text;
+    },
     share(file, live = false, label = null, group = 'normal') {
       const b = document.createElement("button");
       b.className = "dl";
@@ -389,7 +452,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, pr
   const candidate = {outputFile, sourceFile, ui, name, state: 'new',
     skip: preserveIncomplete ? 'unverified-styles' : source ? portraitEligibility(source) : null};
   aiCandidates.push(candidate);
-  if (aiPortrait.checked&&!candidate.skip) await runAiCandidate(candidate);
+  if (aiFeatures.enabled('portrait')&&!candidate.skip) await runAiCandidate(candidate);
   else {
     if(candidate.skip){candidate.state='skipped';ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');}
     ui.output(outputFile);ui.aiBusy(false);
@@ -397,7 +460,7 @@ async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, pr
 }
 
 async function runAiCandidate(candidate) {
-  if (!aiPortrait.checked || !['new', 'failed'].includes(candidate.state)) return;
+  if (!aiFeatures.enabled('portrait') || !['new', 'failed'].includes(candidate.state)) return;
   const {ui, name, sourceFile} = candidate;
   if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.aiBusy(false); return; }
   candidate.state = 'running'; ui.aiState(aiText().loading);
@@ -409,7 +472,7 @@ async function runAiCandidate(candidate) {
   const deadline=setTimeout(()=>controller.abort(new DOMException('AI timed out','TimeoutError')),600000);
   let lastStage='loading';
   const provider=gpuAcceleration.checked?'webgpu':'wasm';
-  const modelId=selectedModel();
+  const modelId=selectedAiLevel();
   try {
     const {createAiPortrait} = await import('./src/portrait/ai-portrait.js');
     const {exportAiPortrait} = await import('./src/portrait/ai-portrait-export.js');
@@ -417,40 +480,98 @@ async function runAiCandidate(candidate) {
     // These serialized conversion jobs are finished. Free their WASM heaps
     // before loading the GPU model, especially after JPEG/PNG or thumbnails.
     releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
+    // Suggested Styles uses its own ORT/WebGPU session. Never keep that session
+    // alive while loading the much larger depth model, especially on Safari.
+    if(aiFeatures.enabled('style'))await import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
     const result = await createAiPortrait(data,(stage,progress)=>{
       lastStage=stage;
-      if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
-        ui.aiState(`${aiText().download}${percent} · ${formatBytes(progress.loaded)}`);
+      if(['download','modelDownload'].includes(stage)&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
+        ui.aiState(`${aiText().modelDownload}${percent} · ${formatBytes(progress.loaded)}`);
       }else ui.aiState(stage==='inference'&&provider==='wasm'?aiText().inferenceCpu:aiText()[stage]||aiText().loading);
     },sourceFile,{signal:controller.signal,provider,modelId});
     lastStage='encoding';ui.aiState(aiText().encoding);
     const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
     ui.cleanup(output.dispose);
     controller.signal.throwIfAborted();
-    if(!aiPortrait.checked)throw new DOMException('AI disabled','AbortError');
+    if(!aiFeatures.enabled('portrait'))throw new DOMException('AI disabled','AbortError');
     const date=photoCaptureDate(output.data);
     const publish=(data,metadata=true)=>{
       candidate.aiFile=new File([data],name.replace(/\.[^.]+$/,'')+'_Portrait.HEIC',{
         type:'image/heic',...(date?.timestamp!==undefined?{lastModified:date.timestamp}:{})});
-      if(aiPortrait.checked)ui.output(candidate.aiFile,{metadata});
+      if(aiFeatures.enabled('portrait'))ui.output(candidate.aiFile,{metadata});
     };
     publish(output.data);
     try{await ui.portraitPreview(result,async(settings,isCurrent)=>{const updated=await output.withSettings(settings);if(isCurrent())publish(updated.data,false);});}
     catch(error){console.warn('Portrait preview unavailable; edit focus in Photos',error);}
     candidate.state = 'done';
-    ui.aiView(aiPortrait.checked);
-    if(aiPortrait.checked){ui.aiState('');ui.note(aiText().ready,'ai');}
+    ui.aiView(aiFeatures.enabled('portrait'));
+    if(aiFeatures.enabled('portrait')){ui.aiState('');ui.note(aiText().ready,'ai');}
   } catch(error) {
     candidate.state = error.name==='AbortError'?'new':'failed';
     console.warn('Optional AI Portrait failed',error);
-    ui.aiState(!aiPortrait.checked?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
-    if(aiPortrait.checked&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
+    ui.aiState(!aiFeatures.enabled('portrait')?'':error.name==='AbortError'?aiText().cancelled:error.name==='TimeoutError'?aiText().timeout:error.message==='WEBGPU'?aiText().gpu:aiText().failed);
+    if(aiFeatures.enabled('portrait')&&error.name!=='AbortError')ui.note(`${aiText().failureStage}: ${aiText()[error.stage||lastStage]||aiText().loading}. ${String(error.message||error).slice(0,180)}`,'ai-error');
   } finally {
     clearTimeout(deadline);removeCancel();candidate.controller=null;
     // Publish the normal fallback only after AI failed/cancelled. Never expose
     // it between Styles processing and the requested Portrait result.
-    if(!candidate.aiFile||!aiPortrait.checked)ui.output(candidate.outputFile);
+    if(!candidate.aiFile||!aiFeatures.enabled('portrait'))ui.output(candidate.outputFile);
     ui.aiBusy(false);
+  }
+}
+
+function stagePercent(done,total){
+  return Number.isFinite(done)&&Number.isFinite(total)&&total>0 ? `${Math.min(100,Math.max(0,Math.round(done/total*100)))}%` : '';
+}
+function modelDownloadStatus(label,event){
+  const progress=event?.progress||event||{},percent=stagePercent(progress.loaded,progress.total);
+  return progress.loaded?`${label}${percent?` ${percent}`:''} · ${formatBytes(progress.loaded)}`:label;
+}
+function styleProgress(ui,progress){
+  const stage=progress.styleStage||progress.stage;
+  if(['download','modelDownload'].includes(stage)){ui.set(modelDownloadStatus(aiText().styleDownloading,progress));return;}
+  if(['modelCache','modelCacheWarning','modelLoading','styleSemantics','styleCpuFallback'].includes(stage)){ui.set(aiText().stylePreparing);return;}
+  if(stage==='inference'){
+    const percent=stagePercent(progress.progress?.done,progress.progress?.total);
+    ui.set(percent?`${aiText().styleAnalyzing} ${percent}`:aiText().styleAnalyzing);return;
+  }
+  ui.set(aiText().styleAnalyzing);
+}
+function styleResultNote(ui,recommendation,error=null){
+  if(error){ui.note(`${aiText().styleUnavailable} ${String(error).slice(0,140)}`,'style-ai');return;}
+  if(!recommendation)return;
+  if(recommendation.fallback){ui.note(aiText().styleFallback,'style-ai');return;}
+  const signed=value=>`${value>=0?'+':''}${Number(value).toFixed(2)}`;
+  ui.note(`${aiText().styleApplied}: ${recommendation.styleName} · Tone ${signed(recommendation.tone)} · Color ${signed(recommendation.color)} · Palette ${Number(recommendation.palette).toFixed(2)}`,'style-ai');
+}
+function adaptiveStyleCompletionNotice(ui,recommendation){
+  if(!aiFeatures.enabled('style')||!recommendation)return;
+  ui.adaptiveStyleAdvice(aiText().styleCompletionNotice);
+}
+async function recommendHeicStyle(bytes,d,ui){
+  if(!aiFeatures.enabled('style')||preserveNativeStyles(bytes,d))return null;
+  try{
+    ui.set(aiText().styleAnalyzing);
+    const [{recommendStyleRgb},{orientStyleImage},rasterHeif]=await Promise.all([
+      import('./src/recommend/style-runtime.js'),
+      import('./src/recommend/style-analysis.js'),
+      import('./src/raster/heif.js'),
+    ]);
+    const rd=rasterHeif.discoverHeic(bytes),[width,height]=rasterHeif.dimensionsForItem(rd.props,rd.primary);
+    const scale=Math.min(1,640/Math.max(width,height));
+    const sampleWidth=Math.max(1,Math.round(width*scale)),sampleHeight=Math.max(1,Math.round(height*scale));
+    const orientation=rasterHeif.itemOrientation(bytes,rd.props,rd.primary);
+    const rgb=await decodeToRgb(bytes,{width:sampleWidth,height:sampleHeight,...orientation});
+    const display=orientStyleImage({data:rgb,width:sampleWidth,height:sampleHeight},orientation);
+    const recommendation=await recommendStyleRgb(display,{
+      level:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm',
+      onProgress:progress=>styleProgress(ui,progress),
+    });
+    return recommendation;
+  }catch(error){
+    console.warn('Suggested Styles unavailable; retaining Standard',error);
+    styleResultNote(ui,null,error?.message||error);
+    return null;
   }
 }
 
@@ -472,7 +593,7 @@ async function handleFile(file) {
       const {importDngFile}=await import('./src/dng/dng-import.js');
       try {file=await importDngFile(bytes,file.name,progress=>{
         const label=lang==='vi'?'Giải mã RAW':lang==='zh'?'解码 RAW':'Developing RAW';
-        ui.set(progress.total&&progress.done?`${label} ${progress.done}/${progress.total}`:label);
+        const percent=stagePercent(progress.done,progress.total);ui.set(percent?`${label} ${percent}`:label);
       });}catch(error){
         console.warn('DNG import failed',error);
         const reason=/JPEG XL/.test(error.message)?'JPEG XL':/large RAW/.test(error.message)?'oversized RAW':'decode';
@@ -483,23 +604,37 @@ async function handleFile(file) {
       ui.note(lang==='vi'?'DNG được giải mã thành ảnh sRGB để thêm Styles; bản xuất là HEIC, không còn RAW.':lang==='zh'?'DNG 转换为 sRGB 图像以添加风格；导出 HEIC，不保留 RAW。':'DNG is developed to sRGB for Styles; the HEIC output is no longer RAW.','raw');
     }
     if (RASTER_MIMES[format]) {
+
       if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
       const { importRaster } = await import("./src/raster/raster-import.js");
       let result;
       try {
         result = await importRaster(new File([bytes], file.name, {type: RASTER_MIMES[format]}),
           null, progress => {
+            if(progress.stage==='styleSuggestion'){styleProgress(ui,progress);return;}
             if (progress.stage === "modelDownload")
-              ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
-            else if (progress.stage === "main") ui.set(`${T("st.rastertiles")} ${progress.done}/${progress.total}`);
+              ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
+            else if (["download","modelCache","modelCacheWarning","modelLoading"].includes(progress.stage))
+              ui.set(aiText().detailPreparing);
+            else if (progress.stage === "inference")
+              ui.set(stagePercent(progress.progress?.done,progress.progress?.total) ? `${aiText().detailWorking} ${stagePercent(progress.progress?.done,progress.progress?.total)}` : aiText().detailWorking);
+            else if (progress.stage === "main") ui.set(stagePercent(progress.done,progress.total) ? `${T("st.rastertiles")} ${stagePercent(progress.done,progress.total)}` : T("st.rastertiles"));
+            else if (progress.stage === "auxiliary") ui.set(stagePercent(progress.done,progress.total) ? `${aiText().detailHdrWorking} ${stagePercent(progress.done,progress.total)}` : aiText().detailHdrWorking);
             else ui.set(T("st.rasterworking"));
-          }, {analyze: true});
+          }, {
+            analyze:true,
+            detail:aiFeatures.enabled('detail')?{modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null,
+            styleSuggestion:aiFeatures.enabled('style')?{level:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null,
+          });
       } catch (error) {
         console.error("Raster conversion failed", file.name, error);
         ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
         return;
       }
       const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
+      if(result.detailSkipped)ui.note(`${aiText().detailSkipped} ${result.detailSkipped}`,'detail');
+      else if(result.detailApplied)ui.note(aiText().detailApplied,'detail');
+      if(aiFeatures.enabled('style'))styleResultNote(ui,result.styleRecommendation,result.styleSuggestionError);
       result.data=await addMissingSoftSkin(result.data,file,ui);
       const date = photoCaptureDate(result.data);
       const output = new File([result.data], outName, {type: "image/heic",
@@ -509,12 +644,45 @@ async function handleFile(file) {
       showCaptureDate(ui, date);
       await ui.metadata(result.data, inputSize, {raster: !result.hdr, raw: input.format === 'dng'});
       await tryAiPortrait(null,output,ui,file.name,file);
+      adaptiveStyleCompletionNotice(ui,result.styleRecommendation);
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
+    let d = input.discovery;
+    if(aiFeatures.enabled('detail')){
+      if(d.hdrGrid!==null&&d.hdrTiles?.length){
+        if(!globalThis.crossOriginIsolated){
+          ui.note(`${aiText().detailSkipped} ${T("err.reloadencoder")}`,'detail');
+        }else{
+          try{
+            const {enhanceNativeHdrHeic}=await import('./src/detail/detail-native-heic.js');
+            const enhanced=await enhanceNativeHdrHeic(bytes,{
+              modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
+            },{onProgress:progress=>{
+              if(['download','modelCache','modelCacheWarning','modelLoading'].includes(progress.stage))ui.set(aiText().detailPreparing);
+              else if(progress.stage==='inference'){
+                const percent=stagePercent(progress.progress?.done,progress.progress?.total);
+                ui.set(percent?`${aiText().detailWorking} ${percent}`:aiText().detailWorking);
+              }else if(/^hdr(Primary|Gain)(Decode|Encode)$/.test(progress.stage)){
+                const percent=stagePercent(progress.done,progress.total);
+                ui.set(percent?`${aiText().detailHdrWorking} ${percent}`:aiText().detailHdrWorking);
+              }
+              else if(progress.stage==='modelDownload')
+                ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
+              else ui.set(aiText().detailHdrWorking);
+            }});
+            bytes=enhanced.data;d=discoverHeic(bytes);
+            ui.note(aiText().detailHdrApplied,'detail');
+          }catch(error){
+            console.warn('Native HDR AI detail unavailable; preserving original HEIC',error);
+            ui.note(`${aiText().detailSkipped} ${String(error?.message||error).slice(0,180)}`,'detail');
+          }
+        }
+      }else ui.note(aiText().detailHeic,'detail');
+    }
 
-    const d = input.discovery;
     const textureOnly = preserveNativeStyles(bytes,d);
+    const nativeTexture = nativeTextureCapture(bytes,d);
     const {nativePortraitBaseState}=await import('./src/portrait/ai-portrait-container.js');
     const portraitState=nativePortraitBaseState(bytes,d);
     const rebuildNativePortrait=textureOnly&&d.stylesItem===null&&portraitState!==null;
@@ -525,8 +693,15 @@ async function handleFile(file) {
     const liveIdentifier = photoContentIdentifier(bytes);
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
-    let data, bits, suffix;
-    if (preserveIncomplete) {
+    let data, bits, suffix, adaptiveStyleRecommendation=null;
+    if (nativeTexture && !hasTexture(d.infos)) {
+      // iPhone 18+ native captures can expose Texture/Film through capture metadata
+      // without the grafted texture_styles/matte graph. Never graft a second Texture
+      // contract onto those files; Photos already owns the native render path.
+      data=bytes;
+      bits=[T('st.native'),T('st.texture')];
+      suffix='_Preserved.HEIC';
+    } else if (preserveIncomplete) {
       // A selected preset is not the Styles editing graph. Adding Texture alone
       // advertises a new renderer without the colour resources it needs. Keep
       // this incomplete native export intact and register only its own HDR map.
@@ -552,11 +727,13 @@ async function handleFile(file) {
     } else {
       const needsExperimental = d.hdrGrid === null
         || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));
-      const name = profileFor(profileIndex, d, needsExperimental);
+      const index=await ensureProfileIndex();
+      const name = profileFor(index, d, needsExperimental);
       const profile = await getProfile(name);
       // Start processing; if the thumbnail is missing, dynamically load the generator.
       let linearThumb = undefined;
       if (d.thumbnail === null) {
+
         if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
         const { generateLinearThumbnail } = await import("./src/codecs/linear-thumbnail.js");
         try {
@@ -589,6 +766,7 @@ async function handleFile(file) {
         : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
       opts.portraitStyleRebuild=rebuildNativePortrait;
       opts.sharpBackgroundEvidence=sharpBackgroundEvidence;
+      if(aiFeatures.enabled('style')&&!rebuildNativePortrait)opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
       // patch() degrades rather than failing when the decoder misbehaves, so trust
@@ -596,6 +774,10 @@ async function handleFile(file) {
       if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
       if(report.styleSelectionCompatibility==='portrait-standard')ui.note(T('warn.portraitstandard'),'style-rebuild');
       else if(report.styleSelectionCompatibility==='bright-palette70')ui.note(T('warn.brightcompat'),'style-rebuild');
+      if(report.styleRecommendation){
+        adaptiveStyleRecommendation=report.styleRecommendation;
+        styleResultNote(ui,report.styleRecommendation);
+      }
 
       bits = [T(report.decoded ? "st.matched" : "st.neutral")];
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));
@@ -609,6 +791,26 @@ async function handleFile(file) {
     if(restorePortrait&&!preserveIncomplete){
       const restored=await restoreNativePortraitInWorker(data,{sharpBackgroundEvidence});
       if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
+    }
+    // Bake the visible rendition only after every metadata/Texture/Portrait
+    // rebuild. This guarantees the exact file offered to Photos owns the styled
+    // primary and thumbnail instead of letting a later graph rebuild restore the
+    // original-colour payloads. Editable Styles metadata remains untouched.
+    if(adaptiveStyleRecommendation){
+      const needsStyledDisplay=shouldRenderStyleDisplay(adaptiveStyleRecommendation);
+      try{
+        const {renderSuggestedStyleDisplay}=await import('./src/recommend/style-display-heic.js');
+        const rendered=await renderSuggestedStyleDisplay(data,adaptiveStyleRecommendation,{
+          onProgress:progress=>{if(progress?.stage==='styleDisplay')ui.set(T('st.working'));}});
+        if(needsStyledDisplay&&!rendered.rendered)
+          throw Error(`Suggested Style display rendition was not written (${rendered.reason||'unknown'})`);
+        data=rendered.data;
+      }catch(error){
+        console.error('Suggested Style display rendition unavailable',error);
+        // Metadata alone previews only inside Photos Edit and disappears on
+        // Cancel. Never publish that misleading half-applied result.
+        if(needsStyledDisplay)throw error;
+      }
     }
     ui.readyNotice=`${T("st.ready")} — ${bits.join(sep)}`;
 
@@ -637,6 +839,7 @@ async function handleFile(file) {
       attachMovie(photo);
     }
     await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
+    adaptiveStyleCompletionNotice(ui,adaptiveStyleRecommendation);
     if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));
     else if(portraitState&&portraitState!=='existing-renderer'&&!restorePortrait)
       ui.portraitAdvice(T(portraitState==='portrait-capture'?'warn.portraiton':'warn.portraitunknown'));
@@ -646,7 +849,7 @@ async function handleFile(file) {
     // still goes to the console, because "unsupported" on every photo is exactly
     // how a bug elsewhere would look.
     console.error("could not port", file.name, e);
-    ui.set(T("err.unsupported"), "err");
+    ui.set(T(e?.code==="APP_RESOURCE_UNAVAILABLE"?"err.resources":"err.unsupported"), "err");
   } finally {
     // Samples belong to this serialized processing operation, not its history
     // row. Release them after export while retaining only the downloadable file.
@@ -711,21 +914,25 @@ function countVisit() {
   countVisit();
   $('boot').textContent = T('st.preparing');
   try {
-    if (await prepareBrowser() !== 'ready') return;
-    const response = await fetch('profiles/index.json');
-    if (!response.ok) throw Error('Profile index unavailable');
-    profileIndex = await response.json();
+    const browserMode=await prepareBrowser();
+    if(browserMode==='reloading')return;
+    // The profile index is only required by legacy/full reconstruction. A transient
+    // deploy/cache miss must not block native HEIC editing or the rest of the UI.
+    try{profileIndex=await fetchJsonWithRetry('profiles/index.json',{attempts:2});}
+    catch(error){console.warn('Profile index will be retried on demand',error);profileIndex=null;}
+
     browserReady = true;refreshHistoryButton();
     fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
-    aiPortrait.disabled=false;
+    aiFeatures.sync();
     $('boot').textContent = '';
     navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
     // Prepare automatically; native HEIC can be processed while this downloads.
     // Conversion awaits the same promise, so it never races runtime loading.
-    prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
+    if(browserMode==='ready')prepareHevcAssets().catch(error => console.warn('Background preparation failed; conversion will retry', error));
+    else console.warn('Running without cross-origin isolation; threaded HEVC/AI features will request isolation when used.');
   } catch (e) {
     console.error('Browser preparation failed', e);
-    $("boot").textContent = T('err.setup');
+    $("boot").textContent = T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources');
     $("boot").className = "err";
     const retry = document.createElement('button');
     retry.className = 'dl alt'; retry.type = 'button'; retry.textContent = T('btn.retry');

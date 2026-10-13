@@ -21,9 +21,11 @@ import {blackWhiteI420, measureHevcRange, hevcOutputColor} from './hevc-color.js
 import { encodeSelectedLinearThumbnail as encodeLinearThumbnail, linearGeometry } from "./linear-thumbnail.js";
 import { supportedHevcConfig } from "./hevc-encoder.js";
 import {ensureHevcEncoder, encodeHevcPixels,decodeJpegYuv} from './ffmpeg-hevc.js';
-import {extractJpegHdr,encodeTmapMetadata,iccColr,yuv420Tile,hdrJpegError} from './jpeg-hdr.js';
+import {extractJpegHdr,encodeTmapMetadata,iccColr,yuv420Tile,hdrJpegError,yuv420ToRgba,rebaseGainMapRgba} from './jpeg-hdr.js';
 import {rgbaToI420} from './raster-color.js';
 import {generateSyntheticHevc} from './synthetic-hevc.js';
+import {buildStyleMarker,validateStyleRecommendation} from '../recommend/style-selection.js';
+import {applyStyleDisplayRgba,shouldRenderStyleDisplay} from '../recommend/style-display-render.js';
 
 const TILE = 512, MAX_PRIMARY_TILES = 48;
 const THUMB_W = 416, THUMB_H = 312;
@@ -593,34 +595,96 @@ export function buildRasterHeic(profile, encoded, sortedLuma = null, faceResult 
 }
 
 
+export function applyRasterStyleRecommendation(profile,value){
+  if(value===undefined||value===null)return {profile,recommendation:null,error:null};
+  try{
+    const recommendation=validateStyleRecommendation(value);
+    return {profile:{...profile,mn54:buildStyleMarker(recommendation,profile.mn54)},recommendation,error:null};
+  }catch(error){
+    console.warn('Invalid Suggested Styles recommendation; retaining Standard',error);
+    return {profile,recommendation:null,error:`Invalid recommendation: ${String(error?.message||error)}`};
+  }
+}
+
+function renderStyleDisplayCanvas(ctx,width,height,recommendation){
+  if(!recommendation||!shouldRenderStyleDisplay(recommendation))return false;
+  const pixels=ctx.getImageData(0,0,width,height),styled=applyStyleDisplayRgba(pixels.data,recommendation);
+  pixels.data.set(styled);ctx.putImageData(pixels,0,0);return true;
+}
+
+function styleAnalysisImage(source,maxSide=640){
+  const scale=Math.min(1,maxSide/Math.max(source.width,source.height));
+  const width=Math.max(1,Math.round(source.width*scale)),height=Math.max(1,Math.round(source.height*scale));
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace:'srgb'});
+  if(!ctx)throw Error('Suggested Styles analysis canvas unavailable');
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,width,height);
+  const rgba=new Uint8ClampedArray(ctx.getImageData(0,0,width,height).data);
+  canvas.width=canvas.height=0;
+  return {data:rgba,width,height};
+}
+async function suggestStyleForImage(image,request,onProgress){
+  if(!request)return {recommendation:null,error:null};
+  try{
+    const {recommendStyleRgb}=await import('../recommend/style-runtime.js');
+    const sample=styleAnalysisImage(image);
+    const recommendation=await recommendStyleRgb(sample,{...request,
+      onProgress:progress=>onProgress?.({...progress,styleStage:progress.stage,stage:'styleSuggestion'})});
+    return {recommendation,error:null};
+  }catch(error){
+    console.warn('Suggested Styles unavailable; retaining Standard',error);
+    return {recommendation:null,error:String(error?.message||error)};
+  }
+}
+
 /** Browser-decoded still image -> new HEIC. No source HEIC graph is re-encoded here. */
-export async function importRaster(file, profile, onProgress = () => {}, {analyze = true} = {}) {
+export async function importRaster(file, profile, onProgress = () => {},
+  {analyze = true, detail = null, styleRecommendation = null, styleSuggestion = null} = {}) {
   // Independent Main10 auxiliary/masks always require the verified WASM encoder.
-  let opened, stored;
+  let opened, stored, enhanced;
+  let detailSkipped = null;
   try {
     const sourceBytes=new Uint8Array(await file.arrayBuffer());
     const sourceHdr=extractJpegHdr(sourceBytes);
-    if(sourceHdr)return await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze});
-    await ensureHevcEncoder(onProgress);
+    if(sourceHdr)return await importHdrJpeg(sourceHdr,sourceBytes,onProgress,{analyze,detail,styleRecommendation,styleSuggestion});
     const sourceExif = extractRasterExif(sourceBytes);
     opened = await openBrowserImage(file, onProgress);
-    const image = opened.image;
+    let image = opened.image;
     if (!image.width || !image.height) throw Error('Raster image decode failed: empty image');
+    if(detail){
+      try{
+        const {enhanceRasterImage}=await import('../detail/detail-raster.js');
+        enhanced=await enhanceRasterImage(image,{...detail,onProgress});
+        image=enhanced;
+      }catch(error){
+        detailSkipped=String(error?.message||error);
+        console.warn('AI detail unavailable, preserving unchanged raster input',error);
+      }
+    }
+    const suggested=styleRecommendation!==undefined&&styleRecommendation!==null
+      ?{recommendation:styleRecommendation,error:null}
+      :await suggestStyleForImage(image,styleSuggestion,onProgress);
+    await ensureHevcEncoder(onProgress);
     const geometry = targetGeometry(image);
     onProgress({stage: 'prepare', ...geometry});
     const assets = await generateSyntheticHevc(onProgress);
     // Construct neutral maps and scene metadata rather than borrowing another photo.
     profile = buildGeneratedProfile('48-12', assets);
+    const styled=applyRasterStyleRecommendation(profile,suggested.recommendation);
+    profile=styled.profile;
     const linearThumbnail = await encodeLinearThumbnail(image, {angle: 270}, onProgress);
     stored = storedCanvas(image, geometry);
+    const styleDisplayRendered=Boolean(styled.recommendation&&shouldRenderStyleDisplay(styled.recommendation));
     const main = await encodeCanvases(TILE, TILE, geometry.primaryTiles, (ctx, i) => {
       ctx.fillStyle = 'black'; ctx.fillRect(0, 0, TILE, TILE);
       ctx.drawImage(stored, -(i % geometry.primaryColumns) * TILE,
         -Math.floor(i / geometry.primaryColumns) * TILE);
+      if(styleDisplayRendered)renderStyleDisplayCanvas(ctx,TILE,TILE,styled.recommendation);
     }, 3_000_000, (done, total) => onProgress({stage: 'main', done, total}), onProgress);
     onProgress({stage: 'auxiliary'});
     const thumb = await encodeCanvases(geometry.thumbWidth, geometry.thumbHeight, 1,
-      ctx => ctx.drawImage(stored, 0, 0, geometry.thumbWidth, geometry.thumbHeight),
+      ctx => {ctx.drawImage(stored, 0, 0, geometry.thumbWidth, geometry.thumbHeight);
+        if(styleDisplayRendered)renderStyleDisplayCanvas(ctx,geometry.thumbWidth,geometry.thumbHeight,styled.recommendation);},
       800_000, undefined, onProgress);
     // A neutral auxiliary is compatibility data, not recovered HDR from an SDR input.
     const hdr = await encodeCanvases(TILE, TILE, 1, ctx => {
@@ -635,16 +699,69 @@ export async function importRaster(file, profile, onProgress = () => {}, {analyz
       // Like the HEIC route, spatial maps follow the primary's stored orientation.
       lightMaps: analyze ? buildLightMaps(sampleRasterLuma(stored, 32, 32)) : null,
     }, analyze ? Array.from(sampleRasterLuma(image)).sort((a, b) => a - b) : null, null, geometry);
-    return {data, geometry};
+    return {data, geometry, detailApplied:Boolean(enhanced), detailSkipped,styleDisplayRendered,
+      ...(styled.recommendation?{styleRecommendation:styled.recommendation}:{}),
+      ...((suggested.error||styled.error)?{styleSuggestionError:suggested.error||styled.error}:{})};
   } finally {
     opened?.close();
     if (stored) stored.width = stored.height = 0;
+    if (enhanced) enhanced.width = enhanced.height = 0;
     releaseHevcEncoder();
   }
 }
 
-async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze}) {
-  let opened;
+
+function readManagedRgba(image,width,height,colorSpace){
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace});
+  if(!ctx)throw Error('HDR detail colour-managed canvas unavailable');
+  const actual=ctx.getContextAttributes?.().colorSpace;
+  if(actual&&actual!==colorSpace)throw Error(`HDR detail canvas lost ${colorSpace} colour space`);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(image,0,0,width,height);
+  const data=ctx.getImageData(0,0,width,height,{colorSpace});
+  if(data.colorSpace&&data.colorSpace!==colorSpace)throw Error('HDR detail readback changed colour space');
+  const rgba=new Uint8ClampedArray(data.data);
+  canvas.width=canvas.height=0;
+  return rgba;
+}
+
+async function encodeHdrCanvasTiles(image,geometry,color,colorSpace,onProgress,styleRecommendation=null){
+  const chunks=[];let hvcc;
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=TILE;
+  const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace});
+  if(!ctx)throw Error('HDR AI tile canvas unavailable');
+  const actual=ctx.getContextAttributes?.().colorSpace;
+  if(actual&&actual!==colorSpace)throw Error(`HDR AI tile canvas lost ${colorSpace} colour space`);
+  try{
+    for(let i=0;i<geometry.primaryTiles;i++){
+      ctx.fillStyle='black';ctx.fillRect(0,0,TILE,TILE);
+      ctx.drawImage(image,-(i%geometry.primaryColumns)*TILE,-Math.floor(i/geometry.primaryColumns)*TILE);
+      if(styleRecommendation)renderStyleDisplayCanvas(ctx,TILE,TILE,styleRecommendation);
+      const pixels=ctx.getImageData(0,0,TILE,TILE,{colorSpace});
+      const yuv=rgbaToI420(pixels.data,TILE,TILE,color);
+      const encoded=await encodeHevcPixels(yuv,{width:TILE,height:TILE,pixelFormat:'yuv420p',...color},onProgress);
+      if(hvcc&&!same(hvcc,encoded.hvcc))throw Error('HDR AI primary tile configurations disagree');
+      hvcc=encoded.hvcc;chunks.push(encoded.payload);
+      onProgress?.({stage:'main',done:i+1,total:geometry.primaryTiles});
+    }
+  }finally{canvas.width=canvas.height=0;}
+  return {chunks,hvcc};
+}
+
+async function encodeYuvGrid(yuv,width,height,columns,rows,color,stage,onProgress){
+  const chunks=[];let hvcc;
+  for(let i=0;i<columns*rows;i++){
+    const tile=yuv420Tile(yuv,width,height,i%columns,Math.floor(i/columns));
+    const encoded=await encodeHevcPixels(tile,{width:TILE,height:TILE,pixelFormat:'yuv420p',...color},onProgress);
+    if(hvcc&&!same(hvcc,encoded.hvcc))throw Error(`${stage} tile configurations disagree`);
+    hvcc=encoded.hvcc;chunks.push(encoded.payload);onProgress?.({stage,done:i+1,total:columns*rows});
+  }
+  return {chunks,hvcc};
+}
+
+async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null,styleRecommendation=null,styleSuggestion=null}) {
+  let opened,enhanced;
   try {
     const sourceExif=extractRasterExif(sourceBytes),orientation=readExifOrientation(sourceExif??new Uint8Array())||1;
     const swap=orientation>=5,width=swap?hdr.height:hdr.width,height=swap?hdr.width:hdr.height;
@@ -657,28 +774,65 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze}) {
     geometry.primaryTiles=geometry.primaryColumns*geometry.primaryRows;
     if(geometry.primaryTiles>48||geometry.hdrColumns*geometry.hdrRows>12)throw hdrJpegError('HDR JPEG exceeds the preserved-image tile budget');
     await ensureHevcEncoder(onProgress);
-    const assets=await generateSyntheticHevc(onProgress),profile=buildGeneratedProfile('48-12',assets);
+    const assets=await generateSyntheticHevc(onProgress);
+    let profile=buildGeneratedProfile('48-12',assets);
     // The dedicated JPEG route encodes normalized upright planes, not the SDR
     // canvas route's 270-degree stored image. All template items share this irot.
     const pd=discoverHeic(profile.meta);
     for(const property of pd.props.properties)if(property.type==='irot')profile.meta[property.box.off+property.box.hdr]=0;
     opened=await openBrowserImage(new File([hdr.base],'base.jpeg',{type:'image/jpeg'}),onProgress);
-    const linearThumbnail=await encodeLinearThumbnail(opened.image,{angle:0},onProgress);
-    const thumb=await encodeCanvases(geometry.thumbWidth,geometry.thumbHeight,1,
-      ctx=>ctx.drawImage(opened.image,0,0,geometry.thumbWidth,geometry.thumbHeight),800_000,undefined,onProgress);
     const color={primaries:hdr.primaries,transfer:'iec61966-2-1',matrix:'smpte170m',fullRange:true};
-    async function tiles(jpeg,w,h,columns,rows,stage){
-      const decoded=await decodeJpegYuv(jpeg,{width:w,height:h,orientation},onProgress),chunks=[];let hvcc;
-      for(let i=0;i<columns*rows;i++){
-        const tile=yuv420Tile(decoded.bytes,decoded.width,decoded.height,i%columns,Math.floor(i/columns));
-        const encoded=await encodeHevcPixels(tile,{width:TILE,height:TILE,pixelFormat:'yuv420p',...color},onProgress);
-        if(hvcc&&!same(hvcc,encoded.hvcc))throw Error('HDR JPEG tile configurations disagree');
-        hvcc=encoded.hvcc;chunks.push(encoded.payload);onProgress?.({stage,done:i+1,total:columns*rows});
+    const colorSpace=hdr.primaries==='smpte432'?'display-p3':'srgb';
+    let working=opened.image,detailSkipped=null,rebase=null,decodedGain=null;
+    if(detail){
+      try{
+        const {enhanceRasterImage}=await import('../detail/detail-raster.js');
+        enhanced=await enhanceRasterImage(opened.image,{...detail,onProgress,colorSpace});
+        const originalBase=readManagedRgba(opened.image,gainWidth,gainHeight,colorSpace);
+        const restoredBase=readManagedRgba(enhanced,gainWidth,gainHeight,colorSpace);
+        decodedGain=await decodeJpegYuv(hdr.gain,{width:hdr.gainWidth,height:hdr.gainHeight,orientation},onProgress);
+        if(decodedGain.width!==gainWidth||decodedGain.height!==gainHeight)throw Error('HDR gain-map orientation mismatch');
+        rebase=rebaseGainMapRgba(originalBase,restoredBase,
+          yuv420ToRgba(decodedGain.bytes,gainWidth,gainHeight),hdr.metadata);
+        const clippedRatio=rebase.components?rebase.clipped/rebase.components:0;
+        if(clippedRatio>.02)throw Error(`AI HDR gain-map range exceeded at ${(100*clippedRatio).toFixed(2)}% of components`);
+        working=enhanced;
+        onProgress?.({stage:'hdrDetail',clipped:rebase.clipped,components:rebase.components,maxError:rebase.maxError});
+      }catch(error){
+        detailSkipped=String(error?.message||error);
+        console.warn('HDR AI detail unavailable; preserving the original HDR pair',error);
+        if(enhanced)enhanced.width=enhanced.height=0;
+        enhanced=null;rebase=null;working=opened.image;
       }
-      return {chunks,hvcc};
     }
-    const main=await tiles(hdr.base,hdr.width,hdr.height,geometry.primaryColumns,geometry.primaryRows,'main');
-    const gain=await tiles(hdr.gain,hdr.gainWidth,hdr.gainHeight,geometry.hdrColumns,geometry.hdrRows,'auxiliary');
+    const suggested=styleRecommendation!==undefined&&styleRecommendation!==null
+      ?{recommendation:styleRecommendation,error:null}
+      :await suggestStyleForImage(working,styleSuggestion,onProgress);
+    const styled=applyRasterStyleRecommendation(profile,suggested.recommendation);profile=styled.profile;
+    const styleDisplayRendered=Boolean(styled.recommendation&&shouldRenderStyleDisplay(styled.recommendation));
+    const linearThumbnail=await encodeLinearThumbnail(working,{angle:0},onProgress);
+    const thumb=await encodeCanvases(geometry.thumbWidth,geometry.thumbHeight,1,
+      ctx=>{ctx.drawImage(working,0,0,geometry.thumbWidth,geometry.thumbHeight);
+        if(styleDisplayRendered)renderStyleDisplayCanvas(ctx,geometry.thumbWidth,geometry.thumbHeight,styled.recommendation);},
+      800_000,undefined,onProgress);
+    let main;
+    if(enhanced||styleDisplayRendered)main=await encodeHdrCanvasTiles(working,geometry,color,colorSpace,onProgress,
+      styleDisplayRendered?styled.recommendation:null);
+    else{
+      const decoded=await decodeJpegYuv(hdr.base,{width:hdr.width,height:hdr.height,orientation},onProgress);
+      main=await encodeYuvGrid(decoded.bytes,decoded.width,decoded.height,
+        geometry.primaryColumns,geometry.primaryRows,color,'main',onProgress);
+    }
+    let gain;
+    if(rebase){
+      const gainYuv=rgbaToI420(rebase.rgba,gainWidth,gainHeight,color);
+      gain=await encodeYuvGrid(gainYuv,gainWidth,gainHeight,
+        geometry.hdrColumns,geometry.hdrRows,color,'auxiliary',onProgress);
+    }else{
+      decodedGain??=await decodeJpegYuv(hdr.gain,{width:hdr.gainWidth,height:hdr.gainHeight,orientation},onProgress);
+      gain=await encodeYuvGrid(decodedGain.bytes,decodedGain.width,decodedGain.height,
+        geometry.hdrColumns,geometry.hdrRows,color,'auxiliary',onProgress);
+    }
     const data=buildRasterHeic(profile,{main:main.chunks,mainHvcc:main.hvcc,
       mainColr:hdr.baseIcc?iccColr(hdr.baseIcc):rasterColr(color),
       thumb:thumb.chunks[0],thumbHvcc:thumb.hvcc,thumbColr:thumb.colr,linearThumbnail,
@@ -686,9 +840,14 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze}) {
       // Adobe gain maps have no alternate rendition ICC: the HDR result uses
       // the base primaries in extended linear RGB, not the gain image's profile.
       hdrMetadata:hdr.metadata,hdrXmp:hdr.xmp,hdrAlternateColr:hdr.alternateIcc?iccColr(hdr.alternateIcc):nclx(hdr.primaries==='smpte432'?12:1,8,0,true),sourceExif,
-      lightMaps:analyze?buildLightMaps(sampleRasterLuma(opened.image,32,32)):null,
-    },analyze?Array.from(sampleRasterLuma(opened.image)).sort((a,b)=>a-b):null,null,geometry);
-    return {data,geometry,hdr:true};
+      lightMaps:analyze?buildLightMaps(sampleRasterLuma(working,32,32)):null,
+    },analyze?Array.from(sampleRasterLuma(working)).sort((a,b)=>a-b):null,null,geometry);
+    const result={data,geometry,hdr:true,detailApplied:Boolean(enhanced&&rebase),detailSkipped,styleDisplayRendered,
+      ...(styled.recommendation?{styleRecommendation:styled.recommendation}:{}),
+      ...((suggested.error||styled.error)?{styleSuggestionError:suggested.error||styled.error}:{})};
+    if(rebase)result.hdrDetail={clipped:rebase.clipped,components:rebase.components,maxError:rebase.maxError};
+    if(enhanced)enhanced.width=enhanced.height=0;
+    return result;
   }catch(error){if(!error.code)error.code='err.hdrjpeg';throw error;}
-  finally{opened?.close();}
+  finally{opened?.close();if(enhanced)enhanced.width=enhanced.height=0;}
 }

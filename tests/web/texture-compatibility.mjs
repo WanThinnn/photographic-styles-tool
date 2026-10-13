@@ -2,13 +2,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {ensureLegacyTextureToneCurve} from '../../web/src/styles/texture-compatibility.js';
+import {preserveNativeStyles} from '../../web/src/styles/style-preservation.js';
 import {parseBplist,buildBplist,BplistReal} from '../../web/src/core/bplist.js';
-import {addTexture,repairTextureCurve,URI_TEXTURE_STYLES} from '../../web/src/styles/texture.js';
+import {addTexture,repairTextureCurve,URI_TEXTURE_STYLES,TEXTURE_STYLES_BLOB,textureStylesPayload} from '../../web/src/styles/texture.js';
+import {TEXTURE_STYLES_BLOB as RASTER_TEXTURE_STYLES_BLOB,addTexture as addRasterTexture} from '../../web/src/raster/texture.js';
+import {discoverHeic as discoverRasterHeic,extractItem as extractRasterItem} from '../../web/src/raster/heif.js';
+import {parseBplist as parseRasterBplist} from '../../web/src/raster/bplist.js';
 import {executeJob} from '../../web/src/media/heic-worker.js';
 import {discoverHeic,extractItem,idatItemBytes,propertyBoxBytes} from '../../web/src/core/heif.js';
 import {loadProfile} from '../../web/src/core/zip.js';
 import {be,box,concat} from '../../web/src/core/box.js';
 const directory='C:/Users/WanThinnn/Downloads/Error-Styles/iCloud Photos/';
+
+test('Texture keeps the native iPhone19,2 renderer profile on every generated path',()=>{
+  assert.equal(parseBplist(TEXTURE_STYLES_BLOB).get('HardwareModel'),'iPhone19,2');
+  assert.equal(parseBplist(RASTER_TEXTURE_STYLES_BLOB).get('HardwareModel'),'iPhone19,2');
+  const perPhoto=parseBplist(textureStylesPayload(null,37));
+  assert.equal(perPhoto.get('HardwareModel'),'iPhone19,2');
+  assert.equal(perPhoto.get('FilmGrainSeed'),37);
+});
+
+
+const brightFixture=new URL('../private-fixtures/Film_Halation_V1/IMG_7864.HEIC',import.meta.url);
+test('native Bright IMG_7864 keeps Styles and Exif byte-exact when Texture is added',{skip:!fs.existsSync(brightFixture)},()=>{
+  const source=new Uint8Array(fs.readFileSync(brightFixture)),before=discoverHeic(source);
+  assert.equal(preserveNativeStyles(source,before),true);
+  const originalStyles=extractItem(source,before.iloc,before.stylesItem);
+  const originalExif=extractItem(source,before.iloc,before.exifItem);
+  const {data}=addTexture(source,{preserveStyles:true}),after=discoverHeic(data);
+  assert.deepEqual(extractItem(data,after.iloc,after.stylesItem),originalStyles);
+  assert.deepEqual(extractItem(data,after.iloc,after.exifItem),originalExif);
+  const textureId=[...after.infos].find(([,info])=>info.uri===URI_TEXTURE_STYLES)[0];
+  const texture=parseBplist(extractItem(data,after.iloc,textureId));
+  assert.equal(texture.get('HardwareModel'),'iPhone19,2');
+  assert.equal(texture.get('Preset'),'Standard');
+});
 
 test('legacy missing curve gets identity samples while preserving native values and real types',()=>{
   const original=buildBplist(new Map([
@@ -48,6 +76,9 @@ test('portable legacy graph relocates only the extended Styles and preserves eve
     cursor+=payload.length;chunks.push(payload);
   }
   const source=concat([profile.ftyp,meta,box('mdat',concat(chunks))]),before=discoverHeic(source);
+  const rasterData=addRasterTexture(source).data,rasterAfter=discoverRasterHeic(rasterData);
+  const rasterTexture=[...rasterAfter.infos].find(([,info])=>info.uri===URI_TEXTURE_STYLES)[0];
+  assert.equal(parseRasterBplist(extractRasterItem(rasterData,rasterAfter.iloc,rasterTexture)).get('HardwareModel'),'iPhone19,2');
   const {data,report}=await executeJob({operation:'texture',data:source}),after=discoverHeic(data);
   assert.equal(report.toneCurveAdded,true);
   assert.equal(repairTextureCurve(data).data,null,'already compatible Texture needs no repair');

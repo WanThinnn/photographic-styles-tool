@@ -1,4 +1,6 @@
-# Photographic Style Port — browser build
+# Stylio — browser build
+
+After cloning, run `node tools/package-ai-style-models.mjs assemble` from the repository root before serving locally. Large Pro models are stored as Git-safe parts; Pages deployment reassembles and verifies them automatically.
 
 The static site published to GitHub Pages. Everything runs in the visitor's browser; photos
 are never uploaded.
@@ -66,10 +68,11 @@ SelfieMulticlass first segments the entire image at 256x256, then runs a square,
 original position and softly blended inside the face contour, excluding eyes/lips/brows.
 The global pass remains the fallback for an empty or failed crop; confidence is not boosted.
 Native skin masks skip refinement. Crops run sequentially and transient canvases are released.
-An iPhone 16+ export missing its native Styles graph still contains rendered colour.
+An iPhone 16+ export missing its native Styles graph can still contain rendered colour.
 Soft Skin supplementation must not treat that absence as permission to rewrite
-person/skin colour statistics in a newly reconstructed Styles graph. Source model
-detection protects this rule even when a caller passes `nativeStyles: false`.
+person/skin colour statistics when its validated native 0x54 selection remains.
+The camera model alone is not evidence: third-party iPhone captures without that
+selection continue through normal Styles construction.
 This guard does not recover missing native calibration or fix the existing colour
 change on entering Edit. Keeping the Bright selection in EXIF also does not,
 by itself, restore the Styles editor. Native Portrait reconstruction therefore

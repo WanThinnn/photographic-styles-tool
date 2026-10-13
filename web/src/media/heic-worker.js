@@ -5,6 +5,7 @@ import {patch} from '../styles/port.js';
 import {describeHeic} from '../ui/result-metadata.js';
 import {installSoftSkin} from '../styles/soft-skin-container.js';
 import {registerTmapHdr} from '../styles/hdr-compatibility.js';
+import {validateStyleRecommendation} from '../recommend/style-selection.js';
 
 function keepEditableHdr(output,source,{headroom=false}={}){
   const fixed=registerTmapHdr(output.data||source,{headroom});
@@ -37,6 +38,8 @@ export async function executeJob(job, decode) {
   }
   if (job.operation === 'patch') {
     const opts = {...job.opts};
+    if(opts.styleRecommendation!==undefined&&opts.styleRecommendation!==null)
+      opts.styleRecommendation=validateStyleRecommendation(opts.styleRecommendation);
     if (opts.decode) opts.decode = (_data, options) => decode(options);
     const output=await patch(job.data, job.profile, opts);
     // Preserve native Portrait resources. An incomplete exported capture may

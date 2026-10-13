@@ -1,0 +1,188 @@
+{
+  "schema": 2,
+  "models": {
+    "lite": {
+      "id": "tinyclip-vit-8m-16-image",
+      "revision": "9463a9c508a344c837ffefe9d724f3827bf2dc79",
+      "license": "MIT",
+      "input": {
+        "size": 224,
+        "channels": 3,
+        "layout": "nchw-rgb",
+        "shape": [
+          1,
+          3,
+          224,
+          224
+        ],
+        "inputName": "pixel_values",
+        "outputName": "image_embeds",
+        "embeddingDimensions": 512,
+        "mean": [
+          0.48145466,
+          0.4578275,
+          0.40821073
+        ],
+        "std": [
+          0.26862954,
+          0.26130258,
+          0.27577711
+        ]
+      },
+      "providers": {
+        "wasm": {
+          "file": "tinyclip-vit-8m-16-image-int8.onnx",
+          "bytes": 9513822,
+          "sha256": "baab630e96d8ab3611e63fed4a731a56cf0bb5a252e3867de8ca2fd627e08a9f",
+          "precision": "int8",
+          "inputName": "pixel_values",
+          "inputShape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "outputName": "image_embeds",
+          "embeddingDimensions": 512
+        },
+        "webgpu": {
+          "file": "tinyclip-vit-8m-16-image-fp16.onnx",
+          "bytes": 16748352,
+          "sha256": "6e3d08d8a557fce41b7ff2d596c901ac8fb1bead1d51237b8ee542253c01dbab",
+          "precision": "fp16",
+          "inputName": "pixel_values",
+          "inputShape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "outputName": "image_embeds",
+          "embeddingDimensions": 512
+        }
+      }
+    },
+    "standard": {
+      "id": "tinyclip-vit-39m-16-image",
+      "revision": "3db5c5bb7947742868eaa7aa12ea4649f9d4f082",
+      "license": "MIT",
+      "input": {
+        "size": 224,
+        "channels": 3,
+        "layout": "nchw-rgb",
+        "shape": [
+          1,
+          3,
+          224,
+          224
+        ],
+        "inputName": "pixel_values",
+        "outputName": "image_embeds",
+        "embeddingDimensions": 512,
+        "mean": [
+          0.48145466,
+          0.4578275,
+          0.40821073
+        ],
+        "std": [
+          0.26862954,
+          0.26130258,
+          0.27577711
+        ]
+      },
+      "providers": {
+        "wasm": {
+          "file": "tinyclip-vit-39m-16-image-int8.onnx",
+          "bytes": 40923246,
+          "sha256": "0d7cc7d6ff02d68263889e9ff7c9af874d42a72a2df1dc955838084725e7dd98",
+          "precision": "int8",
+          "inputName": "pixel_values",
+          "inputShape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "outputName": "image_embeds",
+          "embeddingDimensions": 512
+        },
+        "webgpu": {
+          "file": "tinyclip-vit-39m-16-image-fp16.onnx",
+          "bytes": 77406224,
+          "sha256": "e7770bdfa3f485cc1695a3eeb2fcd41c78572d9730569bda645f98c0634a6409",
+          "precision": "fp16",
+          "inputName": "pixel_values",
+          "inputShape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "outputName": "image_embeds",
+          "embeddingDimensions": 512
+        }
+      }
+    },
+    "pro": {
+      "id": "siglip2-base-patch16-224-image",
+      "revision": "ba1f3b0843f24bc5417d38e19c37b287d719b2f4",
+      "license": "Apache-2.0",
+      "input": {
+        "size": 224,
+        "channels": 3,
+        "layout": "nchw-rgb",
+        "shape": [
+          1,
+          3,
+          224,
+          224
+        ],
+        "inputName": "pixel_values",
+        "outputName": "image_embeds",
+        "embeddingDimensions": 768,
+        "mean": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "std": [
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "providers": {
+        "wasm": {
+          "file": "siglip2-base-patch16-224-image-int8.onnx",
+          "bytes": 96325853,
+          "sha256": "b8183b5cc44cb45db43b260b829541aad72cbf521e99c9eb6d520d97e22fbf1b",
+          "precision": "int8",
+          "inputName": "pixel_values",
+          "inputShape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "outputName": "image_embeds",
+          "embeddingDimensions": 768
+        },
+        "webgpu": {
+          "file": "siglip2-base-patch16-224-image-fp16.onnx",
+          "bytes": 186044299,
+          "sha256": "7bfcfe925e405e0bcd394a128c9b4ebb9a976c27c72fc52f5ff98db5c8b83ea6",
+          "precision": "fp16",
+          "inputName": "pixel_values",
+          "inputShape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "outputName": "image_embeds",
+          "embeddingDimensions": 768
+        }
+      }
+    }
+  }
+}

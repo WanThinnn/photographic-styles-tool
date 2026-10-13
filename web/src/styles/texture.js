@@ -21,8 +21,9 @@ const utf8 = (s) => new TextEncoder().encode(s);
 export const URI_TEXTURE_STYLES = "tag:apple.com,2026:photo:metadata:texture_styles";
 
 // Binary plist: Preset Standard, CaptureType LF, CaptureMode Still, PortType PortTypeBack,
-// HardwareModel iPhone19,2 (keep it - iPhone16,1 made white areas glow),
-// TextureStylePeopleDataVersion 3, FilmGrainSeed 92.
+// HardwareModel iPhone19,2, TextureStylePeopleDataVersion 3, FilmGrainSeed 92.
+// Keep the native donor renderer profile. Device A/B testing found iPhone19,7 did not
+// reduce Film halation versus iPhone19,2 and could regress selected Bright styles to Standard.
 export const TEXTURE_STYLES_BLOB = b64(
   "YnBsaXN0MDDXAQIDBAUGBwgJCgsMDQ5WUHJlc2V0W0NhcHR1cmVUeXBlW0NhcHR1cmVNb2RlWFBv"
   + "cnRUeXBlXUhhcmR3YXJlTW9kZWxfEB1UZXh0dXJlU3R5bGVQZW9wbGVEYXRhVmVyc2lvbl1GaWxt"

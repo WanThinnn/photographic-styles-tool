@@ -21,11 +21,12 @@ export const URI_TEXTURE_STYLES = "tag:apple.com,2026:photo:metadata:texture_sty
 export const URI_PERSON_INSTANCES = "tag:apple.com,2026:photo:aux:semanticpersoninstances";
 
 // Binary plist: Preset Standard, CaptureType LF, CaptureMode Still, PortType PortTypeBack,
-// HardwareModel iPhone19,7 (matching the native iPhone 18 Pro reference set),
-// TextureStylePeopleDataVersion 3, FilmGrainSeed 92.
+// HardwareModel iPhone19,2, TextureStylePeopleDataVersion 3, FilmGrainSeed 92.
+// Keep the native donor renderer profile; iPhone19,7 did not improve the Film A/B
+// and could make some selected Bright captures re-open as Standard in Photos.
 export const TEXTURE_STYLES_BLOB = buildBplist(new Map([
   ['Preset', 'Standard'], ['CaptureType', 'LF'], ['CaptureMode', 'Still'],
-  ['PortType', 'PortTypeBack'], ['HardwareModel', 'iPhone19,7'],
+  ['PortType', 'PortTypeBack'], ['HardwareModel', 'iPhone19,2'],
   ['TextureStylePeopleDataVersion', 3], ['FilmGrainSeed', 92],
 ]));
 

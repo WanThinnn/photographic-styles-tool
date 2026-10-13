@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {imageFormat} from '../../web/src/media/image-format.js';
-import {targetGeometry, buildRasterHeic, sampleRasterLuma} from '../../web/src/raster/raster-import.js';
+import {targetGeometry, buildRasterHeic, sampleRasterLuma, applyRasterStyleRecommendation} from '../../web/src/raster/raster-import.js';
 import {buildLightMaps} from '../../web/src/raster/styles.js';
 import {parseBplist} from '../../web/src/raster/bplist.js';
 import {generateSyntheticHevc} from '../../web/src/raster/synthetic-hevc.js';
@@ -79,6 +79,21 @@ const assets = await generateSyntheticHevc(null, async (_, options) => {
   const asset = options.pixelFormat !== 'gray' ? fixture.assets.delta
     : options.width === 768 ? fixture.assets.textureMask : fixture.assets.mask;
   return {...asset, hvcc:Uint8Array.from(asset.hvcc), payload:Uint8Array.from(asset.payload)};
+});
+
+test('raster Style recommendation derives a marker without mutating the neutral profile and invalid input keeps Standard',()=>{
+  const profile=buildGeneratedProfile('48-12',assets),saved=profile.mn54.slice();
+  const applied=applyRasterStyleRecommendation(profile,{styleId:11,tone:-.42,color:.16,palette:.88,confidence:.9,level:'standard'});
+  assert.notEqual(applied.profile,profile);
+  assert.deepEqual(profile.mn54,saved);
+  const marker=parseBplist(applied.profile.mn54);
+  assert.deepEqual([marker.get('4'),marker.get('1'),marker.get('2'),marker.get('3')],[11,-.42,.16,.88]);
+  assert.equal(applied.recommendation.styleName,'Dramatic');
+  const invalid=applyRasterStyleRecommendation(profile,{styleId:99,tone:0,color:0,palette:1});
+  assert.equal(invalid.profile,profile);
+  assert.equal(invalid.recommendation,null);
+  assert.match(invalid.error,/Invalid recommendation/);
+  assert.deepEqual(profile.mn54,saved);
 });
 
 test('generated Portrait matte has one dedicated descriptor and repeated registration is stable',()=>{

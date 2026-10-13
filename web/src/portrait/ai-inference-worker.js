@@ -14,13 +14,16 @@ self.onmessage = async ({data: {rgb, input, guidance,provider='webgpu',modelId='
     if(provider==='webgpu')ort.env.webgpu.powerPreference = 'high-performance';
     ort.env.wasm.wasmPaths = ASSETS.href; ort.env.wasm.numThreads = 1;
     const manifest=await fetch(new URL('assets.json',ASSETS)).then(r=>{if(!r.ok)throw Error('AI assets unavailable');return r.json();});
-    stage='download';self.postMessage({stage});
+    stage='modelLoading';
     // Download only the selection, sequentially to bound transient buffers.
     const files=[];
     for(const name of selected.files){
       const asset=manifest.files[name];if(!asset)throw Error('AI assets unavailable');
       const url=new URL(name,ASSETS);url.searchParams.set('sha256',asset.sha256);
-      const bytes=await downloadModelBytes(url.href,{onProgress:progress=>self.postMessage({stage:'download',progress})});
+      const bytes=await downloadModelBytes(url.href,{onProgress:progress=>{
+        stage=progress.source==='cache'?'modelCache':progress.source==='cacheWarning'?'modelCacheWarning':'modelDownload';
+        self.postMessage({stage,progress});
+      }});
       const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');
       if(bytes.length!==asset.bytes||hash!==asset.sha256){try{await(await caches.open(MODEL_CACHE_NAME)).delete(url.href);}catch{}throw Error('AI model integrity check failed');}
       files.push(bytes);

@@ -37,6 +37,7 @@ tools/heif-convert text eol=lf
 *.mp4       binary
 *.mov       binary
 *.wasm      binary
+*.onnx      binary
 
 # Machine-generated: keep out of language stats and collapse in diffs.
 uv.lock         linguist-generated=true -diff

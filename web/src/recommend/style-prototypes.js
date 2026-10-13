@@ -2,6 +2,10 @@ import {STYLE_SELECTIONS} from './style-selection.js';
 import {styleModelSpec} from './style-model.js';
 
 const RECOMMENDABLE_STYLE_IDS=Object.freeze(Object.keys(STYLE_SELECTIONS).map(Number).filter(id=>id!==13&&id!==15));
+// Zero-shot text labels do not have equal priors. "Bright" matches generic
+// daylight photos too easily, so require a material semantic lead before it
+// can beat a more specific Style. Strong Bright matches still win.
+export const STYLE_SCORE_CALIBRATION=Object.freeze({16:-.35});
 const ROOT_KEYS=new Set(['schema','model','revision','dimensions','negativeWeight','styles']);
 const STYLE_KEYS=new Set(['name','positive','negative']);
 
@@ -46,7 +50,9 @@ function scoresForView(embedding,manifest){
   const mean=raw.reduce((sum,item)=>sum+item.raw,0)/raw.length;
   const variance=raw.reduce((sum,item)=>sum+(item.raw-mean)**2,0)/raw.length;
   const scale=Math.max(1e-4,Math.sqrt(variance));
-  return raw.map(item=>Object.freeze({...item,score:(item.raw-mean)/scale})).sort((a,b)=>b.score-a.score||a.styleId-b.styleId);
+  return raw.map(item=>Object.freeze({...item,
+    score:(item.raw-mean)/scale+(STYLE_SCORE_CALIBRATION[item.styleId]||0),
+  })).sort((a,b)=>b.score-a.score||a.styleId-b.styleId);
 }
 
 export function scoreStylePrototypes({prototypes,embeddings,level='standard',minSupport=.45,minScoreMargin=.13}){

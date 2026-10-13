@@ -1,65 +1,65 @@
 # Suggested Styles AI assets
 
-Suggested Styles is intentionally fail-closed. The browser runtime uses a compact image-only TinyCLIP package plus pinned semantic-axis vectors. The text tower and tokenizer are build-time only and are never shipped to the browser.
+Suggested Styles uses zero-shot image/text embeddings. It does not train on a
+photo dataset and does not ship a text encoder or tokenizer to the browser.
+Only image-only ONNX graphs and build-time style prototype vectors are shipped.
 
-The runtime requires:
+## Runtime tiers
 
-- `assets.json` plus packaged TinyCLIP **image-only** ONNX graphs;
-- `semantic-axes.json`, generated in the same 512-dimensional TinyCLIP embedding space.
+| Level | Encoder | License | Views | Embedding |
+| --- | --- | --- | ---: | ---: |
+| Lite | TinyCLIP ViT-8M/16 | MIT | 3 | 512 |
+| Standard | TinyCLIP ViT-39M/16 | MIT | 9 | 512 |
+| Pro | SigLIP2 Base patch16 224 | Apache-2.0 | 17 | 768 |
 
-The runtime does **not** use nearest-reference retrieval to choose a Style. `reference-bank.json` is retained for calibration, corpus audits, and diagnostics only.
+No MobileCLIP or other Apple model weight is included. `assets.json` pins the
+exact upstream revision, byte length, SHA-256, preprocessing contract, and the
+INT8 WASM / FP16 WebGPU asset for every tier. License texts are stored in
+`licenses/`.
 
-These assets are not required for the normal Stylio converter. If the model package or semantic axes are missing/invalid, Suggested Styles reports that recommendation is unavailable and the existing Standard non-native Styles path continues.
+The runtime downloads only the chosen tier/provider. Large ONNX files are kept
+in the SHA-verified model cache and are not duplicated by the service worker.
 
-## TinyCLIP packaging
+## Zero-shot style prototypes
 
-Pinned source identity:
+`tools/style-prototype-prompts.json` contains reviewable English positive and
+negative prompts for the 14 supported colour Styles. B&W IDs 13 and 15 are
+intentionally absent, so they cannot be recommended.
 
-- family: TinyCLIP ViT-8M/16
-- source revision: `9463a9c508a344c837ffefe9d724f3827bf2dc79`
-- runtime input: `pixel_values`, float32 NCHW RGB `[1,3,224,224]`
-- runtime output: `image_embeds`, float32 `[1,512]`
+`style-prototypes-{lite,standard,pro}.json` contains normalized prompt means in
+the exact embedding space of its matching image encoder. At runtime every crop
+is compared directly with these vectors. The global view has extra weight;
+support across crops, top-two margin, and dispersion determine confidence.
+Genuine cross-view disagreement fails closed to Standard. Image statistics only
+refine tone, colour, and Palette, whose injected value remains conservatively
+capped.
 
-The packaged graphs must contain the image encoder only. Tokenizers, text inputs and the text tower are not accepted by the runtime contract.
+## Rebuilding and verification
 
-Build the pinned image-only package with:
+Install the Python build dependencies documented at the top of
+`tools/build-ai-style-models.py`, then run:
 
+```text
+python -u tools/build-ai-style-models.py
 ```
-python tools/fetch-ai-style-model.py
-python tools/verify-ai-style-model.py
-```
 
-The fetcher verifies the pinned upstream FP32 LFS object, extracts only `pixel_values -> image_embeds`, then derives a compact WASM model by INT8 weight-quantizing transformer MatMul/Gemm nodes and a WebGPU model by converting the isolated image tower to FP16 while keeping float32 I/O. The upstream all-tower INT8 graph is deliberately not shipped because its quantized patch convolution is not portable across the supported ORT CPU/WASM runtimes.
+The builder:
 
-The verifier checks manifest identity, bytes, SHA-256, the single-image-input / 512-dimensional embedding contract, executes both graphs locally, and requires close cosine agreement between the INT8 and FP16 embeddings. `tools/package-ai-style.mjs` remains available when independently verified image-only ONNX graphs are supplied manually.
+1. resolves and pins each upstream repository revision;
+2. extracts `pixel_values -> image_embeds` and the build-only text tower;
+3. exports INT8 and FP16 image-only graphs;
+4. executes each graph through ONNX Runtime;
+5. projects the reviewed prompts into per-tier prototype files;
+6. writes the schema-2 manifest and license files.
 
-## Semantic-axis decision layer
-
-`tools/style-axis-prompts.json` defines eight build-time semantic/mood axes: dramatic, airy, energetic, warm/cozy, dreamy, natural, people, and colorful. `tools/build-style-semantic-axes.py` projects those prompt groups through the pinned TinyCLIP text tower and writes normalized positive/negative vectors to `semantic-axes.json`.
-
-Runtime receives vectors only. It combines multi-view semantic-axis scores with deterministic image statistics and the balanced 16-Style profile matrix in `web/src/recommend/style-profile-matrix.js`. Standard/Natural/Neutral/Luminous receive only a small prior; expressive Styles can win when semantic and photographic evidence agree. Cross-view disagreement and a small top-score margin trigger Standard fallback.
+An interrupted build can resume: completed model variants and matching
+prototypes are hashed and reused. `node tools/verify-ai-style-model.mjs` performs
+an independent manifest, hash, I/O, and inference check when
+`onnxruntime-node` is installed.
 
 ## Reference-bank diagnostics
 
-A diagnostic `reference-bank.json` must:
-
-1. use embeddings from the exact packaged TinyCLIP image encoder;
-2. contain all 16 validated Photographic Style IDs;
-3. contain only curated native reference selections backed by either a complete Styles graph or the validated iPhone 18+ native capture record;
-4. contain no original pixels, filenames, EXIF, timestamps, GPS, face metadata or free-form source metadata;
-5. pass `style-reference-bank.js` validation.
-
-Production builds require a curated manifest so a generated/reconstructed research file cannot enter the bank merely because it still carries an iPhone camera model. The private manifest is versioned as:
-
-```json
-{"version":1,"records":[
-  {"file":"Standard/IMG_0001.HEIC","styleId":1},
-  {"file":"Vibrant/IMG_0002.HEIC","styleId":8}
-]}
-```
-
-Each `file` is relative to the private `--input` root. Records default to `"role":"reference"`. Mixed diagnostic corpora may explicitly use `"role":"holdout"`; holdouts are structurally audited and reported but never embedded into the production bank. This keeps known-bad B/C/D variants, incomplete exports, and compatibility probes useful for regression without contaminating retrieval. The builder requires a reference record's native 0x54 Style ID to match the curated `styleId`, requires either a complete native Styles graph or the validated iPhone 18+ 0x65 capture record, rejects incompatible 0x54 schemas, and strips the filename before writing the bank. Directory-only `--audit-only` mode remains available for discovery, but cannot produce a production bank.
-
-Build with `node tools/build-style-reference-bank.mjs --input <private-root> --manifest <private-manifest.json> --output web/vendor/ai-style/reference-bank.json`, then audit with `node tools/audit-style-reference-bank.mjs web/vendor/ai-style/reference-bank.json`.
-
-The reference bank is not a runtime prerequisite. Suggested Styles availability is governed by the packaged image encoder and `semantic-axes.json`; the bank remains useful for validating Style IDs, metadata provenance, and research comparisons.
+`reference-bank.json` is retained only for private-corpus audits and research
+comparisons. It is not consulted by the recommendation runtime and never gates
+Suggested Styles availability. Original pixels, filenames, EXIF, timestamps,
+GPS, face metadata, and free-form source metadata must never enter that file.

@@ -1,3 +1,9 @@
+@property --ai-ring-angle {
+   syntax: "<angle>";
+   inherits: false;
+   initial-value: 270deg
+}
+
 :root {
    color-scheme: light;
    --bg: #f7f8fc;
@@ -620,7 +626,7 @@ code {
    --ai-coral: #ff2e54;
    --ai-amber: #ff9004;
    --gradient: linear-gradient(110deg, var(--ai-blue), var(--ai-violet) 38%, var(--ai-coral) 70%, var(--ai-amber));
-   --ring-gradient: conic-gradient(from 270deg, var(--ai-blue), var(--ai-violet), var(--ai-coral), var(--ai-amber), var(--ai-blue));
+   --ring-gradient: conic-gradient(from var(--ai-ring-angle), var(--ai-blue), var(--ai-violet), var(--ai-coral), var(--ai-amber), var(--ai-blue));
    --button-gradient: var(--gradient)
 }
 
@@ -636,6 +642,14 @@ code {
    border-color: transparent;
    background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--ring-gradient) border-box;
    box-shadow: -12px 1px 35px #0894ff20, 0 -9px 30px #c959dd20, 12px 4px 35px #ff2e5420, 0 16px 40px #ff900418
+}
+
+.workspace:has(.ai-settings[open]) {
+   animation: ai-ring-spin 3.2s linear infinite
+}
+
+@keyframes ai-ring-spin {
+   to { --ai-ring-angle: 630deg }
 }
 
 #drop {
@@ -1067,7 +1081,8 @@ code {
 @media (prefers-reduced-motion: reduce) {
    .ai-settings summary { transition: none }
    .ai-settings[open]:not(.is-closing) .ai-settings-panel,
-   .ai-settings.is-closing .ai-settings-panel { animation: none }
+   .ai-settings.is-closing .ai-settings-panel,
+   .workspace:has(.ai-settings[open]) { animation: none }
 }
 
 .ai-settings .portrait-option {
@@ -1802,6 +1817,19 @@ code {
    line-height: 1.5;
    color: var(--muted);
    margin: 6px 0 4px
+}
+
+.adaptive-style-advice {
+   grid-column: 1/-1;
+   margin: 8px 0 4px;
+   padding: 10px 12px;
+   border: 1px solid color-mix(in srgb, var(--ai-blue) 28%, var(--line));
+   border-radius: 12px;
+   background: color-mix(in srgb, var(--ai-blue) 7%, var(--surface));
+   color: var(--fg);
+   font-size: 12px;
+   line-height: 1.55;
+   overflow-wrap: anywhere
 }
 
 .result-metadata {

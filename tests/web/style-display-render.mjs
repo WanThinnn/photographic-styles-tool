@@ -10,11 +10,14 @@ const pixels=Uint8ClampedArray.from([
   0,0,0,255,
 ]);
 
-test('Standard and fallback recommendations do not bake a display rendition',()=>{
-  const standard=rec(1,0,0,1),fallback={...standard,fallback:true};
+test('only a genuinely neutral Standard skips the display rendition',()=>{
+  const standard=rec(1,0,0,1),tuned=rec(1,.18,-.12,.7),fallback={...tuned,fallback:true};
   assert.equal(shouldRenderStyleDisplay(standard),false);
-  assert.equal(shouldRenderStyleDisplay(fallback),false);
+  assert.equal(shouldRenderStyleDisplay(tuned),true);
+  assert.equal(shouldRenderStyleDisplay(fallback),true);
   assert.deepEqual(applyStyleDisplayRgba(pixels,standard),pixels);
+  assert.notDeepEqual(applyStyleDisplayRgba(pixels,tuned),pixels);
+  assert.notDeepEqual(applyStyleDisplayRgba(pixels,fallback),pixels);
 });
 
 test('Dramatic display rendition is deterministic, bounded and keeps black padding black',()=>{

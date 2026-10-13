@@ -102,6 +102,9 @@ test('AI switches share one quality control and have accessible localized copy',
   assert.match(css,/\.ai-settings :is\(\.detail-option, \.style-option, \.gpu-option\)/);
   assert.match(css,/@keyframes ai-settings-in/);
   assert.match(css,/@keyframes ai-settings-out/);
+  assert.match(css,/@property --ai-ring-angle/);
+  assert.match(css,/\.workspace:has\(\.ai-settings\[open\]\)[\s\S]*animation: ai-ring-spin/);
+  assert.match(css,/@keyframes ai-ring-spin/);
   assert.match(css,/prefers-reduced-motion: reduce/);
   assert.match(app,/aiSettings\.classList\.add\('is-closing'\)/);
   assert.match(css,/:is\(#enhance-ai, #ai-portrait, #ai-detail, #ai-style-suggest, #gpu-acceleration\)/);
@@ -113,6 +116,35 @@ test('AI switches share one quality control and have accessible localized copy',
     assert.ok(AI_STRINGS[lang].detailHint);
     assert.ok(AI_STRINGS[lang].styleToggle);
     assert.ok(AI_STRINGS[lang].styleHint);
+  }
+});
+
+test('AI model progress distinguishes downloads from cached preparation and names each feature',()=>{
+  const app=readFileSync(new URL('../../web/app.js',import.meta.url),'utf8');
+  const styleWorker=readFileSync(new URL('../../web/src/recommend/style-inference-worker.js',import.meta.url),'utf8');
+  const depthWorker=readFileSync(new URL('../../web/src/portrait/ai-inference-worker.js',import.meta.url),'utf8');
+  const detailWorker=readFileSync(new URL('../../web/src/detail/detail-worker.js',import.meta.url),'utf8');
+  for(const source of [styleWorker,depthWorker,detailWorker]){
+    assert.match(source,/progress\.source==='cache'\?'modelCache'/);
+    assert.match(source,/progress\.source==='cacheWarning'\?'modelCacheWarning':'modelDownload'/);
+  }
+  assert.match(detailWorker,/downloadModelBytes\(url\.href/,'Detail models must use the persistent model cache');
+  assert.match(app,/modelDownloadStatus\(aiText\(\)\.styleDownloading/);
+  assert.match(app,/modelDownloadStatus\(aiText\(\)\.detailDownloading/);
+  for(const lang of ['vi','en','zh']){
+    assert.ok(AI_STRINGS[lang].styleDownloading.includes('Style')||AI_STRINGS[lang].styleDownloading.includes('风格'));
+    assert.ok(AI_STRINGS[lang].detailDownloading);
+    assert.ok(AI_STRINGS[lang].modelLoading);
+    assert.notEqual(AI_STRINGS[lang].modelLoading,'Preparing AI');
+  }
+});
+
+test('Adaptive Styles completion guidance explains the required Photos edit commit',()=>{
+  assert.match(AI_STRINGS.vi.styleCompletionNotice,/Ảnh → Sửa.*thay đổi nhẹ.*nhấn Xong/);
+  assert.match(AI_STRINGS.en.styleCompletionNotice,/Photos → Edit.*small change.*Done/);
+  assert.match(AI_STRINGS.zh.styleCompletionNotice,/照片.*编辑.*轻微调整.*完成/);
+  for(const lang of ['vi','en','zh']){
+    assert.doesNotMatch(AI_STRINGS[lang].styleCompletionNotice,/hiển thị ngay|appear immediately|立即显示/);
   }
 });
 

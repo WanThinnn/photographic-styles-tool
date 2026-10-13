@@ -726,7 +726,7 @@ function readManagedRgba(image,width,height,colorSpace){
   return rgba;
 }
 
-async function encodeHdrCanvasTiles(image,geometry,color,colorSpace,onProgress){
+async function encodeHdrCanvasTiles(image,geometry,color,colorSpace,onProgress,styleRecommendation=null){
   const chunks=[];let hvcc;
   const canvas=document.createElement('canvas');canvas.width=canvas.height=TILE;
   const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true,colorSpace});
@@ -737,6 +737,7 @@ async function encodeHdrCanvasTiles(image,geometry,color,colorSpace,onProgress){
     for(let i=0;i<geometry.primaryTiles;i++){
       ctx.fillStyle='black';ctx.fillRect(0,0,TILE,TILE);
       ctx.drawImage(image,-(i%geometry.primaryColumns)*TILE,-Math.floor(i/geometry.primaryColumns)*TILE);
+      if(styleRecommendation)renderStyleDisplayCanvas(ctx,TILE,TILE,styleRecommendation);
       const pixels=ctx.getImageData(0,0,TILE,TILE,{colorSpace});
       const yuv=rgbaToI420(pixels.data,TILE,TILE,color);
       const encoded=await encodeHevcPixels(yuv,{width:TILE,height:TILE,pixelFormat:'yuv420p',...color},onProgress);
@@ -808,11 +809,15 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null,sty
       ?{recommendation:styleRecommendation,error:null}
       :await suggestStyleForImage(working,styleSuggestion,onProgress);
     const styled=applyRasterStyleRecommendation(profile,suggested.recommendation);profile=styled.profile;
+    const styleDisplayRendered=Boolean(styled.recommendation&&shouldRenderStyleDisplay(styled.recommendation));
     const linearThumbnail=await encodeLinearThumbnail(working,{angle:0},onProgress);
     const thumb=await encodeCanvases(geometry.thumbWidth,geometry.thumbHeight,1,
-      ctx=>ctx.drawImage(working,0,0,geometry.thumbWidth,geometry.thumbHeight),800_000,undefined,onProgress);
+      ctx=>{ctx.drawImage(working,0,0,geometry.thumbWidth,geometry.thumbHeight);
+        if(styleDisplayRendered)renderStyleDisplayCanvas(ctx,geometry.thumbWidth,geometry.thumbHeight,styled.recommendation);},
+      800_000,undefined,onProgress);
     let main;
-    if(enhanced)main=await encodeHdrCanvasTiles(working,geometry,color,colorSpace,onProgress);
+    if(enhanced||styleDisplayRendered)main=await encodeHdrCanvasTiles(working,geometry,color,colorSpace,onProgress,
+      styleDisplayRendered?styled.recommendation:null);
     else{
       const decoded=await decodeJpegYuv(hdr.base,{width:hdr.width,height:hdr.height,orientation},onProgress);
       main=await encodeYuvGrid(decoded.bytes,decoded.width,decoded.height,
@@ -837,7 +842,7 @@ async function importHdrJpeg(hdr,sourceBytes,onProgress,{analyze,detail=null,sty
       hdrMetadata:hdr.metadata,hdrXmp:hdr.xmp,hdrAlternateColr:hdr.alternateIcc?iccColr(hdr.alternateIcc):nclx(hdr.primaries==='smpte432'?12:1,8,0,true),sourceExif,
       lightMaps:analyze?buildLightMaps(sampleRasterLuma(working,32,32)):null,
     },analyze?Array.from(sampleRasterLuma(working)).sort((a,b)=>a-b):null,null,geometry);
-    const result={data,geometry,hdr:true,detailApplied:Boolean(enhanced&&rebase),detailSkipped,
+    const result={data,geometry,hdr:true,detailApplied:Boolean(enhanced&&rebase),detailSkipped,styleDisplayRendered,
       ...(styled.recommendation?{styleRecommendation:styled.recommendation}:{}),
       ...((suggested.error||styled.error)?{styleSuggestionError:suggested.error||styled.error}:{})};
     if(rebase)result.hdrDetail={clipped:rebase.clipped,components:rebase.components,maxError:rebase.maxError};

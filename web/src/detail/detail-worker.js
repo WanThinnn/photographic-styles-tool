@@ -1,4 +1,5 @@
 import {detailModel,validateDetailAsset} from './detail-models.js';
+import {downloadModelBytes,MODEL_CACHE_NAME} from '../core/model-download.js';
 const ASSETS=new URL('../../vendor/ai-portrait/',import.meta.url);
 const {min,max}=Math;
 const clamp=n=>max(0,min(255,Math.round(n)));
@@ -18,14 +19,14 @@ async function ensureRuntime({modelId,provider,assetRoot,wasmThreads=1}){
   const manifest=await response.json(),entry=validateDetailAsset(manifest.models?.[modelId]);
   if(manifest.schema!==1||entry.family!==model.assetFamily)
     throw Error('AI detail model selection does not match pinned weights');
-  const url=new URL(entry.file,root);
-  self.postMessage({stage:'download'});
-  const res=await fetch(url);
-  if(!res.ok)throw Error('AI detail weights unavailable');
-  const bytes=new Uint8Array(await res.arrayBuffer());
+  const url=new URL(entry.file,root);url.searchParams.set('sha256',entry.sha256);
+  const bytes=await downloadModelBytes(url.href,{onProgress:progress=>self.postMessage({
+    stage:progress.source==='cache'?'modelCache':progress.source==='cacheWarning'?'modelCacheWarning':'modelDownload',progress,
+  })});
   if(bytes.length!==entry.bytes)throw Error('AI detail model size mismatch');
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');
-  if(digest!==entry.sha256)throw Error('AI detail model SHA-256 mismatch');
+  if(digest!==entry.sha256){try{await(await caches.open(MODEL_CACHE_NAME)).delete(url.href);}catch{}
+    throw Error('AI detail model SHA-256 mismatch');}
   const ort=await import('../../vendor/ai-portrait/ort.webgpu.min.mjs');
   ort.env.wasm.wasmPaths=ASSETS.href;
   ort.env.wasm.numThreads=provider==='wasm'?Math.max(1,Math.min(4,wasmThreads|0)):1;

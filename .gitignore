@@ -92,6 +92,9 @@ web/vendor/ai-portrait/*.wasm
 
 # Suggested Styles intentionally ships its compact, image-only ONNX package under
 # web/vendor/ai-style/. Do not add a blanket *.onnx ignore above this point.
+# Large Pro models are reconstructed from tracked .partNNN files.
+web/vendor/ai-style/siglip2-base-patch16-224-image-int8.onnx
+web/vendor/ai-style/siglip2-base-patch16-224-image-fp16.onnx
 #
 # Hugging Face AI detail weights are downloaded to the user's local machine.
 # Verify licensing before distributing the model binaries with the public app.

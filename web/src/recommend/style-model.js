@@ -15,6 +15,7 @@ export const STYLE_MODEL_SPECS=Object.freeze({
   standard:Object.freeze({key:'standard',id:'tinyclip-vit-39m-16-image',license:'MIT',input:CLIP_INPUT}),
   pro:Object.freeze({key:'pro',id:'siglip2-base-patch16-224-image',license:'Apache-2.0',input:SIGLIP2_INPUT}),
 });
+export const STYLE_MODEL_LEVELS=Object.freeze(Object.keys(STYLE_MODEL_SPECS));
 
 // Backwards-compatible aliases for the existing Lite package and build tools.
 export const STYLE_MODEL_ID=STYLE_MODEL_SPECS.lite.id;

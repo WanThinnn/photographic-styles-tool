@@ -1,5 +1,5 @@
 /**
- * Real browser smoke test for Suggested Styles TinyCLIP image-only models.
+ * Real browser smoke test for the tiered Suggested Styles image-only models.
  * Uses installed Chrome/Edge through CDP; no Playwright dependency and no photos.
  *
  * node tools/smoke-ai-style-browser.mjs
@@ -113,8 +113,11 @@ try{
         import('http://127.0.0.1:${port}/src/core/heif.js'),
       ]);
       const input=new Uint8Array(await fetch('http://127.0.0.1:${port}/__style_display_input__').then(r=>r.arrayBuffer()));
-      const before=discoverHeic(input),dramatic={styleId:11,tone:-.75,color:.2,palette:.99,confidence:.9,level:'standard'};
-      const rendered=await renderSuggestedStyleDisplay(input,dramatic);
+      // Regression: Standard/fallback can still carry material Tone/Colour.
+      // Those parameters must be baked into the library rendition even though
+      // the style ID itself is Standard.
+      const before=discoverHeic(input),tunedStandard={styleId:1,tone:.18,color:-.12,palette:.7,confidence:.4,fallback:true,level:'standard'};
+      const rendered=await renderSuggestedStyleDisplay(input,tunedStandard);
       const after=discoverHeic(rendered.data);let changed=0,unchanged=0;
       for(const [id,item] of before.iloc.items){
         if(item.constructionMethod!==0||!item.extents.length)continue;
@@ -122,8 +125,10 @@ try{
         let same=a.length===b.length;if(same)for(let i=0;i<a.length;i++)if(a[i]!==b[i]){same=false;break;}
         same?unchanged++:changed++;
       }
-      const beforeHdr=[...new Set([...before.hdrTiles,...(before.hdrGrid!==null?[before.hdrGrid]:[])])];
-      const afterHdr=[...new Set([...after.hdrTiles,...(after.hdrGrid!==null?[after.hdrGrid]:[])])];
+      const beforeHdr=[...new Set([...before.hdrTiles,...(before.hdrGrid!==null?[before.hdrGrid]:[])])]
+        .filter(id=>before.iloc.items.get(id)?.constructionMethod===0);
+      const afterHdr=[...new Set([...after.hdrTiles,...(after.hdrGrid!==null?[after.hdrGrid]:[])])]
+        .filter(id=>after.iloc.items.get(id)?.constructionMethod===0);
       let hdrUnchanged=0;
       beforeHdr.forEach((id,index)=>{
         const a=extractItem(input,before.iloc,id),b=extractItem(rendered.data,after.iloc,afterHdr[index]);
@@ -139,13 +144,15 @@ try{
   const result=await cdp('Runtime.evaluate',{expression:code,awaitPromise:true,returnByValue:true},heicPath?600000:260000);
   if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));
   const value=result.result?.value;
-  if(!value||value.dimensions!==512||value.views!==({lite:1,standard:5,pro:9})[level]
+  if(!value||value.dimensions!==({lite:512,standard:512,pro:768})[level]
+    ||value.views!==({lite:3,standard:9,pro:17})[level]
     ||value.norms.some(norm=>Math.abs(norm-1)>1e-3)||value.head.some(v=>!Number.isFinite(v))
     ||!Number.isInteger(value.recommendation?.styleId)||value.recommendation.styleId<1||value.recommendation.styleId>16
+    ||value.recommendation.styleId===13||value.recommendation.styleId===15
     ||![value.recommendation.tone,value.recommendation.color,value.recommendation.palette,value.recommendation.confidence].every(Number.isFinite)
     ||(heicPath&&(!value.display?.rendered||value.display.changed<value.display.primaryTiles
       ||value.display.hdrUnchanged!==value.display.hdrItems)))
-    throw Error('Invalid browser TinyCLIP/recommender result: '+JSON.stringify(value));
+    throw Error('Invalid browser Suggested Styles result: '+JSON.stringify(value));
   console.log('SUGGESTED STYLES BROWSER INFERENCE PASS '+JSON.stringify(value));
 }finally{
   try{socket?.close();}catch{}

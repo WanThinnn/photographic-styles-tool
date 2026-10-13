@@ -40,16 +40,30 @@ test('shared AI level and GPU toggle are forwarded to both raster and HEIC recom
   assert.match(app,/recommendStyleRgb\([\s\S]*level:selectedAiLevel\(\),provider:gpuAcceleration\.checked\?'webgpu':'wasm'/);
 });
 
+test('Adaptive Styles completion notice is gated by the feature and an actual recommendation',()=>{
+  assert.match(app,/function adaptiveStyleCompletionNotice\(ui,recommendation\)\{\s*if\(!aiFeatures\.enabled\('style'\)\|\|!recommendation\)return;\s*ui\.adaptiveStyleAdvice\(aiText\(\)\.styleCompletionNotice\);\s*\}/);
+  assert.match(app,/await tryAiPortrait\(null,output,ui,file\.name,file\);\s*adaptiveStyleCompletionNotice\(ui,result\.styleRecommendation\);/,
+    'raster guidance should appear only after all selected processing completes');
+  assert.match(app,/await tryAiPortrait\(bytes,shareFile,ui,file\.name,file,preserveIncomplete\);\s*adaptiveStyleCompletionNotice\(ui,adaptiveStyleRecommendation\);/,
+    'HEIC guidance should appear only after all selected processing completes');
+});
+
 test('Suggested Styles bakes SDR and HDR display bases while retaining editable metadata',()=>{
   const patch=app.indexOf('await patchInWorker(bytes, profile, opts)');
-  const display=app.indexOf("import('./src/recommend/style-display-heic.js')",patch);
-  assert.ok(patch>=0&&display>patch);
-  assert.match(app,/if\(report\.styleRecommendation\)[\s\S]*renderSuggestedStyleDisplay\(data,report\.styleRecommendation/);
+  const softSkin=app.indexOf('data=await addMissingSoftSkin(data,file,ui',patch);
+  const restore=app.indexOf('restoreNativePortraitInWorker(data',softSkin);
+  const display=app.indexOf("import('./src/recommend/style-display-heic.js')",restore);
+  const publish=app.indexOf('const shareFile = new File([data]',display);
+  assert.ok(patch>=0&&softSkin>patch&&restore>softSkin&&display>restore&&publish>display,
+    'the display rendition must be the final HEIC pixel operation before publishing');
+  assert.match(app,/if\(adaptiveStyleRecommendation\)[\s\S]*renderSuggestedStyleDisplay\(data,adaptiveStyleRecommendation/);
   assert.doesNotMatch(app,/report\.styleRecommendation&&d\.hdrGrid===null/);
-  assert.match(app,/if\(needsStyledDisplay&&!rendered\.rendered\)[\s\S]*if\(needsStyledDisplay\)throw error;/,
+  assert.match(app,/const needsStyledDisplay=shouldRenderStyleDisplay\(adaptiveStyleRecommendation\);[\s\S]*if\(needsStyledDisplay&&!rendered\.rendered\)[\s\S]*if\(needsStyledDisplay\)throw error;/,
     'metadata-only recommendations must not be published as successfully applied Styles');
   const linear=raster.indexOf('const linearThumbnail = await encodeLinearThumbnail(image');
   const render=raster.indexOf('const styleDisplayRendered=',linear);
   assert.ok(linear>=0&&render>linear,'linear thumbnail stays based on the unbaked editable source');
   assert.match(raster,/ctx\.drawImage\(stored,[\s\S]*renderStyleDisplayCanvas\(ctx,TILE,TILE,styled\.recommendation\)/);
+  assert.match(raster,/if\(enhanced\|\|styleDisplayRendered\)main=await encodeHdrCanvasTiles[\s\S]*styleDisplayRendered\?styled\.recommendation:null/,
+    'HDR JPEG imports must bake the suggested display colour into their primary too');
 });

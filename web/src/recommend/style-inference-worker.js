@@ -20,8 +20,9 @@ async function ensureRuntime(level,provider){
   if(!response.ok)throw Error('Suggested Styles image-only assets are not packaged');
   const manifest=await response.json(),asset=styleModel(level,provider,manifest),modelUrl=new URL(asset.file,ASSET_ROOT);
   modelUrl.searchParams.set('sha256',asset.sha256);const url=modelUrl.href;
-  self.postMessage({stage:'download'});
-  const bytes=await downloadModelBytes(url,{onProgress:progress=>self.postMessage({stage:'modelDownload',progress})});
+  const bytes=await downloadModelBytes(url,{onProgress:progress=>self.postMessage({
+    stage:progress.source==='cache'?'modelCache':progress.source==='cacheWarning'?'modelCacheWarning':'modelDownload',progress,
+  })});
   if(bytes.byteLength!==asset.bytes)throw Error('Suggested Styles model size mismatch');
   if(await sha256(bytes)!==asset.sha256){
     try{await(await caches.open(MODEL_CACHE_NAME)).delete(url);}catch{}

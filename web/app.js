@@ -21,6 +21,7 @@ import {waitForVisiblePage} from './src/ui/processing-scheduler.js';
 import {depthModel} from './src/portrait/depth-models.js';
 import {clearDownloadedAssets} from './src/core/cache-cleanup.js';
 import {createAiFeatureControls} from './src/ui/ai-feature-controls.js';
+import {shouldRenderStyleDisplay} from './src/recommend/style-display-render.js';
 
 
 const $ = (id) => document.getElementById(id);
@@ -416,6 +417,15 @@ function row(name) {
       const advice=document.createElement('p');advice.className='portrait-advice';advice.textContent=text;
       el.insertBefore(advice,el.querySelector('.act'));
     },
+    adaptiveStyleAdvice(text) {
+      let advice=el.querySelector('.adaptive-style-advice');
+      if(!advice){
+        advice=document.createElement('p');advice.className='adaptive-style-advice';
+        advice.setAttribute('role','status');advice.setAttribute('aria-live','polite');
+        el.insertBefore(advice,el.querySelector('.act'));
+      }
+      advice.textContent=text;
+    },
     share(file, live = false, label = null, group = 'normal') {
       const b = document.createElement("button");
       b.className = "dl";
@@ -475,8 +485,8 @@ async function runAiCandidate(candidate) {
     if(aiFeatures.enabled('style'))await import('./src/recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
     const result = await createAiPortrait(data,(stage,progress)=>{
       lastStage=stage;
-      if(stage==='download'&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
-        ui.aiState(`${aiText().download}${percent} · ${formatBytes(progress.loaded)}`);
+      if(['download','modelDownload'].includes(stage)&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
+        ui.aiState(`${aiText().modelDownload}${percent} · ${formatBytes(progress.loaded)}`);
       }else ui.aiState(stage==='inference'&&provider==='wasm'?aiText().inferenceCpu:aiText()[stage]||aiText().loading);
     },sourceFile,{signal:controller.signal,provider,modelId});
     lastStage='encoding';ui.aiState(aiText().encoding);
@@ -513,9 +523,14 @@ async function runAiCandidate(candidate) {
 function stagePercent(done,total){
   return Number.isFinite(done)&&Number.isFinite(total)&&total>0 ? `${Math.min(100,Math.max(0,Math.round(done/total*100)))}%` : '';
 }
+function modelDownloadStatus(label,event){
+  const progress=event?.progress||event||{},percent=stagePercent(progress.loaded,progress.total);
+  return progress.loaded?`${label}${percent?` ${percent}`:''} · ${formatBytes(progress.loaded)}`:label;
+}
 function styleProgress(ui,progress){
   const stage=progress.styleStage||progress.stage;
-  if(['download','modelDownload','modelLoading','styleSemantics','styleCpuFallback'].includes(stage)){ui.set(aiText().stylePreparing);return;}
+  if(['download','modelDownload'].includes(stage)){ui.set(modelDownloadStatus(aiText().styleDownloading,progress));return;}
+  if(['modelCache','modelCacheWarning','modelLoading','styleSemantics','styleCpuFallback'].includes(stage)){ui.set(aiText().stylePreparing);return;}
   if(stage==='inference'){
     const percent=stagePercent(progress.progress?.done,progress.progress?.total);
     ui.set(percent?`${aiText().styleAnalyzing} ${percent}`:aiText().styleAnalyzing);return;
@@ -528,6 +543,10 @@ function styleResultNote(ui,recommendation,error=null){
   if(recommendation.fallback){ui.note(aiText().styleFallback,'style-ai');return;}
   const signed=value=>`${value>=0?'+':''}${Number(value).toFixed(2)}`;
   ui.note(`${aiText().styleApplied}: ${recommendation.styleName} · Tone ${signed(recommendation.tone)} · Color ${signed(recommendation.color)} · Palette ${Number(recommendation.palette).toFixed(2)}`,'style-ai');
+}
+function adaptiveStyleCompletionNotice(ui,recommendation){
+  if(!aiFeatures.enabled('style')||!recommendation)return;
+  ui.adaptiveStyleAdvice(aiText().styleCompletionNotice);
 }
 async function recommendHeicStyle(bytes,d,ui){
   if(!aiFeatures.enabled('style')||preserveNativeStyles(bytes,d))return null;
@@ -594,8 +613,8 @@ async function handleFile(file) {
           null, progress => {
             if(progress.stage==='styleSuggestion'){styleProgress(ui,progress);return;}
             if (progress.stage === "modelDownload")
-              ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
-            else if (progress.stage === "download" || progress.stage === "modelLoading")
+              ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
+            else if (["download","modelCache","modelCacheWarning","modelLoading"].includes(progress.stage))
               ui.set(aiText().detailPreparing);
             else if (progress.stage === "inference")
               ui.set(stagePercent(progress.progress?.done,progress.progress?.total) ? `${aiText().detailWorking} ${stagePercent(progress.progress?.done,progress.progress?.total)}` : aiText().detailWorking);
@@ -625,6 +644,7 @@ async function handleFile(file) {
       showCaptureDate(ui, date);
       await ui.metadata(result.data, inputSize, {raster: !result.hdr, raw: input.format === 'dng'});
       await tryAiPortrait(null,output,ui,file.name,file);
+      adaptiveStyleCompletionNotice(ui,result.styleRecommendation);
       return;
     }
     if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
@@ -639,7 +659,7 @@ async function handleFile(file) {
             const enhanced=await enhanceNativeHdrHeic(bytes,{
               modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
             },{onProgress:progress=>{
-              if(progress.stage==='download'||progress.stage==='modelLoading')ui.set(aiText().detailPreparing);
+              if(['download','modelCache','modelCacheWarning','modelLoading'].includes(progress.stage))ui.set(aiText().detailPreparing);
               else if(progress.stage==='inference'){
                 const percent=stagePercent(progress.progress?.done,progress.progress?.total);
                 ui.set(percent?`${aiText().detailWorking} ${percent}`:aiText().detailWorking);
@@ -648,7 +668,7 @@ async function handleFile(file) {
                 ui.set(percent?`${aiText().detailHdrWorking} ${percent}`:aiText().detailHdrWorking);
               }
               else if(progress.stage==='modelDownload')
-                ui.set(`${T("st.encoderload")} ${(progress.loaded/1048576).toFixed(1)} MB`);
+                ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
               else ui.set(aiText().detailHdrWorking);
             }});
             bytes=enhanced.data;d=discoverHeic(bytes);
@@ -673,7 +693,7 @@ async function handleFile(file) {
     const liveIdentifier = photoContentIdentifier(bytes);
     ui.liveIdentifier=liveIdentifier;
     const sep = lang === "zh" ? "、" : ", ";
-    let data, bits, suffix;
+    let data, bits, suffix, adaptiveStyleRecommendation=null;
     if (nativeTexture && !hasTexture(d.infos)) {
       // iPhone 18+ native captures can expose Texture/Film through capture metadata
       // without the grafted texture_styles/matte graph. Never graft a second Texture
@@ -749,33 +769,15 @@ async function handleFile(file) {
       if(aiFeatures.enabled('style')&&!rebuildNativePortrait)opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);
       let report;
       ({ data, report } = await patchInWorker(bytes, profile, opts));
-      // The library viewer normally shows the HEIC primary (plus its HDR gain map),
-      // while Photos Edit evaluates the editable Styles graph. Bake the matching
-      // display base for SDR and HDR so no dummy edit+save is needed.
-      if(report.styleRecommendation){
-        const needsStyledDisplay=!report.styleRecommendation.fallback
-          &&report.styleRecommendation.styleId!==1&&report.styleRecommendation.palette>.01;
-        try{
-          const {renderSuggestedStyleDisplay}=await import('./src/recommend/style-display-heic.js');
-          const rendered=await renderSuggestedStyleDisplay(data,report.styleRecommendation,{
-            onProgress:progress=>{if(progress?.stage==='styleDisplay')ui.set(T('st.working'));}});
-          if(needsStyledDisplay&&!rendered.rendered)
-            throw Error(`Suggested Style display rendition was not written (${rendered.reason||'unknown'})`);
-          data=rendered.data;report.styleDisplayRendered=rendered.rendered;
-        }catch(error){
-          report.styleDisplayError=String(error?.message||error);
-          console.error('Suggested Style display rendition unavailable',error);
-          // Metadata alone previews only inside Photos Edit and disappears on
-          // Cancel. Never publish that misleading half-applied result.
-          if(needsStyledDisplay)throw error;
-        }
-      }
       // patch() degrades rather than failing when the decoder misbehaves, so trust
       // what it reports it actually did, not what we asked for.
       if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
       if(report.styleSelectionCompatibility==='portrait-standard')ui.note(T('warn.portraitstandard'),'style-rebuild');
       else if(report.styleSelectionCompatibility==='bright-palette70')ui.note(T('warn.brightcompat'),'style-rebuild');
-      if(report.styleRecommendation)styleResultNote(ui,report.styleRecommendation);
+      if(report.styleRecommendation){
+        adaptiveStyleRecommendation=report.styleRecommendation;
+        styleResultNote(ui,report.styleRecommendation);
+      }
 
       bits = [T(report.decoded ? "st.matched" : "st.neutral")];
       if (report.mattes.added.some((m) => m.startsWith("depth"))) bits.push(T("st.portrait"));
@@ -789,6 +791,26 @@ async function handleFile(file) {
     if(restorePortrait&&!preserveIncomplete){
       const restored=await restoreNativePortraitInWorker(data,{sharpBackgroundEvidence});
       if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
+    }
+    // Bake the visible rendition only after every metadata/Texture/Portrait
+    // rebuild. This guarantees the exact file offered to Photos owns the styled
+    // primary and thumbnail instead of letting a later graph rebuild restore the
+    // original-colour payloads. Editable Styles metadata remains untouched.
+    if(adaptiveStyleRecommendation){
+      const needsStyledDisplay=shouldRenderStyleDisplay(adaptiveStyleRecommendation);
+      try{
+        const {renderSuggestedStyleDisplay}=await import('./src/recommend/style-display-heic.js');
+        const rendered=await renderSuggestedStyleDisplay(data,adaptiveStyleRecommendation,{
+          onProgress:progress=>{if(progress?.stage==='styleDisplay')ui.set(T('st.working'));}});
+        if(needsStyledDisplay&&!rendered.rendered)
+          throw Error(`Suggested Style display rendition was not written (${rendered.reason||'unknown'})`);
+        data=rendered.data;
+      }catch(error){
+        console.error('Suggested Style display rendition unavailable',error);
+        // Metadata alone previews only inside Photos Edit and disappears on
+        // Cancel. Never publish that misleading half-applied result.
+        if(needsStyledDisplay)throw error;
+      }
     }
     ui.readyNotice=`${T("st.ready")} — ${bits.join(sep)}`;
 
@@ -817,6 +839,7 @@ async function handleFile(file) {
       attachMovie(photo);
     }
     await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
+    adaptiveStyleCompletionNotice(ui,adaptiveStyleRecommendation);
     if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));
     else if(portraitState&&portraitState!=='existing-renderer'&&!restorePortrait)
       ui.portraitAdvice(T(portraitState==='portrait-capture'?'warn.portraiton':'warn.portraitunknown'));

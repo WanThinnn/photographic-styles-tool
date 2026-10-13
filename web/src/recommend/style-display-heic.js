@@ -13,16 +13,21 @@ function hvcRecord(data,d,iid){
   const box=topBox(property,'hvcC');
   return property.subarray(box.off+box.hdr,box.off+box.size);
 }
-function colorFromSps(sps){
+export function styleDisplayColorFromSps(sps){
   if(sps.luma!==8||sps.chromaDepth!==8||sps.chroma!==1)throw Error('Suggested Style display requires an 8-bit 4:2:0 primary');
   // Apple photo tiles commonly leave primaries/transfer unspecified in the SPS
   // and carry Display P3 in the colr/ICC property. The established lossless
   // primary re-encode path signals those samples as P3 + BT.709 while preserving
   // the original ICC property byte-for-byte.
-  const primaries={1:'bt709',12:'smpte432'}[sps.primaries]||(sps.primaries===2?'smpte432':null);
-  const transfer={1:'bt709',6:'smpte170m',13:'iec61966-2-1'}[sps.transfer]||(sps.transfer===2?'bt709':null);
-  const matrix={1:'bt709',5:'bt470bg',6:'smpte170m'}[sps.matrix];
-  if(!primaries||!transfer||!matrix||typeof sps.fullRange!=='boolean')throw Error('Suggested Style display has unsupported HEIC colour signalling');
+  // hevcSpsColor normalizes code 2 (unspecified) to null. In that case the
+  // item's preserved Display-P3 ICC is authoritative; use the established
+  // P3/BT.709 encoder fallback rather than rejecting ordinary iPhone tiles.
+  const unspecified=value=>value===2||value===null;
+  const primaries={1:'bt709',12:'smpte432'}[sps.primaries]||(unspecified(sps.primaries)?'smpte432':null);
+  const transfer={1:'bt709',6:'smpte170m',13:'iec61966-2-1'}[sps.transfer]||(unspecified(sps.transfer)?'bt709':null);
+  const matrix={1:'bt709',5:'bt470bg',6:'smpte170m'}[sps.matrix]||(unspecified(sps.matrix)?'bt709':null);
+  if(!primaries||!transfer||!matrix||typeof sps.fullRange!=='boolean')throw Error(
+    `Suggested Style display has unsupported HEIC colour signalling (${sps.primaries}/${sps.transfer}/${sps.matrix}/${sps.fullRange})`);
   return {primaries,transfer,matrix,fullRange:sps.fullRange};
 }
 function assertSameColor(encoded,source){
@@ -38,7 +43,7 @@ function assertSameColor(encoded,source){
 async function renderItem(data,d,iid,recommendation,onProgress){
   const [width,height]=dimensionsForItem(d.props,iid);
   if(![width,height].every(value=>Number.isInteger(value)&&value>=2&&value%2===0))throw Error('Suggested Style display has invalid item geometry');
-  const record=hvcRecord(data,d,iid),color=colorFromSps(hevcSpsColor(record));
+  const record=hvcRecord(data,d,iid),color=styleDisplayColorFromSps(hevcSpsColor(record));
   const yuv=await decodeHevcYuv(record,extractItem(data,d.iloc,iid),{width,height},onProgress);
   const rgba=yuv420ToRgba(yuv,width,height,{matrix:color.matrix,fullRange:color.fullRange});
   const styled=applyStyleDisplayRgba(rgba,recommendation),encoded=await encodeHevcPixels(

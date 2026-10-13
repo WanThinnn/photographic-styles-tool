@@ -31,6 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Assemble and verify large AI Styles models
+        run: node tools/package-ai-style-models.mjs assemble --remove-parts
+
       - name: Download pinned AI Portrait assets
         run: node tools/download-ai-portrait.mjs
 

@@ -22,7 +22,10 @@ const PROFILES=Object.freeze({
 
 export function shouldRenderStyleDisplay(value){
   const recommendation=validateStyleRecommendation(value);
-  return !recommendation.fallback&&recommendation.styleId!==1&&recommendation.palette>0.01;
+  if(recommendation.palette<=0.01)return false;
+  const parameters=styleDisplayParameters(recommendation);
+  return parameters.mono||['exposure','contrast','saturation','warmth','tint','fade']
+    .some(key=>Math.abs(parameters[key])>1e-6);
 }
 
 export function styleDisplayParameters(value){

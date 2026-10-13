@@ -1,4 +1,6 @@
-# Photographic Style Port — browser build
+# Stylio — browser build
+
+After cloning, run `node tools/package-ai-style-models.mjs assemble` from the repository root before serving locally. Large Pro models are stored as Git-safe parts; Pages deployment reassembles and verifies them automatically.
 
 The static site published to GitHub Pages. Everything runs in the visitor's browser; photos
 are never uploaded.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {STYLE_SELECTIONS} from '../../web/src/recommend/style-selection.js';
 import {styleModelSpec} from '../../web/src/recommend/style-model.js';
-import {validateStylePrototypes} from '../../web/src/recommend/style-prototypes.js';
+import {STYLE_SCORE_CALIBRATION,validateStylePrototypes} from '../../web/src/recommend/style-prototypes.js';
 import {recommendStyle,SUGGESTED_STYLE_PALETTE_MAX} from '../../web/src/recommend/style-recommender.js';
 
 const IDS=Object.keys(STYLE_SELECTIONS).map(Number).filter(id=>id!==13&&id!==15);
@@ -32,6 +32,17 @@ test('automatic injected Styles keep a conservative Palette ceiling',()=>{
     const result=recommendStyle({prototypes:model,level:'standard',embeddings:Array(9).fill(Float32Array.from(unit(index))),statistics:neutralStats});
     assert.ok(result.palette<=.70);
   }
+});
+
+test('Bright has a calibrated zero-shot prior but still wins a strong match',()=>{
+  const model=prototypes(),bright=IDS.indexOf(16),natural=IDS.indexOf(6);
+  assert.ok(STYLE_SCORE_CALIBRATION[16]<0);
+  const close=unit(bright);close[natural]=.96;
+  const norm=Math.hypot(...close);for(let i=0;i<close.length;i++)close[i]/=norm;
+  const calibrated=recommendStyle({prototypes:model,level:'standard',embeddings:Array(9).fill(Float32Array.from(close)),statistics:neutralStats});
+  assert.equal(calibrated.styleId,6,'a marginal generic Bright lead should yield to the more specific Style');
+  const strong=recommendStyle({prototypes:model,level:'standard',embeddings:Array(9).fill(Float32Array.from(unit(bright))),statistics:neutralStats});
+  assert.equal(strong.styleId,16,'a strong semantic Bright match must remain available');
 });
 
 test('genuine cross-view disagreement fails closed to Standard',()=>{

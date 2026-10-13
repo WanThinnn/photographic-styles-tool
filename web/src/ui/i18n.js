@@ -72,7 +72,7 @@ export const STRINGS = {
     "date.missing": "Không đọc được thời gian chụp gốc. Ứng dụng Ảnh có thể dùng ngày nhập ảnh.",
     "lang.name": "Tiếng Việt",
     "lang.label": "Ngôn ngữ",
-    "meta.title": "Next-generation Photographic Styles",
+    "meta.title": "Stylio",
     "app.tagline": "Phong cách nhiếp ảnh cho ảnh của bạn",
     "p.author": "bởi Elio",
     "h.notice": "Trước khi bắt đầu",
@@ -194,7 +194,7 @@ export const STRINGS = {
     "t.date": "<b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.",
     "date.missing": "The source has no readable capture time. Photos may use the import date.",
     "lang.name": "中文",
-    "meta.title": "Next-generation Photographic Styles",
+    "meta.title": "Stylio",
     "app.tagline": "Photographic Styles for your photos",
     "p.author": "by Elio",
 
@@ -352,7 +352,7 @@ export const STRINGS = {
     "err.rasterdecode": "浏览器无法解码此图像，未生成输出文件。",
     "err.rasterencode": "无法转换为 HEIC。请检查网络后重试；浏览器也可能内存不足。",
     "lang.name": "English",
-    "meta.title": "Next-generation Photographic Styles",
+    "meta.title": "Stylio",
     "app.tagline": "为照片添加摄影风格",
     "p.author": "由 Elio 修改",
 

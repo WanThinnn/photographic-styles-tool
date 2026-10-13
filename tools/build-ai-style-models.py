@@ -95,6 +95,17 @@ def extract(source: Path, destination: Path, inputs: list[str], outputs: list[st
     onnx_utils.extract_model(str(source), str(destination), inputs, outputs, check_model=True, infer_shapes=True)
 
 
+def verify_image_variant(path: Path, dimensions: int, *, fp16: bool) -> None:
+    options = ort.SessionOptions()
+    if fp16:
+        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
+    session = ort.InferenceSession(str(path), sess_options=options, providers=["CPUExecutionProvider"])
+    output = session.run(["image_embeds"], {"pixel_values": np.zeros((1, 3, 224, 224), np.float32)})[0]
+    if output.shape != (1, dimensions) or not np.isfinite(output).all():
+        raise RuntimeError(f"invalid image output {output.shape}")
+    del session
+
+
 def export_variants(source: Path, output_prefix: str, dimensions: int) -> dict[str, dict[str, object]]:
     targets = {
         "wasm": ASSET_ROOT / f"{output_prefix}-int8.onnx",
@@ -115,14 +126,7 @@ def export_variants(source: Path, output_prefix: str, dimensions: int) -> dict[s
 
     result = {}
     for provider, path in targets.items():
-        options = ort.SessionOptions()
-        if provider == "webgpu":
-            options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
-        session = ort.InferenceSession(str(path), sess_options=options, providers=["CPUExecutionProvider"])
-        output = session.run(["image_embeds"], {"pixel_values": np.zeros((1, 3, 224, 224), np.float32)})[0]
-        if output.shape != (1, dimensions) or not np.isfinite(output).all():
-            raise RuntimeError(f"{provider}: invalid image output {output.shape}")
-        del session
+        verify_image_variant(path, dimensions, fp16=provider == "webgpu")
         result[provider] = {
             "file": path.name,
             "bytes": path.stat().st_size,
@@ -134,6 +138,35 @@ def export_variants(source: Path, output_prefix: str, dimensions: int) -> dict[s
             "embeddingDimensions": dimensions,
         }
         print(provider, path.name, f"{path.stat().st_size / 1048576:.1f} MiB")
+    return result
+
+
+def existing_variants(output_prefix: str, dimensions: int) -> dict[str, dict[str, object]] | None:
+    """Reuse a fully written tier after an interrupted multi-model build."""
+    variants = {
+        "wasm": (ASSET_ROOT / f"{output_prefix}-int8.onnx", "int8"),
+        "webgpu": (ASSET_ROOT / f"{output_prefix}-fp16.onnx", "fp16"),
+    }
+    if not all(path.is_file() and path.stat().st_size > 0 for path, _ in variants.values()):
+        return None
+    try:
+        for provider, (path, _) in variants.items():
+            verify_image_variant(path, dimensions, fp16=provider == "webgpu")
+    except Exception as error:
+        print(output_prefix, "cannot reuse existing variants:", error)
+        return None
+    result = {}
+    for provider, (path, precision) in variants.items():
+        result[provider] = {
+            "file": path.name,
+            "bytes": path.stat().st_size,
+            "sha256": sha256(path),
+            "precision": precision,
+            "inputName": "pixel_values",
+            "inputShape": [1, 3, 224, 224],
+            "outputName": "image_embeds",
+            "embeddingDimensions": dimensions,
+        }
     return result
 
 
@@ -213,17 +246,31 @@ def main() -> None:
             spec = dict(original)
             spec["revision"] = spec.get("revision") or api.model_info(spec["repo"]).sha
             print(level, spec["repo"], spec["revision"])
-            source = Path(hf_hub_download(spec["repo"], spec["remote"], revision=spec["revision"]))
-            image_fp32 = tempdir / f"{level}-image-fp32.onnx"
-            text_fp32 = tempdir / f"{level}-text-fp32.onnx"
-            extract(source, image_fp32, ["pixel_values"], ["image_embeds"])
-            text_inputs = ["input_ids", "attention_mask"] if spec["tokenizer"] == "clip" else ["input_ids"]
-            extract(source, text_fp32, text_inputs, ["text_embeds"])
-            providers = export_variants(image_fp32, spec["model"], int(spec["dimensions"]))
-            prototypes = build_prototypes(text_fp32, spec, prompt_data)
-            (ASSET_ROOT / f"style-prototypes-{level}.json").write_text(
-                json.dumps(prototypes, separators=(",", ":")) + "\n", "utf-8"
-            )
+            prototype_path = ASSET_ROOT / f"style-prototypes-{level}.json"
+            reusable = existing_variants(str(spec["model"]), int(spec["dimensions"]))
+            existing_prototypes = None
+            if reusable and prototype_path.is_file():
+                candidate = json.loads(prototype_path.read_text("utf-8"))
+                if (
+                    candidate.get("model") == spec["model"]
+                    and candidate.get("revision") == spec["revision"]
+                    and candidate.get("dimensions") == spec["dimensions"]
+                ):
+                    existing_prototypes = candidate
+
+            if reusable and existing_prototypes:
+                providers = reusable
+                print(level, "reusing verified image variants and text prototypes")
+            else:
+                source = Path(hf_hub_download(spec["repo"], spec["remote"], revision=spec["revision"]))
+                image_fp32 = tempdir / f"{level}-image-fp32.onnx"
+                text_fp32 = tempdir / f"{level}-text-fp32.onnx"
+                extract(source, image_fp32, ["pixel_values"], ["image_embeds"])
+                text_inputs = ["input_ids", "attention_mask"] if spec["tokenizer"] == "clip" else ["input_ids"]
+                extract(source, text_fp32, text_inputs, ["text_embeds"])
+                providers = export_variants(image_fp32, spec["model"], int(spec["dimensions"]))
+                prototypes = build_prototypes(text_fp32, spec, prompt_data)
+                prototype_path.write_text(json.dumps(prototypes, separators=(",", ":")) + "\n", "utf-8")
             input_contract = {
                 "size": spec["size"], "channels": 3, "layout": "nchw-rgb",
                 "shape": [1, 3, spec["size"], spec["size"]],
@@ -235,7 +282,6 @@ def main() -> None:
                 "id": spec["model"], "revision": spec["revision"], "license": spec["license"],
                 "input": input_contract, "providers": providers,
             }
-            del source
             gc.collect()
     (ASSET_ROOT / "assets.json").write_text(json.dumps(manifest, indent=2) + "\n", "utf-8")
     write_licenses()

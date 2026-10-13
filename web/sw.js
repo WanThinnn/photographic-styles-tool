@@ -1,5 +1,7 @@
 const CACHE_PREFIX = "photographic-style-port-";
 const CACHE_NAME = `${CACHE_PREFIX}v132`;
+// Filled by the static release builder. Also refresh older, unversioned clients.
+const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
 const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 
@@ -217,7 +219,11 @@ async function networkFirst(request) {
     // Revalidate instead of trusting the HTTP cache (GitHub Pages allows 10 minutes), so a
     // freshly deployed page never runs with stale scripts or copy. Unchanged files cost a 304.
     // A navigation Request cannot be re-initialised, so it is refetched by URL.
-    const response = await fetch(request.mode === "navigate" ? request.url : request,
+    const releaseUrl = new URL(request.url);
+    if(RELEASE_ID !== "development")releaseUrl.searchParams.set('release', RELEASE_ID);
+    const source = request.mode === "navigate" ? releaseUrl.href
+      : RELEASE_ID === "development" ? request : new Request(releaseUrl.href, request);
+    const response = await fetch(source,
                                  { cache: "no-cache" });
     if(response.ok){
       if(cache)try{await cache.put(request,response.clone());}catch{}

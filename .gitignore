@@ -71,6 +71,7 @@ tests/private-fixtures/
 # Editor / OS
 # ---------------------------------------------------------------------------
 .vscode/
+.stylio-site/
 .idea/
 .claude/settings.local.json
 .DS_Store

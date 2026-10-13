@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node tools/package-ai-style-models.mjs assemble
       - run: node tests/web/check-i18n.mjs
       - run: node tests/web/check-pwa.mjs
       - run: node --test tests/web/module-paths.mjs

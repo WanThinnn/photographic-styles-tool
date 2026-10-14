@@ -287,6 +287,57 @@ body.is-settings-destination .top-github-symbol {
   animation: none
 }
 
+#boot.err.app-error-banner {
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 10px 10px 10px 12px;
+  border: .5px solid color-mix(in srgb,var(--err) 20%,var(--line));
+  border-radius: 18px;
+  background: color-mix(in srgb,var(--err) 7%,var(--surface));
+  color: var(--fg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .06);
+  font-size: .8125rem;
+  font-weight: 450;
+  line-height: 1.35;
+  text-align: left
+}
+
+.app-error-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb,var(--err) 12%,transparent);
+  color: var(--err)
+}
+
+.app-error-icon svg {
+  width: 20px;
+  height: 20px
+}
+
+.app-error-copy {
+  min-width: 0;
+  text-wrap: pretty
+}
+
+.app-error-retry {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: .8125rem;
+  font-weight: 650
+}
+
 @keyframes boot-gradient-flow {
   0%,100% { background-position: 0 50% }
   50% { background-position: 100% 50% }
@@ -400,9 +451,6 @@ body.is-settings-destination .top-github-symbol {
   box-shadow: none
 }
 
-.dock-search-field:has(#history-search:focus-visible) {
-  box-shadow: inset 0 0 0 .5px var(--glass-outline)
-}
 #history-search::placeholder { color: var(--muted); opacity: 1 }
 #history-search::-webkit-search-cancel-button { display: none }
 .search-clear {

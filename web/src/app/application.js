@@ -199,6 +199,14 @@ export function startApplication(){
 
   let lang = pickLanguage();
   const T = (key) => t(lang, key);
+  function showBootError(message){
+    const boot=$('boot');boot.replaceChildren();boot.className='err app-error-banner';
+    const icon=document.createElement('span');icon.className='app-error-icon';icon.setAttribute('aria-hidden','true');
+    icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg>';
+    const copy=document.createElement('span');copy.className='app-error-copy';copy.textContent=message;
+    const retry=document.createElement('button');retry.className='app-error-retry';retry.type='button';retry.textContent=T('btn.retry');retry.addEventListener('click',()=>location.reload());
+    boot.append(icon,copy,retry);
+  }
   const analysis=createPhotoAnalysis({T,aiText,aiFeatures,selectedAiLevel,gpuAcceleration});
   const {liveMovies,livePhotos,attachMovie,handleMovie}=createLivePhotoSession({T});
   const profiles=createProfileRepository();
@@ -286,12 +294,7 @@ export function startApplication(){
       else console.warn('Running without cross-origin isolation; threaded HEVC/AI features will request isolation when used.');
     } catch (e) {
       console.error('Browser preparation failed', e);
-      $("boot").textContent = T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources');
-      $("boot").className = "err";
-      const retry = document.createElement('button');
-      retry.className = 'dl alt'; retry.type = 'button'; retry.textContent = T('btn.retry');
-      retry.addEventListener('click', () => location.reload());
-      $('boot').append(document.createElement('br'), retry);
+      showBootError(T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources'));
     }
   })();
 

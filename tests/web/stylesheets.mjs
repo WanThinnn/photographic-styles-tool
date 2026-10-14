@@ -209,7 +209,7 @@ test('first-run notice is a single grouped card and appearance controls are inte
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
   const shellLayout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
-  assert.match(workspace,/\.photo-format-tip \{[^}]*grid-template-columns: 17px minmax\(0,1fr\) auto;[^}]*border-radius: 16px;[^}]*background: var\(--surface-secondary\)/s);
+  assert.match(workspace,/\.photo-format-tip \{[^}]*grid-template-columns: 17px minmax\(0,1fr\) auto;[^}]*margin: 10px 0 8px;[^}]*border-radius: 16px;[^}]*background: var\(--surface-secondary\)/s);
   assert.match(workspace,/\.photo-format-tip button \{[^}]*grid-column: 3;[^}]*min-height: 44px/s);
   assert.match(html,/data-theme-value="light"/);
   assert.match(html,/data-theme-value="system"/);
@@ -247,18 +247,35 @@ test('semantic icon palette switches internal app icons to dark material without
   assert.match(results,/meta\.capture[^}]*var\(--icon-detail-green\)/);
 });
 
-test('search and sheet surfaces suppress browser-blue focus frames without removing control focus styles globally',()=>{
+test('browser focus and Tab rings are visually suppressed across the app',()=>{
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
+  const portrait=readFileSync(new URL('../../web/styles/components/portrait-editor.css',import.meta.url),'utf8');
+  assert.match(base,/:focus,\s*\n:focus-visible \{[^}]*outline: none!important;[^}]*outline-offset: 0!important/s);
+  assert.doesNotMatch(base,/outline: 3px solid var\(--focus-ring\)/);
   assert.match(layout,/#history-search:focus,[\s\S]*?#history-search:focus-visible \{[^}]*outline: none;[^}]*box-shadow: none/s);
-  assert.match(layout,/\.dock-search-field:has\(#history-search:focus-visible\) \{[^}]*box-shadow: inset 0 0 0 \.5px var\(--glass-outline\)/s);
-  assert.match(sheets,/\.sheet:focus,[\s\S]*?\.sheet:focus-visible \{[^}]*outline: none/s);
-  assert.match(sheets,/\.language-row #lang:focus,[\s\S]*?\.language-row #lang:focus-visible \{[^}]*outline: none;[^}]*box-shadow: none/s);
-  assert.match(sheets,/\.language-row:has\(#lang:focus-visible\) \{[^}]*outline: none;[^}]*box-shadow: inset 0 0 0 \.5px var\(--line\)/s);
-  assert.doesNotMatch(sheets,/\.language-row:has\(#lang:focus-visible\) \{[^}]*var\(--focus-ring\)/s);
-  assert.match(base,/:focus-visible \{[^}]*outline: 3px solid var\(--focus-ring\)/s);
+  assert.doesNotMatch(layout,/\.dock-search-field:has\(#history-search:focus-visible\)/);
+  assert.match(sheets,/\.language-row:has\(#lang:focus-visible\),[\s\S]*?box-shadow: none/s);
+  assert.match(portrait,/\.ai-aperture-track:has\(input:focus-visible\) \{[^}]*box-shadow: none/s);
+  assert.doesNotMatch(portrait,/outline: 2px solid #0894ff/);
 });
+test('resource failures use native-style banners and stacked labels keep compact title-to-description spacing',()=>{
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
+  const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
+  const application=readFileSync(new URL('../../web/src/app/application.js',import.meta.url),'utf8');
+  assert.match(layout,/#boot\.err\.app-error-banner \{[^}]*grid-template-columns: 30px minmax\(0,1fr\) auto;[^}]*border-radius: 18px;[^}]*background: color-mix/s);
+  assert.match(results,/\.status\.err \{[^}]*grid-template-columns: 24px minmax\(0,1fr\);[^}]*border-radius: 14px;[^}]*background: color-mix/s);
+  assert.match(bootstrap,/showBootError\(t\(selector\.value,'err\.resources'\),t\(selector\.value,'btn\.retry'\)\)/);
+  assert.match(application,/showBootError\(T\(e\?\.code==='BROWSER_INSECURE_CONTEXT'\?'err\.setup':'err\.resources'\)\)/);
+  assert.match(controls,/\.ai-hint \{[^}]*line-height: 1\.4;[^}]*margin: 2px 0 0/s);
+  assert.match(sheets,/\.settings-row-stack \{[^}]*gap: 2px/s);
+  assert.match(sheets,/\.settings-inline-note \{[^}]*line-height: 1\.35/s);
+});
+
 test('sheets and photo workspace close with motion while the photo header protects the Dynamic Island safe area',()=>{
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');

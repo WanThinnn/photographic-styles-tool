@@ -91,9 +91,9 @@
 
 .ai-hint {
   font-size: .8125rem;
-  line-height: 1.5;
+  line-height: 1.4;
   color: var(--muted);
-  margin: 5px 0 0
+  margin: 2px 0 0
 }
 
 input[role="switch"] {

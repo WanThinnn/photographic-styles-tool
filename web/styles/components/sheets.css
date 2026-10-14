@@ -294,11 +294,7 @@ dialog::backdrop {
   box-shadow: none
 }
 
-.language-row:has(#lang:focus-visible) {
-  outline: none;
-  box-shadow: inset 0 0 0 .5px var(--line)
-}
-
+.language-row:has(#lang:focus-visible),
 .language-row:has(#lang[data-pointer-focus]) {
   outline: none;
   box-shadow: none
@@ -317,7 +313,7 @@ dialog::backdrop {
 .settings-row-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   padding: 16px 16px 10px
 }
 
@@ -450,7 +446,7 @@ dialog::backdrop {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 2px;
   min-width: 0
 }
 
@@ -458,7 +454,7 @@ dialog::backdrop {
   color: var(--muted);
   font-size: .8125rem;
   font-weight: 400;
-  line-height: 1.45;
+  line-height: 1.35;
   text-align: left
 }
 
@@ -632,7 +628,7 @@ footer a {
 .ai-settings-panel>.portrait-option:has(+.group-title),
 .ai-settings-panel>.portrait-option:last-child { border-radius: 0 0 20px 20px }
 .ai-settings-panel>.portrait-option label { font-size: 1rem; line-height: 1.3 }
-.ai-settings-panel .ai-hint { margin-top: 6px }
+.ai-settings-panel .ai-hint { margin-top: 2px }
 
 .ai-option-icon {
   display: grid;

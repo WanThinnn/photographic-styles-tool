@@ -75,9 +75,12 @@ svg {
   display: block
 }
 
+/* Stylio intentionally suppresses browser focus/tab rings on every surface.
+   Focusability and keyboard activation remain intact; only the web-style outline is hidden. */
+:focus,
 :focus-visible {
-  outline: 3px solid var(--focus-ring);
-  outline-offset: 3px
+  outline: none!important;
+  outline-offset: 0!important
 }
 
 [hidden] {

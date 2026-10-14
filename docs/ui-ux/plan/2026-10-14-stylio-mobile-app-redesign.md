@@ -731,6 +731,15 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v183**.
 - Regression: **83/83 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
 
+### Native error banners / global focus-ring suppression / spacing polish v184
+
+- Startup/resource failures use an iOS-like rounded banner with semantic error icon, wrapped copy and 44px Retry action; per-result `.status.err` also becomes an inline native-style banner instead of raw red text.
+- Browser focus/Tab rings are visually suppressed globally on desktop and mobile. Keyboard focusability/activation is retained, while Search, Language, aperture and Portrait-specific focus outlines/insets are removed.
+- The original-format notice now uses zero horizontal margin inside `.workspace`, matching the exact width of `Choose photos`.
+- Title-to-description spacing is tightened in AI and Settings rows: hint margin 2px, settings stacks 2px, inline note line-height 1.35.
+- Service Worker tăng **v184**.
+- Regression: **84/84 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

@@ -5,6 +5,14 @@ import {AI_STRINGS} from './ai-strings.js';
 import {getAppShell} from './shell/app-shell.js';
 const shell=getAppShell();
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
+function showBootError(message,retryLabel){
+  boot.replaceChildren();boot.className='err app-error-banner';
+  const icon=document.createElement('span');icon.className='app-error-icon';icon.setAttribute('aria-hidden','true');
+  icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg>';
+  const copy=document.createElement('span');copy.className='app-error-copy';copy.textContent=message;
+  const retry=document.createElement('button');retry.className='app-error-retry';retry.type='button';retry.textContent=retryLabel;retry.onclick=()=>location.reload();
+  boot.append(icon,copy,retry);
+}
 const previewToggle=document.getElementById('result-preview');
 const previewKey='stylio-result-preview-v1';
 const themeKey='stylio-theme-v1',themeButtons=[...document.querySelectorAll('[data-theme-value]')];
@@ -109,8 +117,5 @@ try{
   selector.removeEventListener('change',change);
 }catch(error){
   console.error('Application scripts unavailable',error);
-  boot.textContent=t(selector.value,'err.resources');boot.className='err';
-  const retry=document.createElement('button');retry.className='dl alt';retry.type='button';
-  retry.textContent=t(selector.value,'btn.retry');retry.onclick=()=>location.reload();
-  boot.append(document.createElement('br'),retry);
+  showBootError(t(selector.value,'err.resources'),t(selector.value,'btn.retry'));
 }

@@ -34,6 +34,13 @@ for(const control of [selector,document.getElementById('depth-model')]){
 }
 const formatTip=document.getElementById('ios-format-tip'),drop=document.getElementById('drop');
 const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
+// Standalone Stylio behaves like a native photo app: page zoom would detach the
+// fixed glass dock from the app shell. The viewport/CSS handle modern Safari;
+// gesture events cover iOS WebKit builds that still allow pinch despite them.
+if(ios){
+  const stopPageZoom=event=>event.preventDefault();
+  for(const type of ['gesturestart','gesturechange','gestureend'])document.addEventListener(type,stopPageZoom,{passive:false});
+}
 const formatTipKey='photo-format-tip-dismissed-v1';
 let formatTipDismissed=false;
 try{formatTipDismissed=localStorage.getItem(formatTipKey)==='1';}catch{}

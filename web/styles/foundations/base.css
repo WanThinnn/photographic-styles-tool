@@ -14,14 +14,16 @@
 html {
   min-height: 100%;
   background: var(--bg);
-  -webkit-text-size-adjust: 100%
+  -webkit-text-size-adjust: 100%;
+  touch-action: pan-x pan-y
 }
 
 body {
   margin: 0;
   color: var(--fg);
   font: 1.0625rem/1.5 var(--sans);
-  background: var(--bg)
+  background: var(--bg);
+  touch-action: pan-x pan-y
 }
 
 html.theme-transition body,

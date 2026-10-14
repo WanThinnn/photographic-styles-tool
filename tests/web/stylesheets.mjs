@@ -56,9 +56,21 @@ test('old bright blue is shared and scrollbar hiding does not disable normal scr
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
   assert.match(tokens,/--blue-600: #0894ff/);
   assert.match(base,/scrollbar-width: none/);assert.match(base,/\*::-webkit-scrollbar \{[^}]*display: none/);
+  assert.match(base,/html \{[^}]*touch-action: pan-x pan-y/s);
+  assert.match(base,/body \{[^}]*touch-action: pan-x pan-y/s);
   assert.doesNotMatch(base,/(?:^|\n)(?:html|body|\*) \{[^}]*overflow: hidden/);
 });
 
+test('PWA locks page zoom while keeping native one-finger scrolling',()=>{
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
+  const nav=readFileSync(new URL('../../web/styles/components/navigation-effects.css',import.meta.url),'utf8');
+  assert.match(html,/name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/);
+  assert.match(bootstrap,/\['gesturestart','gesturechange','gestureend'\]/);
+  assert.match(bootstrap,/preventDefault\(\)/);
+  assert.match(nav,/\.app-tabs \{[^}]*touch-action: pan-y/s);
+  assert.doesNotMatch(nav,/touch-action: pan-y pinch-zoom/);
+});
 
 
 test('standalone shell keeps the intro visible, centers its copy, and anchors the dock from the safe bottom',()=>{
@@ -169,7 +181,7 @@ test('tab glass has a pressed lens without nested backdrop filters and preserves
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   assert.match(css,/\.app-tabs\.is-pressing::before/);
   assert.match(css,/scale: 1\.12 1\.36/);
-  assert.match(css,/touch-action: pan-y pinch-zoom/);
+  assert.match(css,/touch-action: pan-y/);
   assert.match(layout,/transform: translate3d\(var\(--lens-offset,calc\(var\(--tab-index,0\) \* 100%\)\),0,0\)/);
   assert.match(css,/\.app-tabs\.is-dragging::before/);
   assert.match(css,/contain: paint/);

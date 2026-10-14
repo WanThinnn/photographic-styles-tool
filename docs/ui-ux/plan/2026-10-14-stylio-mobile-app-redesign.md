@@ -600,6 +600,13 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Appearance icon được chỉnh sát iOS Settings hơn: square 34×34 nền đen/graphite, bo 10px, viền highlight rất nhẹ; glyph là vòng tròn trắng outline với nửa trái trắng, nửa phải để nền đen hiện qua, thay cho circle fill cũ.
 - Regression mới mô phỏng Process screen ngắn: `innerHeight/clientHeight=756`, iPhone screen=844 rồi tụt còn 720 sau khi dismiss notice; dock vẫn phải giữ 844px.
 - Service Worker app-shell cache tăng v169.
+### Native-feel zoom lock v170
+
+- Khóa page zoom cho Web/PWA bằng viewport `minimum-scale=1, maximum-scale=1, user-scalable=no` đồng thời giữ `viewport-fit=cover` cho safe area.
+- `html, body` dùng `touch-action: pan-x pan-y`: vẫn cuộn/pan một ngón bình thường nhưng loại pinch-zoom khỏi gesture arbitration; tab glass bỏ `pinch-zoom` và chỉ giữ `pan-y` để drag lens không kích hoạt zoom.
+- iOS Safari fallback chặn `gesturestart/gesturechange/gestureend` với non-passive `preventDefault()` vì một số WebKit build vẫn cho pinch dù viewport/CSS đã khóa.
+- Mục tiêu là giữ fixed Liquid Glass dock gắn với app shell khi người dùng dùng hai ngón hoặc double-tap, gần hành vi native app hơn. Text sizing/accessibility semantics còn lại giữ nguyên.
+- Service Worker app-shell cache tăng v170.
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

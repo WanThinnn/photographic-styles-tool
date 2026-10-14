@@ -2,7 +2,7 @@
    This is the Web UI reference, not the UIKit optical-refraction bridge.
    The lens shares the bar's material; no nested backdrop-filter. */
 .app-tabs {
-  touch-action: pan-y pinch-zoom;
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
   contain: paint;

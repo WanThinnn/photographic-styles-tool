@@ -104,8 +104,10 @@ test('portrait aperture keeps the yellow selector centered while the ruler moves
 test('process header and Smart Enhance controls use a tighter native grouping',()=>{
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
-  assert.match(layout,/\.app-logo \{[^}]*width: 36px;[^}]*height: 36px/s);
-  assert.match(layout,/h1 \{[^}]*font-size: 1\.25rem;[^}]*font-weight: 700/s);
+  assert.match(layout,/\.app-logo \{[^}]*width: 40px;[^}]*height: 40px/s);
+  assert.match(layout,/h1 \{[^}]*font-size: 1\.375rem;[^}]*font-weight: 700/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: calc\(env\(safe-area-inset-top,0px\) \+ 24px\);[^}]*transform: translateX\(-50%\)/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?main \{[^}]*padding-top: calc\(env\(safe-area-inset-top,0px\) \+ 94px\)/s);
   assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*align-items: center/s);
   assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-trigger \{[^}]*margin-left: auto/s);
 });

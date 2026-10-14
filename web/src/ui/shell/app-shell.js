@@ -266,7 +266,11 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     const cards=[...matching].reverse().map(record=>{
       const next=card(record,{history:true});
       if(record.historyCard){
-        record.historyCard.replaceChildren(...next.childNodes);record.historyCard.dataset.state=record.state;
+        // Progress updates from another result can render many times per second. Keep an
+        // already-open overflow menu mounted so its trigger/menu/focus state is not reset
+        // underneath the user's finger while a different photo is processing.
+        if(!record.historyCard.querySelector('.task-action-wrap')?.classList.contains('is-open'))record.historyCard.replaceChildren(...next.childNodes);
+        record.historyCard.dataset.state=record.state;
       }else record.historyCard=next;
       if(thumbnailObserver&&record.sourceFile&&!record.thumbnail&&!record.thumbnailAttempted)thumbnailObserver.observe(record.historyCard);
       return record.historyCard;

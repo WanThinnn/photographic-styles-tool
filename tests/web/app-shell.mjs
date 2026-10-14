@@ -165,6 +165,20 @@ test('ready results group share/download/delete actions behind one overflow cont
   historyCard.click();assert.equal(h.$('photo-workspace').open,true);
 });
 
+test('an open History overflow menu survives progress renders from another photo',()=>{
+  const h=harness(),ready=h.shell.register(h.row(),'ready.heic');
+  ready.quickActions([{kind:'download',label:'Quick download',run:()=>{}}]);
+  ready.update('ready','Ready');
+  const historyCard=h.$('history-items').firstElementChild;
+  const trigger=historyCard.querySelector('.task-action-trigger'),menu=historyCard.querySelector('.task-action-menu');
+  trigger.click();
+  const active=h.shell.register(h.row(),'processing.heic');active.update('processing','Working');active.progress(42);
+  assert.equal(h.$('history-items').children[1],historyCard);
+  assert.equal(historyCard.querySelector('.task-action-trigger'),trigger);
+  assert.equal(historyCard.querySelector('.task-action-menu'),menu);
+  assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(menu.hidden,false);
+});
+
 test('removed results cannot be resurrected by Forward; blocked storage is harmless',()=>{
   const h=harness({blockedStorage:true}),record=h.shell.register(h.row(),'photo');
   h.$('task-content').firstElementChild.click();record.dispose();h.win.history.forward();

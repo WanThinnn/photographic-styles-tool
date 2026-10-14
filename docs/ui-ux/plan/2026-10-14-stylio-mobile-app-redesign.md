@@ -723,6 +723,14 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v182**.
 - Regression: **82/82 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**. Private Portrait browser fixture trong lượt này timeout ở 120s và 180s trước khi trả assertion; static Portrait/layout regression vẫn pass.
 
+### Fixed mobile header / larger branding / stable History overflow v183
+
+- Mobile root header được fixed ở `safe-area-inset-top + 24px`; icon Stylio và Help/GitHub không còn đi theo document khi người dùng scroll/overscroll. Main content bù đúng chiều cao cũ nên hero/screen content không bị đẩy lên vùng Dynamic Island.
+- In-app header logo tăng 36→40px và title tăng 1.25→1.375rem để cân với 44px top action. Install icon/Home Screen assets không đổi.
+- History quick-action menu giữ nguyên DOM subtree khi đang mở. Progress của result khác vẫn được render, nhưng không còn `replaceChildren()` card có menu đang mở, loại hiện tượng nút ••• reload liên tục giữa lúc xử lý ảnh.
+- Service Worker tăng **v183**.
+- Regression: **83/83 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v151`;
+const CACHE_NAME = `${CACHE_PREFIX}v196`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -8,7 +8,22 @@ const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 // Warm the complete offline converter after startup. Only BOOT_SHELL below
 // gates installation, so first visits do not wait for the whole module graph.
 const APP_SHELL = [
+  "./styles/foundations/tokens.css",
+  "./styles/foundations/base.css",
+  "./styles/layout/app-shell.css",
+  "./styles/layout/workspace.css",
+  "./styles/components/controls.css",
+  "./styles/components/materials.css",
+  "./styles/components/sheets.css",
+  "./styles/components/results.css",
+  "./styles/components/portrait-editor.css",
+  "./src/ui/shell/app-shell.js",
+  "./src/ui/shell/dock-viewport.js",
+  "./src/ui/shell/tab-glass.js",
+  "./styles/components/navigation-effects.css",
   "./src/ui/results/result-view.js",
+  "./src/ui/confirm-dialog.js",
+  "./src/ui/history-store.js",
   "./src/app/processing/portrait-controller.js",
   "./src/app/processing/photo-analysis.js",
   "./src/app/processing/profiles.js",
@@ -22,6 +37,7 @@ const APP_SHELL = [
   "./styles.css",
   "./app.js",
   "./LICENSE.txt",
+  "./THIRD_PARTY_NOTICES.txt",
   "./src/ui/page-bootstrap.js",
   "./src/ui/processing-scheduler.js",
   "./src/ui/ai-strings.js",
@@ -83,6 +99,7 @@ const APP_SHELL = [
   "./src/dng/model-download.js",
   "./manifest.webmanifest",
   "./icons/photographic-styles.svg",
+  "./icons/photographic-styles-dark.svg",
   "./icons/icon-180.png",
   "./icons/apple-touch-icon.png",
   "./icons/apple-touch-icon-v2.png",
@@ -161,7 +178,7 @@ const APP_SHELL = [
 
 // Only the initial screen gates activation. Preloading the whole converter
 // here left first visits waiting for every rarely-used processing module.
-const BOOT_SHELL=['./','./index.html','./styles.css','./src/ui/page-bootstrap.js','./src/ui/i18n.js','./src/ui/ai-strings.js','./icons/photographic-styles.svg'];
+const BOOT_SHELL=['./','./index.html','./styles.css',"./styles/foundations/tokens.css","./styles/foundations/base.css","./styles/layout/app-shell.css","./styles/layout/workspace.css","./styles/components/controls.css","./styles/components/sheets.css","./styles/components/results.css","./styles/components/portrait-editor.css","./src/ui/shell/app-shell.js",'./src/ui/page-bootstrap.js','./src/ui/i18n.js','./src/ui/ai-strings.js','./icons/photographic-styles.svg','./styles/components/materials.css','./THIRD_PARTY_NOTICES.txt','./src/ui/shell/dock-viewport.js','./src/ui/shell/tab-glass.js','./styles/components/navigation-effects.css'];
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)

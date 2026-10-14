@@ -498,9 +498,13 @@ The app preserves existing HDR resources; it cannot recreate a missing gain map.
 An incomplete newer-iPhone export without native depth keeps the preserved-copy
 route and explains that Styles/Texture editing was not added.
 
-Legacy native Styles version 14 without a tone curve need one extra compatibility step:
+Legacy Styles version 14 without a tone curve needs one extra compatibility step:
 the app adds a neutral 516-byte curve to fix black Glow/Film rendering and inactive
-Soft Skin observed in device testing. It retains every other Styles value, including
+Soft Skin observed in device testing on the original non-preserving route. The same
+missing field is now supplied for schema 13, including native-preserving processing,
+following the reported iOS 18 telephoto black Glow/Soft Skin case. This schema 13
+extension still awaits Photos import/edit/save/reopen confirmation on the device.
+It retains every other Styles value, including
 the native version, coefficients and statistics; existing curves are unchanged.
 HDR, depth, original masks and Exif remain byte-identical. A previously processed file
 with Texture and the same missing curve is repaired without duplicate Texture data;
@@ -624,12 +628,14 @@ Style. Private phone tests confirm HDR and aperture/lighting editing for the tes
 native Portrait export; stronger Style colours on reconstructed exports remain unresolved.
 
 Native iPhone 16+ HEIC inputs with Styles use Texture-only processing. Their
-Styles bytes, selection, primary images, depth and HDR resources are preserved.
+Styles bytes, selection, primary images, depth and HDR resources are preserved,
+except that schema 13 missing its tone curve receives the neutral curve described above.
 If a native Portrait export omits its Styles graph, the app creates Styles and
 Texture automatically using the Standard/Bright policy described above, preserving
 its own image and HDR samples. Non-Portrait incomplete native exports retain the
 preserved-copy route. Existing supported ISO tmap HDR is registered with headroom
-derived from its own parameters. Legacy tone-curve repair stays disabled on native inputs.
+derived from its own parameters. Legacy tone-curve repair stays disabled on other
+native schemas, including schema 14; existing curves are never replaced.
 
 Existing complete Portrait renderers remain unchanged. The tested legacy native
 Photo capture with depth (IMG_6246, iPhone 13 Pro Max) again receives an editable

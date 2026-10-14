@@ -16,11 +16,13 @@ import {shouldRenderStyleDisplay} from '../../recommend/style-display-render.js'
 export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis}){
     const {addMissingSoftSkin,ensureDecode,stagePercent,modelDownloadStatus,styleProgress,styleResultNote,adaptiveStyleCompletionNotice,recommendHeicStyle}=analysis;
   async function handleFile(file) {
-    const ui = row(file.name);
+    const ui = row(file.name,file);
     const inputSize = file.size;
+    const overall=value=>ui.progress?.(value);
+    const mapped=(start,end,done,total)=>Number.isFinite(done)&&Number.isFinite(total)&&total>0?start+(end-start)*Math.max(0,Math.min(1,done/total)):start;
     try {
-      ui.set(T("st.reading"));
-      const input = await readImageFile(file);
+      overall(3);ui.set(T("st.reading"));
+      const input = await readImageFile(file);overall(8);
       let bytes = input.bytes;
       if (/\.mov$/i.test(file.name) || file.type === "video/quicktime") {
         await handleMovie(file, bytes, ui);
@@ -33,7 +35,7 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         const {importDngFile}=await import('../../dng/dng-import.js');
         try {file=await importDngFile(bytes,file.name,progress=>{
           const label=getLanguage()==='vi'?'Giải mã RAW':getLanguage()==='zh'?'解码 RAW':'Developing RAW';
-          const percent=stagePercent(progress.done,progress.total);ui.set(percent?`${label} ${percent}`:label);
+          const percent=stagePercent(progress.done,progress.total);overall(mapped(8,18,progress.done,progress.total));ui.set(percent?`${label} ${percent}`:label);
         });}catch(error){
           console.warn('DNG import failed',error);
           const reason=/JPEG XL/.test(error.message)?'JPEG XL':/large RAW/.test(error.message)?'oversized RAW':'decode';
@@ -47,20 +49,23 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
 
         if (!globalThis.crossOriginIsolated) { ui.set(T("err.reloadencoder"), "err"); return; }
         const { importRaster } = await import("../../raster/raster-import.js");
-        let result;
+        let result;overall(14);
         try {
           result = await importRaster(new File([bytes], file.name, {type: RASTER_MIMES[format]}),
             null, progress => {
-              if(progress.stage==='styleSuggestion'){styleProgress(ui,progress);return;}
-              if (progress.stage === "modelDownload")
-                ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
-              else if (["download","modelCache","modelCacheWarning","modelLoading"].includes(progress.stage))
-                ui.set(aiText().detailPreparing);
-              else if (progress.stage === "inference")
-                ui.set(stagePercent(progress.progress?.done,progress.progress?.total) ? `${aiText().detailWorking} ${stagePercent(progress.progress?.done,progress.progress?.total)}` : aiText().detailWorking);
-              else if (progress.stage === "main") ui.set(stagePercent(progress.done,progress.total) ? `${T("st.rastertiles")} ${stagePercent(progress.done,progress.total)}` : T("st.rastertiles"));
-              else if (progress.stage === "auxiliary") ui.set(stagePercent(progress.done,progress.total) ? `${aiText().detailHdrWorking} ${stagePercent(progress.done,progress.total)}` : aiText().detailHdrWorking);
-              else ui.set(T("st.rasterworking"));
+              if(progress.stage==='styleSuggestion'){const p=progress.progress||progress;overall(mapped(18,35,p.done,p.total));styleProgress(ui,progress);return;}
+              if (progress.stage === "modelDownload"){
+                overall(mapped(18,30,progress.loaded,progress.total));ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
+              }
+              else if (["download","modelCache","modelCacheWarning","modelLoading"].includes(progress.stage)){
+                overall(22);ui.set(aiText().detailPreparing);
+              }
+              else if (progress.stage === "inference"){
+                overall(mapped(30,50,progress.progress?.done,progress.progress?.total));ui.set(stagePercent(progress.progress?.done,progress.progress?.total) ? `${aiText().detailWorking} ${stagePercent(progress.progress?.done,progress.progress?.total)}` : aiText().detailWorking);
+              }
+              else if (progress.stage === "main"){overall(mapped(50,67,progress.done,progress.total));ui.set(stagePercent(progress.done,progress.total) ? `${T("st.rastertiles")} ${stagePercent(progress.done,progress.total)}` : T("st.rastertiles"));}
+              else if (progress.stage === "auxiliary"){overall(mapped(67,75,progress.done,progress.total));ui.set(stagePercent(progress.done,progress.total) ? `${aiText().detailHdrWorking} ${stagePercent(progress.done,progress.total)}` : aiText().detailHdrWorking);}
+              else {overall(20);ui.set(T("st.rasterworking"));}
             }, {
               analyze:true,
               detail:aiFeatures.enabled('detail')?{modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'}:null,
@@ -71,24 +76,24 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
           ui.set(T(error.code==='err.hdrjpeg'?'err.hdrjpeg':/Raster image decode failed/i.test(error.message) ? "err.rasterdecode" : "err.rasterencode"), "err");
           return;
         }
-        const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
+        overall(76);const outName = file.name.replace(/\.[^.]+$/, "") + "_PhotographicStyle.HEIC";
         if(result.detailSkipped)ui.note(`${aiText().detailSkipped} ${result.detailSkipped}`,'detail');
         else if(result.detailApplied)ui.note(aiText().detailApplied,'detail');
         if(aiFeatures.enabled('style'))styleResultNote(ui,result.styleRecommendation,result.styleSuggestionError);
-        result.data=await addMissingSoftSkin(result.data,file,ui);
+        overall(78);result.data=await addMissingSoftSkin(result.data,file,ui);overall(84);
         const date = photoCaptureDate(result.data);
         const output = new File([result.data], outName, {type: "image/heic",
           ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {})});
         ui.readyNotice=`${T("st.ready")} — ${T("st.rasterready")}`;
         ui.note(result.hdr?T('raster.hdr'):result.geometry.resized ? T("raster.resized") : T("raster.note"), "conversion");
         showCaptureDate(ui, date);
-        await ui.metadata(result.data, inputSize, {raster: !result.hdr, raw: input.format === 'dng'});
-        await tryAiPortrait(null,output,ui,file.name,file);
+        await ui.metadata(result.data, inputSize, {raster: !result.hdr, raw: input.format === 'dng'});overall(88);
+        overall(90);await tryAiPortrait(null,output,ui,file.name,file);
         adaptiveStyleCompletionNotice(ui,result.styleRecommendation);
         return;
       }
       if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
-      let d = input.discovery;
+      overall(12);let d = input.discovery;
       if(aiFeatures.enabled('detail')){
         if(d.hdrGrid!==null&&d.hdrTiles?.length){
           if(!globalThis.crossOriginIsolated){
@@ -99,17 +104,18 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
               const enhanced=await enhanceNativeHdrHeic(bytes,{
                 modelId:selectedAiLevel(),provider:gpuAcceleration.checked?'webgpu':'wasm'
               },{onProgress:progress=>{
-                if(['download','modelCache','modelCacheWarning','modelLoading'].includes(progress.stage))ui.set(aiText().detailPreparing);
+                if(['download','modelCache','modelCacheWarning','modelLoading'].includes(progress.stage)){overall(16);ui.set(aiText().detailPreparing);}
                 else if(progress.stage==='inference'){
                   const percent=stagePercent(progress.progress?.done,progress.progress?.total);
-                  ui.set(percent?`${aiText().detailWorking} ${percent}`:aiText().detailWorking);
+                  overall(mapped(18,28,progress.progress?.done,progress.progress?.total));ui.set(percent?`${aiText().detailWorking} ${percent}`:aiText().detailWorking);
                 }else if(/^hdr(Primary|Gain)(Decode|Encode)$/.test(progress.stage)){
                   const percent=stagePercent(progress.done,progress.total);
-                  ui.set(percent?`${aiText().detailHdrWorking} ${percent}`:aiText().detailHdrWorking);
+                  overall(mapped(28,34,progress.done,progress.total));ui.set(percent?`${aiText().detailHdrWorking} ${percent}`:aiText().detailHdrWorking);
                 }
-                else if(progress.stage==='modelDownload')
-                  ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
-                else ui.set(aiText().detailHdrWorking);
+                else if(progress.stage==='modelDownload'){
+                  overall(mapped(14,22,progress.loaded,progress.total));ui.set(modelDownloadStatus(aiText().detailDownloading,progress));
+                }
+                else {overall(30);ui.set(aiText().detailHdrWorking);}
               }});
               bytes=enhanced.data;d=discoverHeic(bytes);
               ui.note(aiText().detailHdrApplied,'detail');
@@ -121,7 +127,7 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         }else ui.note(aiText().detailHeic,'detail');
       }
 
-      const textureOnly = preserveNativeStyles(bytes,d);
+      overall(36);const textureOnly = preserveNativeStyles(bytes,d);
       const nativeTexture = nativeTextureCapture(bytes,d);
       const {nativePortraitBaseState}=await import('../../portrait/ai-portrait-container.js');
       const portraitState=nativePortraitBaseState(bytes,d);
@@ -138,36 +144,36 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         // iPhone 18+ native captures can expose Texture/Film through capture metadata
         // without the grafted texture_styles/matte graph. Never graft a second Texture
         // contract onto those files; Photos already owns the native render path.
-        data=bytes;
+        data=bytes;overall(58);
         bits=[T('st.native'),T('st.texture')];
         suffix='_Preserved.HEIC';
       } else if (preserveIncomplete) {
         // A selected preset is not the Styles editing graph. Adding Texture alone
         // advertises a new renderer without the colour resources it needs. Keep
         // this incomplete native export intact and register only its own HDR map.
-        ({data} = await repairTextureInWorker(bytes,{preserveStyles:true}));
+        overall(42);({data} = await repairTextureInWorker(bytes,{preserveStyles:true}));overall(58);
         data ||= bytes;
         bits = [T('st.original')];
         suffix = '_Preserved.HEIC';
       } else if ((textureOnly&&!rebuildNativePortrait) || d.stylesItem !== null) {
         // A native iPhone 16/17 style photo is never re-ported (that would replace its real
         // style data); it only gets the iOS 27 Texture/Grain set added.
-        ui.set(T("st.working"));
+        overall(42);ui.set(T("st.working"));
         if (hasTexture(d.infos)) {
-          ({data} = await repairTextureInWorker(bytes,{preserveStyles:textureOnly}));
+          ({data} = await repairTextureInWorker(bytes,{preserveStyles:textureOnly}));overall(58);
           // A complete Styles file can still be used as input for opt-in Portrait.
           bits = data ? [T('st.native'), T('st.texturerepaired')] : [T('st.native'),T('st.texture')];
           suffix = data ? '_TextureFixed.HEIC' : '_SoftSkin.HEIC';
           data ||= bytes;
         } else {
-          ({ data } = await addTextureInWorker(bytes,{preserveStyles:textureOnly,allowMissingStyles:textureOnly}));
+          ({ data } = await addTextureInWorker(bytes,{preserveStyles:textureOnly,allowMissingStyles:textureOnly}));overall(58);
           bits = [T("st.native"), T("st.texture")];
           suffix = "_TextureGrain.HEIC";
         }
       } else {
         const needsExperimental = d.hdrGrid === null
           || !styleDeltaSize(...dimensionsForItem(d.props, d.primary));
-        const index=await ensureProfileIndex();
+        overall(38);const index=await ensureProfileIndex();
         const name = profileFor(index, d, needsExperimental);
         const profile = await getProfile(name);
         // Start processing; if the thumbnail is missing, dynamically load the generator.
@@ -178,9 +184,10 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
           const { generateLinearThumbnail } = await import("../../codecs/linear-thumbnail.js");
           try {
             linearThumb = await generateLinearThumbnail(bytes, progress => {
-              if (progress.stage === "modelDownload")
-                ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
-              else ui.set(T(progress.stage === "encode" ? "st.thumbnail" : "st.working"));
+              if (progress.stage === "modelDownload"){
+                overall(mapped(38,46,progress.loaded,progress.total));ui.set(`${T("st.encoderload")} ${(progress.loaded / 1048576).toFixed(1)} MB`);
+              }
+              else {overall(progress.stage === "encode" ? 46 : 42);ui.set(T(progress.stage === "encode" ? "st.thumbnail" : "st.working"));}
             });
           } catch (e) {
             console.error("could not generate thumbnail", e);
@@ -192,23 +199,23 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         // Finish thumbnail encoding before retaining a decoded primary canvas:
         // keeping both full-resolution jobs live increases Safari's memory peak.
         if(rebuildNativePortrait&&portraitState!=='existing-renderer'){
-          ui.set(T('st.working'));
+          overall(46);ui.set(T('st.working'));
           try{
             const {analyzeNativePortraitBase}=await import('../../portrait/native-base-analysis.js');
             sharpBackgroundEvidence=await analyzeNativePortraitBase(bytes,d);
             restorePortrait ||= Boolean(sharpBackgroundEvidence);
           }catch(error){console.warn('Native background analysis unavailable',error);}
         }
-        const canDecode = await ensureDecode(bytes);
+        const canDecode = await ensureDecode(bytes);overall(50);
         ui.set(T("st.working"));
         const opts = canDecode
           ? { decode: decodeToRgb, sceneStats: "target", lightMaps: "target", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) }
           : { sceneStats: "donor", linearThumb, experimental: needsExperimental, texture: !hasTexture(d.infos) };
         opts.portraitStyleRebuild=rebuildNativePortrait;
         opts.sharpBackgroundEvidence=sharpBackgroundEvidence;
-        if(aiFeatures.enabled('style')&&!rebuildNativePortrait)opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);
+        if(aiFeatures.enabled('style')&&!rebuildNativePortrait){overall(52);opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui);overall(56);}
         let report;
-        ({ data, report } = await patchInWorker(bytes, profile, opts));
+        ({ data, report } = await patchInWorker(bytes, profile, opts));overall(62);
         // patch() degrades rather than failing when the decoder misbehaves, so trust
         // what it reports it actually did, not what we asked for.
         if (report.decodeError) console.warn("decoder unavailable:", report.decodeError);
@@ -226,12 +233,14 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         if (needsExperimental) bits.push(T("st.experimental"));
         suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
       }
-      if (!preserveIncomplete)
-        data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});
+      if (!preserveIncomplete){
+        overall(64);data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});overall(72);
+      }else overall(72);
       if(restorePortrait&&!preserveIncomplete){
-        const restored=await restoreNativePortraitInWorker(data,{sharpBackgroundEvidence});
+        overall(74);const restored=await restoreNativePortraitInWorker(data,{sharpBackgroundEvidence});
         if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
-      }
+        overall(78);
+      }else overall(78);
       // Bake the visible rendition only after every metadata/Texture/Portrait
       // rebuild. This guarantees the exact file offered to Photos owns the styled
       // primary and thumbnail instead of letting a later graph rebuild restore the
@@ -241,10 +250,10 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         try{
           const {renderSuggestedStyleDisplay}=await import('../../recommend/style-display-heic.js');
           const rendered=await renderSuggestedStyleDisplay(data,adaptiveStyleRecommendation,{
-            onProgress:progress=>{if(progress?.stage==='styleDisplay')ui.set(T('st.working'));}});
+            onProgress:progress=>{if(progress?.stage==='styleDisplay'){overall(82);ui.set(T('st.working'));}}});
           if(needsStyledDisplay&&!rendered.rendered)
             throw Error(`Suggested Style display rendition was not written (${rendered.reason||'unknown'})`);
-          data=rendered.data;
+          data=rendered.data;overall(84);
         }catch(error){
           console.error('Suggested Style display rendition unavailable',error);
           // Metadata alone previews only inside Photos Edit and disappears on
@@ -261,7 +270,7 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
       const shareFile = new File([data], outName, { type: "image/heic",
         ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
       showCaptureDate(ui, date);
-      await ui.metadata(data, inputSize);
+      await ui.metadata(data, inputSize);overall(88);
       if (liveIdentifier) {
         ui.note(T("live.waitmovie"));
         const exporter=createLivePhotoExport(bytes,{
@@ -278,7 +287,7 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         livePhotos.push(photo);
         attachMovie(photo);
       }
-      await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
+      overall(90);await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
       adaptiveStyleCompletionNotice(ui,adaptiveStyleRecommendation);
       if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));
       else if(portraitState&&portraitState!=='existing-renderer'&&!restorePortrait)

@@ -18,7 +18,7 @@ jobs:
       - run: node tools/package-ai-style-models.mjs assemble
       - run: node tests/web/check-i18n.mjs
       - run: node tests/web/check-pwa.mjs
-      - run: node tests/web/application.mjs
+      - run: node --test tests/web/application.mjs tests/web/app-shell.mjs tests/web/stylesheets.mjs
       - run: node --test tests/web/module-paths.mjs
       - run: node --test tests/web/web-release.mjs
       - run: node --test tests/web/depth-refinement.mjs tests/web/native-base-analysis.mjs

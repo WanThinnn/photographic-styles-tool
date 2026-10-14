@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Stylio</title>
 <meta name="description" content="Adds the Photographic Styles palette, introduced with iPhone 16, to HEIC photos from earlier iPhones, plus the Texture and Grain controls on iOS 27. Runs entirely in your browser; photos are never uploaded.">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f7f8fc" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#101118" media="(prefers-color-scheme: dark)">
+<meta id="app-color-scheme" name="color-scheme" content="light">
+<meta id="app-theme-color" name="theme-color" content="#f2f2f7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Stylio">
@@ -17,63 +16,111 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-v2.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192-v2.png">
+<script>(()=>{let t='system';try{const v=localStorage.getItem('stylio-theme-v1');if(v==='light'||v==='dark'||v==='system')t=v}catch{}const dark=t==='dark'||t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;const scheme=dark?'dark':'light';document.documentElement.style.colorScheme=scheme;document.getElementById('app-color-scheme').content=scheme;document.getElementById('app-theme-color').content=dark?'#000000':'#f2f2f7'})()</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<section id="ios-install-guide" class="ios-install-guide" role="dialog" aria-modal="true" aria-labelledby="install-guide-title" hidden>
+  <div class="install-guide-shell">
+    <div class="install-guide-hero" aria-hidden="true">
+      <span class="install-guide-orbit install-guide-orbit-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg></span>
+      <span class="install-guide-orbit install-guide-orbit-spark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.3 4.2 4.2 1.3-4.2 1.3L12 14l-1.3-4.2-4.2-1.3 4.2-1.3Z"/><path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7Z"/></svg></span>
+      <span class="install-guide-orbit install-guide-orbit-sliders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h3m4 0h9M4 12h9m4 0h3M4 18h3m4 0h9"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg></span>
+      <span class="install-guide-orbit install-guide-orbit-model"><svg class="ai-model-network-symbol" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.7 4.3 7.8v12.4l9.7 5.1 9.7-5.1V7.8Z"/><path d="M14 2.7v22.6M4.3 7.8l19.4 12.4M23.7 7.8 4.3 20.2M4.3 14h19.4M14 14 4.3 7.8M14 14l9.7-6.2M14 14l9.7 6.2M14 14l-9.7 6.2"/><circle cx="14" cy="2.7" r="1.55"/><circle cx="4.3" cy="7.8" r="1.55"/><circle cx="23.7" cy="7.8" r="1.55"/><circle cx="4.3" cy="20.2" r="1.55"/><circle cx="23.7" cy="20.2" r="1.55"/><circle cx="14" cy="25.3" r="1.55"/><circle cx="14" cy="14" r="1.8"/></svg></span>
+      <span class="install-guide-app-mark">
+        <img class="install-guide-logo-light" src="icons/photographic-styles.svg" alt="">
+        <img class="install-guide-logo-dark" src="icons/photographic-styles-dark.svg" alt="">
+      </span>
+    </div>
+    <div class="install-guide-copy">
+      <h2 id="install-guide-title" data-i18n="install.title">Use Stylio like an app</h2>
+      <p data-i18n="install.lede">Add Stylio to your Home Screen for the full-screen experience and more room for photos.</p>
+    </div>
+    <div class="install-guide-steps">
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-icon-neutral" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h8"/></svg></span>
+        <span><strong data-i18n="install.menutitle">Open Safari menu</strong><small data-i18n="install.menuhint">Tap the three-line menu in Safari's bottom bar.</small></span>
+      </div>
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><rect x="5" y="10" width="14" height="11" rx="3"/></svg></span>
+        <span><strong data-i18n="install.step1">Tap Share</strong><small data-i18n="install.step1hint">Choose Share from the Safari menu.</small></span>
+      </div>
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
+        <span><strong data-i18n="install.step2">Add to Home Screen</strong><small data-i18n="install.step2hint">Choose Add to Home Screen in the share sheet.</small></span>
+      </div>
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-app" aria-hidden="true">
+          <img class="install-guide-logo-light" src="icons/photographic-styles.svg" alt="">
+          <img class="install-guide-logo-dark" src="icons/photographic-styles-dark.svg" alt="">
+        </span>
+        <span><strong data-i18n="install.step3">Open Stylio</strong><small data-i18n="install.step3hint">Launch it from Home Screen to use Stylio without Safari's tab bar.</small></span>
+      </div>
+    </div>
+    <button id="install-guide-continue" class="install-guide-continue" type="button" data-i18n="install.continue">Continue in Safari</button>
+  </div>
+</section>
 <main>
   <header class="top">
-    <img class="logo" src="icons/photographic-styles.svg" width="36" height="36" alt="" aria-hidden="true">
+    <span class="app-logo" aria-hidden="true">
+      <img class="logo logo-light" src="icons/photographic-styles.svg" width="40" height="40" alt="">
+      <img class="logo logo-dark" src="icons/photographic-styles-dark.svg" width="40" height="40" alt="">
+    </span>
     <div class="title">
       <h1 data-i18n="meta.title">Stylio</h1>
       <span class="tagline" data-i18n="app.tagline">Photographic Styles for your photos</span>
     </div>
-    <label class="language">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
-      <span class="sr-only" data-i18n="lang.label">Language</span>
-      <select id="lang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh">中文</option></select>
-    </label>
+    <button id="header-guide" class="icon-button top-guide glass-surface" type="button" aria-label="Guide">
+      <svg class="top-help-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 4.5 1.2c-.8 1.1-2.3 1.4-2.3 3"/><path d="M12 17h.01"/></svg>
+      <svg class="top-github-symbol" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .08 1.53 1.06 1.53 1.06.9 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.64-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.72 0 0 .84-.28 2.75 1.05A9.34 9.34 0 0 1 12 6.95c.85 0 1.7.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.46.1 2.72.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.59.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"/></svg>
+    </button>
   </header>
 
+  <section id="process-screen" class="app-screen" aria-label="Process">
   <section class="intro">
     <h2><span data-i18n="app.hero">A new mood.</span></h2>
     <p class="sub" data-i18n="app.lede">Add Styles, Texture and Grain. Privately, on your device.</p>
   </section>
 
   <div class="workspace">
-  <div id="drop" role="button" tabindex="0" aria-disabled="true">
-    <div class="drop-icon" aria-hidden="true">
+  <button id="drop" type="button" aria-disabled="true">
+    <span class="drop-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>
-    </div>
+    </span>
     <strong data-i18n="drop.big">Choose photos</strong>
-    <span data-i18n="drop.small">HEIC, JPG, PNG, DNG · or drop here</span>
-  </div>
+    <span class="desktop-upload-copy" data-i18n="drop.small">HEIC, JPG, PNG, DNG · or drop here</span><span class="mobile-upload-copy">HEIC, JPG, PNG, DNG</span>
+  </button>
   <input type="file" id="file" multiple disabled
          accept="image/heic,image/heif,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,image/x-adobe-dng,video/quicktime,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.dng,.mov">
 
   <aside id="ios-format-tip" class="photo-format-tip" aria-labelledby="ios-format-title" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg>
-    <div><strong id="ios-format-title" data-i18n="tip.firsttitle">Keep the original photo format</strong><p id="ios-format-copy" data-i18n="tip.firstbody">Select photos → <b>•••</b> → <b>Options</b> → <b>Format</b> → <b>Current</b>.</p></div>
+    <div><strong id="ios-format-title" data-i18n="tip.firsttitle">Keep the original photo format</strong><p id="ios-format-copy" data-i18n="tip.firstbody">Select photos → <b>•••</b> → <b>Options</b> <br> → <b>Format</b> → <b>Current</b>.</p></div>
     <button id="ios-format-dismiss" type="button" data-i18n="tip.dismiss">Got it</button>
   </aside>
 
   <section class="depth-options" aria-labelledby="enhance-ai-label">
-  <div class="portrait-option">
-    <label for="enhance-ai" id="enhance-ai-label">Enhance Photo with AI</label>
+  <div class="portrait-option ai-summary">
+    <label for="enhance-ai" id="enhance-ai-label">Smart Enhance photo</label>
     <input type="checkbox" id="enhance-ai" disabled role="switch">
-  </div>
-  <p id="ai-settings-discovery" class="ai-settings-discovery" hidden><span id="ai-settings-discovery-copy">More AI features</span></p>
-  <details id="ai-settings" class="ai-settings">
-    <summary>
+    <p id="ai-settings-discovery" class="ai-settings-discovery" hidden><span class="ai-discovery-pill"><svg class="ai-discovery-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2Z"/><path d="m18.5 13 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7Z"/></svg><span id="ai-settings-discovery-copy">More AI features</span><svg class="ai-discovery-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M10 7h7v7"/></svg></span></p>
+    <button id="open-ai-settings" class="icon-button ai-settings-trigger glass-surface" aria-haspopup="dialog" aria-controls="ai-settings" type="button" aria-labelledby="ai-settings-label">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h3m4 0h9M4 12h9m4 0h3M4 18h3m4 0h9"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg>
       <span id="ai-settings-label" class="sr-only">AI settings</span>
-    </summary>
-    <div class="ai-settings-panel">
+    </button>
+  </div>
+  <dialog id="ai-settings" class="sheet" aria-labelledby="ai-sheet-title" tabindex="-1">
+    <header class="sheet-header"><button type="button" class="icon-button glass-surface" data-close-dialog aria-labelledby="close-ai-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-ai-label" class="sr-only" data-i18n="shell.closeai">Close AI settings</span></button><h2 id="ai-sheet-title" data-i18n="shell.aisettings">AI settings</h2></header>
+    <div class="sheet-body ai-settings-panel">
+    <h3 class="group-title" data-i18n="shell.effects">Effects</h3>
     <div class="portrait-option">
+      <span class="ai-option-icon ai-option-icon-blue" aria-hidden="true"><svg class="ai-depth-focus-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H6a3 3 0 0 0-3 3v2M16 3h2a3 3 0 0 1 3 3v2M3 16v2a3 3 0 0 0 3 3h2M21 16v2a3 3 0 0 1-3 3h-2"/><path d="m8 9 4-2 4 2-4 2Z"/><path d="m8 12.4 4 2 4-2M8 15.4l4 2 4-2"/></svg></span>
       <div class="ai-option-copy"><label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
       <p id="ai-portrait-hint" class="ai-hint"></p></div>
       <input type="checkbox" id="ai-portrait" role="switch" disabled aria-describedby="ai-portrait-hint">
     </div>
     <div class="portrait-option detail-option">
+      <span class="ai-option-icon ai-option-icon-amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.1 3.5L16.5 8l-3.4 1.5L12 13l-1.1-3.5L7.5 8l3.4-1.5Z"/><path d="M5 15h14M7 19h10"/></svg></span>
       <div class="ai-option-copy">
         <label for="ai-detail" id="ai-detail-label">Sharpen Photo</label>
         <p id="ai-detail-hint" class="ai-hint">Experimental: preserves the current editable HEIC output until compatibility is validated.</p>
@@ -81,13 +128,16 @@
       <input type="checkbox" id="ai-detail" role="switch" disabled aria-describedby="ai-detail-hint">
     </div>
     <div class="portrait-option style-option">
+      <span class="ai-option-icon ai-option-icon-violet" aria-hidden="true"><svg class="ai-style-matrix-symbol" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><g opacity=".55"><circle cx="6" cy="6" r="1.15"/><circle cx="10" cy="6" r="1.15"/><circle cx="14" cy="6" r="1.15"/><circle cx="18" cy="6" r="1.15"/><circle cx="6" cy="10" r="1.15"/><circle cx="10" cy="10" r="1.15"/><circle cx="14" cy="10" r="1.15"/><circle cx="6" cy="14" r="1.15"/><circle cx="10" cy="14" r="1.15"/><circle cx="18" cy="14" r="1.15"/><circle cx="6" cy="18" r="1.15"/><circle cx="10" cy="18" r="1.15"/><circle cx="14" cy="18" r="1.15"/><circle cx="18" cy="18" r="1.15"/></g><circle cx="14" cy="14" r="1.85"/><circle cx="18" cy="10" r="1.55" opacity=".9"/></svg></span>
       <div class="ai-option-copy">
         <label for="ai-style-suggest" id="ai-style-suggest-label">Suggested Styles</label>
         <p id="ai-style-suggest-hint" class="ai-hint">Analyzes this photo on device and chooses an editable Style starting point.</p>
       </div>
       <input type="checkbox" id="ai-style-suggest" role="switch" disabled aria-describedby="ai-style-suggest-hint">
     </div>
+    <h3 class="group-title" data-i18n="shell.processing">Processing options</h3>
     <div class="portrait-option gpu-option">
+      <span class="ai-option-icon ai-option-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M19 9h3M2 15h3M19 15h3"/><path d="m10 15 4-6v5h2l-4 5v-4Z"/></svg></span>
       <div class="ai-option-copy">
       <label for="gpu-acceleration" id="gpu-acceleration-label">GPU acceleration</label>
       <p id="gpu-acceleration-hint" class="ai-hint">On: GPU · Off: CPU. Applies to the next photo; preview still uses GPU.</p>
@@ -95,53 +145,186 @@
       <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
     </div>
     <div class="depth-model-row portrait-option">
+      <span class="ai-option-icon ai-option-icon-neutral" aria-hidden="true"><svg class="ai-model-network-symbol" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.7 4.3 7.8v12.4l9.7 5.1 9.7-5.1V7.8Z"/><path d="M14 2.7v22.6M4.3 7.8l19.4 12.4M23.7 7.8 4.3 20.2M4.3 14h19.4M14 14 4.3 7.8M14 14l9.7-6.2M14 14l9.7 6.2M14 14l-9.7 6.2"/><circle cx="14" cy="2.7" r="1.55"/><circle cx="4.3" cy="7.8" r="1.55"/><circle cx="23.7" cy="7.8" r="1.55"/><circle cx="4.3" cy="20.2" r="1.55"/><circle cx="23.7" cy="20.2" r="1.55"/><circle cx="14" cy="25.3" r="1.55"/><circle cx="14" cy="14" r="1.8"/></svg></span>
       <div class="ai-option-copy">
       <label for="depth-model" id="depth-model-label">Model</label>
-      <p id="depth-model-hint" class="ai-hint">Lite is faster; Pro analyzes more deeply for finer AI results and better Style suggestions.</p>
+      <p id="depth-model-hint" class="ai-hint">Lite is faster. Pro gives finer AI results.</p>
       </div>
-      <div class="depth-model-control">
+      <fieldset id="model-options" class="depth-model-control" aria-labelledby="depth-model-label" aria-describedby="depth-model-hint">
+        <legend class="sr-only" data-i18n="shell.model">Model</legend>
         <output id="depth-model-value" for="depth-model">Standard</output>
         <div class="depth-model-slider" data-level="1">
-          <input id="depth-model" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Standard" aria-describedby="depth-model-hint">
+          <input id="depth-model" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Standard" aria-labelledby="depth-model-label" aria-describedby="depth-model-hint">
           <span class="model-stop" data-level="0" aria-hidden="true"></span><span class="model-stop" data-level="1" aria-hidden="true"></span><span class="model-stop" data-level="2" aria-hidden="true"></span>
           <span class="model-knob" aria-hidden="true"></span>
         </div>
-      </div>
+      </fieldset>
     </div>
     </div>
-  </details>
+  </dialog>
   </section>
   <p class="ai-hint"><span data-i18n="hint.softskin">Missing Soft Skin data is added automatically. Photos are always processed on your device.</span></p>
   </div>
 
+  <p id="boot" role="status">Preparing the tool for first use…</p>
+  <section id="current-task" class="current-task" hidden aria-labelledby="task-heading"><h3 id="task-heading" data-i18n="shell.activity">Activity</h3><div id="task-content"></div></section>
+  </section>
+  <section id="history-screen" class="app-screen" aria-labelledby="history-title" hidden>
+  <div class="screen-heading"><h2 id="history-title" data-i18n="shell.history">History</h2><p data-i18n="shell.session">Available this session. Download copies before closing the app.</p></div>
   <div class="history-actions">
     <h2 data-i18n="h.history">Processing history</h2>
     <div class="history-tools">
-      <button id="clear-assets" type="button" class="history-clear" aria-describedby="clear-assets-hint" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="cache-icon" d="M7 21h14M3 17a2 2 0 0 1 0-2.8L14.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L9.8 21H7ZM8 10l8 8"/><path class="cache-done" d="m5 12 4 4L19 6"/><path class="cache-spinner" d="M20 12a8 8 0 1 1-4-6.93"/></svg><span id="clear-assets-label">Clear cache</span></button>
-      <p id="clear-assets-hint" class="sr-only">Removes downloaded tools; keeps photos and preferences. Tools download again when needed.</p><p id="clear-assets-status" class="sr-only" role="status"></p>
     <button id="clear-history" class="history-clear" type="button" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7"/></svg>
       <span data-i18n="btn.clearhistory">Clear history</span>
     </button>
     </div>
   </div>
-  <div id="list" aria-live="polite"></div>
-  <p id="boot">Preparing the tool for first use…</p>
-
-  <details class="help">
-    <summary data-i18n="h.help">Help & information</summary>
-    <div class="help-content">
-      <section><h2 data-i18n="h.steps">How to use</h2><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></section>
-      <section><h2 data-i18n="h.formats">Formats and processing</h2><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></section>
-      <section><h2 data-i18n="h.editlimits">iPhone 16/17 photos with edited Styles or Portrait</h2><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></section>
-      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p>
-        <p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
-      <section><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p><p data-i18n="help.language">The default language follows your browser. Your language choice is remembered and always takes priority.</p></section>
+  <p id="history-search-summary" class="search-summary" role="status" hidden></p>
+  <p id="history-no-matches" class="empty-state" data-i18n="shell.nomatches" hidden>No matching results.</p>
+  <div id="history-items" class="history-items"></div>
+  <div id="history-empty" class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><h3 data-i18n="shell.empty">A little history starts here.</h3><p data-i18n="shell.emptyhint">Choose photos in Process. Your results will appear here.</p></div>
+  </section>
+  <div id="list"></div>
+  <div class="app-dock">
+  <nav class="app-tabs glass-surface" aria-label="Stylio">
+    <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><span class="tab-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span id="history-count" class="tab-count" hidden></span></span><span data-i18n="shell.history">History</span></button>
+    <button type="button" data-screen="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15M6 8h3M6 11h3M15 8h3M15 11h3"/></svg><span data-i18n="shell.guide">Guide</span></button>
+    <button class="app-tab" data-screen="settings" aria-controls="settings-screen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.6 2a8 8 0 0 0-1.6.9l-2-.5-2.5 4.2 1.5 1.5a8 8 0 0 0 0 1.8l-1.5 1.5 2.5 4.2 2-.5a8 8 0 0 0 1.6.9l.6 2h5l.6-2a8 8 0 0 0 1.6-.9l2 .5 2.5-4.2-1.5-1.5a8 8 0 0 0 0-1.8l1.5-1.5-2.5-4.2-2 .5a8 8 0 0 0-1.6-.9l-.6-2Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="shell.settings">Settings</span></button>
+  </nav>
+  <div id="history-search-field" class="dock-search-field glass-surface" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+    <label for="history-search" class="sr-only" data-i18n="shell.search">Search history</label>
+    <input id="history-search" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" aria-controls="history-items" placeholder="Search history">
+    <button id="clear-search" type="button" class="search-clear" hidden aria-labelledby="clear-search-label">×<span id="clear-search-label" class="sr-only" data-i18n="shell.clearsearch">Clear search</span></button>
+  </div>
+  <button id="toggle-search" class="icon-button dock-search glass-surface" type="button" aria-expanded="false" aria-controls="history-search-field" aria-labelledby="search-button-label">
+    <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+    <svg class="search-close-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    <span id="search-button-label" class="sr-only" data-i18n="shell.search">Search history</span>
+  </button>
+</div>
+  <section id="guide-screen" class="app-screen guide-screen" hidden aria-labelledby="guide-title">
+    <div class="screen-heading"><h2 id="guide-title" data-i18n="shell.guide">Guide</h2></div>
+    <div class="help-content guide-content">
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.steps">How to use</strong><span data-i18n="guide.steps.short">Choose, process, save, then fine-tune in Photos.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></div>
+      </details>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-purple" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 17l8 4 8-4"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.formats">Formats and processing</strong><span data-i18n="guide.formats.short">Supported formats, HDR, Live Photo and originals.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></div>
+      </details>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-orange" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/><path d="M18 5h3v3"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.editlimits">Edited Styles or Portrait</strong><span data-i18n="guide.edit.short">What Stylio can preserve—and what Photos may omit.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></div>
+      </details>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-3-3Z"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.trouble">Troubleshooting</strong><span data-i18n="guide.trouble.short">First-run downloads, large photos and capture dates.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p><p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></div>
+      </details>
+      <div class="guide-footnote"><span class="guide-footnote-icon" aria-hidden="true">i</span><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p></div>
     </div>
-  </details>
+  </section>
+  <section id="settings-screen" class="app-screen settings-screen" hidden aria-labelledby="settings-title">
+    <div class="screen-heading settings-heading">
+      <h2 id="settings-title" data-i18n="shell.settings">Settings</h2>
+    </div>
+    <div class="settings-content">
+      <h3 class="group-title" data-i18n="shell.preferences">Preferences</h3>
+      <div class="settings-group">
+        <label class="settings-nav-row language-row">
+          <span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.7 2.6 14.3 0 17M12 3.5c-2.6 2.7-2.6 14.3 0 17"/></svg></span>
+          <span class="settings-row-label" data-i18n="settings.applanguage">App language</span>
+          <span id="language-label" class="sr-only" data-i18n="lang.label">Language</span>
+          <select id="lang" aria-labelledby="language-label"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh">中文</option></select>
+          <span class="settings-chevron" aria-hidden="true"></span>
+        </label>
+      </div>
 
-  <footer><span data-i18n="p.author">by Elio</span> · <span data-i18n="p.version">Version</span> <span id="version">0.6.2-web</span> · <a href="https://github.com/WanThinnn/photographic-styles-tool">GitHub</a> · <a href="LICENSE.txt">MIT</a></footer>
+      <h3 class="group-title" data-i18n="settings.appearance">Appearance</h3>
+      <div class="settings-group appearance-card">
+        <div class="settings-appearance-heading">
+          <span class="settings-leading-icon settings-icon-appearance" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="7.5"/>
+              <path d="M12 4.5a7.5 7.5 0 0 0 0 15Z"/>
+            </svg>
+          </span>
+          <div class="settings-row-copy"><strong id="appearance-control-label" data-i18n="settings.appearance">Appearance</strong><span data-i18n="settings.appearancehint">Choose how Stylio looks on this device.</span></div>
+        </div>
+        <div class="appearance-segment" role="group" aria-labelledby="appearance-control-label">
+          <button type="button" class="appearance-option" data-theme-value="light" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg><span data-i18n="settings.light">Light</span></button>
+          <button type="button" class="appearance-option is-selected" data-theme-value="system" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="3"/><path d="M8 22h8M12 19v3"/></svg><span data-i18n="settings.system">System</span></button>
+          <button type="button" class="appearance-option" data-theme-value="dark" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 15.3A8 8 0 0 1 8.7 4a8.3 8.3 0 1 0 11.3 11.3Z"/></svg><span data-i18n="settings.dark">Dark</span></button>
+        </div>
+      </div>
+
+      <h3 class="group-title" data-i18n="settings.processingprefs">Processing</h3>
+      <div class="settings-group settings-future-group">
+        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 14v5h14v-5"/></svg></span><span class="settings-row-label" data-i18n="settings.defaultsave">Default save action</span><span class="settings-row-value" data-i18n="settings.shareSheet">Share sheet</span><span class="settings-chevron" aria-hidden="true"></span></div>
+        <div class="settings-separator"></div>
+        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 2h10v20H7z"/><path d="M10 5h4M10 19h4"/></svg></span><span class="settings-row-label" data-i18n="settings.keepscreen">Keep screen awake</span><span class="settings-row-value" data-i18n="settings.off">Off</span></div>
+        <div class="settings-separator"></div>
+        <label class="settings-nav-row settings-switch-row" for="result-preview"><span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg></span><span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.resultpreview">Result preview</span><span class="settings-inline-note" data-i18n="settings.resultpreviewhint">Show photo previews after processing. Turn off on slower devices.</span></span><input id="result-preview" type="checkbox" role="switch" checked></label>
+        <div class="settings-separator"></div>
+        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="17" cy="17" r="3"/></svg></span><span class="settings-row-label" data-i18n="settings.originalformat">Prefer original format</span><span class="settings-row-value" data-i18n="settings.automatic">Automatic</span></div>
+      </div>
+
+      <h3 class="group-title" data-i18n="shell.storage">On this device</h3>
+      <div class="settings-group settings-cache">
+        <button id="refresh-app" type="button" class="settings-nav-row settings-action-row">
+          <span class="settings-leading-icon settings-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6v5h-5"/><path d="M18.3 16a7 7 0 1 1 .8-7L20 11"/></svg></span>
+          <span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.updateapp">Update Stylio</span><span class="settings-inline-note" data-i18n="settings.updatehint">Check for a newer app shell and refresh cached files.</span></span>
+        </button>
+        <div class="settings-separator"></div>
+        <button id="clear-assets" type="button" class="settings-nav-row settings-action-row" aria-describedby="clear-assets-hint" disabled>
+          <span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path class="cache-icon" d="M7 21h14M3 17a2 2 0 0 1 0-2.8L14.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L9.8 21H7ZM8 10l8 8"/><path class="cache-done" d="m5 12 4 4L19 6"/><path class="cache-spinner" d="M20 12a8 8 0 1 1-4-6.93"/></svg></span>
+          <span class="settings-row-stack"><span id="clear-assets-label" class="settings-row-label">Clear cache</span><span class="settings-inline-note" data-i18n="shell.cachehint">Downloaded tools can be removed safely. Photos and preferences are kept.</span></span>
+        </button>
+        <div class="settings-separator"></div>
+        <button id="full-cleanup" type="button" class="settings-nav-row settings-action-row settings-destructive-row" aria-describedby="full-cleanup-hint" disabled>
+          <span class="settings-leading-icon settings-icon-red" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></span>
+          <span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.fullcleanup">Reset Stylio</span><span id="full-cleanup-hint" class="settings-inline-note" data-i18n="settings.fullcleanuphint">Remove history, preferences, downloaded AI models and cached app files.</span></span>
+        </button>
+        <p id="refresh-app-status" class="sr-only" role="status"></p>
+        <p id="clear-assets-hint" class="sr-only">Removes downloaded tools; keeps photos and preferences. Tools download again when needed.</p><p id="clear-assets-status" class="sr-only" role="status"></p>
+        <p id="full-cleanup-status" class="sr-only" role="status"></p>
+      </div>
+
+      <h3 class="group-title" data-i18n="settings.about">About</h3>
+      <div class="settings-group settings-about">
+        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span><span class="settings-row-label" data-i18n="settings.appversion">App version</span><span class="settings-row-value" id="version">1.0.0</span></div>
+        <div class="settings-separator"></div>
+        <a class="settings-nav-row" href="https://github.com/WanThinnn/stylio" target="_blank" rel="noopener noreferrer"><span class="settings-leading-icon settings-icon-github" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .08 1.53 1.06 1.53 1.06.9 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.64-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.72 0 0 .84-.28 2.75 1.05A9.34 9.34 0 0 1 12 6.95c.85 0 1.7.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.46.1 2.72.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.59.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"/></svg></span><span class="settings-row-label" data-i18n="settings.sourcecode">Source code</span><span class="settings-row-value">GitHub</span><span class="settings-chevron" aria-hidden="true"></span></a>
+        <div class="settings-separator"></div>
+        <a class="settings-nav-row" href="THIRD_PARTY_NOTICES.txt"><span class="settings-leading-icon settings-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7Z"/><path d="M14 3v5h5M10 12h5M10 16h5"/></svg></span><span class="settings-row-label" data-i18n="settings.licenses">Open-source licenses</span><span class="settings-chevron" aria-hidden="true"></span></a>
+      </div>
+
+      <footer><span data-i18n="p.author">by Elio</span> · <a href="LICENSE.txt">MIT</a></footer>
+    </div>
+  </section>
 </main>
+<dialog id="photo-workspace" class="photo-workspace" aria-labelledby="photo-title" tabindex="-1">
+  <header class="sheet-header"><button type="button" class="icon-button glass-surface" id="close-photo" aria-labelledby="close-photo-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-photo-label" class="sr-only" data-i18n="shell.closephoto">Close photo</span></button><h2 id="photo-title" data-i18n="shell.photo">Photo</h2></header>
+  <div id="photo-content"></div>
+</dialog>
 <script type="module" src="src/ui/page-bootstrap.js"></script>
 </body>
 </html>

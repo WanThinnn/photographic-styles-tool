@@ -17,21 +17,26 @@ function switchControl(checked=false){
   return control;
 }
 
-test('enabling Smart Enhance selects Portrait and leaves other effects opt-in',()=>{
+test('AI Settings stays interactive while Smart Enhance is off, and either entry point can enable the group',()=>{
   const master=switchControl(),portrait=switchControl(),detail=switchControl(),style=switchControl();
   const state=createAiFeatureControls({master,features:{portrait,detail,style}});
-  assert.equal(portrait.disabled,true);
-  master.toggle();
-  assert.equal(master.checked,true);
   assert.equal(portrait.disabled,false);
   assert.equal(detail.disabled,false);
-  assert.equal(style.disabled,false);
-  assert.equal(portrait.checked,true);
+  detail.toggle();
+  assert.equal(master.checked,true,'choosing a feature inside AI Settings enables the outer group');
+  assert.equal(detail.checked,true);
+  assert.equal(portrait.checked,false,'implicit group enable must not force another feature on');
+  assert.equal(state.enabled('detail'),true);
+  master.toggle();
+  assert.equal(master.checked,false);
+  assert.equal(detail.checked,false,'turning Smart Enhance off clears every child feature');
+  assert.equal(portrait.disabled,false,'AI Settings remains available so a feature can re-enable the group');
+  master.toggle();
+  assert.equal(master.checked,true);
+  assert.equal(portrait.checked,true,'explicit Smart Enhance on still defaults to Portrait');
   assert.equal(detail.checked,false);
   assert.equal(style.checked,false);
   assert.equal(state.enabled('portrait'),true);
-  assert.equal(state.enabled('detail'),false);
-  assert.equal(state.enabled('style'),false);
 });
 
 test('Portrait can be disabled independently, and group off cancels all active features',()=>{
@@ -62,7 +67,7 @@ test('Portrait can be disabled independently, and group off cancels all active f
   assert.equal(portrait.checked,false);
   assert.equal(detail.checked,false);
   assert.equal(style.checked,false);
-  assert.equal(portrait.disabled,true);
+  assert.equal(portrait.disabled,false);
   master.toggle();
   assert.equal(portrait.checked,true);
   assert.equal(detail.checked,false);
@@ -90,11 +95,11 @@ test('readiness temporarily locks settings without selecting or clearing effects
 test('AI settings discovery hint persists across visits until settings is opened',()=>{
   const values=new Map(),storage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
   const makeVisit=()=>{
-    const summary=new EventTarget(),attrs=new Map(),hint={id:'discovery',hidden:true};
-    summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);
+    const summary=new EventTarget(),attrs=new Map(),classes=new Set(),hint={id:'discovery',hidden:true};
+    summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);summary.classList={add:value=>classes.add(value),contains:value=>classes.has(value)};
     const settings={querySelector:()=>summary};
     showAiSettingsHintOnce({hint,settings,storage});
-    return {summary,attrs,hint};
+    return {summary,attrs,hint,classes};
   };
   const first=makeVisit();
   assert.equal(first.hint.hidden,false);assert.equal(first.attrs.get('aria-describedby'),'discovery');
@@ -103,15 +108,16 @@ test('AI settings discovery hint persists across visits until settings is opened
   assert.equal(second.hint.hidden,false,'an unclicked hint must return on the next visit');
   second.summary.dispatchEvent(new Event('click'));
   assert.equal(second.hint.hidden,true);assert.equal(second.attrs.has('aria-describedby'),false);
-  assert.equal(values.get('stylio-ai-settings-hint-v2'),'opened');
+  assert.equal(values.get('stylio-ai-settings-hint-v2'),'opened');assert.equal(second.classes.has('ai-settings-discovered'),true);
   const third=makeVisit();
-  assert.equal(third.hint.hidden,true,'opening settings dismisses the hint for future visits');
+  assert.equal(third.hint.hidden,true,'opening settings dismisses the hint for future visits');assert.equal(third.classes.has('ai-settings-discovered'),true);
   assert.doesNotThrow(()=>showAiSettingsHintOnce({hint:first.hint,settings:{querySelector:()=>first.summary},storage:{getItem(){throw Error('denied');}}}));
 });
 
 test('AI switches share one quality control and have accessible localized copy',()=>{
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
-  const css=readFileSync(new URL('../../web/styles.css',import.meta.url),'utf8');
+  const entry=readFileSync(new URL('../../web/styles.css',import.meta.url),'utf8');
+  const css=[...entry.matchAll(/url\("([^"]+)"\)/g)].map(match=>readFileSync(new URL('../../web/'+match[1],import.meta.url),'utf8')).join('\n');
   const app=readApplicationSource();
   const portrait=html.indexOf('id="ai-portrait"');
   const detail=html.indexOf('id="ai-detail"');
@@ -119,25 +125,24 @@ test('AI switches share one quality control and have accessible localized copy',
   const gpu=html.indexOf('id="gpu-acceleration"');
   const sharedModel=html.indexOf('id="depth-model"');
   assert.ok(portrait>=0&&portrait<detail&&detail<style&&style<gpu&&gpu<sharedModel,'One model selector must follow Portrait, Detail, Suggested Styles and GPU');
-  assert.equal((html.match(/type="range"[^>]*id="(?:depth|detail)-model"|id="(?:depth|detail)-model"[^>]*type="range"/g)||[]).length,1);
+  assert.equal((html.match(/id="depth-model" type="range"/g)||[]).length,1);
+  assert.match(html,/id="depth-model"[^>]+min="0" max="2" step="1"[^>]+aria-valuetext="Standard"/);
+  assert.doesNotMatch(html,/name="ai-model"/);
   assert.doesNotMatch(html,/id="detail-model"/);
   assert.match(app,/modelId:selectedAiLevel\(\)/);
   assert.doesNotMatch(app,/detailSelector|selectedDetailModel|renderDetailModel/);
   assert.match(html,/id="ai-detail"[^>]+role="switch"[^>]+aria-describedby="ai-detail-hint"/);
   assert.match(html,/id="ai-style-suggest"[^>]+role="switch"[^>]+aria-describedby="ai-style-suggest-hint"/);
-  assert.match(css,/\.ai-settings :is\(\.detail-option, \.style-option, \.gpu-option\)/);
-  assert.match(css,/@keyframes ai-settings-in/);
-  assert.match(css,/@keyframes ai-settings-out/);
-  assert.match(css,/@property --ai-ring-angle/);
-  assert.match(css,/\.workspace:has\(\.ai-settings\[open\]\)[\s\S]*animation: ai-ring-spin/);
-  assert.match(css,/@keyframes ai-ring-spin/);
-  assert.match(css,/prefers-reduced-motion: reduce/);
-  assert.match(app,/aiSettings\.classList\.add\('is-closing'\)/);
-  assert.match(css,/:is\(#enhance-ai, #ai-portrait, #ai-detail, #ai-style-suggest, #gpu-acceleration\)/);
+  assert.match(html,/<dialog id="ai-settings"[^>]+aria-labelledby="ai-sheet-title"/);
+  assert.match(css,/@keyframes sheet-in/);
+  assert.match(css,/prefers-reduced-motion/);
+  assert.doesNotMatch(css,/ai-ring-spin|ai-settings-target-bounce/);
+  assert.match(css,/input\[role="switch"\]/);
   assert.match(app,/features:\{portrait:aiPortrait,detail:aiDetail,style:aiStyleSuggest\}/);
   assert.match(app,/function stagePercent\(/);
   assert.doesNotMatch(app,/progress\.progress\.done}\s*\/\s*\${progress\.progress\.total}|progress\.done}\s*\/\s*\${progress\.total}/);
   for(const lang of ['vi','en','zh']){
+    assert.doesNotMatch(AI_STRINGS[lang].masterToggle,/\bAI\b/i);
     assert.ok(AI_STRINGS[lang].detailToggle);
     assert.ok(AI_STRINGS[lang].detailHint);
     assert.ok(AI_STRINGS[lang].styleToggle);

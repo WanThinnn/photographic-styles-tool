@@ -1,0 +1,295 @@
+.workspace {
+  padding: 12px;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--card-radius)
+}
+
+#drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  width: 100%;
+  gap: 10px;
+  min-height: 200px;
+  padding: 28px 16px;
+  border: 1px dashed var(--line);
+  border-radius: calc(var(--card-radius) - 12px);
+  background: var(--bg);
+  color: var(--fg);
+  text-align: center;
+  transition: background var(--duration-fast),border-color var(--duration-fast)
+}
+
+#drop.over {
+  border-color: var(--accent);
+  background: var(--surface-secondary)
+}
+
+#drop[aria-disabled="true"] {
+  opacity: .5;
+  cursor: wait
+}
+
+#drop strong {
+  font-size: 1.0625rem;
+  font-weight: 650
+}
+
+#drop>span:not(.drop-icon) {
+  font-size: .8125rem;
+  color: var(--muted)
+}
+
+.drop-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 4px;
+  background: var(--icon-blue-bg);
+  color: var(--icon-blue-fg);
+  border-radius: 16px
+}
+
+.drop-icon svg {
+  width: 28px;
+  height: 28px
+}
+
+.mobile-upload-copy {
+  display: none
+}
+
+.depth-options {
+  position: relative;
+  margin: 10px 8px 0;
+  border-top: 1px solid var(--line)
+}
+
+.depth-options>.portrait-option {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 63px 44px;
+  align-items: center;
+  gap: 10px;
+  padding-block: 8px;
+  border: 0;
+  min-height: 64px
+}
+
+.depth-options>.ai-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px
+}
+
+.depth-options>.ai-summary>label {
+  flex: 0 1 auto;
+  min-width: 0
+}
+
+.depth-options>.ai-summary>input[type="checkbox"] {
+  flex: none
+}
+
+.depth-options>.ai-summary>.ai-settings-trigger {
+  flex: none;
+  margin-left: auto
+}
+
+.depth-options>.ai-summary>.ai-settings-discovery:not([hidden])+.ai-settings-trigger {
+  margin-left: 0
+}
+
+.workspace>.ai-hint {
+  font-size: .8125rem;
+  margin: 0 8px 6px;
+  color: var(--muted)
+}
+
+.photo-format-tip {
+  display: grid;
+  grid-template-columns: 17px minmax(0,1fr) auto;
+  align-items: start;
+  gap: 8px;
+  margin: 10px 0 8px;
+  padding: 10px 10px 10px 11px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-secondary);
+  font-size: .78125rem
+}
+
+.photo-format-tip>svg {
+  width: 17px;
+  height: 17px;
+  align-self: center;
+  margin-top: 0;
+  color: var(--accent-text)
+}
+
+.photo-format-tip p {
+  color: var(--muted);
+  margin: 3px 0 0;
+  line-height: 1.35
+}
+
+.photo-format-tip button {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  min-height: 44px;
+  padding: 0 2px 0 8px;
+  background: none;
+  border: 0;
+  color: var(--accent-text);
+  font-weight: 600;
+  white-space: nowrap
+}
+
+.ai-settings-trigger {
+  position: relative;
+  justify-self: end;
+  overflow: visible
+}
+
+.ai-settings-trigger::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  padding: 2px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,var(--ai-blue),var(--ai-violet) 34%,var(--ai-coral) 68%,var(--ai-amber) 84%,var(--ai-blue));
+  -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  transform-origin: center
+}
+
+.ai-settings-discovery {
+  display: flex;
+  align-items: center;
+  flex: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  pointer-events: none
+}
+
+.ai-discovery-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  margin-right: 1px;
+  padding: 4px 9px;
+  border: .5px solid var(--glass-outline);
+  border-radius: var(--capsule-radius);
+  background:
+    linear-gradient(180deg,#ffffff12,#00000005),
+    rgb(var(--glass-rgb) / .42);
+  box-shadow:
+    inset 0 1px 1px var(--glass-rim-top),
+    inset 0 -1px 1px var(--glass-rim-bottom),
+    0 3px 12px var(--glass-shade);
+  color: var(--accent-text);
+  font-size: .75rem;
+  font-weight: 650;
+  line-height: 1.2;
+  transform-origin: right center
+}
+
+#ai-settings-discovery-copy {
+  background: var(--gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent
+}
+
+.ai-discovery-spark {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--ai-violet)
+}
+
+.ai-discovery-arrow {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--ai-coral)
+}
+
+.ai-settings-discovery:not([hidden]) .ai-discovery-pill {
+  animation: ai-discovery-spring 620ms cubic-bezier(.18,.86,.22,1.18) both
+}
+
+.depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger {
+  outline: none;
+  animation: ai-settings-discovery-nudge 560ms cubic-bezier(.18,.86,.22,1.18) 120ms 1
+}
+
+.depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger::before {
+  animation: ai-settings-ring-spin 1.8s cubic-bezier(.18,.76,.2,1) both
+}
+
+@keyframes ai-discovery-spring {
+  0% { opacity: 0; transform: translateX(8px) scale(.88) }
+  58% { opacity: 1; transform: translateX(-2px) scale(1.1) }
+  78% { transform: translateX(0) scale(.98) }
+  100% { opacity: 1; transform: none }
+}
+
+@keyframes ai-settings-discovery-nudge {
+  0%,100% { scale: 1 }
+  55% { scale: 1.12 }
+  78% { scale: .98 }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger,
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger::before,
+  .ai-settings-discovery:not([hidden]) .ai-discovery-pill { animation: none }
+}
+
+@media(hover:hover) {
+  #drop:hover:not([aria-disabled="true"]) {
+    background: var(--surface-secondary)
+  }
+}
+
+@keyframes ai-settings-ring-spin {
+  0% { opacity: 0; transform: rotate(0deg) scale(.94) }
+  14% { opacity: 1; transform: rotate(70deg) scale(1.04) }
+  72% { opacity: 1; transform: rotate(560deg) scale(1.01) }
+  100% { opacity: 1; transform: rotate(720deg) scale(1) }
+}
+
+@media(max-width:767px) {
+  .depth-options>.portrait-option {
+    gap: 8px
+  }
+  .ai-settings-discovery {
+    display: none!important
+  }
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger {
+    animation: none
+  }
+  .depth-options>.portrait-option label {
+    flex: 1;
+    min-width: 0;
+    font-size: .9375rem;
+    line-height: 1.4
+  }
+  #drop {
+    border: 0;
+    min-height: 190px
+  }
+  .desktop-upload-copy {
+    display: none
+  }
+  .mobile-upload-copy {
+    display: block
+  }
+}

@@ -41,9 +41,9 @@ Double-click the launcher for your system:
 A console window shows the address and a status page opens in your browser. Close the window
 to stop the server.
 
-Requirements are the same as for the command-line tool (see the [main README](../README.md#install-from-source)):
+Requirements are the same as for the command-line tool (see the [CLI reference](../docs/project/upstream-cli-and-research.md#python-cli)):
 [uv](https://docs.astral.sh/uv/), plus `ffmpeg` for full results. Without `ffmpeg` the server
-falls back to the [no-encoder mode](../README.md#no-encoder-mode) and says so on the status page.
+falls back to the [no-encoder mode](../docs/project/upstream-cli-and-research.md#no-encoder-mode) and says so on the status page.
 
 ## Address
 

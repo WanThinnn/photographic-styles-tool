@@ -1,3 +1,4 @@
+import {getAppShell} from '../ui/shell/app-shell.js';
 import {VERSION} from '../styles/port.js';
 import {loadLibheif,releaseDecodeCache} from '../media/decode.js';
 import {pickLanguage,rememberLanguage,applyLanguage,t} from '../ui/i18n.js';
@@ -8,9 +9,11 @@ import {releaseHevcEncoder as releaseRasterEncoder} from '../raster/ffmpeg-hevc.
 import {releaseHeicProcessor} from '../media/heic-processing.js';
 import {waitForVisiblePage} from '../ui/processing-scheduler.js';
 import {depthModel} from '../portrait/depth-models.js';
-import {clearDownloadedAssets} from '../core/cache-cleanup.js';
+import {clearDownloadedAssets,clearAllAppCaches} from '../core/cache-cleanup.js';
 import {createAiFeatureControls,showAiSettingsHintOnce} from '../ui/ai-feature-controls.js';
 import {createResultView} from '../ui/results/result-view.js';
+import {createHistoryStore,restoredFile} from '../ui/history-store.js';
+import {confirmAction} from '../ui/confirm-dialog.js';
 import {createLivePhotoSession} from '../media/live-photo-session.js';
 import {createProfileRepository} from './processing/profiles.js';
 import {createPhotoAnalysis} from './processing/photo-analysis.js';
@@ -19,34 +22,24 @@ import {createFileProcessor} from './processing/file-processor.js';
 
 // App wiring and session lifecycle; domain workflows live in their modules.
 export function startApplication(){
+  const shell=getAppShell();
   const $ = (id) => document.getElementById(id);
   const fileInput = $("file"), drop = $("drop"), list = $("list");
   const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), aiStyleSuggest=$("ai-style-suggest"), enhanceAi = $("enhance-ai");
   const gpuAcceleration=$('gpu-acceleration');
-  const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
+  const modelSelector=$('depth-model'),clearAssets=$('clear-assets'),fullCleanup=$('full-cleanup');
   const modelLevels=['lite','standard','pro'];
+  const appStorageKeys=['psport.lang','stylio-theme-v1','stylio-result-preview-v1','photo-format-tip-dismissed-v1','stylio-ai-settings-hint-v2','stylio-has-processed','depth-model','depth-gpu-acceleration'];
   const aiSettings=$('ai-settings');
-  const aiSettingsSummary=aiSettings?.querySelector('summary');
-  if(aiSettings&&aiSettingsSummary){
-    aiSettingsSummary.addEventListener('click',event=>{
-      if(!aiSettings.open||aiSettings.classList.contains('is-closing'))return;
-      if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-      event.preventDefault();
-      aiSettings.classList.add('is-closing');
-      const close=()=>{aiSettings.open=false;aiSettings.classList.remove('is-closing');};
-      aiSettings.querySelector('.ai-settings-panel')?.addEventListener('animationend',close,{once:true});
-      setTimeout(()=>{if(aiSettings.classList.contains('is-closing'))close();},220);
-    });
-  }
 
   const selectedAiLevel=()=>modelLevels[Number(modelSelector.value)];
   function renderModel(){
     const name=depthModel(selectedAiLevel()).label;
     $('depth-model-value').textContent=name;modelSelector.setAttribute('aria-valuetext',name);
-    modelSelector.parentElement.style.setProperty('--model-position',['14px','50%','calc(100% - 14px)'][Number(modelSelector.value)]);
+    modelSelector.parentElement.style.setProperty('--model-position',['20px','50%','calc(100% - 20px)'][Number(modelSelector.value)]);
     modelSelector.parentElement.dataset.level=modelSelector.value;
   }
-  let clearingAssets=false,assetStatus='';
+  let clearingAssets=false,fullCleaning=false,assetStatus='';
   try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved);modelSelector.value=modelLevels.indexOf(saved);}catch{}
 
   renderModel();
@@ -58,18 +51,21 @@ export function startApplication(){
     try{localStorage.setItem('depth-gpu-acceleration',gpuAcceleration.checked?'on':'off');}catch{}
   });
   const clearHistory = $('clear-history');
+  const historyStore=createHistoryStore();
+  const previewEnabled=()=>$('result-preview')?.checked!==false;
   const resultUrls = new Set(), resultCleanups = new Set();
   const aiCandidates = [];
   let browserReady = false, pendingTasks = 0;
   const aiFeatures=createAiFeatureControls({
     master:enhanceAi,
     features:{portrait:aiPortrait,detail:aiDetail,style:aiStyleSuggest},
-    isAvailable:()=>browserReady&&!clearingAssets,
+    isAvailable:()=>browserReady&&!clearingAssets&&!fullCleaning,
   });
   function refreshHistoryButton() {
     clearHistory.hidden = !list.childElementCount;
     clearHistory.disabled = pendingTasks > 0;
-    clearAssets.disabled=!browserReady||pendingTasks>0||clearingAssets||aiCandidates.some(candidate=>candidate.ui.portraitPending);
+    clearAssets.disabled=!browserReady||pendingTasks>0||clearingAssets||fullCleaning||aiCandidates.some(candidate=>candidate.ui.portraitPending);
+    fullCleanup.disabled=!browserReady||pendingTasks>0||clearingAssets||fullCleaning||aiCandidates.some(candidate=>candidate.ui.portraitPending);
   }
   function queueTask(task) {
     pendingTasks++; refreshHistoryButton();
@@ -77,12 +73,19 @@ export function startApplication(){
     fileQueue = pending.catch(() => {}).finally(() => { pendingTasks--; refreshHistoryButton(); });
     return pending;
   }
-  clearHistory.addEventListener('click', () => {
+  clearHistory.addEventListener('click', async() => {
     if (pendingTasks) return;
+    if(!await confirmAction({
+      title:T('shell.clear').replace('{count}',String(list.childElementCount)),
+      detail:T('confirm.cannotundo'),
+      confirmLabel:T('action.delete'),
+      cancelLabel:T('action.cancel'),
+    }))return;
     for (const cleanup of resultCleanups) cleanup();
     resultCleanups.clear();
     for (const url of resultUrls) URL.revokeObjectURL(url);
     resultUrls.clear(); livePhotos.length = 0; liveMovies.clear(); aiCandidates.length = 0;
+    void historyStore.clear();
     list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
     releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor();
     void import('../detail/detail-inference.js').then(({releaseDetailWorkers})=>releaseDetailWorkers()).catch(()=>{});
@@ -93,7 +96,7 @@ export function startApplication(){
     if(clearAssets.disabled)return;
     clearingAssets=true;assetStatus='cleaning';translateAi();refreshHistoryButton();
     aiFeatures.sync();
-    modelSelector.disabled=gpuAcceleration.disabled=true;
+    $('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
     fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
     try{
       releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
@@ -102,7 +105,43 @@ export function startApplication(){
       releaseDetailWorkers();releaseStyleRecommender();await releaseOrtModels();
       await clearDownloadedAssets();assetStatus='cleaned';
     }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
-    finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+    finally{clearingAssets=false;aiFeatures.sync();$('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+  });
+  fullCleanup.addEventListener('click',async()=>{
+    if(fullCleanup.disabled)return;
+    if(!await confirmAction({
+      title:T('confirm.resettitle'),detail:T('confirm.resetdetail'),confirmLabel:T('action.reset'),cancelLabel:T('action.cancel')
+    }))return;
+    fullCleaning=true;fullCleanup.setAttribute('aria-busy','true');$('full-cleanup-status').textContent=T('settings.fullcleaning');
+    refreshHistoryButton();aiFeatures.sync();
+    $('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
+    fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
+    let reloading=false;
+    try{
+      for(const cleanup of [...resultCleanups])cleanup();
+      resultCleanups.clear();
+      for(const url of resultUrls)URL.revokeObjectURL(url);
+      resultUrls.clear();livePhotos.length=0;liveMovies.clear();aiCandidates.length=0;
+      if(historyStore.destroy)await historyStore.destroy();else await historyStore.clear();list.replaceChildren();fileInput.value='';
+      releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
+      const [{releaseOrtModels},{releaseDetailWorkers},{releaseStyleRecommender}]=await Promise.all([
+        import('../vision/ort-vision.js'),import('../detail/detail-inference.js'),import('../recommend/style-runtime.js')]);
+      releaseDetailWorkers();releaseStyleRecommender();await releaseOrtModels();
+      await clearAllAppCaches();
+      for(const key of appStorageKeys)try{localStorage.removeItem(key);}catch{}
+      for(const key of ['stylio-screen','counted'])try{sessionStorage.removeItem(key);}catch{}
+      $('full-cleanup-status').textContent='';
+      reloading=true;location.reload();
+    }catch(error){
+      console.warn('Full Stylio cleanup unavailable',error);
+      $('full-cleanup-status').textContent=T('settings.fullcleanupfailed');
+    }finally{
+      if(!reloading){
+        fullCleaning=false;fullCleanup.removeAttribute('aria-busy');
+        $('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=false;
+        fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));aiFeatures.sync();refreshHistoryButton();
+      }
+    }
   });
   const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
   function translateAi() {
@@ -160,11 +199,32 @@ export function startApplication(){
 
   let lang = pickLanguage();
   const T = (key) => t(lang, key);
+  function showBootError(message){
+    const boot=$('boot');boot.replaceChildren();boot.className='err app-error-banner';
+    const icon=document.createElement('span');icon.className='app-error-icon';icon.setAttribute('aria-hidden','true');
+    icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg>';
+    const copy=document.createElement('span');copy.className='app-error-copy';copy.textContent=message;
+    const retry=document.createElement('button');retry.className='app-error-retry';retry.type='button';retry.textContent=T('btn.retry');retry.addEventListener('click',()=>location.reload());
+    boot.append(icon,copy,retry);
+  }
   const analysis=createPhotoAnalysis({T,aiText,aiFeatures,selectedAiLevel,gpuAcceleration});
   const {liveMovies,livePhotos,attachMovie,handleMovie}=createLivePhotoSession({T});
   const profiles=createProfileRepository();
   const {ensureProfileIndex,getProfile}=profiles;
-  const row=createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton});
+  const row=createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell,historyStore,previewEnabled});
+  async function restorePersistentHistory(){
+    const entries=await historyStore.list();
+    for(const entry of entries){
+      const file=restoredFile(entry);
+      if(!file)continue;
+      const ui=row(entry.name||entry.fileName||file.name,file,{
+        historyId:entry.id,restored:true,restoredPreview:entry.preview||null,restoredThumbnail:entry.thumbnail||null
+      });
+      ui.output(file,{metadata:false,persist:false});
+      ui.set(T('st.ready'),'ok');
+    }
+    refreshHistoryButton();
+  }
   const {tryAiPortrait,runAiCandidate}=createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcceleration,selectedAiLevel});
   const {handleFiles}=createFileProcessor({row,T,getLanguage:()=>lang,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis});
 
@@ -180,9 +240,6 @@ export function startApplication(){
     enqueueFiles([...e.dataTransfer.files]);
   });
   drop.addEventListener("click", () => { if (browserReady) fileInput.click(); });
-  drop.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (browserReady) fileInput.click(); }
-  });
   fileInput.addEventListener("change", () => {
     enqueueFiles([...fileInput.files]);
     fileInput.value = "";
@@ -192,7 +249,7 @@ export function startApplication(){
     lang = $("lang").value;
     rememberLanguage(lang);
     applyLanguage(lang);
-    translateAi();
+    translateAi();shell.render();
   });
 
   // Visit counter behind the README badge. The only request this site makes to a
@@ -227,6 +284,7 @@ export function startApplication(){
       browserReady = true;refreshHistoryButton();
       fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
       aiFeatures.sync();
+      await restorePersistentHistory();
       showAiSettingsHintOnce({hint:$('ai-settings-discovery'),settings:aiSettings});
       $('boot').textContent = '';
       navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});
@@ -236,12 +294,7 @@ export function startApplication(){
       else console.warn('Running without cross-origin isolation; threaded HEVC/AI features will request isolation when used.');
     } catch (e) {
       console.error('Browser preparation failed', e);
-      $("boot").textContent = T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources');
-      $("boot").className = "err";
-      const retry = document.createElement('button');
-      retry.className = 'dl alt'; retry.type = 'button'; retry.textContent = T('btn.retry');
-      retry.addEventListener('click', () => location.reload());
-      $('boot').append(document.createElement('br'), retry);
+      showBootError(T(e?.code==='BROWSER_INSECURE_CONTEXT'?'err.setup':'err.resources'));
     }
   })();
 

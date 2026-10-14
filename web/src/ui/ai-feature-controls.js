@@ -14,8 +14,16 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
   const sync=()=>{
     const available=Boolean(isAvailable());
     master.disabled=!available;
-    for(const control of controls.values())control.disabled=!available||!master.checked;
+    for(const control of controls.values())control.disabled=!available;
   };
+  for(const control of controls.values())control.addEventListener('change',()=>{
+    if(control.checked&&!master.checked){
+      // A feature selected from AI Settings implicitly enables the group without
+      // also forcing Portrait on. The outer Smart Enhance switch reflects it.
+      master.checked=true;
+      sync();
+    }
+  });
   master.addEventListener('change',()=>{
     if(master.checked){
       const portrait=controls.get('portrait');
@@ -38,19 +46,20 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
 }
 
 export function showAiSettingsHintOnce({hint,settings,storage}){
-  // Persist only after the user actually discovers/opens AI Settings. Merely
-  // seeing the hint must not dismiss it across visits.
+  // The gradient ring remains as a quiet affordance after discovery; only its
+  // first-run motion and explanatory copy are one-shot.
   const key='stylio-ai-settings-hint-v2';
+  const summary=settings.querySelector('summary')||document.getElementById('open-ai-settings');
   try{
     storage??=globalThis.localStorage;
-    if(storage?.getItem(key)==='opened')return;
+    if(storage?.getItem(key)==='opened'){summary.classList.add('ai-settings-discovered');return;}
   }catch{} // Storage restrictions must not break the AI controls.
   hint.hidden=false;
-  const summary=settings.querySelector('summary');
   summary.setAttribute('aria-describedby',hint.id);
   summary.addEventListener('click',()=>{
     hint.hidden=true;
     summary.removeAttribute('aria-describedby');
+    summary.classList.add('ai-settings-discovered');
     try{storage?.setItem(key,'opened');}catch{}
   },{once:true});
 }

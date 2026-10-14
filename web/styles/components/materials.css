@@ -1,0 +1,72 @@
+/* Web adaptation of ionic-theme-ios27's glass material (MIT).
+   Navigation/control chrome only — never blur or tint a photo preview.
+   No nested backdrop filters or continuously animated lighting. */
+.glass-surface,.photo-workspace .act {
+  border: .5px solid transparent;
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 2px var(--glass-rim-top),
+    inset 0 -1px 2px var(--glass-rim-bottom),
+    0 -.5px 0 var(--glass-rim-top),
+    0 .5px 0 var(--glass-rim-bottom),
+    0 0 0 .5px var(--glass-outline),
+    0 2px 3px var(--glass-shade),
+    0 8px 24px var(--glass-shade)
+}
+@supports ((backdrop-filter:blur(6px)) or (-webkit-backdrop-filter:blur(6px))) {
+  .glass-surface,.photo-workspace .act {
+    background:
+      linear-gradient(180deg,#0000,#00000003 48%,#00000007),
+      rgb(var(--glass-rgb) / calc(var(--glass-opacity) * var(--glass-opacity-scale)));
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale))) saturate(180%) brightness(1.05);
+    backdrop-filter: blur(calc(var(--glass-blur) * var(--glass-blur-scale))) saturate(180%) brightness(1.05)
+  }
+}
+/* Enhanced edge lighting where border-area is available; shadows remain fallback. */
+@supports (background-clip:border-area) {
+  .glass-surface,.photo-workspace .act {
+    background:
+      linear-gradient(180deg,var(--glass-rim-top),transparent 32%,transparent 68%,var(--glass-rim-bottom)) border-area,
+      linear-gradient(180deg,#0000,#00000007) padding-box,
+      rgb(var(--glass-rgb) / calc(var(--glass-opacity) * var(--glass-opacity-scale))) padding-box
+  }
+}
+.icon-button.glass-surface {
+  --glass-blur: 2px;
+  --glass-opacity: .72;
+  transition: scale var(--duration-fast) var(--spring-ease),box-shadow var(--duration-fast)
+}
+.icon-button.glass-surface:active { scale: .94 }
+.dock-search.glass-surface {
+  --glass-blur: 6px;
+  --glass-opacity: .53;
+  width: var(--tab-height);
+  min-height: var(--tab-height)
+}
+.photo-workspace .act { --glass-blur: 20px; --glass-opacity: .58 }
+.app-tabs button[aria-current="page"] svg { stroke-width: 2.35 }
+.dock-search svg { stroke-width: 2.15; stroke-linecap: round; stroke-linejoin: round }
+@media(prefers-reduced-motion:reduce) {
+  .icon-button.glass-surface:active { scale: 1 }
+}
+@media(prefers-reduced-transparency:reduce), (prefers-contrast:more) {
+  .glass-surface,.photo-workspace .act {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: var(--muted)
+  }
+}
+@media(forced-colors:active) {
+  .glass-surface,.photo-workspace .act {
+    background: Canvas;
+    border-color: ButtonText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none
+  }
+  .app-tabs button[aria-current="page"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px
+  }
+}

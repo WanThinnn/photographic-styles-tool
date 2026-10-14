@@ -396,8 +396,8 @@ export function addTexture(data, {preserveStyles = false, allowMissingStyles = f
 
   const [newMeta, newPayloads, summary] = addTextureItems(data.slice(mo, mo + ms), d.primary,
     softSkinPeople(data, d), filmGrainSeed(data, d));
-  const toneCurve = preserveStyles || d.stylesItem === null ? {added:false}
-    : ensureLegacyTextureToneCurve(extractItem(data, iloc, d.stylesItem));
+  const toneCurve = d.stylesItem === null ? {added:false}
+    : ensureLegacyTextureToneCurve(extractItem(data, iloc, d.stylesItem), {preserveStyles});
   if (toneCurve.added) newPayloads.set(d.stylesItem, toneCurve.data);
   const delta = newMeta.length - ms;
   const metaOut = newMeta.slice();
@@ -437,10 +437,9 @@ export function addTexture(data, {preserveStyles = false, allowMissingStyles = f
 
 /** Repair a previously exported legacy file without adding duplicate Texture/mattes. */
 export function repairTextureCurve(data, {preserveStyles = false} = {}) {
-  if (preserveStyles) return {data:null};
   const d = discoverHeic(data);
   if (d.stylesItem === null || !hasTexture(d.infos)) return {data:null};
-  const curve = ensureLegacyTextureToneCurve(extractItem(data,d.iloc,d.stylesItem));
+  const curve = ensureLegacyTextureToneCurve(extractItem(data,d.iloc,d.stylesItem), {preserveStyles});
   if (!curve.added) return {data:null};
   const item = d.iloc.items.get(d.stylesItem);
   if (d.iloc.offsetSize!==4 || d.iloc.lengthSize!==4 || d.iloc.baseOffsetSize!==0

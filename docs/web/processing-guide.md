@@ -164,6 +164,55 @@ output. New contracts require real original fixtures and import/edit/save/reopen
 testing; rewriting an iOS version string cannot convert an unknown contract.
 
 
+### Active processing handoff — 2026-10-15, iOS 18 telephoto Texture
+
+Branch: `feature/ui-ux-redesign`. UI work is complete for this task; do not redesign
+or alter HDR/depth rendering while investigating this report. The working tree was
+clean at the start. These processing changes are uncommitted/unpushed; SW cache is v191.
+
+- Report: iPhone 16 Pro telephoto, Portrait initially Off and Standard capture;
+  web processing → Share → Save to Photos → black Glow/Soft Skin and Photos fails
+  to save the edit. Private inputs/screenshots are in
+  `C:/Users/WanThinnn/Downloads/16-pro-iOS-18-error-black/`.
+- `IMG_3435_orgirnal.HEIC` and `IMG_1529_processed.HEIC` have identical native
+  Styles bytes: schema 13, no key `3` (tone curve). The output added Texture while
+  retaining that missing field. All 96 original HEVC payload hashes occur in the output.
+- `texture-compatibility.js` now permits a missing-curve-only schema 13 extension
+  through `preserveStyles:true`. `texture.js` uses it both when adding Texture and
+  repairing an already processed file. No schema/coefficient/scene-statistic/Exif
+  replacement; existing curves and native-preserving policy for other schemas stay unchanged.
+- Tests first failed on the actual original and the portable worker fixture, then
+  passed after the change. The real processed-file repair retains every original
+  container byte except its Styles extent offset/length and an appended Styles payload.
+  It preserves all other 131 item payloads, properties and references, and is idempotent.
+- The native-preserving helper also leaves unreadable/opaque Styles untouched,
+  rather than introducing a new rejection while checking for schema 13. A separate
+  regression failed before that guard was added, then passed.
+- Private generator/audit: `tests/private-fixtures/Texture_iOS18_3435/curve-trial.mjs`.
+  It writes with `wx` (will not overwrite), performs no decode/encode/inference,
+  and generates `IMG_1529_TextureCurveTrial.HEIC` (isolated repair) and
+  `IMG_3435_TextureCurveTrial.HEIC` (fresh original through the Texture worker).
+  These files and personal images are ignored, not deployed.
+- **Pending, not a confirmed visual fix:** import the isolated repair into Photos as
+  a new asset; try Glow and Soft Skin, Done, then reopen. Compare with the fresh
+  original conversion if needed. Confirm both render and successful save. If it still
+  fails, this missing-curve hypothesis is insufficient; do not stack unrelated metadata
+  changes. Windows tests cannot execute Apple's renderer. See `facts.md` §10.74.
+
+Latest lightweight results: 61 passed / 8 optional private-fixture skips / 0 failed
+across the six Node suites below; PWA and git whitespace checks also pass.
+Commands were run separately, not in parallel:
+
+```powershell
+rtk proxy node tests/web/texture-compatibility.mjs
+rtk proxy node tests/web/ai-portrait-export.mjs
+rtk proxy node tests/web/style-preservation.mjs
+rtk proxy node tests/web/soft-skin.mjs
+rtk proxy node tests/web/heic-worker.mjs
+rtk proxy node tests/web/module-paths.mjs
+rtk proxy node tests/web/check-pwa.mjs
+```
+
 ### DNG import
 
 The DNG path adapts the existing LibRaw worker in `ref/Elio-backup`. It decodes

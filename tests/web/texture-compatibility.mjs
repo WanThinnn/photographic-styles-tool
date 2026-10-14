@@ -13,6 +13,26 @@ import {discoverHeic,extractItem,idatItemBytes,propertyBoxBytes} from '../../web
 import {loadProfile} from '../../web/src/core/zip.js';
 import {be,box,concat} from '../../web/src/core/box.js';
 const directory='C:/Users/WanThinnn/Downloads/Error-Styles/iCloud Photos/';
+const ios18Directory='C:/Users/WanThinnn/Downloads/16-pro-iOS-18-error-black/';
+
+test('reported iOS 18 telephoto Styles v13 is Texture-compatible through the native-preserving worker route',
+  {skip:!fs.existsSync(ios18Directory+'IMG_3435_orgirnal.HEIC')},async()=>{
+  const source=new Uint8Array(fs.readFileSync(ios18Directory+'IMG_3435_orgirnal.HEIC'));
+  const before=discoverHeic(source);
+  const original=extractItem(source,before.iloc,before.stylesItem);
+  const native=parseBplist(original);
+  assert.equal(native.get('0'),13);assert.equal(native.has('3'),false);
+  const {data,report}=await executeJob({operation:'texture',data:source,opts:{preserveStyles:true}});
+  const after=discoverHeic(data),styles=parseBplist(extractItem(data,after.iloc,after.stylesItem));
+  assert.equal(styles.get('3')?.length,516,'legacy Texture contract must have the neutral tone curve');
+  assert.equal(report.toneCurveAdded,true);
+  styles.delete('3');assert.deepEqual(styles,native,'no replacement of native schema, coefficients, maps or statistics');
+  for(const [id,item]of before.iloc.items){
+    if(id===before.stylesItem)continue;
+    const read=(bytes,d)=>item.constructionMethod===0?extractItem(bytes,d.iloc,id):idatItemBytes(bytes,id,d.meta);
+    assert.deepEqual(read(data,after),read(source,before),'untouched source item '+id);
+  }
+});
 
 test('Texture keeps the native iPhone19,2 renderer profile on every generated path',()=>{
   assert.equal(parseBplist(TEXTURE_STYLES_BLOB).get('HardwareModel'),'iPhone19,2');
@@ -57,25 +77,92 @@ test('legacy missing curve gets identity samples while preserving native values 
 });
 
 test('existing tone curves and unvalidated versions are left byte-identical',()=>{
-  for(const version of [14,15,16,131087,131088]){
+  for(const version of [13,14,15,16,131087,131088]){
     const values=new Map([['0',version],['1',new Uint8Array([1,2,3])]]);
-    if(version===14)values.set('3',new Uint8Array([9,8,7]));
-    const blob=buildBplist(values),result=ensureLegacyTextureToneCurve(blob);
-    assert.equal(result.data,blob);assert.equal(result.added,false);
+    if(version===13||version===14)values.set('3',new Uint8Array([9,8,7]));
+    const blob=buildBplist(values);
+    for(const preserveStyles of [false,true]){
+      const result=ensureLegacyTextureToneCurve(blob,{preserveStyles});
+      assert.equal(result.data,blob);assert.equal(result.added,false);
+    }
   }
 });
 
-test('portable legacy graph relocates only the extended Styles and preserves every other payload',async()=>{
+test('native-preserving route leaves opaque or malformed Styles untouched',()=>{
+  for(const blob of [new Uint8Array(),new TextEncoder().encode('unrecognized native Styles'),buildBplist([1,2])]){
+    assert.deepEqual(ensureLegacyTextureToneCurve(blob,{preserveStyles:true}),{data:blob,added:false});
+    assert.throws(()=>ensureLegacyTextureToneCurve(blob));
+  }
+});
+
+test('reported processed v13 repairs without altering any other container data',
+  {skip:!fs.existsSync(ios18Directory+'IMG_1529_processed.HEIC')},async()=>{
+  const source=new Uint8Array(fs.readFileSync(ios18Directory+'IMG_1529_processed.HEIC')),before=discoverHeic(source);
+  const native=parseBplist(extractItem(source,before.iloc,before.stylesItem),{preserveReals:true});
+  assert.equal(native.get('0'),13);assert.equal(native.has('3'),false);
+  const {data}=repairTextureCurve(source,{preserveStyles:true}),after=discoverHeic(data);
+  assert.deepEqual(after.infos,before.infos);assert.deepEqual(after.refs,before.refs);assert.deepEqual(after.props,before.props);
+  const styles=parseBplist(extractItem(data,after.iloc,after.stylesItem),{preserveReals:true});
+  assert.equal(styles.get('3').length,516);styles.delete('3');assert.deepEqual(styles,native);
+  const extent=before.iloc.items.get(before.stylesItem).extents[0];
+  for(let i=0;i<source.length;i++){
+    if(i>=extent.offsetPos&&i<extent.offsetPos+4||i>=extent.lengthPos&&i<extent.lengthPos+4)continue;
+    assert.equal(data[i],source[i],'unchanged original byte '+i);
+  }
+  const worker=await executeJob({operation:'repair-texture',data:source,opts:{preserveStyles:true}});
+  assert.deepEqual(worker.data,data,'worker does not change HDR registration on this file');
+  assert.equal(repairTextureCurve(data,{preserveStyles:true}).data,null);
+});
+
+async function legacyPhoto(version=14){
   const profile=await loadProfile(new Uint8Array(fs.readFileSync(new URL('../../web/profiles/48-12.zip',import.meta.url))));
   const meta=profile.meta.slice(),d=discoverHeic(meta),chunks=[];let cursor=profile.ftyp.length+meta.length+8;
   for(const [id,item] of d.iloc.items){
     if(item.constructionMethod!==0||!item.extents.length)continue;
     let payload=profile.retained.get(id)||new Uint8Array([0,0,0,4,38,1,id&255,0]);
-    if(id===d.stylesItem){const pl=parseBplist(payload);pl.delete('3');pl.delete('k');pl.set('0',14);payload=buildBplist(pl);}
+    if(id===d.stylesItem){const pl=parseBplist(payload);pl.delete('3');pl.delete('k');pl.set('0',version);payload=buildBplist(pl);}
     meta.set(be(cursor,d.iloc.offsetSize),item.extents[0].offsetPos);meta.set(be(payload.length,d.iloc.lengthSize),item.extents[0].lengthPos);
     cursor+=payload.length;chunks.push(payload);
   }
-  const source=concat([profile.ftyp,meta,box('mdat',concat(chunks))]),before=discoverHeic(source);
+  return concat([profile.ftyp,meta,box('mdat',concat(chunks))]);
+}
+
+test('native-preserving schema 13 route adds only its missing curve and repairs existing Texture idempotently',async()=>{
+  const source=await legacyPhoto(13),before=discoverHeic(source);
+  const {data,report}=await executeJob({operation:'texture',data:source,opts:{preserveStyles:true}});
+  assert.equal(report.toneCurveAdded,true);
+  const after=discoverHeic(data),styles=parseBplist(extractItem(data,after.iloc,after.stylesItem));
+  const original=parseBplist(extractItem(source,before.iloc,before.stylesItem));
+  assert.equal(styles.get('3')?.length,516);styles.delete('3');assert.deepEqual(styles,original);
+  for(const [id,item]of before.iloc.items){
+    if(id===before.stylesItem)continue;
+    const read=(bytes,g)=>item.constructionMethod===0?extractItem(bytes,g.iloc,id):idatItemBytes(bytes,id,g.meta);
+    assert.deepEqual(read(data,after),read(source,before),'preserved source item '+id);
+  }
+  // Simulate an earlier web export that added Texture while retaining the missing curve.
+  const broken=data.slice(),extent=after.iloc.items.get(after.stylesItem).extents[0];
+  const native=extractItem(source,before.iloc,before.stylesItem);
+  broken.set(native,extent.offset);broken.set(be(native.length,after.iloc.lengthSize),extent.lengthPos);
+  const repaired=await executeJob({operation:'repair-texture',data:broken,opts:{preserveStyles:true}});
+  assert.equal(repaired.report.toneCurveAdded,true);
+  const fixed=discoverHeic(repaired.data);
+  assert.deepEqual(fixed.infos,after.infos);assert.deepEqual(fixed.refs,after.refs);
+  assert.deepEqual(parseBplist(extractItem(repaired.data,fixed.iloc,fixed.stylesItem)),
+    parseBplist(extractItem(data,after.iloc,after.stylesItem)));
+  for(const [id,item]of after.iloc.items){
+    if(id===after.stylesItem)continue;
+    const read=(bytes,g)=>item.constructionMethod===0?extractItem(bytes,g.iloc,id):idatItemBytes(bytes,id,g.meta);
+    assert.deepEqual(read(repaired.data,fixed),read(broken,after),'repaired source item '+id);
+  }
+  assert.equal(repairTextureCurve(repaired.data,{preserveStyles:true}).data,null);
+  for(const version of [14,15,16,131087,131088,999]){
+    const blob=buildBplist(new Map([['0',version],['1',new Uint8Array([1,2,3])]]));
+    assert.equal(ensureLegacyTextureToneCurve(blob,{preserveStyles:true}).data,blob,'native policy for schema '+version);
+  }
+});
+
+test('portable legacy graph relocates only the extended Styles and preserves every other payload',async()=>{
+  const source=await legacyPhoto(),before=discoverHeic(source);
   const rasterData=addRasterTexture(source).data,rasterAfter=discoverRasterHeic(rasterData);
   const rasterTexture=[...rasterAfter.infos].find(([,info])=>info.uri===URI_TEXTURE_STYLES)[0];
   assert.equal(parseRasterBplist(extractRasterItem(rasterData,rasterAfter.iloc,rasterTexture)).get('HardwareModel'),'iPhone19,2');

@@ -3504,3 +3504,74 @@ Verification remained deliberately light: one direct single-process Portrait sui
 passes 42/42 in about three seconds; the depth-range parser passes 2/2; PWA and module
 path checks pass. No browser, FFmpeg/image transcoding, background child runner, commit,
 push or UI redesign was used.
+
+## 10.74 — iOS 18 telephoto Styles v13 missing curve: isolated Texture candidate (2026-10-15)
+
+The user reports a telephoto iPhone 16 Pro/iOS 18 capture, Standard selected and
+Portrait initially off. After processing and Share → Save to Photos, Glow/Soft Skin
+renders almost black and Photos refuses Done with “There was an error saving this
+photo. Please try again later.” Private screenshots IMG_1532/IMG_1533 show that
+failure, with Vibrant + Glow selected during editing (not evidence that the original
+capture used Vibrant). Inputs are IMG_3435_orgirnal.HEIC and IMG_1529_processed.HEIC
+in the user's private `16-pro-iOS-18-error-black` directory.
+
+The task starts from a clean feature/ui-ux-redesign branch after the completed UI
+work. No UI redesign or HDR/Portrait renderer changes are part of this investigation.
+
+Both files contain the same 56,947-byte native Styles plist, schema 13, without key
+`3`. The original 51,840-byte coefficients hash is
+`274de533499375919c851ca4ade03ec702830008ed5436bc7f35839ae82f6a95`.
+All 96 original HEVC payload hashes occur in the processed file. Texture was added
+with HardwareModel iPhone19,2 and no postprocessed people data. This is consistent
+with a legacy Texture compatibility gap, not evidence of an encoder blackening RGB.
+
+Section 10.6 documented a device-accepted missing-curve-only repair for schema 14.
+Current native preservation bypasses that repair, and its helper only recognized
+14. New actual-original and portable worker regressions first fail because the
+native-preserving schema 13 path adds Texture without the missing curve. They then
+pass with a narrowly scoped change: recognize 13 as well as the historical 14 on
+the default route; allow only 13 through preserveStyles:true. Existing curves and
+all other native-preserving schemas (including 14) remain untouched. No schema
+upgrade, coefficient/statistic substitution, camera-label rewrite, HDR gain change,
+depth normalization, people deletion or HardwareModel experiment is introduced.
+Both add-Texture and already-Texture repair use the same eligibility check.
+
+Private metadata-only candidates were generated under
+`tests/private-fixtures/Texture_iOS18_3435/`:
+
+- `IMG_1529_TextureCurveTrial.HEIC`, 2,269,645 bytes, SHA-256
+  `99e7f32bd17cb0166796e2f8e4c6c0ea272103922a7b3bbabbb5f2c6432ccdcb`.
+  Only adds the 516-byte identity curve to the processed Styles, serializing with
+  preserved plist real types. All existing bytes except two Styles iloc extent
+  fields remain identical, followed by the appended replacement Styles mdat.
+  All 131 non-Styles item payloads, references and properties stay exact.
+- `IMG_3435_TextureCurveTrial.HEIC`, 2,270,123 bytes, SHA-256
+  `15f8d36a445b0daa5b33e6650a2250008ed85c680faca4691ef5b92e6724106f`.
+  Runs the original through the actual native-preserving Texture worker with the
+  new compatibility field and verifies every non-Styles source payload unchanged.
+
+The private curve-trial.mjs refuses output overwrites and performs no decoding,
+encoding, model inference, downloads or heavy disk work. Original user files are
+read-only; candidates remain ignored and are not included in the web deployment.
+
+**Device validation is pending.** Structural regressions do not execute Apple
+Photos and cannot establish that schema 13 has exactly the schema 14 renderer
+requirement. Import the repaired processed file as a new asset; select Glow and
+Soft Skin, tap Done, then reopen and verify rendering and saved edits. If that
+single-variable trial fails, do not call the issue fixed or stack speculative
+changes. The fresh original candidate permits a second check of the upload route.
+The separate Photos persistence symptom might need further investigation even if
+rendering improves. The web compatibility candidate ships in cache v191; no commit
+or push has been requested for these changes. Current handoff is in the browser
+processing guide, not a new UI plan.
+
+The compatibility probe preserves opaque/unreadable Styles on the native route;
+checking for schema 13 must not introduce a new processing rejection. A separate
+test first caught that regression and passed after adding the preservation guard.
+Lightweight sequential checks: Texture 9 pass / 4 optional skips; Portrait export
+42 pass; native preservation 3 pass / 2 optional skips; Soft Skin 5 pass; worker
+1 pass / 2 optional skips; module paths 1 pass. Total 61 pass / 8 optional skips /
+0 fail, plus passing PWA and git diff whitespace checks. No heavy encoders, models
+or concurrent test runners were started. There is a separate working-tree change
+to the install-guide SVG in web/index.html; it is unrelated and left untouched by
+this processing task.

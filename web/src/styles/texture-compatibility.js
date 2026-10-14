@@ -1,11 +1,23 @@
 import {parseBplist, buildBplist} from '../core/bplist.js';
 
-// Device-tested on legacy iOS 18.2 native Styles: a missing tone curve makes
-// Glow/Film render black and Soft Skin ineffective. Add only the neutral curve;
-// retain the native version, flags, coefficients, maps and scene statistics.
-export function ensureLegacyTextureToneCurve(blob) {
-  const styles = parseBplist(blob, {preserveReals:true});
-  if (styles.get('0') !== 14 || styles.has('3')) return {data:blob, added:false};
+// The legacy v14 missing-curve fix was device-tested on iOS 18.2. The reported
+// v13 telephoto capture has the same missing field when Texture is added.
+// Add only the neutral curve; retain native version, flags, coefficients, maps
+// and statistics. v13 is the sole exception to native byte-preservation here;
+// do not widen that exception to other contracts without device evidence.
+export function ensureLegacyTextureToneCurve(blob, {preserveStyles = false} = {}) {
+  let styles, version;
+  try {
+    styles = parseBplist(blob, {preserveReals:true});
+    version = styles.get('0');
+  } catch (error) {
+    // The old native route did not parse Styles here. An unreadable/opaque
+    // contract does not authorize a repair or a new processing rejection.
+    if (!preserveStyles) throw error;
+    return {data:blob, added:false};
+  }
+  if ((version !== 13 && version !== 14) || styles.has('3')
+      || (preserveStyles && version !== 13)) return {data:blob, added:false};
   const curve = new Uint8Array(516);
   curve.set([1,1,0,0]);
   const view = new DataView(curve.buffer);

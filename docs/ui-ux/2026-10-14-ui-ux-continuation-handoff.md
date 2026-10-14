@@ -2,6 +2,8 @@
 
 > Mục đích: đây là tài liệu bàn giao trực tiếp cho AI/agent tiếp theo. Đọc file này trước khi sửa UI/UX. Nếu có mâu thuẫn giữa lịch sử cũ và trạng thái hiện tại, ưu tiên: **code hiện tại trong working tree → tài liệu này → mục mới nhất trong `docs/ui-ux/plan/2026-10-14-stylio-mobile-app-redesign.md` → các mục lịch sử cũ**.
 
+> **Checkpoint 2026-10-15:** người dùng xác nhận redesign đã xong; working tree đã sạch trước task mới. Các danh sách UI modified bên dưới là lịch sử bàn giao, không phải trạng thái git hiện tại. Task mới chỉ sửa pipeline đen Glow/Soft Skin với telephoto iOS 18 trên cùng nhánh, không sửa UI. Cache v191; chi tiết tiến độ và bước thử Photos còn chờ ở [processing guide](../web/processing-guide.md#active-processing-handoff--2026-10-15-ios-18-telephoto-texture) và `facts.md` §10.74. Chưa commit/push thay đổi mới này.
+
 ## 1. Trạng thái repository hiện tại
 
 - Workspace: `photographic-styles-tool`.

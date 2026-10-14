@@ -80,7 +80,7 @@ test('Indigo ICC v2 descriptions identify Display P3 without an alternate gain-m
  const hdr=extractJpegHdr(jpegFixture(true,{gainXml:adobeXmp(),baseProfile:profile,alternateProfile:null}));
  assert.deepEqual(hdr.baseIcc,profile);assert.equal(hdr.primaries,'smpte432');
 });
-test('ordinary JPEG is SDR; recognized truncated or unsupported HDR never silently becomes SDR',()=>{
+test('ordinary JPEG is SDR; malformed supported HDR contracts never silently become SDR',()=>{
  const sdr=concat([Uint8Array.of(255,216),sof(20,20),Uint8Array.of(255,217)]);
  assert.equal(extractJpegHdr(sdr),null);assert.equal(extractJpegHdr(text('not JPEG')),null);
  assert.equal(extractJpegHdr(Uint8Array.of(255,216,255)),null);
@@ -89,6 +89,12 @@ test('ordinary JPEG is SDR; recognized truncated or unsupported HDR never silent
  assert.throws(()=>extractJpegHdr(concat([sdr.slice(0,-2),segment(226,text('urn:iso:std:iso:ts:21496:-1\0')),Uint8Array.of(255,217)])),{code:'err.hdrjpeg'});
  assert.throws(()=>parseAdaptiveHdrXmp(xmp().replace('<HDRToneMap:Gamma>1','<HDRToneMap:Gamma>0')),{code:'err.hdrjpeg'});
  assert.throws(()=>parseAdaptiveHdrXmp(xmp().replace('<HDRToneMap:Version>1','<HDRToneMap:Version>2')),{code:'err.hdrjpeg'});
+});
+test('orphaned Apple legacy MPF from a Photos duplicate falls back to its valid raster base',()=>{
+ const apple='<rdf:Description xmlns:apdi="http://ns.apple.com/pixeldatainfo/1.0/" xmlns:HDRGainMap="http://ns.apple.com/HDRGainMap/1.0/">'
+  +'<apdi:AuxiliaryImageType>urn:com:apple:photo:2020:aux:hdrgainmap</apdi:AuxiliaryImageType>'
+  +'<HDRGainMap:HDRGainMapVersion>65536</HDRGainMap:HDRGainMapVersion></rdf:Description>';
+ assert.equal(extractJpegHdr(jpegFixture(false,{gainXml:apple})),null);
 });
 test('tmap preserves signed per-channel ranges, headroom/gamma/offsets and namespace-independent XMP',()=>{
  const metadata=parseAdaptiveHdrXmp(xmp('gm')),bytes=encodeTmapMetadata(metadata),v=new DataView(bytes.buffer);

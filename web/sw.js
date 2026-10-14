@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v149`;
+const CACHE_NAME = `${CACHE_PREFIX}v151`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -8,6 +8,13 @@ const DEPTH_ASSET_CACHE = 'photographic-style-depth-assets-4472b736-ort-1.22.0';
 // Warm the complete offline converter after startup. Only BOOT_SHELL below
 // gates installation, so first visits do not wait for the whole module graph.
 const APP_SHELL = [
+  "./src/ui/results/result-view.js",
+  "./src/app/processing/portrait-controller.js",
+  "./src/app/processing/photo-analysis.js",
+  "./src/app/processing/profiles.js",
+  "./src/media/live-photo-session.js",
+  "./src/app/processing/file-processor.js",
+  "./src/app/application.js",
   "./src/core/gain-map.js",
   "./src/styles/hdr-compatibility.js",
   "./",
@@ -56,6 +63,7 @@ const APP_SHELL = [
   "./src/portrait/ai-portrait-export-worker.js",
   "./src/codecs/libheif-lifecycle.js",
   "./src/portrait/ai-portrait-container.js",
+  "./src/portrait/native-portrait-contract.js",
   "./src/portrait/native-base-analysis.js",
   "./src/portrait/apple-depth-metadata.js",
   "./src/portrait/ai-portrait-export.js",

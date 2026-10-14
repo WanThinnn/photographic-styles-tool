@@ -125,6 +125,12 @@ test('legacy native Photo depth restores editing independently of Photos feature
     assert.deepEqual(extractItemData(out.data,after,after.stylesItem),extractItemData(source,before,before.stylesItem));
     before.primaryTiles.forEach((id,i)=>assert.deepEqual(extractItemData(out.data,after,after.primaryTiles[i]),extractItemData(source,before,id)));
   }
+  const iphone14=withCamera(capture(attachAiDepth(photo(900,600),
+    {...depth,floatMin:.461914,floatMax:1.234375}),1,1),'iPhone 14 Pro Max');
+  assert.equal(nativePortraitBaseState(iphone14),'legacy-photo-base');
+  const restored14=await executeJob({operation:'native-portrait',data:iphone14,opts:{template}});
+  assert.equal(restored14.report.mode,'restored-native-portrait');
+  assert.equal(restored14.report.nativeDepthRangePreserved,true);
   for(const model of ['iPhone 13 Pro Max','iPhone 16 Pro']){
     const source=withCamera(capture(attachAiDepth(photo(900,600),depth),12,0),model);
     assert.equal(nativePortraitBaseState(source),'unknown-base');
@@ -409,8 +415,9 @@ test('Apple legacy Rec.709 gain samples are converted to the equivalent ISO loga
   assert.ok(maxError<.006,`legacy-to-ISO gain error ${maxError}`);
 });
 
-function maker33LegacyHdr({numerator=28718,denominator=31509,maker48=null,withMaker33=true}={}){
-  let source=withCamera(capture(attachAiDepth(photo(900,600),depth),10,0),'iPhone 13 Pro Max');
+function maker33LegacyHdr({numerator=28718,denominator=31509,maker48=null,withMaker33=true,
+  captureClass=10,model='iPhone 13 Pro Max'}={}){
+  let source=withCamera(capture(attachAiDepth(photo(900,600),depth),captureClass,0),model);
   const d=discoverHeic(source),ft=topBox(source,'ftyp');
   let meta=source.slice(d.meta.off,d.meta.off+d.meta.size),index,ids;
   for(const id of d.hdrTiles.length?d.hdrTiles:[d.hdrGrid])
@@ -437,8 +444,11 @@ function maker33LegacyHdr({numerator=28718,denominator=31509,maker48=null,withMa
 
 test('native Portrait-off restores camera depth with normalized HDR even without Maker48',async()=>{
   // Actual reported captures: IMG_5202/1412 and IMG_7094/1415, Maker48 absent.
-  for(const [numerator,denominator,stops]of [[28718,31509,1.8],[39391,27267,3]]){
-    const source=maker33LegacyHdr({numerator,denominator}),saved=source.slice(),before=discoverHeic(source);
+  for(const [numerator,denominator,stops,captureClass,model]of [
+    [28718,31509,1.8,10,'iPhone 13 Pro Max'],
+    [39391,27267,3,1,'iPhone 14 Pro Max'],
+  ]){
+    const source=maker33LegacyHdr({numerator,denominator,captureClass,model}),saved=source.slice(),before=discoverHeic(source);
     const oldDepth=[...before.infos.keys()].find(id=>auxUriForItem(before.props,id)===DEPTH_URI);
     let decodes=0,encodes=0;
     const codec={

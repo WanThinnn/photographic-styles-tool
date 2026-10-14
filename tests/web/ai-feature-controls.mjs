@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {readApplicationSource} from './helpers/application-source.mjs';
 import {AI_STRINGS} from '../../web/src/ui/ai-strings.js';
 import {createAiFeatureControls,showAiSettingsHintOnce} from '../../web/src/ui/ai-feature-controls.js';
 
@@ -111,7 +112,7 @@ test('AI settings discovery hint persists across visits until settings is opened
 test('AI switches share one quality control and have accessible localized copy',()=>{
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const css=readFileSync(new URL('../../web/styles.css',import.meta.url),'utf8');
-  const app=readFileSync(new URL('../../web/app.js',import.meta.url),'utf8');
+  const app=readApplicationSource();
   const portrait=html.indexOf('id="ai-portrait"');
   const detail=html.indexOf('id="ai-detail"');
   const style=html.indexOf('id="ai-style-suggest"');
@@ -145,7 +146,7 @@ test('AI switches share one quality control and have accessible localized copy',
 });
 
 test('AI model progress distinguishes downloads from cached preparation and names each feature',()=>{
-  const app=readFileSync(new URL('../../web/app.js',import.meta.url),'utf8');
+  const app=readApplicationSource();
   const styleWorker=readFileSync(new URL('../../web/src/recommend/style-inference-worker.js',import.meta.url),'utf8');
   const depthWorker=readFileSync(new URL('../../web/src/portrait/ai-inference-worker.js',import.meta.url),'utf8');
   const detailWorker=readFileSync(new URL('../../web/src/detail/detail-worker.js',import.meta.url),'utf8');

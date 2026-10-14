@@ -7,11 +7,12 @@
 // index.html asks for that no longer exists.
 
 import { readFileSync } from "node:fs";
+import {readApplicationSource} from './helpers/application-source.mjs';
 import { STRINGS } from "../../web/src/ui/i18n.js";
 
 const ROOT = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const html = readFileSync(`${ROOT}web/index.html`, "utf8");
-const app = readFileSync(`${ROOT}web/app.js`, "utf8");
+const app = readApplicationSource();
 
 const usedInHtml = new Set([...html.matchAll(/data-i18n="([^"]+)"/g)].map((m) => m[1]));
 // Keys reach T() through ternaries and variables as well as literal calls, so match

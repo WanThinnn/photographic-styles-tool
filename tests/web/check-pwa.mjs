@@ -11,6 +11,7 @@ const WEB = join(ROOT, "web");
 const manifest = JSON.parse(readFileSync(join(WEB, "manifest.webmanifest"), "utf8"));
 const html = readFileSync(join(WEB, "index.html"), "utf8");
 const app = readFileSync(join(WEB, "app.js"), "utf8");
+const application = readFileSync(join(WEB, "src/app/application.js"), "utf8");
 const worker = readFileSync(join(WEB, "sw.js"), "utf8");
 const startup = readFileSync(join(WEB, 'src/ui/startup.js'), 'utf8');
 const errors = [];
@@ -40,8 +41,8 @@ if (!html.includes('rel="manifest" href="manifest.webmanifest"')) {
 if (html.includes("manifest-dark.webmanifest") || html.includes("icon-180-ios-dark.png")) {
   errors.push("install icons must not be frozen to the appearance used when the PWA was installed");
 }
-if (!startup.includes("serviceWorker?.register('./sw.js'") || !app.includes('await prepareBrowser()')) {
-  errors.push("app.js does not register the service worker with a relative URL");
+if (!startup.includes("serviceWorker?.register('./sw.js'") || !application.includes('await prepareBrowser()') || !app.includes("import {startApplication} from './src/app/application.js'")) {
+  errors.push("application does not register the service worker with a relative URL");
 }
 
 function pngInfo(path) {

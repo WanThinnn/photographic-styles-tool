@@ -19,7 +19,7 @@ test('every non-Standard Style keeps Palette in Details',()=>{
 });
 
 test('result notes use the shared parameter formatter, including existing fallback handling',()=>{
-  const source=readFileSync(new URL('../../web/app.js',import.meta.url),'utf8');
+  const source=readFileSync(new URL('../../web/src/app/processing/photo-analysis.js',import.meta.url),'utf8');
   const note=source.slice(source.indexOf('function styleResultNote('),source.indexOf('function adaptiveStyleCompletionNotice('));
   assert.match(note,/formatStyleParameters\(recommendation\)/);
   assert.match(note,/recommendation\.fallback.*styleFallback/);

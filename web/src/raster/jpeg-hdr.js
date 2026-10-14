@@ -149,12 +149,14 @@ function parseAdobeHdrXmp(xml,prefix,declarations){
  return {baseHeadroom:lo[0],alternateHeadroom:hi[0],channels,useBaseColorSpace:true};
 }
 
-/** Null for ordinary SDR JPEG; recognized unsupported/broken HDR must never fall back to SDR. */
+/** Null for ordinary SDR JPEG. Broken formats supported by this importer must
+ * never fall back to SDR. Photos duplicates can retain an orphaned Apple legacy
+ * MPF auxiliary without the complete editable/HDR contract; those are treated
+ * as raster input so the valid base photo is still processable. */
 export function extractJpegHdr(bytes) {
  if(bytes[0]!==255||bytes[1]!==216)return null;
  const metadataText=text.decode(bytes);
- const hasHdrSignal=metadataText.includes(HDR_NS)||metadataText.includes('urn:com:apple:photo:2020:aux:hdrgainmap')
-  ||metadataText.includes('urn:iso:std:iso:ts:21496:-1');
+ const hasHdrSignal=metadataText.includes(HDR_NS)||metadataText.includes('urn:iso:std:iso:ts:21496:-1');
  let primary;
  try{primary=jpegHeader(bytes);}catch(error){if(hasHdrSignal)throw error;return null;}
  const mpf=primary.segments.find(s=>s.marker===226&&starts(s.data,MPF));

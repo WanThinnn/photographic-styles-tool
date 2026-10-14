@@ -19,9 +19,12 @@ Trên iPhone, nên thêm Stylio vào Màn hình chính để dùng dưới dạn
 ## Giao diện
 
 <p align="center">
-  <img src="../demo/img/demo-1.png" width="32%" alt="Giao diện xử lý ảnh của Stylio">
-  <img src="../demo/img/demo-2.png" width="32%" alt="Luồng chỉnh sửa ảnh của Stylio">
-  <img src="../demo/img/demo-3.png" width="32%" alt="Cài đặt và AI Settings của Stylio">
+  <img src="../demo/img/demo-3.png" width="72%" alt="Giao diện chính của Stylio">
+</p>
+
+<p align="center">
+  <img src="../demo/img/demo-1.png" width="45%" alt="Quy trình xử lý ảnh với Stylio">
+  <img src="../demo/img/demo-2.png" width="45%" alt="Cài đặt và AI Settings của Stylio">
 </p>
 
 ## Tính năng chính

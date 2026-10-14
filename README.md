@@ -19,9 +19,12 @@ On iPhone, add Stylio to the Home Screen for the full-screen PWA experience.
 ## Preview
 
 <p align="center">
-  <img src="docs/demo/img/demo-1.png" width="32%" alt="Stylio processing interface">
-  <img src="docs/demo/img/demo-2.png" width="32%" alt="Stylio photo editing workflow">
-  <img src="docs/demo/img/demo-3.png" width="32%" alt="Stylio settings and AI controls">
+  <img src="docs/demo/img/demo-3.png" width="72%" alt="Stylio main interface">
+</p>
+
+<p align="center">
+  <img src="docs/demo/img/demo-1.png" width="45%" alt="Stylio workflow">
+  <img src="docs/demo/img/demo-2.png" width="45%" alt="Stylio settings">
 </p>
 
 ## Main features

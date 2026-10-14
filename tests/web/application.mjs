@@ -8,6 +8,7 @@ import {createAiFeatureControls} from '../../web/src/ui/ai-feature-controls.js';
 // decoding photos. Domain factories are injected at the module boundary.
 const source=readFileSync(new URL('../../web/src/app/application.js',import.meta.url),'utf8')
   .replace(/^import .*;\n/gm,'').replace('export function startApplication','function startApplication');
+const resultViewSource=readFileSync(new URL('../../web/src/ui/results/result-view.js',import.meta.url),'utf8');
 function harness({manualQueue=false,historyEntries=[]}={}){
   const nodes=new Map(),calls=[],captured={},batches=new Map();
   function batchFor(name){
@@ -108,6 +109,15 @@ test('three-stop model range updates the displayed name and the actual processin
     assert.equal(h.node('depth-model-value').textContent,name);
     assert.equal(h.node('depth-model').parentElement.dataset.level,String(index));
   }
+});
+
+test('ready output is persisted immediately and preview enrichment cannot block F5 history restore',()=>{
+  assert.match(resultViewSource,/const persistHistory=\(\)=>persistedOutput&&historyStore\?\.save\?\.\(\{[\s\S]*?preview:previewSnapshot,thumbnail:historyThumbnail/s);
+  assert.doesNotMatch(resultViewSource,/persistedOutput&&previewSnapshotPromise\.then/);
+  assert.match(resultViewSource,/previewSnapshotPromise\.then\(preview=>\{previewSnapshot=preview;void persistHistory\(\);\}\)/);
+  const listener=resultViewSource.indexOf("image.addEventListener('load'");
+  const sourceAssignment=resultViewSource.indexOf('image.src=url');
+  assert.ok(listener>=0&&sourceAssignment>listener,'preview listeners must be attached before the blob URL can load');
 });
 
 test('persistent history is restored as ready downloadable results without reprocessing',async()=>{

@@ -232,6 +232,7 @@ test('four destinations include a standalone Guide and Settings, with Back and s
     h.tabs[index].click();
     assert.equal(h.$(name+'-screen').hidden,false);
     assert.equal(h.tabs[index].getAttribute('aria-current'),'page');
+    assert.equal(h.$('.app-tabs').css.get('--tab-rest-offset'),`calc(${index} * 100%)`,'resting lens uses stable layout math instead of transformed button geometry');
     assert.equal(h.$('header-guide').getAttribute('aria-label'),name==='settings'?'GitHub':'shell.guide');
     assert.equal(h.doc.body.classes.has('is-settings-destination'),name==='settings');
     for(const other of ['process','history','guide','settings'])if(other!==name)assert.equal(h.$(other+'-screen').hidden,true);
@@ -301,6 +302,22 @@ test('dock clears stale offsets on resume and only lifts for a real Search keybo
   assert.equal(values.has('--dock-keyboard-offset'),false,'pagehide clears keyboard offsets');
   dispose();viewport.dispatchEvent(new Event('resize'));assert.equal(frame,null);
 });
+test('freshly installed standalone PWA re-samples a transient short layout viewport after load settles',()=>{
+  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
+  viewport.height=720;viewport.offsetTop=0;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=756;
+  win.navigator={standalone:true};win.matchMedia=()=>({matches:true});
+  let frame;win.requestAnimationFrame=fn=>{frame=fn;return 1;};win.cancelAnimationFrame=()=>frame=null;
+  win.setTimeout=()=>1;win.clearTimeout=()=>{};
+  const dock={style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)},classList:{contains:()=>false}};
+  const doc={documentElement:{clientHeight:756},activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?{hidden:true}:input,addEventListener(){},removeEventListener(){}};
+  const flush=()=>{const next=frame;frame=null;next?.();};
+  const dispose=bindDockViewport({win,doc});flush();
+  assert.equal(values.get('--dock-shell-height'),'756px');
+  win.innerHeight=812;doc.documentElement.clientHeight=812;win.dispatchEvent(new Event('load'));flush();
+  assert.equal(values.get('--dock-shell-height'),'812px','first launch must re-anchor once the real standalone layout viewport settles');
+  dispose();
+});
+
 test('standalone dock follows the visible layout viewport instead of overshooting to physical screen height',()=>{
   const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
   viewport.height=720;viewport.offsetTop=0;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=756;
@@ -350,11 +367,14 @@ function glassHarness({reduced=false}={}){
   const dispose=bindTabGlass({nav,tabs,doc,win,select:name=>selected.push(name)});
   return {nav,tabs,doc,win,selected,dispose,flushFrame(){const next=frame;frame=null;next?.();},settle(){scheduled?.();scheduled=null;}};
 }
-test('glass lens previews a press without navigating, then commits once and settles',()=>{
+test('glass lens previews a press with measured iOS27 geometry, then commits once and settles',()=>{
   const h=glassHarness();h.nav.fire('pointerdown',{target:h.tabs[1],clientX:150});
   assert.equal(h.nav.classList.contains('is-pressing'),true);
   assert.deepEqual(h.selected,[]);
   assert.equal(h.nav.style.getPropertyValue('--lens-offset'),'100px');
+  assert.equal(Number(h.nav.style.getPropertyValue('--ios27-bar-held-scale')).toFixed(5),'1.03535');
+  assert.equal(Number(h.nav.style.getPropertyValue('--ios27-lens-held-sx')).toFixed(2),'1.16');
+  assert.equal(Number(h.nav.style.getPropertyValue('--ios27-lens-held-sy')).toFixed(5),'1.34783');
   h.doc.fire('pointerup',{clientX:150});
   assert.deepEqual(h.selected,['history']);
   assert.equal(h.nav.classList.contains('is-releasing'),true);

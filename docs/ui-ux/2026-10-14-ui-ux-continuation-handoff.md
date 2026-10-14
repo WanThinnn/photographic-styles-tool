@@ -2,14 +2,14 @@
 
 > Mục đích: đây là tài liệu bàn giao trực tiếp cho AI/agent tiếp theo. Đọc file này trước khi sửa UI/UX. Nếu có mâu thuẫn giữa lịch sử cũ và trạng thái hiện tại, ưu tiên: **code hiện tại trong working tree → tài liệu này → mục mới nhất trong `docs/ui-ux/plan/2026-10-14-stylio-mobile-app-redesign.md` → các mục lịch sử cũ**.
 
-> **Checkpoint 2026-10-15:** baseline redesign + processing work đã được gom vào commit `8e5d975` và push. Sau đó người dùng mở lại UI pass để sửa live Safari theme sync và polish PWA/iOS27 motion; working tree hiện có batch v192–v193 chưa commit/push. Processing history vẫn ở [processing guide](../web/processing-guide.md#active-processing-handoff--2026-10-15-ios-18-telephoto-texture) và `facts.md` §10.74.
+> **Checkpoint 2026-10-15:** baseline redesign + processing work đã được gom vào commit `8e5d975` và push. Sau đó người dùng mở lại UI pass để sửa live Safari theme sync và polish PWA/iOS27 motion; baseline UI polish đến v193 đã được commit/push ở `356930a`; working tree hiện có batch v194–v196 chưa commit/push. Processing history vẫn ở [processing guide](../web/processing-guide.md#active-processing-handoff--2026-10-15-ios-18-telephoto-texture) và `facts.md` §10.74.
 
 ## 1. Trạng thái repository hiện tại
 
 - Workspace: `photographic-styles-tool`.
 - Nhánh làm việc hiện tại theo plan: `feature/ui-ux-redesign`.
 - Working tree **đang có thay đổi chưa commit/push**. Không reset, checkout, rebase, stash, merge hoặc xóa các thay đổi đang có nếu người dùng chưa yêu cầu rõ.
-- UI shell hiện ở Service Worker cache **v193**: `web/sw.js`.
+- UI shell hiện ở Service Worker cache **v196**: `web/sw.js`.
 - PWA là static HTML/CSS/JS, không chuyển sang React/Ionic/React Native. Các repo trong `ref/` chỉ dùng làm reference.
 - `facts.md` là sổ thí nghiệm kỹ thuật dài hạn. **Không sửa facts.md cho các thay đổi UI/UX thông thường.**
 - Các install icon PWA/Home Screen vẫn dùng bản xanh mặc định. **Không tạo cơ chế dynamic dark install icon.** iOS quyết định appearance ở Home Screen. Dark icon nội bộ của app chỉ dùng cho header/app shell.
@@ -318,7 +318,7 @@ Behavior:
 - không lưu full source photo lần thứ hai chỉ để preview/thumbnail.
 
 Lưu ý implementation hiện tại:
-- `result-view.js` dùng `previewSnapshotPromise`;
+- `result-view.js` vẫn dùng `previewSnapshotPromise` để enrich preview sau, nhưng **không được chặn lần save History đầu tiên**; output Ready phải persist file ngay rồi preview/thumbnail cập nhật record sau.
 - snapshot max width khoảng 960px, JPEG quality ~0.82;
 - History store record có field `preview`;
 - `application.js::restorePersistentHistory()` truyền `restoredPreview` vào row.
@@ -556,7 +556,7 @@ Nếu thêm setting mới:
 
 ## 20. Service Worker và offline
 
-`web/sw.js` hiện cache `photographic-style-port-v193`.
+`web/sw.js` hiện cache `photographic-style-port-v196`.
 
 Mọi module/UI asset mới cần dùng offline phải được thêm vào `APP_SHELL` nếu phù hợp.
 
@@ -636,9 +636,9 @@ Nếu user gửi screenshot mới, ưu tiên screenshot thực tế trên thiế
 
 ## 24. Test suite hiện tại
 
-Mốc regression gần nhất sau v193:
+Mốc regression gần nhất sau v196:
 
-- main lightweight suite: **87/87 pass**
+- main lightweight suite: **89/89 pass**
 - language tests: **3/3 pass**
 - PWA check: pass
 - i18n check: pass
@@ -868,7 +868,43 @@ Batch v192 tiếp tục được refine trong cùng working tree; chưa commit/p
 - Service Worker cache tăng **v193**.
 - Regression: **87/87 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
 
-Chưa commit/push. Working tree v193 là base hiện hành.
+Batch v193 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 40. Batch v194 — measured iOS27 Liquid Glass tab scaling
+
+- Port lại interaction của bottom tab từ `ref/ionic-theme-ios27/src/sheets-of-glass/animations.ts`, `sheets-of-glass/index.ts` và `styles/components/ion-tabs.scss` thay vì dùng scale cảm tính cũ `1.15 × 1.4`.
+- Platter/tab bar khi giữ được scale theo đúng rule UIKit reference: tăng kích thước tương đương **14.14pt** trên chiều rộng thực tế, transition **367ms** với đúng `linear(...)` press curve; khi nhả dùng đúng 367ms release curve có undershoot/overshoot nhỏ.
+- Touched tab content scale **1.1×** với `transform-origin:center 65%`, khớp `ion-tab-button.ion-activated`.
+- Liquid lens dùng nguyên measured press frames 0–900ms từ reference: stretch ngang đi trước (`25.94pt` peak), dọc bắt kịp sau (`20.75pt` peak), rồi settle ở **+16pt × +16pt**. Vì Stylio có tab width responsive, JS đổi các pt samples thành scale theo geometry thật thay vì hard-code tỉ lệ.
+- Drag gesture dừng press animation và dùng velocity deformation từ reference (`min(16, 32 × velocity²)`): kéo nhanh thì lens kéo dài theo trục di chuyển và co nhẹ trục còn lại; release dùng measured 450ms remaining samples với undershoot rất nhỏ.
+- Giữ nguyên navigation semantics: press chỉ preview, pointer-up mới commit, kéo dọc/cancel/outside không navigate, click browser thừa sau drag vẫn bị suppress, reduced-motion bỏ deformation.
+- Service Worker cache tăng **v194**.
+- Regression: **87/87 main lightweight suite pass**; targeted app-shell/styles **47/47 pass**; `tab-glass.js` syntax check pass.
+
+Batch v194 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 41. Batch v195 — stable selected-pill geometry / F5 History persistence
+
+- Fix selected lens ở tab cuối (`Settings`): trước đây `syncTabLens()` đo `getBoundingClientRect()` ngay trong lúc tab/platter đang scale theo Liquid Glass press. Vì transformed geometry bị đọc vào `--tab-rest-offset`, vị trí rest của Settings có thể lệch vài px, làm hai đường cong outer glass và selected fill không còn song song. Rest offset giờ được tính hoàn toàn từ tab index (`calc(index * 100%)`), không phụ thuộc animation/transformed rect.
+- Fix regression History mất sau F5: lần persist đầu trước đây chờ `previewSnapshotPromise`. Nếu lazy preview chưa phát `load` (hoặc blob load xảy ra trước khi listener được gắn), output Ready chưa bao giờ được ghi vào IndexedDB trước reload. `result-view.js` giờ save output file **ngay lập tức** với preview hiện có; JPEG preview và thumbnail chỉ enrich/update cùng record sau.
+- Listener `load/error` cho preview được gắn trước `image.src`, loại bỏ race blob URL tải quá nhanh.
+- Restore flow `application.js::restorePersistentHistory()` và IndexedDB schema `stylio-history-v1/results` giữ nguyên.
+- Service Worker cache tăng **v195**.
+- Regression mới khóa cả hai lỗi: tab rest offset ổn định qua cả 4 destinations và persistence không còn phụ thuộc preview promise.
+- Regression: **88/88 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+Batch v195 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 42. Batch v196 — first-launch PWA dock settling / AI Settings independent entry
+
+- Fix cold-launch PWA dock: không quay lại dùng VisualViewport cho resting geometry vì lịch sử v165–v167 đã chứng minh API này có thể giữ stale browser/keyboard metrics khi standalone resume. Thay vào đó dock tiếp tục neo theo `max(innerHeight, documentElement.clientHeight)` nhưng resample dài hơn trong 6 giây đầu (`80/240/520/900/1500/2500/4000/6000ms`) và thêm `window.load` trigger. Trường hợp iOS vừa Add to Home Screen mở lần đầu với layout viewport tạm thời ngắn sẽ tự re-anchor xuống đúng bottom khi layout standalone settle, không cần kill/reopen app.
+- Search keyboard path vẫn tách riêng và chỉ dùng VisualViewport sau focus + resize hợp lệ; warm reopen behavior cũ được giữ.
+- AI Settings không còn bị khóa chỉ vì `Smart Enhance photo` đang Off. Khi app/model sẵn sàng, Portrait/Sharpen/Adaptive Styles luôn thao tác được trong sheet.
+- Nếu người dùng bật một feature từ AI Settings trong lúc master đang Off, `Smart Enhance photo` tự chuyển On nhưng không ép bật Portrait thêm. Nếu người dùng tắt `Smart Enhance photo` ở màn Process, tất cả feature con vẫn bị tắt/cancel như trước.
+- Service Worker cache tăng **v196**.
+- Regression: **89/89 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+Chưa commit/push. Working tree v196 là base hiện hành.
 
 ---
 

@@ -1,6 +1,7 @@
-/* Pressed lens: expand outside the resting platter, with a lit glass rim.
-   This is the Web UI reference, not the UIKit optical-refraction bridge.
-   The lens shares the bar's material; no nested backdrop-filter. */
+/* iOS 27 Liquid Glass tab interaction.
+   Press/release samples mirror ref/ionic-theme-ios27's measured UIKit frames:
+   the platter grows ~14.14pt, the touched tab grows 1.1x, and the lens
+   stretches horizontally before its vertical rebound catches up. */
 .app-tabs {
   touch-action: pan-y;
   user-select: none;
@@ -9,17 +10,26 @@
   contain: layout style;
   isolation: isolate;
   transform: translateZ(0);
+  transform-origin: center;
   backface-visibility: hidden
 }
+
 .app-tabs::before {
   transform-origin: center;
   border: .5px solid transparent;
   scale: 1;
   contain: paint;
   will-change: transform,scale;
-  transition: transform 360ms var(--spring-ease),scale 440ms var(--spring-ease),background 360ms,box-shadow 440ms
+  transition: transform 360ms var(--spring-ease),background 360ms,box-shadow 440ms,border-color 200ms
 }
+
+.app-tabs.is-pressing {
+  transform: scale(var(--ios27-bar-held-scale,1.038)) translateZ(0);
+  transition: transform 367ms linear(0,0.148 9%,0.46 18%,0.752 27%,0.951 36%,1.052 45%,1.081 54%,1.058 72%,1.019 86%,1)
+}
+
 .app-tabs.is-pressing::before,
+.app-tabs.is-dragging::before,
 .app-tabs.is-releasing::before {
   background:
     radial-gradient(ellipse at 24% 12%,var(--glass-rim-top),transparent 64%),
@@ -32,13 +42,101 @@
     0 0 0 .5px var(--glass-outline),
     0 6px 18px var(--glass-shade)
 }
+
 .app-tabs.is-pressing::before {
-  scale: 1.15 1.4;
-  transition: transform 320ms var(--spring-ease),scale 220ms var(--spring-ease),background 140ms,box-shadow 200ms
+  animation: ios27-tab-lens-press 900ms linear both;
+  transition: transform 320ms var(--spring-ease),background 140ms,box-shadow 200ms,border-color 140ms
+}
+
+.app-tabs.is-dragging {
+  transform: scale(var(--ios27-bar-held-scale,1.038)) translateZ(0);
+  transition: transform 160ms var(--spring-ease)
 }
 
 .app-tabs.is-dragging::before {
-  transition: scale 160ms var(--spring-ease),background 120ms,box-shadow 160ms
+  scale: var(--ios27-drag-lens-sx,var(--ios27-lens-held-sx,1.2)) var(--ios27-drag-lens-sy,var(--ios27-lens-held-sy,1.3));
+  transition: transform 90ms linear,scale 160ms var(--spring-ease),background 120ms,box-shadow 160ms
+}
+
+.app-tabs.is-releasing {
+  transform: translateZ(0);
+  transition: transform 367ms linear(0,0.096 9%,0.356 18%,0.64 27%,0.863 36%,1 45%,1.078 54%,1.092 59%,1.018 95%,1)
+}
+
+.app-tabs.is-releasing::before {
+  animation: ios27-tab-lens-release 450ms linear both;
+  transition: transform 360ms var(--spring-ease),background 260ms,box-shadow 300ms
+}
+
+.app-tabs button {
+  transform-origin: center 65%;
+  transition: transform 200ms ease-out,background var(--duration-fast),color var(--duration-fast)
+}
+
+.app-tabs.is-pressing button[aria-current="page"]:not(.is-previewed) {
+  color: var(--muted)
+}
+
+.app-tabs button.is-previewed {
+  color: var(--accent-text)
+}
+
+.app-tabs.is-pressing button.is-previewed,
+.app-tabs.is-dragging button.is-previewed {
+  transform: scale(1.1)
+}
+
+.app-tabs.is-releasing button.is-previewed {
+  transform: scale(1);
+  transition: transform 200ms ease-out,color var(--duration-fast)
+}
+
+.app-tabs button>svg,
+.app-tabs button>span:not(.tab-count) {
+  transition: color var(--duration-fast),filter 180ms ease;
+  transform-origin: center
+}
+
+.app-tabs.is-pressing button.is-previewed>svg,
+.app-tabs.is-pressing button.is-previewed>span:not(.tab-count),
+.app-tabs.is-dragging button.is-previewed>svg,
+.app-tabs.is-dragging button.is-previewed>span:not(.tab-count) {
+  filter: brightness(104%)
+}
+
+.dock-search.glass-surface:active {
+  scale: 1.08;
+  box-shadow: inset 0 1px 3px var(--glass-rim-top),inset 0 -1px 3px var(--glass-rim-bottom),0 0 0 .5px var(--glass-outline),0 5px 16px var(--glass-shade)
+}
+
+@keyframes ios27-tab-lens-press {
+  0% { scale: var(--ios27-lens-sx-0,1) var(--ios27-lens-sy-0,1) }
+  3.667% { scale: var(--ios27-lens-sx-1,1) var(--ios27-lens-sy-1,1) }
+  7.444% { scale: var(--ios27-lens-sx-2,1) var(--ios27-lens-sy-2,1) }
+  11.111% { scale: var(--ios27-lens-sx-3,1) var(--ios27-lens-sy-3,1) }
+  14.778% { scale: var(--ios27-lens-sx-4,1) var(--ios27-lens-sy-4,1) }
+  18.556% { scale: var(--ios27-lens-sx-5,1) var(--ios27-lens-sy-5,1) }
+  22.222% { scale: var(--ios27-lens-sx-6,1) var(--ios27-lens-sy-6,1) }
+  29.667% { scale: var(--ios27-lens-sx-7,1) var(--ios27-lens-sy-7,1) }
+  37% { scale: var(--ios27-lens-sx-8,1) var(--ios27-lens-sy-8,1) }
+  44.444% { scale: var(--ios27-lens-sx-9,1) var(--ios27-lens-sy-9,1) }
+  51.889% { scale: var(--ios27-lens-sx-10,1) var(--ios27-lens-sy-10,1) }
+  66.667% { scale: var(--ios27-lens-sx-11,1) var(--ios27-lens-sy-11,1) }
+  81.444% { scale: var(--ios27-lens-sx-12,1) var(--ios27-lens-sy-12,1) }
+  100% { scale: var(--ios27-lens-sx-13,var(--ios27-lens-held-sx,1.2)) var(--ios27-lens-sy-13,var(--ios27-lens-held-sy,1.3)) }
+}
+
+@keyframes ios27-tab-lens-release {
+  0% { scale: var(--ios27-release-sx-0,1) var(--ios27-release-sy-0,1) }
+  7.333% { scale: var(--ios27-release-sx-1,1) var(--ios27-release-sy-1,1) }
+  14.889% { scale: var(--ios27-release-sx-2,1) var(--ios27-release-sy-2,1) }
+  22.222% { scale: var(--ios27-release-sx-3,1) var(--ios27-release-sy-3,1) }
+  29.556% { scale: var(--ios27-release-sx-4,1) var(--ios27-release-sy-4,1) }
+  37.111% { scale: var(--ios27-release-sx-5,1) var(--ios27-release-sy-5,1) }
+  44.444% { scale: var(--ios27-release-sx-6,1) var(--ios27-release-sy-6,1) }
+  59.333% { scale: var(--ios27-release-sx-7,1) var(--ios27-release-sy-7,1) }
+  81.556% { scale: var(--ios27-release-sx-8,1) var(--ios27-release-sy-8,1) }
+  100% { scale: var(--ios27-release-sx-9,1) var(--ios27-release-sy-9,1) }
 }
 
 @media(pointer:coarse) {
@@ -50,32 +148,48 @@
       0 3px 10px var(--glass-shade)
   }
 }
-.app-tabs.is-pressing button[aria-current="page"]:not(.is-previewed) { color: var(--muted) }
-.app-tabs button.is-previewed { color: var(--accent-text) }
-.app-tabs button>svg,.app-tabs button>span:not(.tab-count) {
-  transition: scale 220ms var(--spring-ease),color var(--duration-fast);
-  transform-origin: center
-}
-.app-tabs.is-pressing button.is-previewed>svg,
-.app-tabs.is-pressing button.is-previewed>span:not(.tab-count) { scale: 1.08 }
-.dock-search.glass-surface:active {
-  scale: 1.08;
-  box-shadow: inset 0 1px 3px var(--glass-rim-top),inset 0 -1px 3px var(--glass-rim-bottom),0 0 0 .5px var(--glass-outline),0 5px 16px var(--glass-shade)
-}
+
 @media(prefers-reduced-motion:reduce) {
-  .app-tabs.is-pressing::before,.dock-search.glass-surface:active,
-  .app-tabs.is-pressing button.is-previewed>svg,
-  .app-tabs.is-pressing button.is-previewed>span:not(.tab-count) { scale: 1 }
+  .app-tabs,
+  .app-tabs.is-pressing,
+  .app-tabs.is-dragging,
+  .app-tabs.is-releasing {
+    animation: none;
+    transform: translateZ(0);
+    transition: none
+  }
+  .app-tabs::before,
+  .app-tabs.is-pressing::before,
+  .app-tabs.is-dragging::before,
+  .app-tabs.is-releasing::before {
+    animation: none;
+    scale: 1;
+    transition: none
+  }
+  .app-tabs.is-pressing button.is-previewed,
+  .app-tabs.is-dragging button.is-previewed,
+  .app-tabs.is-releasing button.is-previewed,
+  .dock-search.glass-surface:active {
+    transform: none;
+    scale: 1
+  }
 }
+
 @media(prefers-reduced-transparency:reduce), (prefers-contrast:more) {
-  .app-tabs.is-pressing::before,.app-tabs.is-releasing::before {
+  .app-tabs.is-pressing::before,
+  .app-tabs.is-dragging::before,
+  .app-tabs.is-releasing::before {
     background: var(--surface-secondary);
     border-color: var(--muted);
     box-shadow: none
   }
 }
+
 @media(forced-colors:active) {
-  .app-tabs::before,.app-tabs.is-pressing::before,.app-tabs.is-releasing::before {
+  .app-tabs::before,
+  .app-tabs.is-pressing::before,
+  .app-tabs.is-dragging::before,
+  .app-tabs.is-releasing::before {
     background: Canvas;
     border-color: Highlight;
     box-shadow: none

@@ -807,6 +807,33 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v193**.
 - Regression: **87/87 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
 
+### Measured iOS27 Liquid Glass tab scaling v194
+
+- Replace the previous heuristic `1.15 × 1.4` selected-lens scale with the measured UIKit samples from the local ionic-theme-ios27 reference.
+- The whole tab platter expands by the reference 14.14pt-equivalent amount over the actual rendered width using the exact 367ms press `linear(...)` curve, and relaxes through the matching 367ms release curve.
+- The touched tab itself scales to 1.1 with center-65% transform origin, matching `ion-tab-button.ion-activated`.
+- The lens uses the original 900ms measured width/height frames: horizontal deformation leads, vertical deformation follows, then the held state settles at +16pt in both axes. Scale is derived from each rendered tab's geometry so phone widths remain correct.
+- Drag deformation now follows the reference velocity formula `min(16, 32 * velocity²)` and release follows the 450ms remaining-sample rebound. Existing cancel/navigation/reduced-motion semantics remain intact.
+- Service Worker tăng **v194**.
+- Regression: **87/87 main lightweight tests pass**; targeted app-shell/styles **47/47 pass**; tab-glass syntax check pass.
+
+### Stable selected-pill geometry / F5 History persistence v195
+
+- Do not derive the resting selected-lens offset from `getBoundingClientRect()` while Liquid Glass transforms are active. The tab rest position is now pure equal-tab layout math (`calc(index * 100%)`), which keeps the inner selected curve concentric/parallel with the outer glass capsule even on the trailing Settings tab.
+- Persist a Ready output to IndexedDB immediately. Preview snapshot generation is enrichment only and may update the same record later; it must never gate the first History save.
+- Preview load/error listeners are attached before assigning the blob URL to `img.src`, removing the fast-load race that could leave `previewSnapshotPromise` unresolved until reload.
+- Existing restore/download/thumbnail behavior and IndexedDB schema remain unchanged.
+- Service Worker tăng **v195**.
+- Regression: **88/88 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+### First-launch PWA dock settling / AI Settings independent entry v196
+
+- Keep VisualViewport out of resting standalone dock placement; historical iOS testing showed stale lifecycle metrics. Instead, re-sample the real layout viewport through load and an extended 80ms→6s settling window so the very first Home Screen launch corrects a transient short viewport without requiring a force-quit.
+- Keyboard Search remains the only path that can temporarily override dock bottom using VisualViewport.
+- AI feature switches remain interactive whenever AI is available even when Smart Enhance is off. Enabling a child feature implicitly turns Smart Enhance on without auto-selecting Portrait; turning Smart Enhance off still clears/cancels every child.
+- Service Worker tăng **v196**.
+- Regression: **89/89 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

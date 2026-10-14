@@ -13,11 +13,10 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   const tabs=[...doc.querySelectorAll('[data-screen]')],tabNav=doc.querySelector('.app-tabs');
   bindDockViewport({doc,win});
   const syncTabLens=()=>{
-    const active=tabs.find(button=>button.getAttribute?.('aria-current')==='page'),first=tabs[0];
-    if(!active||!first||!tabNav?.style)return;
-    const activeRect=active.getBoundingClientRect?.(),firstRect=first.getBoundingClientRect?.();
-    const offset=Number(activeRect?.left)-Number(firstRect?.left);
-    if(Number.isFinite(offset))tabNav.style.setProperty('--tab-rest-offset',offset+'px');
+    const active=tabs.find(button=>button.getAttribute?.('aria-current')==='page');
+    if(!active||!tabNav?.style)return;
+    const index=tabs.indexOf(active);
+    if(index>=0)tabNav.style.setProperty('--tab-rest-offset',`calc(${index} * 100%)`);
   };
   let destination='process',selected=null,serial=0,opener=null,scroll=0,returning=false,pendingOpen=null,photoClosingTimer=null,closeTaskMenu=null;
   const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;

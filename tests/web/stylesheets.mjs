@@ -414,18 +414,25 @@ test('photo actions use a compact liquid-glass capsule that expands on interacti
   assert.match(results,/@media\(min-width:768px\) \{[\s\S]*?\.photo-workspace:has\(#photo-content>\.row\[data-preview="off"\]\) \{[^}]*height: auto;[^}]*max-height: min\(90dvh,620px\)/s);
   assert.match(results,/@media\(max-width:767px\) \{[\s\S]*?\.photo-workspace \{[^}]*height: 100dvh/s);
 });
-test('tab glass expands outside the platter, keeps badges optically anchored, and uses heavier symbol weights',()=>{
+test('tab glass ports measured iOS27 platter, lens, drag and release geometry while keeping badges anchored',()=>{
   const css=readFileSync(new URL('../../web/styles/components/navigation-effects.css',import.meta.url),'utf8');
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const materials=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
   const tokens=readFileSync(new URL('../../web/styles/foundations/tokens.css',import.meta.url),'utf8');
   const shell=readFileSync(new URL('../../web/src/ui/shell/app-shell.js',import.meta.url),'utf8');
+  const glass=readFileSync(new URL('../../web/src/ui/shell/tab-glass.js',import.meta.url),'utf8');
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
-  assert.match(css,/\.app-tabs\.is-pressing::before/);
-  assert.match(css,/scale: 1\.15 1\.4/);
-  assert.match(css,/transition: transform 360ms var\(--spring-ease\)/);
-  assert.match(css,/\.app-tabs\.is-pressing::before \{[^}]*transition: transform 320ms var\(--spring-ease\)/s);
+  assert.match(glass,/const BAR_EXPANSION_PT=14\.14/);
+  assert.match(glass,/const HELD_EXTRA_PT=16/);
+  assert.match(glass,/\[\.133,\.736,25\.94,2\.77,\.951\]/);
+  assert.match(glass,/\[\.467,1\.018,11\.3,20\.75,1\]/);
+  assert.match(glass,/const stretch=Math\.min\(HELD_EXTRA_PT,32\*velocity\*velocity\)/);
+  assert.match(css,/\.app-tabs\.is-pressing \{[^}]*transform: scale\(var\(--ios27-bar-held-scale,1\.038\)\) translateZ\(0\);[^}]*transition: transform 367ms linear\(0,0\.148 9%,0\.46 18%,0\.752 27%,0\.951 36%,1\.052 45%,1\.081 54%,1\.058 72%,1\.019 86%,1\)/s);
+  assert.match(css,/\.app-tabs\.is-pressing::before \{[^}]*animation: ios27-tab-lens-press 900ms linear both/s);
+  assert.match(css,/\.app-tabs\.is-pressing button\.is-previewed,[\s\S]*?transform: scale\(1\.1\)/s);
+  assert.match(css,/@keyframes ios27-tab-lens-release/);
+  assert.match(css,/\.app-tabs\.is-releasing \{[^}]*transition: transform 367ms linear\(0,0\.096 9%,0\.356 18%,0\.64 27%,0\.863 36%,1 45%,1\.078 54%,1\.092 59%,1\.018 95%,1\)/s);
   assert.match(css,/var\(--selection-active-fill\)/);
   assert.match(css,/\.app-tabs \{[^}]*overflow: visible;[^}]*contain: layout style/s);
   assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--selection-fill: #0000005c;[\s\S]*?--selection-active-fill: #08080bd9/s);

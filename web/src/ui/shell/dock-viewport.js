@@ -20,6 +20,9 @@ export function bindDockViewport({win=window,doc=document}={}){
     if(!standalone())return;
     const docHeight=Number(doc.documentElement?.clientHeight)||0;
     const inner=Number(win.innerHeight)||0;
+    // Resting geometry intentionally ignores VisualViewport: on iOS it may carry
+    // stale browser/keyboard values across PWA lifecycle transitions. Re-sample
+    // the real layout viewport for a few seconds while a fresh install settles.
     const measured=Math.max(inner,docHeight);
     if(measured>0)dock.style.setProperty('--dock-shell-height',measured+'px');
   };
@@ -31,7 +34,7 @@ export function bindDockViewport({win=window,doc=document}={}){
     retryTimers=[];
     if(!standalone())return;
     scheduleShell();
-    for(const delay of [80,240,520]){
+    for(const delay of [80,240,520,900,1500,2500,4000,6000]){
       let timer;
       timer=later(()=>{
         retryTimers=retryTimers.filter(id=>id!==timer);
@@ -71,7 +74,7 @@ export function bindDockViewport({win=window,doc=document}={}){
   viewport.addEventListener('resize',viewportResize);viewport.addEventListener('scroll',viewportScroll);
   input.addEventListener('focus',focus);input.addEventListener('blur',reset);
   const orientationReset=()=>reset();
-  win.addEventListener('resize',refreshShell);win.addEventListener('pagehide',clearKeyboard);
+  win.addEventListener('resize',refreshShell);win.addEventListener('load',refreshShell);win.addEventListener('pagehide',clearKeyboard);
   win.addEventListener('pageshow',reset);win.addEventListener('orientationchange',orientationReset);
   const visibility=()=>{if(doc.visibilityState==='visible')reset();else clearKeyboard();};
   doc.addEventListener?.('visibilitychange',visibility);
@@ -85,7 +88,7 @@ export function bindDockViewport({win=window,doc=document}={}){
     dock.style.removeProperty('--dock-shell-height');
     viewport.removeEventListener('resize',viewportResize);viewport.removeEventListener('scroll',viewportScroll);
     input.removeEventListener('focus',focus);input.removeEventListener('blur',reset);
-    win.removeEventListener('resize',refreshShell);win.removeEventListener('pagehide',clearKeyboard);
+    win.removeEventListener('resize',refreshShell);win.removeEventListener('load',refreshShell);win.removeEventListener('pagehide',clearKeyboard);
     win.removeEventListener('pageshow',reset);win.removeEventListener('orientationchange',orientationReset);
     doc.removeEventListener?.('visibilitychange',visibility);
   };

@@ -24,10 +24,10 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     el.querySelector(".name").textContent = name;
     el.querySelector(".name").title = name;
     list.appendChild(el);
-    let previewSnapshotPromise=Promise.resolve(restoredPreview||null),persistedOutput=null,historyThumbnail=restoredThumbnail||null;
-    const persistHistory=()=>persistedOutput&&previewSnapshotPromise.then(preview=>historyStore?.save?.({
-      id:historyId,name,file:persistedOutput,preview,thumbnail:historyThumbnail
-    }));
+    let previewSnapshot=restoredPreview||null,previewSnapshotPromise=Promise.resolve(previewSnapshot),persistedOutput=null,historyThumbnail=restoredThumbnail||null;
+    const persistHistory=()=>persistedOutput&&historyStore?.save?.({
+      id:historyId,name,file:persistedOutput,preview:previewSnapshot,thumbnail:historyThumbnail
+    });
     const presentation=shell?.register(el,name,previewSource,{
       thumbnail:restoredThumbnail,
       onThumbnail:thumbnail=>{historyThumbnail=thumbnail;void persistHistory();}
@@ -69,7 +69,6 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     if(hasPreview){
       const figure=document.createElement('figure');figure.className='source-preview';
       const image=document.createElement('img');image.alt=name;image.loading='lazy';image.decoding='async';
-      const url=URL.createObjectURL(previewSource);image.src=url;resultUrls.add(url);
       if(!restoredPreview){
         previewSnapshotPromise=new Promise(resolve=>{
           image.addEventListener('load',()=>{
@@ -83,8 +82,10 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
           },{once:true});
           image.addEventListener('error',()=>resolve(null),{once:true});
         });
+        previewSnapshotPromise.then(preview=>{previewSnapshot=preview;void persistHistory();});
       }
       image.addEventListener('error',()=>{figure.dataset.unavailable='true';figure.hidden=true;});
+      const url=URL.createObjectURL(previewSource);image.src=url;resultUrls.add(url);
       const caption=document.createElement('figcaption');caption.dataset.i18n='shell.sourcepreview';caption.textContent=T('shell.sourcepreview');
       figure.append(image,caption);el.insertBefore(figure,el.querySelector('.act'));
       // Persist only a display-sized JPEG preview; full originals/results stay separate.

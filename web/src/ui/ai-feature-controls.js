@@ -14,8 +14,16 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
   const sync=()=>{
     const available=Boolean(isAvailable());
     master.disabled=!available;
-    for(const control of controls.values())control.disabled=!available||!master.checked;
+    for(const control of controls.values())control.disabled=!available;
   };
+  for(const control of controls.values())control.addEventListener('change',()=>{
+    if(control.checked&&!master.checked){
+      // A feature selected from AI Settings implicitly enables the group without
+      // also forcing Portrait on. The outer Smart Enhance switch reflects it.
+      master.checked=true;
+      sync();
+    }
+  });
   master.addEventListener('change',()=>{
     if(master.checked){
       const portrait=controls.get('portrait');

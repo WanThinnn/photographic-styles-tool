@@ -19,7 +19,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     const offset=Number(activeRect?.left)-Number(firstRect?.left);
     if(Number.isFinite(offset))tabNav.style.setProperty('--tab-rest-offset',offset+'px');
   };
-  let destination='process',selected=null,serial=0,opener=null,scroll=0,returning=false,pendingOpen=null,photoClosingTimer=null;
+  let destination='process',selected=null,serial=0,opener=null,scroll=0,returning=false,pendingOpen=null,photoClosingTimer=null,closeTaskMenu=null;
   const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;
   const sessionId=win.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2);
   try{if('scrollRestoration' in win.history)win.history.scrollRestoration='manual';}catch{}
@@ -45,6 +45,13 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   const searchInput=$('history-search'),searchButton=$('toggle-search'),searchField=$('history-search-field');
   let searching=false,searchReturn='process',query='';
   const normalize=value=>String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLocaleLowerCase();
+  doc.addEventListener?.('pointerdown',event=>{
+    if(closeTaskMenu&&!event.target?.closest?.('.task-action-wrap'))closeTaskMenu();
+  },true);
+  doc.addEventListener?.('keydown',event=>{
+    if(event.key==='Escape'&&closeTaskMenu){event.preventDefault();closeTaskMenu();}
+  });
+  win.addEventListener?.('scroll',()=>closeTaskMenu?.(),{passive:true});
   function setSearch(open,{restore=true,focus=true}={}){
     if(open===searching)return;
     searching=open;searchButton.setAttribute('aria-expanded',String(open));
@@ -215,12 +222,36 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       const image=doc.createElement('img');image.className='task-thumbnail';image.alt='';image.src=record.thumbnail;image.setAttribute('aria-hidden','true');open.append(image);
     }else open.append(icon);
     open.append(copy);
-    if(record.state==='ready'&&record.quickAction){
-      const quick=doc.createElement('button');quick.type='button';quick.className='task-quick-action';quick.setAttribute('aria-label',record.quickLabel||translate(record.quickKind==='share'?'shell.quickshare':'shell.quickdownload'));
-      quick.innerHTML=record.quickKind==='share'
+    if(record.state==='ready'&&record.quickActions?.length){
+      const wrap=doc.createElement('div');wrap.className='task-action-wrap';
+      const trigger=doc.createElement('button');trigger.type='button';trigger.className='task-action-trigger';trigger.setAttribute('aria-label',translate('shell.actions'));trigger.setAttribute('aria-expanded','false');
+      trigger.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';
+      const menu=doc.createElement('div');menu.className='task-action-menu';menu.hidden=true;menu.setAttribute('role','group');menu.setAttribute('aria-label',translate('shell.actions'));
+      const icon=kind=>kind==='share'
         ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>'
-        :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>';
-      quick.addEventListener('click',event=>{event.stopPropagation();void record.quickAction();});card.append(open,quick);
+        :kind==='delete'
+          ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>'
+          :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>';
+      const close=()=>{
+        menu.hidden=true;wrap.classList.remove('is-open');trigger.setAttribute('aria-expanded','false');
+        if(closeTaskMenu===close)closeTaskMenu=null;
+      };
+      trigger.addEventListener('click',event=>{
+        event.stopPropagation();
+        const opening=menu.hidden;
+        closeTaskMenu?.();
+        if(opening){menu.hidden=false;wrap.classList.add('is-open');trigger.setAttribute('aria-expanded','true');closeTaskMenu=close;}
+      });
+      for(const action of record.quickActions){
+        const button=doc.createElement('button');button.type='button';button.className='task-action-item';button.dataset.kind=action.kind;
+        button.setAttribute('aria-label',action.label||action.kind);button.title=action.label||'';
+        if(action.danger)button.classList.add('is-danger');
+        button.innerHTML=icon(action.kind);
+        button.addEventListener('click',event=>{event.stopPropagation();close();void action.run?.();});
+        menu.append(button);
+      }
+      wrap.addEventListener('focusout',event=>{if(wrap.contains&&!wrap.contains(event.relatedTarget))close();});
+      wrap.append(menu,trigger);card.append(open,wrap);
     }else{
       const arrow=doc.createElement('span');arrow.className='task-chevron';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');open.append(arrow);card.append(open);
     }
@@ -252,8 +283,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     // The running task is not coupled to whichever older photo is being edited.
     const current=all.find(record=>!['ready','failed','info'].includes(record.state))||all.at(-1);
     const task=$('task-content'),next=current?card(current):null,currentCard=task.firstElementChild;
-    const wantsQuick=Boolean(current?.state==='ready'&&current.quickAction);
-    const hasQuick=Boolean(currentCard?.querySelector('.task-quick-action'));
+    const wantsQuick=Boolean(current?.state==='ready'&&current.quickActions?.length);
+    const hasQuick=Boolean(currentCard?.querySelector('.task-action-trigger'));
     if(next&&currentCard?.dataset.result===current.id&&wantsQuick===hasQuick){
       currentCard.querySelector('.task-copy>span').textContent=current.status||translate('shell.queued');
       currentCard.querySelector('.task-copy>strong').textContent=current.name;
@@ -284,7 +315,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       return {
         update(state,status){record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;render();},
         progress(value){record.progress=Number.isFinite(value)?Math.max(0,Math.min(100,value)):null;render();},
-        quickAction(kind,run,label=''){record.quickKind=kind;record.quickAction=run;record.quickLabel=label;render();},
+        quickActions(items){record.quickActions=(items||[]).filter(item=>item&&typeof item.run==='function');render();},
+        quickAction(kind,run,label=''){record.quickActions=[{kind,run,label}];render();},
         source(file){record.sourceFile=file?.type==='video/quicktime'?null:file;record.thumbnail=null;record.thumbnailAttempted=false;if(record.historyCard&&thumbnailObserver&&record.sourceFile)thumbnailObserver.observe(record.historyCard);render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();

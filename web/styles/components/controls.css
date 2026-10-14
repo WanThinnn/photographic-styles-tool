@@ -280,15 +280,19 @@ input[role="switch"]:disabled {
 .depth-model-control:disabled { opacity: .5 }
 .depth-model-row {
   display: grid;
-  grid-template-columns: minmax(0,1fr) minmax(120px,46%);
-  column-gap: 20px;
+  grid-template-columns: 34px minmax(0,1fr) minmax(132px,42%);
+  column-gap: 12px;
+  row-gap: 8px;
   align-items: center
 }
-.depth-model-row>.ai-option-copy { grid-column: 1; grid-row: 1 }
-.depth-model-control { grid-column: 2; grid-row: 1 }
-@container (max-width: 16rem) {
-  .depth-model-row { grid-template-columns: minmax(0,1fr); row-gap: 8px }
-  .depth-model-control { grid-column: 1; grid-row: 2 }
+.depth-model-row>.ai-option-icon { grid-column: 1; grid-row: 1; align-self: start }
+.depth-model-row>.ai-option-copy { grid-column: 2; grid-row: 1 }
+.depth-model-control { grid-column: 3; grid-row: 1; min-width: 0 }
+@container (max-width: 22rem) {
+  .depth-model-row { grid-template-columns: 34px minmax(0,1fr) }
+  .depth-model-row>.ai-option-icon { grid-row: 1 }
+  .depth-model-row>.ai-option-copy { grid-column: 2; grid-row: 1 }
+  .depth-model-control { grid-column: 2; grid-row: 2; width: 100% }
 }
 @media(prefers-reduced-motion:reduce) {
   input[role="switch"]:active::after,.depth-model-slider:has(input:active) .model-knob { scale: 1 }

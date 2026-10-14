@@ -265,6 +265,7 @@
 
 .ai-photos-controls,
 .ai-portrait-toggle,
+.ai-center-focus,
 .ai-reset {
   min-height: 44px;
   border: .5px solid var(--glass-outline);
@@ -283,29 +284,40 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 2px;
   min-width: 92px;
-  padding: 4px 9px;
+  padding: 3px;
   border-radius: var(--capsule-radius);
   background: rgb(var(--glass-rgb) / .52)
 }
 
-.ai-depth-effect-symbol {
-  width: 24px;
-  height: 24px;
-  flex: none
-}
-
-.ai-photos-f {
+.ai-photo-mode {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1.5px solid #d3a300;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
   border-radius: 50%;
-  color: #c38c00;
-  background: color-mix(in srgb,#ffd84d 10%,transparent);
-  font: 700 17px/1 Georgia,serif
+  background: transparent;
+  color: var(--muted);
+  transition: transform 160ms var(--spring-ease),background 160ms ease,color 160ms ease,border-color 160ms ease
+}
+
+.ai-photo-mode svg {
+  width: 20px;
+  height: 20px
+}
+
+.ai-mode-f {
+  font: 700 18px/1 Georgia,serif
+}
+
+.ai-photo-mode[aria-pressed="true"] {
+  border-color: #d3a300;
+  color: #b98200;
+  background: color-mix(in srgb,#ffd84d 14%,transparent);
+  box-shadow: inset 0 0 0 .5px #fff7
 }
 
 .ai-portrait-toggle {
@@ -330,9 +342,16 @@
   box-shadow: inset 0 1px 1px var(--glass-rim-top),0 3px 12px var(--glass-shade)
 }
 
-.ai-reset {
+.ai-preview-actions {
   grid-column: 3;
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px
+}
+
+.ai-center-focus,
+.ai-reset {
   display: grid;
   place-items: center;
   width: 44px;
@@ -343,13 +362,15 @@
   cursor: pointer
 }
 
+.ai-center-focus svg,
 .ai-reset svg {
-  width: 22px;
-  height: 22px
+  width: 21px;
+  height: 21px
 }
 
-.ai-photos-controls:active,
+.ai-photo-mode:active,
 .ai-portrait-toggle:active,
+.ai-center-focus:active,
 .ai-reset:active {
   transform: scale(.97);
   background-color: var(--line)
@@ -372,14 +393,16 @@
 }
 
 @media(hover:hover) {
-  .ai-photos-controls:hover,
+  .ai-photo-mode:hover,
+  .ai-center-focus:hover,
   .ai-reset:hover {
     background: var(--surface-secondary)
   }
 }
 
+.ai-photo-mode:focus-visible,
+.ai-center-focus:focus-visible,
 .ai-reset:focus-visible,
-.ai-photos-controls:focus-visible,
 .ai-portrait-toggle:focus-visible,
 .ai-preview-frame:focus-visible {
   outline: 2px solid #0894ff;

@@ -136,13 +136,20 @@ test('History thumbnails decode lazily, use small cached images, and preserve re
   assert.equal(h.$('history-empty').hidden,false);
 });
 
-test('ready results expose a separate quick action without replacing detail navigation',()=>{
-  const h=harness(),record=h.shell.register(h.row(),'ready.heic');let quick=0;
-  record.quickAction('download',()=>quick++,'Quick download');
+test('ready results group share/download/delete actions behind one overflow control',()=>{
+  const h=harness(),record=h.shell.register(h.row(),'ready.heic');let shared=0,downloaded=0,removed=0;
+  record.quickActions([
+    {kind:'share',label:'Quick share',run:()=>shared++},
+    {kind:'download',label:'Quick download',run:()=>downloaded++},
+    {kind:'delete',label:'Remove this result',run:()=>removed++,danger:true},
+  ]);
   record.update('ready','Ready');
-  const historyCard=h.$('history-items').firstElementChild,button=historyCard.querySelector('.task-quick-action');
-  assert.ok(button);
-  button.click();assert.equal(quick,1);
+  const historyCard=h.$('history-items').firstElementChild;
+  const trigger=historyCard.querySelector('.task-action-trigger'),menu=historyCard.querySelector('.task-action-menu');
+  assert.ok(trigger);assert.ok(menu);assert.equal(menu.hidden,true);
+  trigger.click();assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(menu.hidden,false);
+  assert.equal(menu.children.length,3);
+  menu.children[1].click();assert.equal(downloaded,1);assert.equal(shared,0);assert.equal(removed,0);
   assert.equal(h.$('photo-workspace').open,false);
   historyCard.click();assert.equal(h.$('photo-workspace').open,true);
 });

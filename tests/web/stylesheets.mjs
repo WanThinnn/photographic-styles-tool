@@ -51,7 +51,7 @@ test('AI summary keeps the switch beside its label while pinning Settings to the
   assert.match(html,/id="enhance-ai"[^>]*>[\s\S]*?id="ai-settings-discovery"[\s\S]*?id="open-ai-settings"/);
   assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-discovery:not\(\[hidden\]\)\+\.ai-settings-trigger \{[^}]*margin-left: 0/s);
   assert.doesNotMatch(workspace,/ai-settings-discovery:not\(\[hidden\]\)[^}]*outline: 1px solid var\(--ai-violet\)/s);
-  assert.match(controls,/grid-template-columns: minmax\(0,1fr\) minmax\(120px,46%\)/);
+  assert.match(controls,/grid-template-columns: 34px minmax\(0,1fr\) minmax\(132px,42%\)/);
   assert.match(controls,/@container/);
 });
 
@@ -115,17 +115,30 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   const js=readFileSync(new URL('../../web/src/portrait/ai-portrait-preview.js',import.meta.url),'utf8');
   const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
   assert.match(css,/\.ai-preview-toolbar \{[^}]*grid-template-columns: 1fr auto 1fr/s);
+  assert.match(css,/\.ai-photo-mode\[aria-pressed="true"\] \{[^}]*#d3a300/s);
+  assert.match(css,/\.ai-preview-actions \{[^}]*justify-self: end/s);
   assert.match(css,/\.ai-portrait-toggle \{[^}]*border-radius: var\(--capsule-radius\);[^}]*background: linear-gradient\(180deg,#ffdf62/s);
   assert.match(css,/\.ai-portrait-toggle\[aria-pressed="false"\] \{[^}]*color: var\(--muted\)/s);
   assert.match(css,/\.result-details \+ \.ai-details \{[^}]*margin-top: -8px/s);
   assert.match(js,/className='ai-photos-controls'/);
-  assert.match(js,/class="ai-depth-effect-symbol"/);
+  assert.match(js,/className='ai-photo-mode'/);
+  assert.match(js,/className='ai-center-focus'/);
+  assert.match(js,/className='ai-preview-actions'/);
   assert.match(js,/className='ai-portrait-toggle'/);
   assert.match(js,/portraitToggle\.setAttribute\('aria-pressed',String\(enabled\)\)/);
-  assert.match(js,/photosInfo\.hidden=!expanded/);
+  assert.match(js,/photosInfo\.hidden=!lighting/);
   assert.match(js,/blur\.disabled=!enabled/);
   assert.match(strings,/"photosEdit": "Aperture and lighting"/);
+  assert.match(strings,/"lighting": "Portrait Lighting"/);
+  assert.match(strings,/"centreFocus": "Centre focus"/);
   assert.match(strings,/"photosEditHint": "After saving, open the photo in Photos/);
+});
+
+test('AI Settings model row preserves its icon column and reflows the slider on narrow sheets',()=>{
+  const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
+  assert.match(controls,/\.depth-model-row \{[^}]*grid-template-columns: 34px minmax\(0,1fr\) minmax\(132px,42%\)/s);
+  assert.match(controls,/\.depth-model-row>\.ai-option-icon \{[^}]*grid-column: 1;[^}]*grid-row: 1/s);
+  assert.match(controls,/@container \(max-width: 22rem\) \{[\s\S]*?\.depth-model-control \{ grid-column: 2; grid-row: 2; width: 100% \}/s);
 });
 
 test('settings follows iOS grouped rows with language navigation, appearance preview and GitHub toolbar action',()=>{
@@ -148,6 +161,9 @@ test('settings follows iOS grouped rows with language navigation, appearance pre
   assert.match(html,/settings\.originalformat/);
   assert.equal([...html.matchAll(/class="ai-option-icon /g)].length,5);
   assert.match(html,/settings-icon-github/);
+  assert.match(html,/class="ai-depth-focus-symbol"/);
+  assert.match(sheets,/\.settings-about \.settings-nav-row:has\(\.settings-leading-icon\) \.settings-chevron \{[^}]*grid-column: 4/s);
+  assert.match(sheets,/\.settings-chevron \{[^}]*justify-self: end/s);
   assert.match(sheets,/\.language-row #lang \{[^}]*appearance: none/s);
   assert.match(sheets,/\.settings-leading-icon/);
   assert.match(layout,/\.top-github-symbol \{[^}]*translateY\(-22px\)/s);
@@ -250,6 +266,10 @@ test('photo details and guide use compact icon-led disclosures instead of dense 
   assert.match(resultView,/details\.photo/);
   assert.match(resultView,/className='result-meta-icon'/);
   assert.match(resultView,/className='detail-note-icon'/);
+  assert.match(resultView,/presentation\?\.quickActions/);
+  assert.match(resultView,/kind:'share'/);
+  assert.match(resultView,/kind:'download'/);
+  assert.match(resultView,/kind:'delete'/);
   assert.match(resultView,/if\(!text\)\{[\s\S]*?note\?\.remove\(\)/);
   assert.doesNotMatch(resultView,/this\.note\('', 'metadata'\)/);
   assert.doesNotMatch(resultView,/className='result-notice'/);

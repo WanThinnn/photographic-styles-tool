@@ -678,6 +678,17 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker app-shell cache tăng v178 và precache src/ui/history-store.js.
 - Regression hiện tại: **78 pass, 0 fail**, PWA check đạt, VI/EN/ZH mỗi ngôn ngữ 195 strings, git diff --check sạch.
 
+### AI Settings / History overflow / Portrait mode polish v179
+
+- Model row trong AI Settings sửa grid thành icon | copy | slider; ở sheet hẹp slider tự xuống hàng dưới copy thay vì đẩy icon sang phải và bó text thành cột dọc.
+- Depth Effect icon bỏ hexagon cũ, chuyển sang glyph focus-bracket kiểu Face ID với các lớp depth ở giữa. SVG local/currentColor nên giữ offline và thích nghi Light/Dark.
+- Activity/History quick export đổi thành một nút overflow ••• Liquid Glass. Mở ra mới hiện Share (nếu Web Share file được hỗ trợ), Download và Delete; Windows vẫn luôn có Download + Delete. Menu đóng khi chọn action, tap ra ngoài, scroll hoặc Escape.
+- Portrait edit tách ƒ và Portrait Lighting thành hai mode thật trong capsule trái. Mode đang chọn mới nhận accent vàng; chạm/drag aperture tự trả selection về ƒ, còn Lighting mở guidance chỉnh tiếp trong Photos.
+- Bên phải Portrait có thêm Center Focus cạnh Reset: Center Focus chỉ đưa focus về giữa và giữ aperture; Reset vẫn khôi phục focus + f/4.5.
+- About rows ép chevron Source code/Open-source licenses vào cùng trailing grid column, loại lệch ngang.
+- Service Worker app-shell cache tăng v179.
+- Regression: **79 pass, 0 fail** trong suite UI/application/history/release, thêm 3 language tests pass; PWA/i18n checks đạt, VI/EN/ZH mỗi ngôn ngữ 196 strings, git diff --check sạch.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

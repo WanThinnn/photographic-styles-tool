@@ -103,17 +103,24 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   const instruction=document.createElement('p');instruction.className='ai-focus-hint';instruction.textContent=strings.focus;
   const reset=document.createElement('button');reset.type='button';reset.className='ai-reset';reset.title=strings.reset;reset.setAttribute('aria-label',strings.reset);
   reset.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4M4 7h8a8 8 0 1 1-8 8"/></svg>';
+  const centerFocus=document.createElement('button');centerFocus.type='button';centerFocus.className='ai-center-focus';centerFocus.title=strings.centreFocus;centerFocus.setAttribute('aria-label',strings.centreFocus);
+  centerFocus.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H6a3 3 0 0 0-3 3v2M16 3h2a3 3 0 0 1 3 3v2M3 16v2a3 3 0 0 0 3 3h2M21 16v2a3 3 0 0 1-3 3h-2"/><circle cx="12" cy="12" r="2.2"/></svg>';
   const toolbar=document.createElement('div');toolbar.className='ai-preview-toolbar';
-  const photos=document.createElement('button');photos.type='button';photos.className='ai-photos-controls';photos.setAttribute('aria-expanded','false');photos.setAttribute('aria-label',strings.photosEdit);
-  photos.innerHTML='<svg class="ai-depth-effect-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.7 7.8 4.5v9.6L12 21.3l-7.8-4.5V7.2Z"/><circle cx="12" cy="12" r="5.1"/><circle cx="12" cy="12" r="2.15"/></svg><span class="ai-photos-f" aria-hidden="true">ƒ</span>';
+  const photos=document.createElement('div');photos.className='ai-photos-controls';photos.setAttribute('role','group');photos.setAttribute('aria-label',strings.photosEdit);
+  const apertureMode=document.createElement('button');apertureMode.type='button';apertureMode.className='ai-photo-mode';apertureMode.dataset.mode='aperture';apertureMode.setAttribute('aria-pressed','true');apertureMode.setAttribute('aria-label',strings.aperture);
+  apertureMode.innerHTML='<span class="ai-mode-f" aria-hidden="true">ƒ</span>';
+  const lightingMode=document.createElement('button');lightingMode.type='button';lightingMode.className='ai-photo-mode';lightingMode.dataset.mode='lighting';lightingMode.setAttribute('aria-pressed','false');lightingMode.setAttribute('aria-label',strings.lighting);
+  lightingMode.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>';
+  photos.append(apertureMode,lightingMode);
   const portraitToggle=document.createElement('button');portraitToggle.type='button';portraitToggle.className='ai-portrait-toggle';portraitToggle.textContent=strings.preview;portraitToggle.setAttribute('aria-pressed','true');portraitToggle.setAttribute('aria-label',strings.portraitToggle);
+  const utilities=document.createElement('div');utilities.className='ai-preview-actions';utilities.append(centerFocus,reset);
   const progress=document.createElement('span');progress.className='ai-preview-progress';progress.hidden=true;progress.setAttribute('role','status');
   const spinner=document.createElement('span');spinner.className='ai-spinner';spinner.setAttribute('aria-hidden','true');
   spinner.innerHTML='<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><circle cx="20" cy="20" r="15" opacity=".18"/><path d="M20 5a15 15 0 1 1-15 15" opacity=".75"/></svg>';
   const progressLabel=document.createElement('span');progressLabel.className='ai-accessible-text';progressLabel.textContent=strings.updating;
   progress.append(spinner,progressLabel);
   const photosInfo=document.createElement('p');photosInfo.className='ai-photos-info';photosInfo.textContent=strings.photosEditHint;photosInfo.hidden=true;
-  toolbar.append(photos,portraitToggle,reset,progress);
+  toolbar.append(photos,portraitToggle,utilities,progress);
   const state=document.createElement('p');state.className='ai-preview-state';state.setAttribute('role','status');
   host.append(toolbar,photosInfo,frame,instruction,aperture.element,state);
   const showUpdating=busy=>{progress.hidden=!busy;photos.hidden=busy;host.setAttribute('aria-busy',String(busy));};
@@ -125,10 +132,14 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
     host.classList.toggle('is-portrait-off',!enabled);
     blur.disabled=!enabled;
   };
-  photos.addEventListener('click',()=>{
-    const expanded=photos.getAttribute('aria-expanded')!=='true';
-    photos.setAttribute('aria-expanded',String(expanded));photosInfo.hidden=!expanded;
-  });
+  const selectPhotoMode=mode=>{
+    const lighting=mode==='lighting';
+    apertureMode.setAttribute('aria-pressed',String(!lighting));
+    lightingMode.setAttribute('aria-pressed',String(lighting));
+    photosInfo.hidden=!lighting;
+  };
+  apertureMode.addEventListener('click',()=>selectPhotoMode('aperture'));
+  lightingMode.addEventListener('click',()=>selectPhotoMode('lighting'));
   portraitToggle.addEventListener('click',()=>{
     const enabled=selectedAperture(blur)!==null;
     if(enabled){lastPortraitAperture=Number(blur.value);blur.value=String(APERTURES.length-1);}
@@ -173,9 +184,10 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
     const delta={ArrowLeft:[-.025,0],ArrowRight:[.025,0],ArrowUp:[0,-.025],ArrowDown:[0,.025]}[e.key];
     if(delta){e.preventDefault();focus(displayX+delta[0],displayY+delta[1]);}
   });
-  blur.addEventListener('input',()=>{if(selectedAperture(blur)!==null)lastPortraitAperture=Number(blur.value);syncPortraitState();changed();});
+  blur.addEventListener('input',()=>{selectPhotoMode('aperture');if(selectedAperture(blur)!==null)lastPortraitAperture=Number(blur.value);syncPortraitState();changed();});
   blur.addEventListener('change',commit);
-  reset.addEventListener('click',()=>{blur.value=String(DEFAULT_APERTURE);lastPortraitAperture=DEFAULT_APERTURE;aperture.update();syncPortraitState();focus(.5,.5);commit();});
+  centerFocus.addEventListener('click',()=>{focus(.5,.5);commit();});
+  reset.addEventListener('click',()=>{selectPhotoMode('aperture');blur.value=String(DEFAULT_APERTURE);lastPortraitAperture=DEFAULT_APERTURE;aperture.update();syncPortraitState();focus(.5,.5);commit();});
   syncPortraitState();draw();
   // Histories can contain many photos. Keep live GPU contexts only for previews
   // that are visible; their canvas snapshots and settings survive suspension.

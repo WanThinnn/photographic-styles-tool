@@ -162,6 +162,8 @@ dialog::backdrop {
   width: 9px;
   height: 9px;
   margin-left: 2px;
+  justify-self: end;
+  align-self: center;
   border-top: 2px solid var(--muted);
   border-right: 2px solid var(--muted);
   transform: rotate(45deg);
@@ -381,6 +383,10 @@ dialog::backdrop {
 
 .settings-about .settings-nav-row:not(:has(.settings-leading-icon)) .settings-chevron {
   grid-column: 3
+}
+
+.settings-about .settings-nav-row:has(.settings-leading-icon) .settings-chevron {
+  grid-column: 4
 }
 
 .help {

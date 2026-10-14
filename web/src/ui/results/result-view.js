@@ -168,21 +168,27 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
         host.replaceChildren();
         const canShare=Boolean(navigator.canShare?.({files:[file]}));
+        const quickDownload=()=>{
+          downloadedFiles.add(file);
+          const url=URL.createObjectURL(file),anchor=document.createElement('a');
+          anchor.href=url;anchor.download=file.name;anchor.hidden=true;document.body.append(anchor);anchor.click();anchor.remove();
+          setTimeout(()=>URL.revokeObjectURL(url),1000);
+        };
+        const quickShare=async()=>{
+          try{await navigator.share({files:[file]});savedFiles.add(file);}
+          catch(error){if(error?.name!=='AbortError')console.warn('Quick share unavailable',error);}
+        };
         if(canShare){
           this.share(file,!!this.liveIdentifier);
           this.note(T('shell.sharehint'),'save');
-          presentation?.quickAction?.('share',async()=>{
-            try{await navigator.share({files:[file]});}
-            catch(error){if(error?.name!=='AbortError')console.warn('Quick share unavailable',error);}
-          },T('shell.quickshare'));
-        }else{
-          this.note('','save');
-          presentation?.quickAction?.('download',()=>{
-            const url=URL.createObjectURL(file),anchor=document.createElement('a');
-            anchor.href=url;anchor.download=file.name;anchor.hidden=true;document.body.append(anchor);anchor.click();anchor.remove();
-            setTimeout(()=>URL.revokeObjectURL(url),1000);
-          },T('shell.quickdownload'));
-        }
+        }else this.note('','save');
+        const quickActions=[
+          ...(canShare?[{kind:'share',label:T('shell.quickshare'),run:quickShare}]:[]),
+          {kind:'download',label:T('shell.quickdownload'),run:quickDownload},
+          {kind:'delete',label:T('btn.removeresult'),danger:true,run:()=>{if(confirm(T('shell.remove')))ui.dispose();}},
+        ];
+        if(presentation?.quickActions)presentation.quickActions(quickActions);
+        else presentation?.quickAction?.(quickActions[0].kind,quickActions[0].run,quickActions[0].label);
         this.link(file,file.name);
         presentation?.source?.(file);
         if(persist)void historyStore?.save?.({id:historyId,name,file});

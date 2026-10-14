@@ -19,9 +19,12 @@ Stylio 在浏览器本地处理照片，不会把你的照片上传到服务器�
 ## 界面预览
 
 <p align="center">
-  <img src="../demo/img/demo-1.png" width="32%" alt="Stylio 处理界面">
-  <img src="../demo/img/demo-2.png" width="32%" alt="Stylio 照片处理流程">
-  <img src="../demo/img/demo-3.png" width="32%" alt="Stylio 设置与 AI 控件">
+  <img src="../demo/img/demo-3.png" width="72%" alt="Stylio 主界面">
+</p>
+
+<p align="center">
+  <img src="../demo/img/demo-1.png" width="45%" alt="Stylio 照片处理流程">
+  <img src="../demo/img/demo-2.png" width="45%" alt="Stylio 设置与 AI 功能">
 </p>
 
 ## 主要功能

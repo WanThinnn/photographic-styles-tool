@@ -26,9 +26,9 @@
 
 只需要准备一次：
 
-1. **安装 uv**：一个帮你自动准备 Python 环境的小工具。安装方法见[主说明的“从源码安装”](../README.zh-CN.md#从源码安装)。
+1. **安装 uv**：一个帮你自动准备 Python 环境的小工具。安装方法见[英文 CLI 文档](../docs/project/upstream-cli-and-research.md#python-cli)。
 2. **安装 ffmpeg（推荐）**：有了它才能得到最好的效果。没有也能用，服务器会自动改用效果稍弱的
-   [免编码器模式](../README.zh-CN.md#免编码器模式)，并在状态页上提示你。
+   [免编码器模式](../docs/project/upstream-cli-and-research.md#no-encoder-mode)，并在状态页上提示你。
 
 ## 启动服务器
 

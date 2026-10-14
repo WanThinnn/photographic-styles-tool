@@ -38,19 +38,20 @@ export function createAiFeatureControls({master,features,isAvailable=()=>true}){
 }
 
 export function showAiSettingsHintOnce({hint,settings,storage}){
-  // Persist only after the user actually discovers/opens AI Settings. Merely
-  // seeing the hint must not dismiss it across visits.
+  // The gradient ring remains as a quiet affordance after discovery; only its
+  // first-run motion and explanatory copy are one-shot.
   const key='stylio-ai-settings-hint-v2';
+  const summary=settings.querySelector('summary')||document.getElementById('open-ai-settings');
   try{
     storage??=globalThis.localStorage;
-    if(storage?.getItem(key)==='opened')return;
+    if(storage?.getItem(key)==='opened'){summary.classList.add('ai-settings-discovered');return;}
   }catch{} // Storage restrictions must not break the AI controls.
   hint.hidden=false;
-  const summary=settings.querySelector('summary')||document.getElementById('open-ai-settings');
   summary.setAttribute('aria-describedby',hint.id);
   summary.addEventListener('click',()=>{
     hint.hidden=true;
     summary.removeAttribute('aria-describedby');
+    summary.classList.add('ai-settings-discovered');
     try{storage?.setItem(key,'opened');}catch{}
   },{once:true});
 }

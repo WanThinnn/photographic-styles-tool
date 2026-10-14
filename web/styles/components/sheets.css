@@ -16,6 +16,75 @@ dialog::backdrop {
   background: #0003
 }
 
+.ios-confirm-dialog {
+  width: min(330px,calc(100% - 32px));
+  margin: auto;
+  padding: 0;
+  border: .5px solid var(--glass-outline);
+  border-radius: 28px;
+  color: var(--fg);
+  background: rgb(var(--glass-rgb) / .78);
+  box-shadow: inset 0 1px 1px var(--glass-rim-top),0 18px 46px #0005;
+  backdrop-filter: blur(30px) saturate(165%);
+  -webkit-backdrop-filter: blur(30px) saturate(165%);
+  overflow: hidden
+}
+
+.ios-confirm-dialog::backdrop {
+  background: #0004;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px)
+}
+
+.ios-confirm-card {
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 14px
+}
+
+.ios-confirm-copy {
+  padding: 4px 8px 0;
+  text-align: left
+}
+
+.ios-confirm-copy h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25
+}
+
+.ios-confirm-copy p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: .875rem;
+  line-height: 1.35
+}
+
+.ios-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px
+}
+
+.ios-confirm-actions button {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--capsule-radius);
+  font: 600 .9375rem/1 var(--sans)
+}
+
+.ios-confirm-cancel {
+  background: var(--accent);
+  color: var(--on-accent)
+}
+
+.ios-confirm-destructive {
+  background: var(--surface-secondary);
+  color: var(--err)
+}
+
 .sheet[open] {
   animation: sheet-in 180ms ease-out
 }
@@ -549,3 +618,41 @@ footer a {
 .ai-option-icon-amber { background: var(--icon-amber-bg); color: var(--icon-amber-fg) }
 .ai-option-icon-violet { background: var(--icon-violet-bg); color: var(--icon-violet-fg) }
 .ai-option-icon-neutral { background: var(--appearance-icon-bg); color: var(--appearance-icon-fg) }
+
+.ai-settings-panel>.portrait-option.depth-model-row {
+  grid-template-columns: 36px minmax(82px,.72fr) minmax(150px,1.28fr);
+  gap: 8px;
+  align-items: center
+}
+
+.ai-settings-panel>.portrait-option.depth-model-row>.ai-option-icon {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  justify-self: center
+}
+
+.ai-settings-panel>.portrait-option.depth-model-row>.ai-option-copy {
+  grid-column: 2;
+  grid-row: 1;
+  max-width: 13rem
+}
+
+.ai-settings-panel>.portrait-option.depth-model-row>.depth-model-control {
+  grid-column: 3;
+  grid-row: 1;
+  width: 100%;
+  min-width: 150px
+}
+
+@container (max-width:22rem) {
+  .ai-settings-panel>.portrait-option.depth-model-row {
+    grid-template-columns: 34px minmax(48px,.55fr) minmax(112px,1.45fr);
+    gap: 6px
+  }
+  .ai-settings-panel>.portrait-option.depth-model-row>.depth-model-control {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 112px
+  }
+}

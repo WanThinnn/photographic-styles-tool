@@ -13,6 +13,7 @@ import {clearDownloadedAssets} from '../core/cache-cleanup.js';
 import {createAiFeatureControls,showAiSettingsHintOnce} from '../ui/ai-feature-controls.js';
 import {createResultView} from '../ui/results/result-view.js';
 import {createHistoryStore,restoredFile} from '../ui/history-store.js';
+import {confirmAction} from '../ui/confirm-dialog.js';
 import {createLivePhotoSession} from '../media/live-photo-session.js';
 import {createProfileRepository} from './processing/profiles.js';
 import {createPhotoAnalysis} from './processing/photo-analysis.js';
@@ -70,9 +71,14 @@ export function startApplication(){
     fileQueue = pending.catch(() => {}).finally(() => { pendingTasks--; refreshHistoryButton(); });
     return pending;
   }
-  clearHistory.addEventListener('click', () => {
+  clearHistory.addEventListener('click', async() => {
     if (pendingTasks) return;
-    if(!confirm(T('shell.clear').replace('{count}',String(list.childElementCount))))return;
+    if(!await confirmAction({
+      title:T('shell.clear').replace('{count}',String(list.childElementCount)),
+      detail:T('confirm.cannotundo'),
+      confirmLabel:T('action.delete'),
+      cancelLabel:T('action.cancel'),
+    }))return;
     for (const cleanup of resultCleanups) cleanup();
     resultCleanups.clear();
     for (const url of resultUrls) URL.revokeObjectURL(url);
@@ -165,7 +171,7 @@ export function startApplication(){
     for(const entry of entries){
       const file=restoredFile(entry);
       if(!file)continue;
-      const ui=row(entry.name||entry.fileName||file.name,file,{historyId:entry.id,restored:true});
+      const ui=row(entry.name||entry.fileName||file.name,file,{historyId:entry.id,restored:true,restoredPreview:entry.preview||null});
       ui.output(file,{metadata:false,persist:false});
       ui.set(T('st.ready'),'ok');
     }

@@ -280,19 +280,29 @@ input[role="switch"]:disabled {
 .depth-model-control:disabled { opacity: .5 }
 .depth-model-row {
   display: grid;
-  grid-template-columns: 34px minmax(0,1fr) minmax(132px,42%);
-  column-gap: 12px;
-  row-gap: 8px;
+  grid-template-columns: 36px minmax(82px,.75fr) minmax(150px,1.35fr);
+  column-gap: 8px;
   align-items: center
 }
-.depth-model-row>.ai-option-icon { grid-column: 1; grid-row: 1; align-self: start }
-.depth-model-row>.ai-option-copy { grid-column: 2; grid-row: 1 }
-.depth-model-control { grid-column: 3; grid-row: 1; min-width: 0 }
-@container (max-width: 22rem) {
-  .depth-model-row { grid-template-columns: 34px minmax(0,1fr) }
-  .depth-model-row>.ai-option-icon { grid-row: 1 }
-  .depth-model-row>.ai-option-copy { grid-column: 2; grid-row: 1 }
-  .depth-model-control { grid-column: 2; grid-row: 2; width: 100% }
+.depth-model-row>.ai-option-icon {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  justify-self: center
+}
+.depth-model-row>.ai-option-copy {
+  grid-column: 2;
+  grid-row: 1;
+  max-width: 14rem
+}
+.depth-model-control {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 150px
+}
+.ai-model-network-symbol {
+  width: 27px;
+  height: 23px
 }
 @media(prefers-reduced-motion:reduce) {
   input[role="switch"]:active::after,.depth-model-slider:has(input:active) .model-knob { scale: 1 }

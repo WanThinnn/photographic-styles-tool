@@ -443,6 +443,8 @@ Ghi nhận phiên bản đầu trước phản hồi giao diện; các quyết �
 
 ## 15. Bàn giao đang thực hiện — 2026-10-14
 
+> **Canonical continuation handoff hiện tại:** trước khi sửa UI/UX, agent mới phải đọc `docs/ui-ux/2026-10-14-ui-ux-continuation-handoff.md`. File đó tổng hợp trạng thái working tree v181, kiến trúc, persistence keys, UI invariants, test map, các quyết định người dùng đã chốt và checklist để tiếp tục code. Nếu nội dung lịch sử trong plan này mâu thuẫn với code hiện tại hoặc handoff mới, ưu tiên code hiện tại rồi đến handoff mới.
+
 Đây là điểm tiếp tục cho agent sau. Các mục §13–14 là lịch sử lần triển khai trước; nếu mâu thuẫn, ưu tiên yêu cầu và trạng thái trong mục này.
 
 ### Yêu cầu mới nhất đã chốt
@@ -688,6 +690,27 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - About rows ép chevron Source code/Open-source licenses vào cùng trailing grid column, loại lệch ngang.
 - Service Worker app-shell cache tăng v179.
 - Regression: **79 pass, 0 fail** trong suite UI/application/history/release, thêm 3 language tests pass; PWA/i18n checks đạt, VI/EN/ZH mỗi ngôn ngữ 196 strings, git diff --check sạch.
+
+### AI model / compact photo detail polish v180
+
+- AI Settings Model row không còn rơi slider xuống bottom trên mobile. Layout được giữ cùng một hàng icon | copy | slider, icon căn giữa dọc, copy rút ngắn và slider được ưu tiên chiều rộng; narrow container chỉ co tỉ lệ cột chứ không đổi sang row thứ hai.
+- Model glyph đổi sang local neural-network symbol và kéo rộng theo trục ngang để đọc rõ hơn trong tile graphite Light/Dark.
+- Portrait strip bỏ spinner tròn legacy. Trạng thái cập nhật chuyển sang text status/aria-busy, giữ toolbar ổn định; hai utility action được gom vào một Liquid Glass capsule.
+- ƒ mode dùng system/SF-style typography thay Georgia; selected mode chỉ đổi accent vàng, không thêm bubble nền.
+- Desktop/iPad Photo detail khi Result preview Off co theo content thay vì giữ sheet 90dvh; iPhone vẫn giữ full-height behavior.
+- Service Worker app-shell cache tăng v180.
+
+### Persistent preview / History thumbnail / iOS confirmations v181
+
+- Portrait control strip bám reference Photos hơn: Portrait Lighting đứng trước ƒ, glyph Lighting là hexagon + concentric ring + solid core; Focus + Reset ở chung một capsule và bỏ divider dọc thừa.
+- Activity và History ưu tiên thumbnail 40px của ảnh khi đã Ready; progress ring vẫn được giữ trong lúc đang xử lý. Overflow action mở ra làm phần nội dung card blur nhẹ để action nổi lên mà không đè trực tiếp lên filename/status.
+- Result preview khi bật được snapshot thành JPEG display-size và lưu cùng output Blob trong IndexedDB. Reload khôi phục preview JPEG thay vì buộc browser phải render lại output HEIC; preview Off vẫn không tạo/lưu snapshot.
+- AI Settings button luôn giữ viền conic-gradient tĩnh. First-use state mới xoay ring + hiện discovery copy; sau khi người dùng mở AI Settings, ring không còn animation nhưng vẫn giữ accent.
+- Adaptive Styles icon đổi sang matrix-grid glyph với một điểm trung tâm đậm và một điểm secondary ở vùng trên-phải, gần ngôn ngữ Photographic Styles hơn stacked-layers cũ.
+- Browser-native confirm() được loại khỏi Clear History/Delete Result. Destructive flow dùng custom iOS-style glass dialog với title/detail, Cancel capsule xanh và Delete capsule semantic red; backdrop blur nhẹ.
+- Model network glyph tiếp tục được nới ngang; narrow AI Settings container có rule specificity riêng để generic portrait row không kéo slider xuống hàng dưới.
+- Service Worker app-shell cache tăng v181 và precache confirm-dialog module.
+- Regression: **79/79 suite pass**, **3/3 language tests pass**, PWA/i18n checks đạt, VI/EN/ZH mỗi ngôn ngữ 199 strings, git diff --check sạch; private Portrait control fixture **1/1 pass** trên 18 layout/theme/language combinations.
 
 ### Lệnh kiểm tra nhẹ
 

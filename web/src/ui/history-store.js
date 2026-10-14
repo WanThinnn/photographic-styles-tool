@@ -61,12 +61,12 @@ export function createHistoryStore({indexedDB=globalThis.indexedDB}={}){
         return Array.isArray(results)?results.sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0)):[];
       }catch(error){console.warn('Could not restore Stylio history',error);return [];}
     },
-    async save({id,name,file,readyNotice=''}) {
+    async save({id,name,file,preview=null,readyNotice=''}) {
       if(!id||!file)return;
       try{
         await mutate(()=>withStore('readwrite',store=>{
           store.put({
-            id,name,file,fileName:file.name||name||'Stylio.HEIC',type:file.type||'application/octet-stream',
+            id,name,file,preview,fileName:file.name||name||'Stylio.HEIC',type:file.type||'application/octet-stream',
             lastModified:file.lastModified||Date.now(),readyNotice,updatedAt:Date.now()
           });
         }));

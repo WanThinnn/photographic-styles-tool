@@ -1,6 +1,7 @@
 // Result DOM and output lifetime. Processing is supplied by the controller.
 import {describeInWorker} from '../../media/heic-processing.js';
 import {formatBytes} from '../result-metadata.js';
+import {confirmAction} from '../confirm-dialog.js';
 export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell,historyStore,previewEnabled=()=>true}){
   const detailIcon=key=>({
     'group.details':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/><circle cx="18" cy="17" r="2"/></svg>',
@@ -13,16 +14,20 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     'meta.resources':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16Z"/></svg>',
     'meta.capture':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>'
   }[key]||'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg>');
-  function row(name,sourceFile,{historyId=(globalThis.crypto?.randomUUID?.()||`history-${Date.now()}-${Math.random().toString(16).slice(2)}`),restored=false}={}) {
+  function row(name,sourceFile,{historyId=(globalThis.crypto?.randomUUID?.()||`history-${Date.now()}-${Math.random().toString(16).slice(2)}`),restored=false,restoredPreview=null}={}) {
     const el = document.createElement("div");
     el.className = "row";
+    const previewSource=restoredPreview||sourceFile;
+    const hasPreview=Boolean(previewEnabled()&&previewSource&&previewSource.type!=='video/quicktime');
+    el.dataset.preview=hasPreview?'on':'off';
     el.innerHTML = `<div class="result-header"><div class="name"></div><div class="status"></div></div><div class="act"></div>`;
     el.querySelector(".name").textContent = name;
     el.querySelector(".name").title = name;
     list.appendChild(el);
-    const presentation=shell?.register(el,name,sourceFile);
+    const presentation=shell?.register(el,name,previewSource);
     el.querySelector('.status').setAttribute('role','status');
     const cleanups=new Set(),downloadedFiles=new WeakSet(),savedFiles=new WeakSet();let disposed=false;
+    let previewSnapshotPromise=Promise.resolve(restoredPreview||null);
     const ensureDetails=()=>{
       let details=el.querySelector('.result-details');
       if(details)return details;
@@ -55,14 +60,28 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       const details=el.querySelector('.result-details');
       if(details&&!details.querySelector('.detail-group'))details.remove();
     };
-    if(previewEnabled()&&sourceFile&&sourceFile.type!=='video/quicktime'){
+    if(hasPreview){
       const figure=document.createElement('figure');figure.className='source-preview';
       const image=document.createElement('img');image.alt=name;image.loading='lazy';image.decoding='async';
-      const url=URL.createObjectURL(sourceFile);image.src=url;resultUrls.add(url);
+      const url=URL.createObjectURL(previewSource);image.src=url;resultUrls.add(url);
+      if(!restoredPreview){
+        previewSnapshotPromise=new Promise(resolve=>{
+          image.addEventListener('load',()=>{
+            try{
+              const maxWidth=960,scale=Math.min(1,maxWidth/image.naturalWidth),canvas=document.createElement('canvas');
+              canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+              canvas.getContext('2d')?.drawImage(image,0,0,canvas.width,canvas.height);
+              canvas.toBlob?.(blob=>{canvas.width=canvas.height=0;resolve(blob||null);},'image/jpeg',.82);
+              if(!canvas.toBlob){canvas.width=canvas.height=0;resolve(null);}
+            }catch{resolve(null);}
+          },{once:true});
+          image.addEventListener('error',()=>resolve(null),{once:true});
+        });
+      }
       image.addEventListener('error',()=>{figure.dataset.unavailable='true';figure.hidden=true;});
       const caption=document.createElement('figcaption');caption.dataset.i18n='shell.sourcepreview';caption.textContent=T('shell.sourcepreview');
       figure.append(image,caption);el.insertBefore(figure,el.querySelector('.act'));
-      // Native browser rendering only; no decoder/model is downloaded for a thumbnail.
+      // Persist only a display-sized JPEG preview; full originals/results stay separate.
       cleanups.add(()=>{URL.revokeObjectURL(url);resultUrls.delete(url);});
     }
     const remove=document.createElement('button');remove.type='button';remove.className='result-remove';remove.disabled=true;
@@ -185,13 +204,13 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         const quickActions=[
           ...(canShare?[{kind:'share',label:T('shell.quickshare'),run:quickShare}]:[]),
           {kind:'download',label:T('shell.quickdownload'),run:quickDownload},
-          {kind:'delete',label:T('btn.removeresult'),danger:true,run:()=>{if(confirm(T('shell.remove')))ui.dispose();}},
+          {kind:'delete',label:T('btn.removeresult'),danger:true,run:async()=>{if(await confirmAction({title:T('shell.remove'),detail:T('confirm.cannotundo'),confirmLabel:T('action.delete'),cancelLabel:T('action.cancel')}))ui.dispose();}},
         ];
         if(presentation?.quickActions)presentation.quickActions(quickActions);
         else presentation?.quickAction?.(quickActions[0].kind,quickActions[0].run,quickActions[0].label);
         this.link(file,file.name);
         presentation?.source?.(file);
-        if(persist)void historyStore?.save?.({id:historyId,name,file});
+        if(persist)void previewSnapshotPromise.then(preview=>historyStore?.save?.({id:historyId,name,file,preview}));
         this.liveExporter?.setOutput(file);
         if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
           file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);}
@@ -281,7 +300,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         actions(group).prepend(b);
       },
     };
-    remove.addEventListener('click',()=>{if(confirm(T('shell.remove')))ui.dispose();});resultCleanups.add(ui.dispose);return ui;
+    remove.addEventListener('click',async()=>{if(await confirmAction({title:T('shell.remove'),detail:T('confirm.cannotundo'),confirmLabel:T('action.delete'),cancelLabel:T('action.cancel')}))ui.dispose();});resultCleanups.add(ui.dispose);return ui;
   }
 
     return row;

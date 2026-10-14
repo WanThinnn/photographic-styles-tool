@@ -110,20 +110,15 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   const apertureMode=document.createElement('button');apertureMode.type='button';apertureMode.className='ai-photo-mode';apertureMode.dataset.mode='aperture';apertureMode.setAttribute('aria-pressed','true');apertureMode.setAttribute('aria-label',strings.aperture);
   apertureMode.innerHTML='<span class="ai-mode-f" aria-hidden="true">ƒ</span>';
   const lightingMode=document.createElement('button');lightingMode.type='button';lightingMode.className='ai-photo-mode';lightingMode.dataset.mode='lighting';lightingMode.setAttribute('aria-pressed','false');lightingMode.setAttribute('aria-label',strings.lighting);
-  lightingMode.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>';
-  photos.append(apertureMode,lightingMode);
+  lightingMode.innerHTML='<svg class="ai-lighting-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 7.8 4.5v9L12 20.8l-7.8-4.5v-9Z"/><circle cx="12" cy="11.8" r="4.25"/><circle class="ai-lighting-core" cx="12" cy="11.8" r="1.85" fill="currentColor" stroke="none"/></svg>';
+  photos.append(lightingMode,apertureMode);
   const portraitToggle=document.createElement('button');portraitToggle.type='button';portraitToggle.className='ai-portrait-toggle';portraitToggle.textContent=strings.preview;portraitToggle.setAttribute('aria-pressed','true');portraitToggle.setAttribute('aria-label',strings.portraitToggle);
   const utilities=document.createElement('div');utilities.className='ai-preview-actions';utilities.append(centerFocus,reset);
-  const progress=document.createElement('span');progress.className='ai-preview-progress';progress.hidden=true;progress.setAttribute('role','status');
-  const spinner=document.createElement('span');spinner.className='ai-spinner';spinner.setAttribute('aria-hidden','true');
-  spinner.innerHTML='<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><circle cx="20" cy="20" r="15" opacity=".18"/><path d="M20 5a15 15 0 1 1-15 15" opacity=".75"/></svg>';
-  const progressLabel=document.createElement('span');progressLabel.className='ai-accessible-text';progressLabel.textContent=strings.updating;
-  progress.append(spinner,progressLabel);
   const photosInfo=document.createElement('p');photosInfo.className='ai-photos-info';photosInfo.textContent=strings.photosEditHint;photosInfo.hidden=true;
-  toolbar.append(photos,portraitToggle,utilities,progress);
+  toolbar.append(photos,portraitToggle,utilities);
   const state=document.createElement('p');state.className='ai-preview-state';state.setAttribute('role','status');
   host.append(toolbar,photosInfo,frame,instruction,aperture.element,state);
-  const showUpdating=busy=>{progress.hidden=!busy;photos.hidden=busy;host.setAttribute('aria-busy',String(busy));};
+  const showUpdating=busy=>{host.setAttribute('aria-busy',String(busy));};
   let x=.5,y=.5,displayX=.5,displayY=.5,pending=null,timer=null,version=0,disposed=false,lastCommitted=0,inFlight=null,lastPortraitAperture=DEFAULT_APERTURE;
   const syncPortraitState=()=>{
     const enabled=selectedAperture(blur)!==null;
@@ -168,7 +163,7 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
     return inFlight;
   };
   const changed=()=>{
-    version++;onPending(true);showUpdating(true);state.textContent='';
+    version++;onPending(true);showUpdating(true);state.textContent=strings.updating;
     marker.hidden=false;marker.style.left=`${displayX*100}%`;marker.style.top=`${displayY*100}%`;
     if(pending!==null)cancelAnimationFrame(pending);
     pending=requestAnimationFrame(()=>{pending=null;try{draw();}catch(error){console.warn('Preview unavailable',error);state.textContent=strings.previewFailed;}});

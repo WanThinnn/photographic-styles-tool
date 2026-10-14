@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v179`;
+const CACHE_NAME = `${CACHE_PREFIX}v181`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -22,6 +22,7 @@ const APP_SHELL = [
   "./src/ui/shell/tab-glass.js",
   "./styles/components/navigation-effects.css",
   "./src/ui/results/result-view.js",
+  "./src/ui/confirm-dialog.js",
   "./src/ui/history-store.js",
   "./src/app/processing/portrait-controller.js",
   "./src/app/processing/photo-analysis.js",

@@ -51,8 +51,8 @@ test('AI summary keeps the switch beside its label while pinning Settings to the
   assert.match(html,/id="enhance-ai"[^>]*>[\s\S]*?id="ai-settings-discovery"[\s\S]*?id="open-ai-settings"/);
   assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-discovery:not\(\[hidden\]\)\+\.ai-settings-trigger \{[^}]*margin-left: 0/s);
   assert.doesNotMatch(workspace,/ai-settings-discovery:not\(\[hidden\]\)[^}]*outline: 1px solid var\(--ai-violet\)/s);
-  assert.match(controls,/grid-template-columns: 34px minmax\(0,1fr\) minmax\(132px,42%\)/);
-  assert.match(controls,/@container/);
+  assert.match(controls,/grid-template-columns: 36px minmax\(82px,\.75fr\) minmax\(150px,1\.35fr\)/);
+  assert.doesNotMatch(controls,/@container \(max-width: 22rem\)/);
 });
 
 test('old bright blue is shared and scrollbar hiding does not disable normal scrolling',()=>{
@@ -115,8 +115,10 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   const js=readFileSync(new URL('../../web/src/portrait/ai-portrait-preview.js',import.meta.url),'utf8');
   const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
   assert.match(css,/\.ai-preview-toolbar \{[^}]*grid-template-columns: 1fr auto 1fr/s);
-  assert.match(css,/\.ai-photo-mode\[aria-pressed="true"\] \{[^}]*#d3a300/s);
-  assert.match(css,/\.ai-preview-actions \{[^}]*justify-self: end/s);
+  assert.match(css,/\.ai-mode-f \{[^}]*border: 1\.5px solid currentColor;[^}]*border-radius: 50%/s);
+  assert.match(css,/\.ai-photo-mode\[aria-pressed="true"\] \{[^}]*color: #c08b00/s);
+  assert.doesNotMatch(css,/\.ai-photo-mode\[aria-pressed="true"\] \{[^}]*background:/s);
+  assert.match(css,/\.ai-preview-actions \{[^}]*justify-self: end;[^}]*gap: 0;[^}]*border-radius: var\(--capsule-radius\);[^}]*background: rgb\(var\(--glass-rgb\) \/ \.52\)/s);
   assert.match(css,/\.ai-portrait-toggle \{[^}]*border-radius: var\(--capsule-radius\);[^}]*background: linear-gradient\(180deg,#ffdf62/s);
   assert.match(css,/\.ai-portrait-toggle\[aria-pressed="false"\] \{[^}]*color: var\(--muted\)/s);
   assert.match(css,/\.result-details \+ \.ai-details \{[^}]*margin-top: -8px/s);
@@ -125,6 +127,10 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   assert.match(js,/className='ai-center-focus'/);
   assert.match(js,/className='ai-preview-actions'/);
   assert.match(js,/className='ai-portrait-toggle'/);
+  assert.match(js,/class="ai-lighting-symbol"/);
+  assert.match(js,/photos\.append\(lightingMode,apertureMode\)/);
+  assert.doesNotMatch(css,/\.ai-center-focus::after/);
+  assert.doesNotMatch(js,/className='ai-spinner'/);
   assert.match(js,/portraitToggle\.setAttribute\('aria-pressed',String\(enabled\)\)/);
   assert.match(js,/photosInfo\.hidden=!lighting/);
   assert.match(js,/blur\.disabled=!enabled/);
@@ -134,11 +140,17 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   assert.match(strings,/"photosEditHint": "After saving, open the photo in Photos/);
 });
 
-test('AI Settings model row preserves its icon column and reflows the slider on narrow sheets',()=>{
+test('AI Settings model row keeps a wide inline slider and vertically centered network icon on mobile and desktop',()=>{
   const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
-  assert.match(controls,/\.depth-model-row \{[^}]*grid-template-columns: 34px minmax\(0,1fr\) minmax\(132px,42%\)/s);
-  assert.match(controls,/\.depth-model-row>\.ai-option-icon \{[^}]*grid-column: 1;[^}]*grid-row: 1/s);
-  assert.match(controls,/@container \(max-width: 22rem\) \{[\s\S]*?\.depth-model-control \{ grid-column: 2; grid-row: 2; width: 100% \}/s);
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  assert.match(controls,/\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.75fr\) minmax\(150px,1\.35fr\)/s);
+  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.72fr\) minmax\(150px,1\.28fr\)/s);
+  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-icon \{[^}]*align-self: center;[^}]*justify-self: center/s);
+  assert.match(sheets,/@container \(max-width:22rem\)[\s\S]*?\.depth-model-control \{[^}]*grid-column: 3;[^}]*grid-row: 1;[^}]*min-width: 112px/s);
+  assert.match(html,/class="ai-model-network-symbol" viewBox="0 0 28 24"/);
+  assert.match(strings,/"modelHint": "Lite is faster\. Pro gives finer AI results\."/);
 });
 
 test('settings follows iOS grouped rows with language navigation, appearance preview and GitHub toolbar action',()=>{
@@ -266,6 +278,7 @@ test('photo details and guide use compact icon-led disclosures instead of dense 
   assert.match(resultView,/details\.photo/);
   assert.match(resultView,/className='result-meta-icon'/);
   assert.match(resultView,/className='detail-note-icon'/);
+  assert.match(resultView,/el\.dataset\.preview=hasPreview\?'on':'off'/);
   assert.match(resultView,/presentation\?\.quickActions/);
   assert.match(resultView,/kind:'share'/);
   assert.match(resultView,/kind:'download'/);
@@ -289,6 +302,8 @@ test('photo actions use a compact liquid-glass capsule that expands on interacti
   assert.doesNotMatch(action,/border-top:/);
   assert.match(materials,/\.glass-surface,\.photo-workspace \.act/);
   assert.match(materials,/\.photo-workspace \.act \{ --glass-blur: 20px; --glass-opacity: \.58 \}/);
+  assert.match(results,/@media\(min-width:768px\) \{[\s\S]*?\.photo-workspace:has\(#photo-content>\.row\[data-preview="off"\]\) \{[^}]*height: auto;[^}]*max-height: min\(90dvh,620px\)/s);
+  assert.match(results,/@media\(max-width:767px\) \{[\s\S]*?\.photo-workspace \{[^}]*height: 100dvh/s);
 });
 test('tab glass expands outside the platter, keeps badges optically anchored, and uses heavier symbol weights',()=>{
   const css=readFileSync(new URL('../../web/styles/components/navigation-effects.css',import.meta.url),'utf8');
@@ -321,6 +336,7 @@ test('tab glass expands outside the platter, keeps badges optically anchored, an
   assert.match(workspace,/ai-discovery-spring/);
   assert.match(workspace,/@media\(max-width:767px\)[\s\S]*?\.ai-settings-discovery \{[^}]*display: none!important/s);
   assert.match(workspace,/\.ai-settings-trigger::before \{[^}]*conic-gradient\([^}]*var\(--ai-blue\)[^}]*var\(--ai-violet\)[^}]*var\(--ai-coral\)/s);
+  assert.match(workspace,/\.depth-options:has\(\.ai-settings-discovery:not\(\[hidden\]\)\) \.ai-settings-trigger::before \{[^}]*animation: ai-settings-ring-spin/s);
   assert.match(workspace,/ai-settings-ring-spin/);
   assert.match(workspace,/prefers-reduced-motion:reduce[\s\S]*?\.ai-settings-trigger::before,[\s\S]*?animation: none/s);
   assert.match(css,/prefers-reduced-motion:reduce/);

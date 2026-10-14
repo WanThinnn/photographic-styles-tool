@@ -40,7 +40,7 @@ function harness({manualQueue=false,historyEntries=[]}={}){
     matchMedia:()=>({matches:false}),
     VERSION:'test',AI_STRINGS:{en:{},vi:{}},pickLanguage:()=> 'en',
     rememberLanguage:lang=>calls.push(['language',lang]),applyLanguage(){},t:(_lang,key)=>key,
-    depthModel:id=>({label:id}),createAiFeatureControls,showAiSettingsHintOnce(){},
+    depthModel:id=>({label:id}),createAiFeatureControls,showAiSettingsHintOnce(){},confirmAction:async()=>true,
     prepareBrowser:async()=> 'ready-limited',prepareHevcAssets:()=>assert.fail('limited mode must not warm encoder'),
     loadLibheif:async()=>{},releaseDecodeCache(){},releaseHevcEncoder(){},releaseRasterEncoder(){},releaseHeicProcessor(){},
     clearDownloadedAssets:async()=>{},waitForVisiblePage:async()=>{},
@@ -109,12 +109,13 @@ test('three-stop model range updates the displayed name and the actual processin
 });
 
 test('persistent history is restored as ready downloadable results without reprocessing',async()=>{
-  const file={name:'saved-result.heic',type:'image/heic',size:4096};
-  const h=harness({historyEntries:[{id:'persisted-1',name:'original.heic',file}]});await h.start();
+  const file={name:'saved-result.heic',type:'image/heic',size:4096},preview={type:'image/jpeg',size:2048};
+  const h=harness({historyEntries:[{id:'persisted-1',name:'original.heic',file,preview}]});await h.start();
   assert.equal(h.captured.rows.length,1);
   assert.equal(h.captured.rows[0].name,'original.heic');
   assert.equal(h.captured.rows[0].options.historyId,'persisted-1');
   assert.equal(h.captured.rows[0].options.restored,true);
+  assert.equal(h.captured.rows[0].options.restoredPreview,preview);
   assert.equal(h.captured.rows[0].outputs.length,1);
   assert.equal(h.captured.rows[0].outputs[0][0],file);
   assert.equal(h.captured.rows[0].outputs[0][1].metadata,false);

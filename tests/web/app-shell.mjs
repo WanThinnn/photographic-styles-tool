@@ -130,6 +130,8 @@ test('History thumbnails decode lazily, use small cached images, and preserve re
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail').className,'task-thumbnail');
   assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail').alt,'');
+  record.update('ready','Ready');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.$('task-content').firstElementChild.querySelector('.task-thumbnail').className,'task-thumbnail','Activity uses the same small photo thumbnail once ready');
   h.$('history-items').firstElementChild.click();
   assert.equal(h.$('photo-workspace').open,true);
   record.dispose();

@@ -218,7 +218,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     const name=doc.createElement('strong');name.textContent=record.name;
     const status=doc.createElement('span');status.textContent=record.status||translate('shell.queued');
     copy.append(name,status);
-    if(history&&record.thumbnail){
+    if(record.thumbnail&&(history||record.state==='ready')){
       const image=doc.createElement('img');image.className='task-thumbnail';image.alt='';image.src=record.thumbnail;image.setAttribute('aria-hidden','true');open.append(image);
     }else open.append(icon);
     open.append(copy);
@@ -285,10 +285,12 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     const task=$('task-content'),next=current?card(current):null,currentCard=task.firstElementChild;
     const wantsQuick=Boolean(current?.state==='ready'&&current.quickActions?.length);
     const hasQuick=Boolean(currentCard?.querySelector('.task-action-trigger'));
-    if(next&&currentCard?.dataset.result===current.id&&wantsQuick===hasQuick){
+    const wantsThumbnail=Boolean(current?.state==='ready'&&current.thumbnail);
+    const hasThumbnail=Boolean(currentCard?.querySelector('.task-thumbnail'));
+    if(next&&currentCard?.dataset.result===current.id&&wantsQuick===hasQuick&&wantsThumbnail===hasThumbnail){
       currentCard.querySelector('.task-copy>span').textContent=current.status||translate('shell.queued');
       currentCard.querySelector('.task-copy>strong').textContent=current.name;
-      updateTaskIndicator(currentCard.querySelector('.task-symbol'),current);
+      const currentSymbol=currentCard.querySelector('.task-symbol');if(currentSymbol)updateTaskIndicator(currentSymbol,current);
       currentCard.dataset.state=current.state;
     }else{
       if(next){next.dataset.result=current.id;next.querySelector('.task-copy>span').setAttribute('role','status');}
@@ -313,11 +315,11 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       doc.body.classList.add('has-used-app');try{win.localStorage.setItem('stylio-has-processed','1');}catch{}
       render();
       return {
-        update(state,status){record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;render();},
+        update(state,status){record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;if(state==='ready'&&record.sourceFile&&!record.thumbnail)void makeThumbnail(record);render();},
         progress(value){record.progress=Number.isFinite(value)?Math.max(0,Math.min(100,value)):null;render();},
         quickActions(items){record.quickActions=(items||[]).filter(item=>item&&typeof item.run==='function');render();},
         quickAction(kind,run,label=''){record.quickActions=[{kind,run,label}];render();},
-        source(file){record.sourceFile=file?.type==='video/quicktime'?null:file;record.thumbnail=null;record.thumbnailAttempted=false;if(record.historyCard&&thumbnailObserver&&record.sourceFile)thumbnailObserver.observe(record.historyCard);render();},
+        source(file){if(!record.sourceFile&&file?.type!=='video/quicktime'){record.sourceFile=file;record.thumbnail=null;record.thumbnailAttempted=false;}if(record.historyCard&&thumbnailObserver&&record.sourceFile&&!record.thumbnail)thumbnailObserver.observe(record.historyCard);render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();
           observer?.disconnect();

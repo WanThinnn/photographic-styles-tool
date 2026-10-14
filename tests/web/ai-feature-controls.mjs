@@ -90,11 +90,11 @@ test('readiness temporarily locks settings without selecting or clearing effects
 test('AI settings discovery hint persists across visits until settings is opened',()=>{
   const values=new Map(),storage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
   const makeVisit=()=>{
-    const summary=new EventTarget(),attrs=new Map(),hint={id:'discovery',hidden:true};
-    summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);
+    const summary=new EventTarget(),attrs=new Map(),classes=new Set(),hint={id:'discovery',hidden:true};
+    summary.setAttribute=(key,value)=>attrs.set(key,value);summary.removeAttribute=key=>attrs.delete(key);summary.classList={add:value=>classes.add(value),contains:value=>classes.has(value)};
     const settings={querySelector:()=>summary};
     showAiSettingsHintOnce({hint,settings,storage});
-    return {summary,attrs,hint};
+    return {summary,attrs,hint,classes};
   };
   const first=makeVisit();
   assert.equal(first.hint.hidden,false);assert.equal(first.attrs.get('aria-describedby'),'discovery');
@@ -103,9 +103,9 @@ test('AI settings discovery hint persists across visits until settings is opened
   assert.equal(second.hint.hidden,false,'an unclicked hint must return on the next visit');
   second.summary.dispatchEvent(new Event('click'));
   assert.equal(second.hint.hidden,true);assert.equal(second.attrs.has('aria-describedby'),false);
-  assert.equal(values.get('stylio-ai-settings-hint-v2'),'opened');
+  assert.equal(values.get('stylio-ai-settings-hint-v2'),'opened');assert.equal(second.classes.has('ai-settings-discovered'),true);
   const third=makeVisit();
-  assert.equal(third.hint.hidden,true,'opening settings dismisses the hint for future visits');
+  assert.equal(third.hint.hidden,true,'opening settings dismisses the hint for future visits');assert.equal(third.classes.has('ai-settings-discovered'),true);
   assert.doesNotThrow(()=>showAiSettingsHintOnce({hint:first.hint,settings:{querySelector:()=>first.summary},storage:{getItem(){throw Error('denied');}}}));
 });
 

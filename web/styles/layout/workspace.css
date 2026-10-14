@@ -153,6 +153,20 @@
   overflow: visible
 }
 
+.ai-settings-trigger::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  padding: 2px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,var(--ai-blue),var(--ai-violet) 34%,var(--ai-coral) 68%,var(--ai-amber) 84%,var(--ai-blue));
+  -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  transform-origin: center
+}
+
 .ai-settings-discovery {
   display: flex;
   align-items: center;
@@ -215,6 +229,10 @@
   animation: ai-settings-discovery-nudge 560ms cubic-bezier(.18,.86,.22,1.18) 120ms 1
 }
 
+.depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger::before {
+  animation: ai-settings-ring-spin 1.8s cubic-bezier(.18,.76,.2,1) both
+}
+
 @keyframes ai-discovery-spring {
   0% { opacity: 0; transform: translateX(8px) scale(.88) }
   58% { opacity: 1; transform: translateX(-2px) scale(1.1) }
@@ -256,20 +274,6 @@
   }
   .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger {
     animation: none
-  }
-  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger::before {
-    content: "";
-    position: absolute;
-    inset: -4px;
-    padding: 2px;
-    border-radius: 50%;
-    background: conic-gradient(from 0deg,var(--ai-blue),var(--ai-violet) 34%,var(--ai-coral) 68%,var(--ai-amber) 84%,var(--ai-blue));
-    -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    transform-origin: center;
-    animation: ai-settings-ring-spin 1.8s cubic-bezier(.18,.76,.2,1) both
   }
   .depth-options>.portrait-option label {
     flex: 1;

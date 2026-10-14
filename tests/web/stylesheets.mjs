@@ -56,6 +56,53 @@ test('old bright blue is shared and scrollbar hiding does not disable normal scr
   assert.doesNotMatch(base,/(?:^|\n)(?:html|body|\*) \{[^}]*overflow: hidden/);
 });
 
+
+
+test('standalone shell keeps the intro visible, centers its copy, and anchors the dock from the safe bottom',()=>{
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const i18n=readFileSync(new URL('../../web/src/ui/i18n.js',import.meta.url),'utf8');
+  assert.doesNotMatch(layout,/\.has-used-app \.intro/);
+  assert.match(layout,/\.intro \{[^}]*text-align: center/s);
+  assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*top: auto;[^}]*bottom: calc\(max\(10px,env\(safe-area-inset-bottom,0px\)\) \+ var\(--dock-keyboard-offset,0px\)\)/);
+  assert.match(i18n,/Add Styles, Texture and Grain\.<br>Privately, on your device\./);
+  assert.equal([...html.matchAll(/class="icon-button glass-surface"[^>]*><svg/g)].length>=2,true);
+});
+
+test('portrait aperture keeps the yellow selector centered while the ruler moves and preserves the initial aperture dot',()=>{
+  const css=readFileSync(new URL('../../web/styles/components/portrait-editor.css',import.meta.url),'utf8');
+  const js=readFileSync(new URL('../../web/src/portrait/ai-portrait-preview.js',import.meta.url),'utf8');
+  assert.match(css,/\.ai-aperture-selection \{[^}]*left: 50%/s);
+  assert.match(css,/\.ai-aperture-origin \{/);
+  assert.match(js,/className='ai-aperture-origin'/);
+  assert.match(js,/ruler\.style\.transform=.*-index\*TICK_SPACING/);
+  assert.doesNotMatch(js,/selection\.style\.left/);
+});
+
+test('settings follows iOS grouped rows with language navigation, appearance preview and GitHub toolbar action',()=>{
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  assert.match(html,/class="settings-github icon-button glass-surface" href="https:\/\/github\.com\/WanThinnn\/stylio"/);
+  assert.match(html,/class="settings-nav-row language-row"/);
+  assert.match(html,/class="appearance-segment"/);
+  assert.match(html,/settings\.defaultsave/);
+  assert.match(html,/settings\.keepscreen/);
+  assert.match(html,/settings\.originalformat/);
+  assert.match(sheets,/\.language-row #lang \{[^}]*appearance: none/s);
+  assert.match(sheets,/\.settings-leading-icon/);
+});
+
+test('photo actions use the shared liquid-glass material as a floating capsule',()=>{
+  const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
+  const materials=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');
+  const action=results.match(/\.photo-workspace \.act \{([^}]+)\}/)[1];
+  assert.match(action,/bottom: max\(18px/);
+  assert.match(action,/width: min\(720px,calc\(100% - 32px\)\)/);
+  assert.match(action,/border-radius: 28px/);
+  assert.doesNotMatch(action,/border-top:/);
+  assert.match(materials,/\.glass-surface,\.photo-workspace \.act/);
+  assert.match(materials,/\.photo-workspace \.act \{ --glass-blur: 20px; --glass-opacity: \.58 \}/);
+});
 test('tab glass has a pressed lens without nested backdrop filters and preserves accessibility fallbacks',()=>{
   const css=readFileSync(new URL('../../web/styles/components/navigation-effects.css',import.meta.url),'utf8');
   assert.match(css,/\.app-tabs\.is-pressing::before/);

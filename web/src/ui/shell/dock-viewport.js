@@ -9,14 +9,24 @@ export function bindDockViewport({win=window,doc=document}={}){
   const update=()=>{
     frame=null;
     if(doc.activeElement!==input||Math.abs(viewport.scale-1)>.01){
-      dock.style.removeProperty('--dock-viewport-bottom');return;
+      dock.style.removeProperty('--dock-viewport-bottom');
+      dock.style.removeProperty('--dock-keyboard-offset');
+      return;
     }
     const bottom=viewport.height+viewport.offsetTop;
-    if(Number.isFinite(bottom)&&bottom>0)dock.style.setProperty('--dock-viewport-bottom',bottom+'px');
-    else dock.style.removeProperty('--dock-viewport-bottom');
+    if(Number.isFinite(bottom)&&bottom>0){
+      dock.style.setProperty('--dock-viewport-bottom',bottom+'px');
+      const layoutHeight=Number(win.innerHeight);
+      const keyboardOffset=Number.isFinite(layoutHeight)?Math.max(0,layoutHeight-bottom):0;
+      if(keyboardOffset>0)dock.style.setProperty('--dock-keyboard-offset',keyboardOffset+'px');
+      else dock.style.removeProperty('--dock-keyboard-offset');
+    }else{
+      dock.style.removeProperty('--dock-viewport-bottom');
+      dock.style.removeProperty('--dock-keyboard-offset');
+    }
   };
   const schedule=()=>{if(frame===null)frame=win.requestAnimationFrame(update);};
-  const blur=()=>{dock.style.removeProperty('--dock-viewport-bottom');schedule();};
+  const blur=()=>{dock.style.removeProperty('--dock-viewport-bottom');dock.style.removeProperty('--dock-keyboard-offset');schedule();};
   viewport.addEventListener('resize',schedule);viewport.addEventListener('scroll',schedule);
   input.addEventListener('focus',schedule);input.addEventListener('blur',blur);
   win.addEventListener('pageshow',schedule);win.addEventListener('orientationchange',schedule);
@@ -26,5 +36,6 @@ export function bindDockViewport({win=window,doc=document}={}){
     input.removeEventListener('focus',schedule);input.removeEventListener('blur',blur);
     win.removeEventListener('pageshow',schedule);win.removeEventListener('orientationchange',schedule);
     dock.style.removeProperty('--dock-viewport-bottom');
+    dock.style.removeProperty('--dock-keyboard-offset');
   };
 }

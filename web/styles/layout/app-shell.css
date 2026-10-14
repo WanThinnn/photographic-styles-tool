@@ -57,13 +57,14 @@ h1 {
 }
 
 .intro {
-  padding: 8px 0 0
+  padding: 8px 0 0;
+  text-align: center
 }
 
 .intro h2 {
   font-size: 2rem;
   letter-spacing: -.04em;
-  margin: 0 0 8px
+  margin: 0 0 12px
 }
 
 .intro h2 span {
@@ -76,12 +77,9 @@ h1 {
 .sub {
   color: var(--muted);
   font-size: .9375rem;
-  margin: 0;
+  line-height: 1.65;
+  margin: 0 auto;
   max-width: 34rem
-}
-
-.has-used-app .intro {
-  display: none
 }
 
 /* Four real destinations plus a separate search action. */
@@ -164,14 +162,20 @@ h1 {
 }
 .tab-count {
   position: absolute;
-  top: 2px;
-  right: 5px;
-  font-size: .625rem;
-  min-width: 16px;
+  top: 0;
+  left: calc(50% + 7px);
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
   border-radius: var(--capsule-radius);
-  background: var(--surface);
-  color: var(--fg);
-  padding: 0 3px
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 2px var(--surface);
+  font-size: .5625rem;
+  font-weight: 700;
+  line-height: 1
 }
 
 #boot {
@@ -233,6 +237,11 @@ h1 {
 @media(display-mode:standalone) {
   main {
     min-height: 100dvh
+  }
+  .app-dock {
+    top: auto;
+    bottom: calc(max(10px,env(safe-area-inset-bottom,0px)) + var(--dock-keyboard-offset,0px));
+    transform: translateX(-50%)
   }
 }
 

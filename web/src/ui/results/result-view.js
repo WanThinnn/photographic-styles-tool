@@ -9,7 +9,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     el.querySelector(".name").textContent = name;
     el.querySelector(".name").title = name;
     list.appendChild(el);
-    const presentation=shell?.register(el,name);
+    const presentation=shell?.register(el,name,sourceFile);
     el.querySelector('.status').setAttribute('role','status');
     const cleanups=new Set(),downloadedFiles=new WeakSet(),savedFiles=new WeakSet();let disposed=false;
     if(sourceFile&&sourceFile.type!=='video/quicktime'){

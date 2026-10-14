@@ -128,13 +128,53 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   }
   let used=false;try{used=win.localStorage.getItem('stylio-has-processed')==='1';}catch{}
   doc.body.classList.toggle('has-used-app',used);
-  function card(record){
+  // Low-resolution thumbnails are decoded only when History cards become visible.
+  // Unsupported image formats retain their status icons without loading a decoder.
+  const thumbnailObserver=win.IntersectionObserver?new win.IntersectionObserver(entries=>{
+    for(const entry of entries){
+      if(!entry.isIntersecting)continue;
+      thumbnailObserver.unobserve(entry.target);
+      const record=[...records.values()].find(item=>item.historyCard===entry.target);
+      if(record)void makeThumbnail(record);
+    }
+  },{rootMargin:'80px'}):null;
+  async function makeThumbnail(record){
+    if(record.thumbnailAttempted||record.thumbnailPending||record.thumbnail||!record.sourceFile||typeof win.createImageBitmap!=='function')return;
+    record.thumbnailAttempted=true;record.thumbnailPending=true;
+    let bitmap;
+    try{
+      bitmap=await win.createImageBitmap(record.sourceFile,{resizeWidth:96,resizeQuality:'medium'});
+      if(!records.has(record.id))return;
+      const canvas=doc.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
+      const context=canvas.getContext?.('2d');if(!context)return;
+      context.drawImage(bitmap,0,0);
+      record.thumbnail=canvas.toDataURL('image/jpeg',0.7);
+      render();
+    }catch{/* Browser could not decode this file; preserve its status icon. */}
+    finally{bitmap?.close?.();record.thumbnailPending=false;}
+  }
+  // A percentage is a stage-local value supplied by the pipeline, never an
+  // estimated percentage of the full job. Keep the same indicator footprint.
+  function updateTaskIndicator(icon,record){
+    const active=record.state==='processing'||record.state==='updating';
+    const match=active&&String(record.status).match(/(?:^|\s)(100|[1-9]?\d)%(?=$|\s|[.,;])/);
+    const percent=match?Number(match[1]):null;
+    icon.classList.toggle('is-active',active);
+    icon.classList.toggle('is-determinate',percent!==null);
+    icon.style.setProperty('--task-progress',`${percent??0}%`);
+    icon.textContent=active?'':record.state==='ready'?'✓':record.state==='failed'?'!':'◷';
+  }
+  function card(record,{history=false}={}){
     const button=doc.createElement('button');button.type='button';button.className='task-card';
-    const icon=doc.createElement('span');icon.className='task-symbol';icon.setAttribute('aria-hidden','true');icon.textContent=record.state==='ready'?'✓':record.state==='failed'?'!':'◷';
+    const icon=doc.createElement('span');icon.className='task-symbol';icon.setAttribute('aria-hidden','true');updateTaskIndicator(icon,record);
     const copy=doc.createElement('span');copy.className='task-copy';
     const name=doc.createElement('strong');name.textContent=record.name;
     const status=doc.createElement('span');status.textContent=record.status||translate('shell.queued');
-    copy.append(name,status);button.append(icon,copy);
+    copy.append(name,status);
+    if(history&&record.thumbnail){
+      const image=doc.createElement('img');image.className='task-thumbnail';image.alt='';image.src=record.thumbnail;image.setAttribute('aria-hidden','true');button.append(image);
+    }else button.append(icon);
+    button.append(copy);
     const arrow=doc.createElement('span');arrow.className='task-chevron';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');button.append(arrow);
     button.dataset.state=record.state;button.addEventListener('click',()=>openPhoto(record.id));return button;
   }
@@ -143,10 +183,11 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     const history=$('history-items');
     const matching=all.filter(record=>!query||normalize(record.name+' '+record.status).includes(query));
     const cards=[...matching].reverse().map(record=>{
-      const next=card(record);
+      const next=card(record,{history:true});
       if(record.historyCard){
         record.historyCard.replaceChildren(...next.childNodes);record.historyCard.dataset.state=record.state;
       }else record.historyCard=next;
+      if(thumbnailObserver&&record.sourceFile&&!record.thumbnail&&!record.thumbnailAttempted)thumbnailObserver.observe(record.historyCard);
       return record.historyCard;
     });
     for(const old of [...history.children])if(!cards.includes(old))old.remove();
@@ -165,7 +206,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     if(next&&task.firstElementChild?.dataset.result===current.id){
       task.firstElementChild.querySelector('.task-copy>span').textContent=current.status||translate('shell.queued');
       task.firstElementChild.querySelector('.task-copy>strong').textContent=current.name;
-      task.firstElementChild.querySelector('.task-symbol').textContent=next.querySelector('.task-symbol').textContent;
+      updateTaskIndicator(task.firstElementChild.querySelector('.task-symbol'),current);
       task.firstElementChild.dataset.state=current.state;
     }else{
       if(next){next.dataset.result=current.id;next.querySelector('.task-copy>span').setAttribute('role','status');}
@@ -175,8 +216,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   showScreen(destination);
   return {
     render,
-    register(el,name){
-      const id='result-'+sessionId+'-'+(++serial),record={id,el,name,state:'queued',status:''};records.set(id,record);
+    register(el,name,sourceFile){
+      const id='result-'+sessionId+'-'+(++serial),record={id,el,name,state:'queued',status:'',sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile};records.set(id,record);
       const actions=el.querySelector('.act');
       record.measureActions=()=>el.style.setProperty('--actions-height',`${actions.getBoundingClientRect().height}px`);
       const observer=win.ResizeObserver?new win.ResizeObserver(record.measureActions):null;
@@ -187,7 +228,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
         update(state,status){record.state=state;record.status=status;render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();
-          observer?.disconnect();records.delete(id);render();
+          observer?.disconnect();if(record.historyCard)thumbnailObserver?.unobserve(record.historyCard);
+          records.delete(id);record.thumbnail=null;record.sourceFile=null;render();
           if(wasSelected)tabs.find(button=>button.dataset.screen===destination)?.focus({preventScroll:true});
         },
       };

@@ -42,13 +42,18 @@
   position: relative;
   height: 60px;
   margin-top: 4px;
-  border-radius: 8px
+  border-radius: 8px;
+  overflow: hidden
 }
 
 .ai-aperture-ruler {
   position: absolute;
-  inset: 0 12px;
-  pointer-events: none
+  left: 50%;
+  bottom: 0;
+  height: 60px;
+  pointer-events: none;
+  transition: transform 140ms ease-out;
+  will-change: transform
 }
 
 .ai-aperture-tick, .ai-aperture-selection {
@@ -67,11 +72,24 @@
   transform: translateX(-50%)
 }
 
+.ai-aperture-origin {
+  position: absolute;
+  bottom: 48px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a6a6a6;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 .5px #fff8
+}
+
 .ai-aperture-selection {
+  left: 50%;
   height: 34px;
   width: 3px;
   background: #e4b400;
-  transform: translateX(-50%)
+  transform: translateX(-50%);
+  z-index: 1
 }
 
 .ai-aperture-track input {
@@ -119,7 +137,7 @@
 }
 
 @media(prefers-reduced-motion:reduce) {
-  .ai-aperture-tick {
+  .ai-aperture-tick,.ai-aperture-ruler {
     transition: none
   }
 }

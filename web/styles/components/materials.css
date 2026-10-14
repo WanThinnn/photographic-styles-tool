@@ -43,7 +43,7 @@
   width: var(--tab-height);
   min-height: var(--tab-height)
 }
-.photo-workspace .act { --glass-blur: 16px; --glass-opacity: .85 }
+.photo-workspace .act { --glass-blur: 20px; --glass-opacity: .58 }
 .app-tabs button[aria-current="page"] svg { stroke-width: 2.2 }
 @media(prefers-reduced-motion:reduce) {
   .icon-button.glass-surface:active { scale: 1 }

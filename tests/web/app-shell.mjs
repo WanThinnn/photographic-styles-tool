@@ -6,10 +6,10 @@ import {bindTabGlass} from '../../web/src/ui/shell/tab-glass.js';
 
 // Small DOM adapter: tests exercise the same shell interface as the browser,
 // not HTML/source snapshots. No decoder, encoder, model or filesystem fixtures.
-function harness({blockedStorage=false,initialState=null,deferBack=false}={}){
+function harness({blockedStorage=false,initialState=null,deferBack=false,thumbnails=false}={}){
   let doc;
   class Element extends EventTarget{
-    constructor(tag='div'){super();this.tagName=tag;this.children=[];this.dataset={};this.attrs=new Map();this.style={setProperty(){}};this.hidden=false;this.open=false;this.className='';this.classList={toggle(){},add(){}};}
+    constructor(tag='div'){super();this.tagName=tag;this.children=[];this.dataset={};this.attrs=new Map();this.css=new Map();this.style={setProperty:(k,v)=>this.css.set(k,v)};this.hidden=false;this.open=false;this.className='';this.classes=new Set();this.classList={toggle:(k,enabled)=>{if(enabled)this.classes.add(k);else this.classes.delete(k);},add:k=>this.classes.add(k)};}
     get childNodes(){return [...this.children];}
     get firstElementChild(){return this.children[0];}
     get isConnected(){return !!this.parentElement||this===doc.body;}
@@ -49,10 +49,20 @@ function harness({blockedStorage=false,initialState=null,deferBack=false}={}){
   for(const sheet of sheets){const button=new Element('button');button.closeButton=true;sheet.append(button);}
   const storage=new Map(),entries=[initialState];let cursor=0,pendingBack;
   const win=new EventTarget();win.scrollY=0;win.scrollTo=(_x,y)=>win.scrollY=y;
+  let intersection;
+  if(thumbnails){
+    win.IntersectionObserver=class {constructor(callback){intersection=callback;}observe(){}unobserve(){}};
+    win.createImageBitmap=async()=>({width:96,height:64,close(){}});
+    const create=doc.createElement;doc.createElement=tag=>{
+      const el=create(tag);
+      if(tag==='canvas'){el.getContext=()=>({drawImage(){}});el.toDataURL=()=> 'data:image/jpeg;base64,dGh1bWI=';}
+      return el;
+    };
+  }
   win.localStorage=win.sessionStorage={getItem:key=>{if(blockedStorage)throw Error('denied');return storage.get(key);},setItem:(key,value)=>{if(blockedStorage)throw Error('denied');storage.set(key,value);}};
   win.history={get state(){return entries[cursor];},replaceState(state){entries[cursor]=state;},pushState(state){entries.splice(++cursor);entries[cursor]=state;},back(){if(cursor>0){const go=()=>{cursor--;win.dispatchEvent(new Event('popstate'));};if(deferBack)pendingBack=go;else go();}},forward(){if(cursor<entries.length-1){cursor++;win.dispatchEvent(new Event('popstate'));}}};
   const shell=createAppShell({doc,win,translate:key=>key});
-  return {doc,win,tabs,shell,flushBack(){pendingBack?.();pendingBack=null;},$:id=>nodes.get(id),row(){const el=new Element();const actions=new Element();actions.className='act';el.append(actions);doc.body.append(el);return el;}};
+  return {doc,win,tabs,shell,intersect(el){intersection?.([{target:el,isIntersecting:true}]);},flushBack(){pendingBack?.();pendingBack=null;},$:id=>nodes.get(id),row(){const el=new Element();const actions=new Element();actions.className='act';el.append(actions);doc.body.append(el);return el;}};
 }
 
 test('History stays available empty; navigation preserves scroll and does not dispose results',()=>{
@@ -84,6 +94,36 @@ test('current task is independent of selected photo; updates preserve the focuse
   const task=h.$('task-content').firstElementChild;task.focus();active.update('processing','Working 50%');
   assert.equal(h.$('task-content').firstElementChild,task);assert.equal(h.doc.activeElement,task);
   assert.equal(task.querySelector('.task-copy>span').textContent,'Working 50%');
+});
+
+test('task indicator uses real stage percentage, stable geometry and indeterminate fallback',()=>{
+  const h=harness(),record=h.shell.register(h.row(),'stage.heic');
+  const symbol=()=>h.$('task-content').firstElementChild.querySelector('.task-symbol');
+  record.update('processing','Encoding 45%');
+  assert.equal(symbol().css.get('--task-progress'),'45%');
+  assert.equal(symbol().classes.has('is-determinate'),true);
+  const original=symbol();
+  record.update('processing','Loading encoder');
+  assert.equal(symbol(),original);
+  assert.equal(symbol().classes.has('is-active'),true);
+  assert.equal(symbol().classes.has('is-determinate'),false);
+  record.update('ready','Ready');
+  assert.equal(symbol().classes.has('is-active'),false);
+  assert.equal(symbol().textContent,'✓');
+});
+
+test('History thumbnails decode lazily, use small cached images, and preserve result navigation',async()=>{
+  const h=harness({thumbnails:true}),source={type:'image/jpeg'},record=h.shell.register(h.row(),'photo.jpg',source);
+  const historyCard=h.$('history-items').firstElementChild;
+  assert.equal(historyCard.firstElementChild.className,'task-symbol');
+  h.intersect(historyCard);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.$('history-items').firstElementChild.firstElementChild.className,'task-thumbnail');
+  assert.equal(h.$('history-items').firstElementChild.firstElementChild.alt,'');
+  h.$('history-items').firstElementChild.click();
+  assert.equal(h.$('photo-workspace').open,true);
+  record.dispose();
+  assert.equal(h.$('history-empty').hidden,false);
 });
 
 test('removed results cannot be resurrected by Forward; blocked storage is harmless',()=>{
@@ -171,7 +211,7 @@ test('browser Back closes search and leaves the selected destination valid',()=>
 
 test('dock uses visual viewport only for keyboard focus, then clears stale offsets and respects pinch zoom',()=>{
   const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
-  viewport.height=550;viewport.offsetTop=24;viewport.scale=1;win.visualViewport=viewport;
+  viewport.height=550;viewport.offsetTop=24;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=700;
   let frame,scheduled=0;win.requestAnimationFrame=fn=>{frame=fn;scheduled++;return 1;};win.cancelAnimationFrame=()=>frame=null;
   const flush=()=>{const next=frame;frame=null;next?.();};
   const dock={style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)}};
@@ -181,11 +221,14 @@ test('dock uses visual viewport only for keyboard focus, then clears stale offse
   assert.equal(values.has('--dock-viewport-bottom'),false,'PWA startup uses dynamic CSS viewport, not cached visual viewport dimensions');
   doc.activeElement=input;input.dispatchEvent(new Event('focus'));flush();
   assert.equal(values.get('--dock-viewport-bottom'),'574px');
+  assert.equal(values.get('--dock-keyboard-offset'),'126px');
   viewport.height=500;viewport.dispatchEvent(new Event('resize'));viewport.dispatchEvent(new Event('scroll'));
   assert.equal(scheduled,3,'resize/scroll coalesce into one frame');flush();
   assert.equal(values.get('--dock-viewport-bottom'),'524px');
+  assert.equal(values.get('--dock-keyboard-offset'),'176px');
   viewport.scale=1.5;viewport.dispatchEvent(new Event('resize'));flush();
   assert.equal(values.has('--dock-viewport-bottom'),false,'no forced zoom compensation');
+  assert.equal(values.has('--dock-keyboard-offset'),false);
   viewport.scale=1;viewport.dispatchEvent(new Event('resize'));flush();
   doc.activeElement=null;input.dispatchEvent(new Event('blur'));
   assert.equal(values.has('--dock-viewport-bottom'),false,'clear immediately even if keyboard resize is late');flush();

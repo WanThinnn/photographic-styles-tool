@@ -17,19 +17,22 @@ function apertureControl(input,strings){
   heading.append(caption,value);
   const track=document.createElement('span');track.className='ai-aperture-track';
   const ruler=document.createElement('span');ruler.className='ai-aperture-ruler';ruler.setAttribute('aria-hidden','true');
+  const TICK_SPACING=24;
+  ruler.style.width=`${(APERTURES.length-1)*TICK_SPACING}px`;
   const ticks=Array.from({length:APERTURES.length},(_,i)=>{
-    const tick=document.createElement('span');tick.className='ai-aperture-tick';tick.style.left=`${i/(APERTURES.length-1)*100}%`;ruler.append(tick);return tick;
+    const tick=document.createElement('span');tick.className='ai-aperture-tick';tick.style.left=`${i*TICK_SPACING}px`;ruler.append(tick);return tick;
   });
-  const selection=document.createElement('span');selection.className='ai-aperture-selection';ruler.append(selection);
+  const origin=document.createElement('span');origin.className='ai-aperture-origin';origin.style.left=`${DEFAULT_APERTURE*TICK_SPACING}px`;ruler.append(origin);
+  const selection=document.createElement('span');selection.className='ai-aperture-selection';selection.setAttribute('aria-hidden','true');
   input.step='1';input.setAttribute('aria-label',strings.aperture);
-  track.append(ruler,input);control.append(heading,track);
+  track.append(ruler,selection,input);control.append(heading,track);
   let adjusting=false;
   const update=()=>{
-    const position=Number(input.value)/(APERTURES.length-1);
+    const index=Number(input.value);
     value.textContent=apertureLabel(selectedAperture(input));input.setAttribute('aria-valuetext',value.textContent);
-    selection.style.left=`${position*100}%`;
+    ruler.style.transform=`translateX(${-index*TICK_SPACING}px)`;
     ticks.forEach((tick,i)=>{
-      const distance=(i/(APERTURES.length-1)-position)/.12;
+      const distance=(i-index)/2.6;
       const wave=adjusting?Math.exp(-distance*distance)*1.6:0;
       tick.style.transform=`translateX(-50%) scaleY(${1+wave})`;
     });

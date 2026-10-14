@@ -34,7 +34,19 @@ dialog::backdrop {
   background: var(--surface)
 }
 
+.sheet-header>.icon-button {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px
+}
+
 .sheet-header h2 {
+  grid-column: 2;
+  grid-row: 1;
   margin: 0;
   font-size: 1.0625rem;
   font-weight: 650;
@@ -57,29 +69,260 @@ dialog::backdrop {
   color: var(--muted)
 }
 
-.settings-row {
-  display: flex;
-  flex-wrap: wrap;
+.settings-heading {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 44px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 56px;
-  padding: 4px 16px;
+  gap: 12px
+}
+
+.settings-heading h2 {
+  margin: 0
+}
+
+.settings-github {
+  justify-self: end;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  color: var(--fg);
+  text-decoration: none
+}
+
+.settings-github svg {
+  width: 22px;
+  height: 22px
+}
+
+.settings-content {
+  padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom,0px) + 40px)
+}
+
+.settings-content>.group-title {
+  margin: 24px 16px 8px;
+  text-transform: none;
+  letter-spacing: 0
+}
+
+.settings-content>.group-title:first-child {
+  margin-top: 0
+}
+
+.settings-group {
+  overflow: hidden;
+  border-radius: 22px;
   background: var(--surface);
-  border-radius: 20px;
-  border-bottom: 1px solid var(--line)
+  box-shadow: inset 0 0 0 .5px var(--line)
+}
+
+.settings-nav-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 16px;
+  color: var(--fg);
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font: inherit
+}
+
+.settings-leading-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: inset 0 0 0 .5px #ffffff40
+}
+
+.settings-leading-icon svg {
+  width: 19px;
+  height: 19px
+}
+
+.settings-icon-blue { background: linear-gradient(155deg,#58a9ff,#1778f2) }
+.settings-icon-green { background: linear-gradient(155deg,#73df8b,#2dbb52) }
+.settings-icon-amber { background: linear-gradient(155deg,#ffc45a,#f29a18) }
+.settings-icon-violet { background: linear-gradient(155deg,#b68cff,#8059df) }
+
+.settings-row-label {
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 450;
+  overflow-wrap: anywhere
+}
+
+.settings-row-value {
+  color: var(--muted);
+  font-size: .9375rem;
+  white-space: nowrap
+}
+
+.settings-chevron {
+  width: 9px;
+  height: 9px;
+  margin-left: 2px;
+  border-top: 2px solid var(--muted);
+  border-right: 2px solid var(--muted);
+  transform: rotate(45deg);
+  opacity: .55
+}
+
+.language-row .settings-leading-icon {
+  width: 34px;
+  height: 34px;
+  color: var(--fg);
+  background: transparent;
+  box-shadow: none
+}
+
+.language-row .settings-leading-icon svg {
+  width: 28px;
+  height: 28px
+}
+
+.language-row #lang {
+  grid-column: 3;
+  min-height: 44px;
+  max-width: 10rem;
+  margin: 0;
+  padding: 8px 2px 8px 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 400 .9375rem/1.3 var(--sans);
+  text-align: right;
+  text-align-last: right;
+  outline: none
+}
+
+.language-row:has(#lang:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px
+}
+
+.language-row:has(#lang[data-pointer-focus]) {
+  outline: none
+}
+
+.settings-separator {
+  height: .5px;
+  margin-left: 58px;
+  background: var(--line)
+}
+
+.settings-static-row {
+  cursor: default
+}
+
+.settings-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 16px 10px
+}
+
+.settings-row-copy strong {
+  font-size: 1rem;
+  font-weight: 600
+}
+
+.settings-row-copy span {
+  color: var(--muted);
+  font-size: .8125rem;
+  line-height: 1.45
+}
+
+.appearance-card {
+  padding-bottom: 12px
+}
+
+.appearance-segment {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 6px;
+  margin: 0 12px;
+  padding: 4px;
+  border-radius: var(--capsule-radius);
+  background: var(--surface-secondary)
+}
+
+.appearance-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--capsule-radius);
+  background: transparent;
+  color: var(--muted);
+  font: 600 .8125rem/1.2 var(--sans);
+  opacity: 1
+}
+
+.appearance-option svg {
+  width: 17px;
+  height: 17px;
+  flex: none
+}
+
+.appearance-option.is-selected {
+  color: var(--fg);
+  background: var(--surface);
+  box-shadow: 0 1px 5px #00000016,inset 0 0 0 .5px var(--line)
+}
+
+.settings-action-row {
+  cursor: pointer
+}
+
+.settings-action-row:disabled {
+  opacity: .55;
+  cursor: wait
 }
 
 .settings-cache {
-  padding: 8px 16px 16px;
-  background: var(--surface);
-  border-radius: 20px
+  padding-bottom: 12px
+}
+
+.settings-cache .settings-copy {
+  padding: 0 16px 2px 58px
 }
 
 .settings-copy {
   font-size: .8125rem;
+  line-height: 1.5;
   color: var(--muted);
-  margin: 4px 0 0
+  margin: 0
+}
+
+.settings-about .settings-nav-row:not(:has(.settings-leading-icon)) {
+  grid-template-columns: minmax(0,1fr) auto auto
+}
+
+.settings-about .settings-nav-row:not(:has(.settings-leading-icon)) .settings-row-label {
+  grid-column: 1
+}
+
+.settings-about .settings-nav-row:not(:has(.settings-leading-icon)) .settings-row-value {
+  grid-column: 2
+}
+
+.settings-about .settings-nav-row:not(:has(.settings-leading-icon)) .settings-chevron {
+  grid-column: 3
 }
 
 .help {

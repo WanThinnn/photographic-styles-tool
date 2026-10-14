@@ -414,7 +414,7 @@ Ghi nhận phiên bản đầu trước phản hồi giao diện; các quyết �
 - 3 ảnh HEIC thực tế: đổi tab khi queue chạy, mở ảnh Ready khác, chỉnh focus/ƒ rồi Share/Download và mở lại trong Photos; kiểm tra HDR/Portrait/Live Photo. Trong lượt UI này chỉ kiểm thử state/identity, không tuyên bố đã kiểm chứng lại chất lượng ảnh đầu ra.
 - Bảng chia sẻ iOS: dismiss không báo saved, Share Image đúng ảnh/đúng phiên bản; ZIP Live Photo giữ nhãn riêng.
 - Thử cold/airplane-mode warm start thực tế. Hiện đã kiểm tra đường dẫn offline và release URL, chưa mô phỏng tắt mạng của thiết bị.
-- Thumbnail History độ phân giải thấp và vòng tiến trình cùng hình học giữa determinate/indeterminate còn cần tối ưu; hiện dùng biểu tượng trạng thái và phần trăm stage chính xác sẵn có, không dựng progress giả. Không giải mã đồng loạt ảnh gốc chỉ để làm thumbnail.
+- Đã triển khai thumbnail History lazy sau bàn giao §15: chỉ decode File khi card vào viewport qua IntersectionObserver, createImageBitmap giới hạn chiều rộng 96px, vẽ JPEG nhỏ 0.7 và giải phóng ImageBitmap; không thay output/preview, không tải decoder phụ, fallback icon nếu trình duyệt không hỗ trợ. Vẫn cần đo bộ nhớ và kiểm chứng HEIC trên Safari/iPhone thật. Vòng tiến trình cùng hình học determinate/indeterminate đã bổ sung: chỉ dùng % stage có thật, hỗ trợ reduced-motion.
 
 ## 14. Điều chỉnh theo phản hồi mobile và đối chiếu iOS 26/27
 
@@ -492,6 +492,33 @@ Ghi nhận phiên bản đầu trước phản hồi giao diện; các quyết �
 - Test mới gồm press/settle, drag commit/stale click, cancel/vertical scroll/blur/outside, reduced motion/dispose và CSS fallback. Lượt cuối: **52 pass, 0 fail**, PWA và i18n đạt (162 chuỗi/ngôn ngữ), Git diff check sạch lỗi khoảng trắng. Server fixture đã dừng; server app 8006 giữ nguyên. Chưa commit/push.
 - Ảnh trạng thái giữ: `stylio-tab-glass-held.jpg`; model mobile: `stylio-model-capsule-mobile-final.jpg`; shell mobile: `stylio-four-tabs-mobile-final.jpg`, trong thư mục visualization của chat. Vẫn chờ người dùng nghiệm thu độ nổi của kính và lỗi vị trí dock ngay khi mở Home Screen trên iPhone 16 Pro.
 
+### Kiểm chứng thumbnail và nghiệm thu thiết bị
+
+Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộng 96px khi card vào viewport, giải phóng bitmap sau khi vẽ, tránh thử decode liên tục khi file không hỗ trợ. Regression kiểm tra lazy, thumbnail, mở workspace và cleanup. Service worker hiện lên v158 sau các sửa UI/PWA tiếp theo.
+
+**Chưa nghiệm thu trên iPhone thật:** iPhone Safari/PWA, safe area/Home Screen startup/keyboard/orientation, VoiceOver traversal và announcements, Share sheet Cancel/Save Image, mở output thực trong Photos, HDR/Portrait/Live Photo, offline airplane-mode, hiệu năng HEIC nhiều ảnh. Không đánh dấu các mục này là pass chỉ dựa trên Node tests.
+
+**Checklist thiết bị:** iPhone 16 Pro và ít nhất một iPhone khác; Safari rồi Add to Home Screen; cold/warm launch, landscape, bật Search/keyboard, VoiceOver, Larger Text, Reduce Motion/Transparency, Increase Contrast. Chọn 3 HEIC (SDR, HDR/Portrait, Live Photo + MOV), đổi tab khi queue đang chạy, chỉnh focus/ƒ khi mở kết quả, xác nhận pending khóa Share/Download, Cancel không hiện trạng thái đã lưu, Share lại đúng file sau cập nhật rồi mở trong Photos để xác nhận HDR, depth, Live Photo. Ghi version iOS, screenshot, pass/fail từng bước trước khi đóng issue.
+
+### Cập nhật theo ảnh kiểm chứng iPhone/PWA mới nhất
+
+- Người dùng xác nhận dock PWA vẫn lệch lúc cold launch và chỉ về đúng sau double-tap. Phương án `top + 100dvh` vì vậy không còn được coi là nghiệm thu. Standalone hiện override sang `fixed + bottom` với `safe-area-inset-bottom`; khi Search mở, `dock-viewport.js` chỉ cộng phần keyboard offset từ VisualViewport. Safari thường vẫn giữ cơ chế top/dvh hiện tại.
+- Hero `A new mood.` không còn bị ẩn sau khi app từng xử lý ảnh. Intro căn giữa; lede VI/EN/ZH có ngắt dòng semantic bằng `<br>` và line-height thoáng như giao diện cũ.
+- Badge số History đổi sang badge xanh nhỏ, neo theo tâm icon thay vì góc phải của toàn button.
+- Nút đóng AI Settings và Photo workspace dùng SVG X 22px trong hit target 44×44; header grid đặt explicit cột/hàng để tránh lệch optical của glyph `×`.
+- Aperture preview đổi sang hình học giống Photos: vạch vàng đứng cố định ở tâm, ruler tick trượt ngang bên dưới theo giá trị hiện tại; chấm xám đi cùng ruler đánh dấu khẩu độ khởi tạo mặc định. Native range vẫn giữ interaction/keyboard/AT; reduced-motion tắt transition ruler.
+- Các thay đổi trên chỉ thuộc presentation/preview; không sửa HDR, depth metadata, Portrait export hoặc bokeh renderer.
+
+**Chờ người dùng kiểm chứng lại trên iPhone:** cold launch PWA không cần double-tap; dock đúng safe area ở portrait/landscape; Search keyboard không che dock; AI/Photo X cân; History badge; aperture f/2.8 và f/8 giữ vạch vàng giữa màn hình trong khi ticks và chấm init chạy qua.
+### Settings và floating action bar theo iOS 26/27
+
+- Đối chiếu trực tiếp `ref/ionic-theme-ios27`: settings demo dùng GitHub icon-only ở toolbar phải và grouped inset rows; ion-button dùng glass control material với rim/pressed expansion. Stylio giữ Web UI, không chuyển Ionic.
+- Photo workspace action bar không còn dính sát đáy/full-width: Share/Download nằm trong capsule glass nổi, có safe-area bottom gap, bo 28px, shared glass material, primary/secondary action tách rõ; không lồng thêm backdrop-filter trong từng nút.
+- Settings được mở rộng thành grouped layout: App language dạng iOS navigation row (globe, value, chevron), Appearance Light/System/Dark ở mức presentation-only, Processing mock rows cho default save action / keep screen awake / prefer original format, On this device, About.
+- Appearance và các processing preference mới chỉ là giao diện theo yêu cầu, chưa áp dụng/persist behavior. Language, Clear cache và link hiện có vẫn hoạt động.
+- Góc phải tiêu đề Settings có GitHub glass button mở `https://github.com/WanThinnn/stylio`; repository đã được xác nhận qua GitHub connector là public repo `WanThinnn/stylio`.
+- About có version, Source code và Open-source licenses. Footer rút gọn để tránh lặp quá nhiều link.
+- I18n VI/EN/ZH bổ sung đủ copy mới; SW tăng lên v159 để PWA nhận layout mới.
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

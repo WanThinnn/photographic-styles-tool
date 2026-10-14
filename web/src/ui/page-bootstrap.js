@@ -16,8 +16,18 @@ function showBootError(message,retryLabel){
 const previewToggle=document.getElementById('result-preview');
 const previewKey='stylio-result-preview-v1';
 const themeKey='stylio-theme-v1',themeButtons=[...document.querySelectorAll('[data-theme-value]')];
+const systemThemeQuery=matchMedia('(prefers-color-scheme: dark)');
+const themeColorMeta=document.getElementById('app-theme-color');
+const colorSchemeMeta=document.getElementById('app-color-scheme');
 let themeTransitionTimer;
 function currentTheme(){try{const value=localStorage.getItem(themeKey);return ['light','dark','system'].includes(value)?value:'system';}catch{return 'system';}}
+function resolvedTheme(theme=currentTheme()){return theme==='system'?(systemThemeQuery.matches?'dark':'light'):theme;}
+function syncBrowserChrome(theme=currentTheme()){
+  const resolved=resolvedTheme(theme),dark=resolved==='dark';
+  document.documentElement.style.colorScheme=resolved;
+  if(colorSchemeMeta)colorSchemeMeta.content=resolved;
+  if(themeColorMeta)themeColorMeta.content=dark?'#000000':'#f2f2f7';
+}
 function applyTheme(theme,{persist=false,animate=false}={}){
   const root=document.documentElement;
   if(animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -27,13 +37,17 @@ function applyTheme(theme,{persist=false,animate=false}={}){
   }
   if(theme==='system')delete root.dataset.theme;
   else root.dataset.theme=theme;
+  syncBrowserChrome(theme);
   for(const button of themeButtons){
     const selected=button.dataset.themeValue===theme;
     button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
   }
   if(persist)try{localStorage.setItem(themeKey,theme);}catch{}
 }
+function syncSystemThemeChrome(){if(currentTheme()==='system')syncBrowserChrome('system');}
 applyTheme(currentTheme());
+if(systemThemeQuery.addEventListener)systemThemeQuery.addEventListener('change',syncSystemThemeChrome);
+else systemThemeQuery.addListener?.(syncSystemThemeChrome);
 for(const button of themeButtons)button.addEventListener('click',()=>applyTheme(button.dataset.themeValue,{persist:true,animate:true}));
 
 const topBar=document.querySelector('.top');

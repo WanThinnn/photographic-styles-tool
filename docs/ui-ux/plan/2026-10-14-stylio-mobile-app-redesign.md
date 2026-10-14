@@ -790,6 +790,14 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v190**.
 - Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
 
+### Live Safari chrome theme sync v192
+
+- Replace the paired media-qualified `theme-color` meta tags with one runtime-controlled `#app-theme-color`, plus a resolved `#app-color-scheme`.
+- The inline head bootstrap resolves persisted Light/Dark/System before CSS paints. `page-bootstrap.js` keeps the browser chrome metadata and root `colorScheme` synchronized with manual theme changes.
+- While System is selected, a `prefers-color-scheme: dark` MediaQueryList change listener updates Safari's status/address/tab-bar chrome immediately when iOS changes appearance, avoiding the previous reload requirement.
+- Service Worker tăng **v192**.
+- Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

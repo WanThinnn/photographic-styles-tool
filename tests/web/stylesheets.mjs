@@ -225,8 +225,16 @@ test('first-run notice is a single grouped card and appearance controls are inte
   assert.match(html,/data-theme-value="system"/);
   assert.match(html,/data-theme-value="dark"/);
   assert.doesNotMatch(html,/data-theme-value="(?:light|system|dark)"[^>]*aria-disabled="true"/);
+  assert.match(html,/id="app-color-scheme" name="color-scheme" content="light"/);
+  assert.match(html,/id="app-theme-color" name="theme-color" content="#f2f2f7"/);
+  assert.doesNotMatch(html,/name="theme-color"[^>]*media="\(prefers-color-scheme:/);
   assert.match(bootstrap,/stylio-theme-v1/);
   assert.match(bootstrap,/root\.dataset\.theme/);
+  assert.match(bootstrap,/const systemThemeQuery=matchMedia\('\(prefers-color-scheme: dark\)'\)/);
+  assert.match(bootstrap,/function syncBrowserChrome\(theme=currentTheme\(\)\)/);
+  assert.match(bootstrap,/themeColorMeta\.content=dark\?'#000000':'#f2f2f7'/);
+  assert.match(bootstrap,/colorSchemeMeta\.content=resolved/);
+  assert.match(bootstrap,/systemThemeQuery\.addEventListener\('change',syncSystemThemeChrome\)/);
   assert.match(bootstrap,/theme-transition/);
   assert.match(bootstrap,/animate:true/);
   assert.match(base,/html\.theme-transition body/);

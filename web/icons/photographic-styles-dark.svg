@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Photographic Styles Dark</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b2b2f"/>
+      <stop offset=".62" stop-color="#151517"/>
+      <stop offset="1" stop-color="#080809"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="510" height="510" rx="112.64" fill="url(#bg)"/>
+  <rect x="153.6" y="153.6" width="204.8" height="204.8" rx="56.889"
+        fill="none" stroke="#f5f5f7" stroke-width="24.178"/>
+  <circle cx="325.689" cy="201.956" r="27.022" fill="#f5f5f7"/>
+</svg>

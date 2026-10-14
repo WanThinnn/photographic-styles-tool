@@ -40,10 +40,11 @@ test('four-tab floating dock has a separate search action and material fallbacks
   assert.match(html,/id="history-search" type="search"/);
   assert.match(material,/inset 0 1px 2px/);
 });
-test('AI summary is centered in a single grid and model range stays beside its label',()=>{
+test('AI summary keeps the switch beside its label while pinning Settings to the trailing edge',()=>{
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
   const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
-  assert.match(workspace,/grid-template-columns: minmax\(0,1fr\) 63px 44px/);
+  assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*gap: 10px/s);
+  assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-trigger \{[^}]*margin-left: auto/s);
   assert.doesNotMatch(workspace,/\.ai-settings-trigger \{[^}]*position: absolute/);
   assert.match(workspace,/ai-settings-discovery-nudge/);
   assert.doesNotMatch(workspace,/ai-settings-discovery:not\(\[hidden\]\)[^}]*outline: 1px solid var\(--ai-violet\)/s);
@@ -97,6 +98,32 @@ test('portrait aperture keeps the yellow selector centered while the ruler moves
   assert.doesNotMatch(js,/selection\.style\.left/);
 });
 
+test('process header and Smart Enhance controls use a tighter native grouping',()=>{
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
+  assert.match(layout,/\.app-logo \{[^}]*width: 36px;[^}]*height: 36px/s);
+  assert.match(layout,/h1 \{[^}]*font-size: 1\.25rem;[^}]*font-weight: 700/s);
+  assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*align-items: center/s);
+  assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-trigger \{[^}]*margin-left: auto/s);
+});
+
+test('Portrait preview uses an Apple-like control strip with Photos info, toggle and reset',()=>{
+  const css=readFileSync(new URL('../../web/styles/components/portrait-editor.css',import.meta.url),'utf8');
+  const js=readFileSync(new URL('../../web/src/portrait/ai-portrait-preview.js',import.meta.url),'utf8');
+  const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
+  assert.match(css,/\.ai-preview-toolbar \{[^}]*grid-template-columns: auto minmax\(96px,1fr\) 44px/s);
+  assert.match(css,/\.ai-portrait-toggle \{[^}]*background: linear-gradient\(180deg,#ffda55,#f5bf31\)/s);
+  assert.match(css,/\.ai-portrait-toggle\[aria-pressed="false"\] \{[^}]*color: var\(--muted\)/s);
+  assert.match(css,/\.result-details \+ \.ai-details \{[^}]*margin-top: -8px/s);
+  assert.match(js,/className='ai-photos-controls'/);
+  assert.match(js,/className='ai-portrait-toggle'/);
+  assert.match(js,/portraitToggle\.setAttribute\('aria-pressed',String\(enabled\)\)/);
+  assert.match(js,/photosInfo\.hidden=!expanded/);
+  assert.match(js,/blur\.disabled=!enabled/);
+  assert.match(strings,/"photosEdit": "Aperture and lighting"/);
+  assert.match(strings,/"photosEditHint": "After saving, open the photo in Photos/);
+});
+
 test('settings follows iOS grouped rows with language navigation, appearance preview and GitHub toolbar action',()=>{
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
@@ -130,7 +157,8 @@ test('first-run notice is a single grouped card and appearance controls are inte
   const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
-  assert.match(workspace,/\.photo-format-tip \{[^}]*border: 0;[^}]*border-radius: 18px;[^}]*background: var\(--surface-secondary\)/s);
+  assert.match(workspace,/\.photo-format-tip \{[^}]*grid-template-columns: 17px minmax\(0,1fr\) auto;[^}]*border-radius: 16px;[^}]*background: var\(--surface-secondary\)/s);
+  assert.match(workspace,/\.photo-format-tip button \{[^}]*grid-column: 3;[^}]*min-height: 44px/s);
   assert.match(html,/data-theme-value="light"/);
   assert.match(html,/data-theme-value="system"/);
   assert.match(html,/data-theme-value="dark"/);
@@ -143,15 +171,24 @@ test('first-run notice is a single grouped card and appearance controls are inte
   assert.match(sheets,/\.settings-row-stack/);
   assert.match(html,/id="header-guide" class="icon-button top-guide glass-surface"/);
 });
-test('semantic icon palette switches with dark mode across settings, guide and photo details',()=>{
+test('semantic icon palette switches internal app icons to dark material without changing install icons',()=>{
   const tokens=readFileSync(new URL('../../web/styles/foundations/tokens.css',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
-  assert.match(tokens,/@media\(prefers-color-scheme:dark\)[\s\S]*?--icon-blue-a: #2f8fff;[\s\S]*?--appearance-icon-bg: linear-gradient\(145deg,#f2f2f7/s);
-  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--icon-detail-green: #30d158;[\s\S]*?--appearance-icon-fg: #111/s);
-  assert.match(sheets,/\.settings-icon-blue \{ background: linear-gradient\(155deg,var\(--icon-blue-a\),var\(--icon-blue-b\)\) \}/);
-  assert.match(layout,/\.guide-icon-purple \{ background: linear-gradient\(145deg,var\(--icon-purple-a\),var\(--icon-purple-b\)\) \}/);
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const manifest=readFileSync(new URL('../../web/manifest.webmanifest',import.meta.url),'utf8');
+  assert.match(tokens,/@media\(prefers-color-scheme:dark\)[\s\S]*?--icon-blue-bg: var\(--icon-dark-tile\);[\s\S]*?--icon-blue-fg: #0a84ff/s);
+  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--appearance-icon-bg: var\(--icon-dark-tile\);[\s\S]*?--appearance-icon-fg: #f5f5f7/s);
+  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--icon-green-bg: var\(--icon-dark-tile\)/s);
+  assert.match(sheets,/\.settings-icon-blue \{ background: var\(--icon-blue-bg\); color: var\(--icon-blue-fg\) \}/);
+  assert.match(layout,/\.guide-icon-purple \{ background: var\(--icon-purple-bg\); color: var\(--icon-purple-fg\) \}/);
+  assert.match(layout,/\.logo-dark \{ opacity: 0 \}/);
+  assert.match(layout,/:root\[data-theme="dark"\] \.logo-dark \{ opacity: 1 \}/);
+  assert.match(html,/photographic-styles-dark\.svg/);
+  assert.match(manifest,/icons\/icon-192-v2\.png/);
+  assert.match(manifest,/icons\/icon-512-v2\.png/);
+  assert.doesNotMatch(manifest,/dark/i);
   assert.match(results,/meta\.camera[^}]*var\(--icon-detail-blue\)/);
   assert.match(results,/meta\.capture[^}]*var\(--icon-detail-green\)/);
 });
@@ -168,13 +205,17 @@ test('search and sheet surfaces suppress browser-blue focus frames without remov
   assert.doesNotMatch(sheets,/\.language-row:has\(#lang:focus-visible\) \{[^}]*var\(--focus-ring\)/s);
   assert.match(base,/:focus-visible \{[^}]*outline: 3px solid var\(--focus-ring\)/s);
 });
-test('sheets close with motion and the full-screen photo header protects the Dynamic Island safe area',()=>{
+test('sheets and photo workspace close with motion while the photo header protects the Dynamic Island safe area',()=>{
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
+  const shell=readFileSync(new URL('../../web/src/ui/shell/app-shell.js',import.meta.url),'utf8');
   assert.match(sheets,/\.sheet\.is-closing \{[^}]*sheet-out/s);
   assert.match(sheets,/@keyframes sheet-out/);
   assert.match(results,/@media\(max-width:767px\)[\s\S]*?\.photo-workspace>\.sheet-header \{[^}]*padding-top: calc\(20px \+ env\(safe-area-inset-top,0px\)\)[^}]*backdrop-filter: none/s);
   assert.match(results,/\.photo-workspace\[open\] \{[^}]*photo-workspace-in/s);
+  assert.match(results,/\.photo-workspace\.is-closing \{[^}]*photo-workspace-out/s);
+  assert.match(shell,/photo\.classList\.add\('is-closing'\)/);
+  assert.match(shell,/photoClosingTimer=later\(finish,180\)/);
   assert.match(results,/\.photo-workspace:focus,[\s\S]*?\.photo-workspace:focus-visible \{[^}]*outline: none/s);
 });
 
@@ -188,6 +229,8 @@ test('photo details and guide use compact icon-led disclosures instead of dense 
   assert.match(html,/data-i18n="guide\.seemore"/);
   assert.match(html,/data-i18n="guide\.showless"/);
   assert.match(layout,/\.guide-card>summary \{[^}]*grid-template-columns: 38px minmax\(0,1fr\) auto/s);
+  assert.match(layout,/\.guide-card-body \{[^}]*padding: 0 16px 16px;[^}]*border-top/s);
+  assert.doesNotMatch(layout,/\.guide-card-body \{[^}]*66px/s);
   assert.match(results,/\.result-meta-row \{[^}]*grid-template-columns: 26px minmax\(0,1fr\)/s);
   assert.match(results,/\.detail-group-title \{/);
   assert.match(results,/\.details-summary-icon,/);
@@ -220,12 +263,19 @@ test('tab glass expands outside the platter, keeps badges optically anchored, an
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const materials=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
+  const tokens=readFileSync(new URL('../../web/styles/foundations/tokens.css',import.meta.url),'utf8');
+  const shell=readFileSync(new URL('../../web/src/ui/shell/app-shell.js',import.meta.url),'utf8');
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   assert.match(css,/\.app-tabs\.is-pressing::before/);
   assert.match(css,/scale: 1\.15 1\.4/);
+  assert.match(css,/transition: transform 360ms var\(--spring-ease\)/);
+  assert.match(css,/\.app-tabs\.is-pressing::before \{[^}]*transition: transform 320ms var\(--spring-ease\)/s);
+  assert.match(css,/var\(--selection-active-fill\)/);
   assert.match(css,/\.app-tabs \{[^}]*overflow: visible;[^}]*contain: layout style/s);
+  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--selection-fill: #0000005c;[\s\S]*?--selection-active-fill: #08080bd9/s);
+  assert.match(shell,/--tab-rest-offset/);
   assert.match(css,/touch-action: pan-y/);
-  assert.match(layout,/transform: translate3d\(var\(--lens-offset,calc\(var\(--tab-index,0\) \* 100%\)\),0,0\)/);
+  assert.match(layout,/transform: translate3d\(var\(--lens-offset,var\(--tab-rest-offset,calc\(var\(--tab-index,0\) \* 100%\)\)\),0,0\)/);
   assert.match(css,/\.app-tabs\.is-dragging::before/);
   assert.match(css,/contain: paint/);
   assert.match(layout,/\.tab-icon-wrap \{[^}]*position: relative/s);
@@ -237,7 +287,10 @@ test('tab glass expands outside the platter, keeps badges optically anchored, an
   assert.match(workspace,/\.ai-discovery-pill \{[^}]*rgb\(var\(--glass-rgb\) \/ \.42\)/s);
   assert.match(workspace,/#ai-settings-discovery-copy \{[^}]*background: var\(--gradient\)/s);
   assert.match(workspace,/ai-discovery-spring/);
-  assert.match(workspace,/@media\(max-width:767px\)[\s\S]*?\.ai-discovery-arrow \{[^}]*display: none/s);
+  assert.match(workspace,/@media\(max-width:767px\)[\s\S]*?\.ai-settings-discovery \{[^}]*display: none!important/s);
+  assert.match(workspace,/\.ai-settings-trigger::before \{[^}]*conic-gradient\([^}]*var\(--ai-blue\)[^}]*var\(--ai-violet\)[^}]*var\(--ai-coral\)/s);
+  assert.match(workspace,/ai-settings-ring-spin/);
+  assert.match(workspace,/prefers-reduced-motion:reduce[\s\S]*?\.ai-settings-trigger::before,[\s\S]*?animation: none/s);
   assert.match(css,/prefers-reduced-motion:reduce/);
   assert.match(css,/prefers-reduced-transparency:reduce/);
   assert.match(css,/forced-colors:active/);

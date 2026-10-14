@@ -10,9 +10,17 @@ export function getAppShell(){return instance??=createAppShell();}
 export function createAppShell({doc=document,win=window,translate=key=>t(pickLanguage(),key)}={}){
   const $=id=>doc.getElementById(id),records=new Map();
   const photo=$('photo-workspace'),content=$('photo-content');
-  const tabs=[...doc.querySelectorAll('[data-screen]')];
+  const tabs=[...doc.querySelectorAll('[data-screen]')],tabNav=doc.querySelector('.app-tabs');
   bindDockViewport({doc,win});
-  let destination='process',selected=null,serial=0,opener=null,scroll=0,returning=false,pendingOpen=null;
+  const syncTabLens=()=>{
+    const active=tabs.find(button=>button.getAttribute?.('aria-current')==='page'),first=tabs[0];
+    if(!active||!first||!tabNav?.style)return;
+    const activeRect=active.getBoundingClientRect?.(),firstRect=first.getBoundingClientRect?.();
+    const offset=Number(activeRect?.left)-Number(firstRect?.left);
+    if(Number.isFinite(offset))tabNav.style.setProperty('--tab-rest-offset',offset+'px');
+  };
+  let destination='process',selected=null,serial=0,opener=null,scroll=0,returning=false,pendingOpen=null,photoClosingTimer=null;
+  const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;
   const sessionId=win.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2);
   try{if('scrollRestoration' in win.history)win.history.scrollRestoration='manual';}catch{}
   const screens=['process','history','guide','settings'],positions={process:0,history:0,guide:0,settings:0};
@@ -30,7 +38,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     doc.body.classList.toggle('is-settings-destination',settingsActive);
     guideAction.setAttribute('aria-label',settingsActive?'GitHub':translate('shell.guide'));
     for(const button of tabs){if(button.dataset.screen===next)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');}
-    doc.querySelector('.app-tabs').style.setProperty('--tab-index',String(screens.indexOf(next)));
+    tabNav.style.setProperty('--tab-index',String(screens.indexOf(next)));
+    syncTabLens();
     win.scrollTo(0,positions[next]);
   }
   const searchInput=$('history-search'),searchButton=$('toggle-search'),searchField=$('history-search-field');
@@ -73,10 +82,18 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     else tabs.find(button=>button.dataset.screen===destination)?.focus({preventScroll:true});
     opener=null;
   }
-  function closePhoto({back=true}={}){
-    if(!photo.open)return;
-    photo.close();restorePhoto();
-    if(back&&win.history.state?.stylioPhoto){returning=true;win.history.back();}
+  function closePhoto({back=true,animate=back}={}){
+    if(!photo.open||photo.classList.contains('is-closing'))return;
+    const shouldBack=Boolean(back&&win.history.state?.stylioPhoto);
+    if(shouldBack)returning=true;
+    const finish=()=>{
+      if(photoClosingTimer!==null){clearLater(photoClosingTimer);photoClosingTimer=null;}
+      photo.classList.remove('is-closing');photo.close();restorePhoto();
+      if(shouldBack)win.history.back();
+    };
+    if(!animate||win.matchMedia?.('(prefers-reduced-motion: reduce)').matches){finish();return;}
+    photo.classList.add('is-closing');
+    photoClosingTimer=later(finish,180);
   }
   function openPhoto(id,{push=true}={}){
     if(returning){pendingOpen=id;return;}
@@ -121,7 +138,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     navigate('guide');
   });
   for(const button of tabs)button.addEventListener('click',()=>navigate(button.dataset.screen));
-  bindTabGlass({nav:doc.querySelector('.app-tabs'),tabs,select:navigate,win,doc});
+  bindTabGlass({nav:tabNav,tabs,select:navigate,win,doc});
+  win.addEventListener?.('resize',syncTabLens);
   for(const [trigger,id]of [['open-ai-settings','ai-settings']]){
     const sheet=$(id);
     let closingTimer;
@@ -172,15 +190,17 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     }catch{/* Browser could not decode this file; preserve its status icon. */}
     finally{bitmap?.close?.();record.thumbnailPending=false;}
   }
-  // A percentage is a stage-local value supplied by the pipeline, never an
-  // estimated percentage of the full job. Keep the same indicator footprint.
+  // Prefer the pipeline's explicit overall progress. Legacy stage-local percentages
+  // remain a fallback for operations that have not adopted overall milestones yet.
   function updateTaskIndicator(icon,record){
     const active=record.state==='processing'||record.state==='updating';
     const match=active&&String(record.status).match(/(?:^|\s)(100|[1-9]?\d)%(?=$|\s|[.,;])/);
-    const percent=match?Number(match[1]):null;
+    const explicit=active&&Number.isFinite(record.progress)?Math.max(0,Math.min(100,Math.round(record.progress))):null;
+    const percent=explicit??(match?Number(match[1]):null);
     icon.classList.toggle('is-active',active);
     icon.classList.toggle('is-determinate',percent!==null);
     icon.style.setProperty('--task-progress',`${percent??0}%`);
+    icon.dataset.progressLabel=percent!==null?`${percent}%`:'';
     icon.textContent=active?'':record.state==='ready'?'✓':record.state==='failed'?'!':'◷';
   }
   function card(record,{history=false}={}){
@@ -236,7 +256,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   return {
     render,
     register(el,name,sourceFile){
-      const id='result-'+sessionId+'-'+(++serial),record={id,el,name,state:'queued',status:'',sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile};records.set(id,record);
+      const id='result-'+sessionId+'-'+(++serial),record={id,el,name,state:'queued',status:'',progress:null,sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile};records.set(id,record);
       const actions=el.querySelector('.act');
       record.actions=actions;
       record.measureActions=()=>el.style.setProperty('--actions-height',`${actions.getBoundingClientRect().height}px`);
@@ -250,7 +270,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       doc.body.classList.add('has-used-app');try{win.localStorage.setItem('stylio-has-processed','1');}catch{}
       render();
       return {
-        update(state,status){record.state=state;record.status=status;render();},
+        update(state,status){record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;render();},
+        progress(value){record.progress=Number.isFinite(value)?Math.max(0,Math.min(100,value)):null;render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();
           observer?.disconnect();

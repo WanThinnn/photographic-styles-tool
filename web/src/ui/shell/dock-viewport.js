@@ -9,7 +9,7 @@ export function bindDockViewport({win=window,doc=document}={}){
   const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;
   const requestFrame=win.requestAnimationFrame?.bind(win)||(fn=>later(fn,0));
   const cancelFrame=win.cancelAnimationFrame?.bind(win)||clearLater;
-  let frame=null,shellFrame=null,keyboardSignal=false,retryTimers=[],shellFloor=0;
+  let frame=null,shellFrame=null,keyboardSignal=false,retryTimers=[];
   const standalone=()=>win.matchMedia?.('(display-mode: standalone)')?.matches===true||win.navigator?.standalone===true;
   const clearKeyboard=()=>{
     dock.style.removeProperty('--dock-viewport-bottom');
@@ -20,11 +20,8 @@ export function bindDockViewport({win=window,doc=document}={}){
     if(!standalone())return;
     const docHeight=Number(doc.documentElement?.clientHeight)||0;
     const inner=Number(win.innerHeight)||0;
-    const screenHeight=Number(win.screen?.availHeight)||Number(win.screen?.height)||0;
-    const plausibleScreen=screenHeight>=inner&&(!inner||screenHeight<=inner*1.25)?screenHeight:0;
-    const measured=Math.max(inner,docHeight,plausibleScreen);
-    shellFloor=Math.max(shellFloor,measured);
-    if(shellFloor>0)dock.style.setProperty('--dock-shell-height',shellFloor+'px');
+    const measured=Math.max(inner,docHeight);
+    if(measured>0)dock.style.setProperty('--dock-shell-height',measured+'px');
   };
   const scheduleShell=()=>{
     if(shellFrame===null)shellFrame=requestFrame(applyShellHeight);
@@ -73,7 +70,7 @@ export function bindDockViewport({win=window,doc=document}={}){
   };
   viewport.addEventListener('resize',viewportResize);viewport.addEventListener('scroll',viewportScroll);
   input.addEventListener('focus',focus);input.addEventListener('blur',reset);
-  const orientationReset=()=>{shellFloor=0;reset();};
+  const orientationReset=()=>reset();
   win.addEventListener('resize',refreshShell);win.addEventListener('pagehide',clearKeyboard);
   win.addEventListener('pageshow',reset);win.addEventListener('orientationchange',orientationReset);
   const visibility=()=>{if(doc.visibilityState==='visible')reset();else clearKeyboard();};

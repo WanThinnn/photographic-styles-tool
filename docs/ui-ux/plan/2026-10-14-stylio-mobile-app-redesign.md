@@ -630,6 +630,41 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - `More AI features` quay về hướng compact/glass: pill trong suốt, text gradient brand, sparkle + arrow nhỏ; mobile ẩn arrow để tiết kiệm không gian. Animation dùng một lần spring overshoot/settle và settings button scale 1.12→.98→1, bám pattern press-spring của reference theme và tắt hoàn toàn với Reduced Motion.
 - Đối chiếu thêm `ionic-theme-ios27` Animation/Features/Special Markup: effect chỉ là presentation layer, press state dùng spring/overshoot, dark mode cần theme variables cho từng component. Apple HIG cũng nhấn mạnh press state rõ ràng và symbol/icon phải thích nghi appearance/contrast.
 - Service Worker app-shell cache tăng v173.
+### Mobile AI ring / compact format notice / dark internal icons v174
+
+- Mobile first-use AI discovery no longer renders the `More AI features` pill/text. The hidden discovery state now drives a 2px conic-gradient ring around the 44px AI Settings glass button; the ring rotates/settles once and remains visible until the settings sheet is opened. Reduced Motion keeps the ring static. Desktop/tablet retain the compact discovery pill.
+- First-run `Keep the original photo format` notice is now a three-column inset row (info icon / copy / Got it) instead of a second button row. Padding, radius, typography and copy spacing are reduced while the `Got it` hit target remains 44px.
+- Dark appearance inside the app now follows an iOS-style dark-icon material: Settings and Guide tiles use a graphite/black tile with bright semantic glyph colours instead of merely darker coloured gradients. The Choose Photos tile uses the same semantic icon material.
+- The in-app Stylio header icon now has a dedicated graphite dark appearance (`photographic-styles-dark.svg`) and cross-fades with manual/system theme changes. This asset is app-shell-only.
+- PWA/Home Screen install icons are intentionally unchanged (`apple-touch-icon-v2.png`, `icon-192-v2.png`, `icon-512-v2.png`, maskable v2). No dark install icon is added; iOS remains responsible for Home Screen appearance.
+- Service Worker app-shell cache increases to v174 and precaches the internal dark header SVG.
+### Toolbar viewport / lens alignment / dark glass polish v175
+
+- Fixed the Process/History dock clipping regression by removing `screen.availHeight`/monotonic shell-floor anchoring from `dock-viewport.js`. Standalone placement now follows the current layout viewport (`innerHeight` / `documentElement.clientHeight`) and retries after relaunch; a physical screen height can no longer push the dock below the visible app area.
+- Resting tab lens alignment now uses the selected button's measured pixel offset (`--tab-rest-offset`) instead of relying only on percentage translation. It resyncs on destination changes and window resize, eliminating the cumulative right-shift seen on History / Guide / Settings while preserving Process at zero offset.
+- Liquid Glass selection motion is slowed slightly: transform 280→360ms and release material lifetime 220→360ms. Direct drag motion remains frame-coalesced and responsive.
+- Dark toolbar selection now follows the Phone/iOS reference more closely: the resting selected lens uses a translucent black fill (`#0000005c`) and held/releasing glass uses a darker active fill (`#08080bd9`) instead of the previous light selection fill.
+- Appearance icon in Dark Mode now keeps the graphite/black icon tile with a white split-circle glyph instead of inverting to a white tile.
+- Service Worker app-shell cache increased to v175.
+### Smart Enhance spacing / Photo close motion / Portrait control strip v176
+
+- Smart Enhance summary now uses a content-sized label column followed immediately by the 63px switch and 44px AI Settings button, removing the large empty gap between label and switch.
+- App header branding is slightly larger: Stylio logo 32→36px and title 1.1875→1.25rem / 700 for stronger native visual weight.
+- Photo workspace close now mirrors the sheet presentation model: direct close/cancel adds `is-closing`, plays the existing `photo-workspace-out` animation for 180ms, then restores the originating result and navigates Back. Reduced Motion and internal history restoration close immediately.
+- Removed the empty visual gap between the collapsed Details inspector and Portrait preview by reducing `.ai-details` top inset and offsetting the grid gap when it follows `.result-details`.
+- Portrait preview now has an iOS-style three-part control strip: left aperture/lighting info capsule (`ƒ` + lighting symbol) reveals guidance to finish those edits in Photos; centre Portrait toggle uses yellow/orange active material and neutral outlined inactive material; right reset remains a circular action.
+- Portrait toggle controls the local preview state while keeping the saved HEIC contract unchanged (editable depth, Portrait starts off in Photos). Turning preview off disables aperture interaction; turning it back on restores the last selected aperture. Reset restores f/4.5, focus centre and Portrait preview on.
+- Added VI/EN/ZH accessibility/help copy for aperture/lighting info and Portrait toggle states.
+- Service Worker app-shell cache increased to v176.
+### Guide disclosure / slower tab travel / AI trailing action / total progress v177
+
+- Expanded Guide cards now use full inset width: disclosure body text starts at the card's normal 16px inset instead of remaining indented under the leading icon.
+- Smart Enhance keeps its switch close to the label while the AI Settings glass button is pinned to the trailing edge; long localized labels may shrink/wrap without pulling the Settings action inward.
+- Liquid Glass tab travel on pointer press is slowed from 80ms originally / 280ms interim to 320ms spring motion, so Process → History / Guide / Settings visibly glides instead of snapping.
+- Activity progress rings now render the numeric percentage in the centre. The shell prefers an explicit overall pipeline percentage and falls back to legacy stage-local percentages only where an overall milestone is not supplied.
+- File processing now reports coarse overall milestones across read/decode, raster or HEIC preparation, optional AI detail/style work, Texture/Soft Skin/metadata, and Portrait. Portrait depth uses 90–100% milestones, so long GPU inference no longer leaves the activity ring numerically blank.
+- Service Worker app-shell cache increased to v177.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

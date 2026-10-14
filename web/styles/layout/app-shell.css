@@ -14,11 +14,34 @@ main {
   margin-bottom: 32px
 }
 
-.logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px
+.app-logo {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 36px
 }
+
+.logo {
+  position: absolute;
+  inset: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  transition: opacity 180ms ease
+}
+
+.logo-dark { opacity: 0 }
+
+@media(prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) .logo-light { opacity: 0 }
+  :root:not([data-theme="light"]) .logo-dark { opacity: 1 }
+}
+
+:root[data-theme="dark"] .logo-light { opacity: 0 }
+:root[data-theme="dark"] .logo-dark { opacity: 1 }
+:root[data-theme="light"] .logo-light { opacity: 1 }
+:root[data-theme="light"] .logo-dark { opacity: 0 }
 
 .title {
   flex: 1;
@@ -27,8 +50,8 @@ main {
 
 h1 {
   margin: 0;
-  font-size: 1.1875rem;
-  font-weight: 680;
+  font-size: 1.25rem;
+  font-weight: 700;
   letter-spacing: -.04em
 }
 
@@ -181,8 +204,8 @@ body.is-settings-destination .top-github-symbol {
   width: calc((100% - 8px) / 4);
   border-radius: var(--capsule-radius);
   background: var(--selection-fill);
-  transform: translate3d(var(--lens-offset,calc(var(--tab-index,0) * 100%)),0,0);
-  transition: transform 280ms var(--spring-ease);
+  transform: translate3d(var(--lens-offset,var(--tab-rest-offset,calc(var(--tab-index,0) * 100%))),0,0);
+  transition: transform 360ms var(--spring-ease);
   pointer-events: none
 }
 .app-tabs svg {
@@ -407,10 +430,10 @@ body.is-settings-destination .top-github-symbol {
 }
 
 .guide-icon svg { width: 22px; height: 22px }
-.guide-icon-blue { background: linear-gradient(145deg,var(--icon-blue-a),var(--icon-blue-b)) }
-.guide-icon-purple { background: linear-gradient(145deg,var(--icon-purple-a),var(--icon-purple-b)) }
-.guide-icon-orange { background: linear-gradient(145deg,var(--icon-orange-a),var(--icon-orange-b)) }
-.guide-icon-green { background: linear-gradient(145deg,var(--icon-green-a),var(--icon-green-b)) }
+.guide-icon-blue { background: var(--icon-blue-bg); color: var(--icon-blue-fg) }
+.guide-icon-purple { background: var(--icon-purple-bg); color: var(--icon-purple-fg) }
+.guide-icon-orange { background: var(--icon-orange-bg); color: var(--icon-orange-fg) }
+.guide-icon-green { background: var(--icon-green-bg); color: var(--icon-green-fg) }
 
 .guide-summary-copy {
   display: grid;
@@ -444,7 +467,7 @@ body.is-settings-destination .top-github-symbol {
 .guide-card[open] .guide-more [data-i18n="guide.showless"] { display: inline }
 
 .guide-card-body {
-  padding: 0 16px 16px 66px;
+  padding: 0 16px 16px;
   border-top: 1px solid var(--line)
 }
 

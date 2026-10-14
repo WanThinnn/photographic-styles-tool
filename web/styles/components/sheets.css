@@ -139,10 +139,10 @@ dialog::backdrop {
   height: 19px
 }
 
-.settings-icon-blue { background: linear-gradient(155deg,var(--icon-blue-a),var(--icon-blue-b)) }
-.settings-icon-green { background: linear-gradient(155deg,var(--icon-green-a),var(--icon-green-b)) }
-.settings-icon-amber { background: linear-gradient(155deg,var(--icon-amber-a),var(--icon-amber-b)) }
-.settings-icon-violet { background: linear-gradient(155deg,var(--icon-violet-a),var(--icon-violet-b)) }
+.settings-icon-blue { background: var(--icon-blue-bg); color: var(--icon-blue-fg) }
+.settings-icon-green { background: var(--icon-green-bg); color: var(--icon-green-fg) }
+.settings-icon-amber { background: var(--icon-amber-bg); color: var(--icon-amber-fg) }
+.settings-icon-violet { background: var(--icon-violet-bg); color: var(--icon-violet-fg) }
 
 .settings-row-label {
   min-width: 0;

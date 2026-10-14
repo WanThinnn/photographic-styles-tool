@@ -17,13 +17,13 @@
   scale: 1;
   contain: paint;
   will-change: transform,scale;
-  transition: transform 280ms var(--spring-ease),scale 220ms var(--spring-ease),background 180ms,box-shadow 220ms
+  transition: transform 360ms var(--spring-ease),scale 440ms var(--spring-ease),background 360ms,box-shadow 440ms
 }
 .app-tabs.is-pressing::before,
 .app-tabs.is-releasing::before {
   background:
     radial-gradient(ellipse at 24% 12%,var(--glass-rim-top),transparent 64%),
-    linear-gradient(160deg,rgb(var(--glass-rgb) / .32),rgb(var(--glass-rgb) / .08) 55%,rgb(var(--glass-rgb) / .26));
+    var(--selection-active-fill);
   border-color: var(--glass-rim-top) var(--glass-outline) var(--glass-rim-bottom);
   box-shadow:
     inset 0 1px 2px var(--glass-rim-top),
@@ -34,7 +34,7 @@
 }
 .app-tabs.is-pressing::before {
   scale: 1.15 1.4;
-  transition: transform 80ms linear,scale 200ms var(--spring-ease),background 120ms,box-shadow 180ms
+  transition: transform 320ms var(--spring-ease),scale 220ms var(--spring-ease),background 140ms,box-shadow 200ms
 }
 
 .app-tabs.is-dragging::before {

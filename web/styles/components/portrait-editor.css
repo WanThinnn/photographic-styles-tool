@@ -1,8 +1,12 @@
 /* Portrait preview geometry is retained: do not crop or filter focus surfaces. */
 .ai-details {
   grid-column: 1/-1;
-  padding-top: 12px;
+  padding-top: 2px;
   min-width: 0
+}
+
+.result-details + .ai-details {
+  margin-top: -8px
 }
 
 .ai-preview {
@@ -249,26 +253,71 @@
 }
 
 .ai-preview-toolbar {
+  position: relative;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  grid-template-columns: auto minmax(96px,1fr) 44px;
   align-items: center;
   gap: 8px;
-  min-height: 44px
+  width: min(100%,520px);
+  min-height: 44px;
+  margin: 0 auto 8px
 }
 
-.ai-preview-title {
-  grid-column: 2;
-  margin: 0;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: #e4b400
+.ai-photos-controls,
+.ai-portrait-toggle,
+.ai-reset {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb,var(--surface) 86%,transparent);
+  color: var(--fg);
+  box-shadow: inset 0 1px 1px var(--glass-rim-top),0 .5px 1px var(--glass-shade)
 }
 
-@media(prefers-color-scheme:dark) {
-  .ai-preview-title {
-    color: #ffd60a
-  }
+.ai-photos-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 88px;
+  padding: 4px 10px;
+  border-radius: var(--capsule-radius)
+}
+
+.ai-photos-controls svg {
+  width: 18px;
+  height: 18px
+}
+
+.ai-photos-f {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1.5px solid #d9a900;
+  border-radius: 50%;
+  color: #c79500;
+  font: 700 18px/1 Georgia,serif
+}
+
+.ai-portrait-toggle {
+  justify-self: center;
+  min-width: 104px;
+  padding: 0 16px;
+  border-color: #d5a514;
+  border-radius: 13px;
+  background: linear-gradient(180deg,#ffda55,#f5bf31);
+  color: #4b3a00;
+  font-size: .8125rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase
+}
+
+.ai-portrait-toggle[aria-pressed="false"] {
+  border-color: var(--line);
+  background: color-mix(in srgb,var(--surface) 88%,transparent);
+  color: var(--muted);
+  box-shadow: inset 0 1px 1px var(--glass-rim-top)
 }
 
 .ai-reset {
@@ -278,10 +327,7 @@
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--bg);
-  color: var(--fg);
   cursor: pointer
 }
 
@@ -290,17 +336,40 @@
   height: 22px
 }
 
+.ai-photos-controls:active,
+.ai-portrait-toggle:active,
 .ai-reset:active {
-  background: var(--line)
+  transform: scale(.97);
+  background-color: var(--line)
+}
+
+.ai-photos-info {
+  width: min(100%,520px);
+  margin: -2px auto 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--surface-secondary);
+  color: var(--muted);
+  font-size: .75rem;
+  line-height: 1.4;
+  text-align: center
+}
+
+.ai-details.is-portrait-off .ai-aperture {
+  opacity: .45
 }
 
 @media(hover:hover) {
+  .ai-photos-controls:hover,
   .ai-reset:hover {
-    background: var(--line)
+    background: var(--surface-secondary)
   }
 }
 
-.ai-reset:focus-visible, .ai-preview-frame:focus-visible {
+.ai-reset:focus-visible,
+.ai-photos-controls:focus-visible,
+.ai-portrait-toggle:focus-visible,
+.ai-preview-frame:focus-visible {
   outline: 2px solid #0894ff;
   outline-offset: 3px
 }

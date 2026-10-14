@@ -66,17 +66,24 @@
   position: relative
 }
 
-/* Stage percentage or indeterminate activity, with identical ring geometry. */
+/* Overall percentage when supplied; otherwise keep the same indeterminate ring geometry. */
 .task-symbol.is-active {
   background: conic-gradient(var(--accent) var(--task-progress,0%),var(--line) 0);
   border-radius: 50%
 }
 .task-symbol.is-active::after {
-  content: '';
+  content: attr(data-progress-label);
   position: absolute;
   inset: 5px;
+  display: grid;
+  place-items: center;
   background: var(--surface);
-  border-radius: 50%
+  border-radius: 50%;
+  color: var(--fg);
+  font-size: .625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em
 }
 .task-symbol.is-active:not(.is-determinate) {
   background: conic-gradient(var(--accent) 0 25%,var(--line) 25% 100%);

@@ -51,7 +51,7 @@ function harness({blockedStorage=false,initialState=null,deferBack=false,thumbna
   for(const sheet of sheets){const button=new Element('button');button.closeButton=true;sheet.append(button);}
   const storage=new Map(),entries=[initialState];let cursor=0,pendingBack;
   const win=new EventTarget();win.scrollY=0;win.scrollTo=(_x,y)=>win.scrollY=y;
-  win.navigator={standalone};win.matchMedia=query=>({matches:standalone&&query==='(display-mode: standalone)'});
+  win.navigator={standalone};win.matchMedia=query=>({matches:query==='(prefers-reduced-motion: reduce)'||standalone&&query==='(display-mode: standalone)'});
   let intersection;
   if(thumbnails){
     win.IntersectionObserver=class {constructor(callback){intersection=callback;}observe(){}unobserve(){}};
@@ -99,17 +99,24 @@ test('current task is independent of selected photo; updates preserve the focuse
   assert.equal(task.querySelector('.task-copy>span').textContent,'Working 50%');
 });
 
-test('task indicator uses real stage percentage, stable geometry and indeterminate fallback',()=>{
+test('task indicator shows overall percentage when supplied, with stage fallback and stable geometry',()=>{
   const h=harness(),record=h.shell.register(h.row(),'stage.heic');
   const symbol=()=>h.$('task-content').firstElementChild.querySelector('.task-symbol');
   record.update('processing','Encoding 45%');
   assert.equal(symbol().css.get('--task-progress'),'45%');
+  assert.equal(symbol().dataset.progressLabel,'45%');
   assert.equal(symbol().classes.has('is-determinate'),true);
   const original=symbol();
   record.update('processing','Loading encoder');
   assert.equal(symbol(),original);
   assert.equal(symbol().classes.has('is-active'),true);
   assert.equal(symbol().classes.has('is-determinate'),false);
+  record.progress(63);
+  assert.equal(symbol().dataset.progressLabel,'63%');
+  assert.equal(symbol().css.get('--task-progress'),'63%');
+  assert.equal(symbol().classes.has('is-determinate'),true);
+  record.update('processing','Depth on GPU');
+  assert.equal(symbol().dataset.progressLabel,'63%','overall progress survives status text changes');
   record.update('ready','Ready');
   assert.equal(symbol().classes.has('is-active'),false);
   assert.equal(symbol().textContent,'✓');
@@ -251,7 +258,7 @@ test('dock clears stale offsets on resume and only lifts for a real Search keybo
   assert.equal(values.has('--dock-keyboard-offset'),false,'pagehide clears keyboard offsets');
   dispose();viewport.dispatchEvent(new Event('resize'));assert.equal(frame,null);
 });
-test('standalone dock keeps the full iPhone shell height when short content changes viewport reporting',()=>{
+test('standalone dock follows the visible layout viewport instead of overshooting to physical screen height',()=>{
   const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
   viewport.height=720;viewport.offsetTop=0;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=756;
   win.screen={height:844,availHeight:844};win.navigator={standalone:true};win.matchMedia=()=>({matches:true});
@@ -261,9 +268,9 @@ test('standalone dock keeps the full iPhone shell height when short content chan
   const doc={documentElement:{clientHeight:756},activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?{hidden:true}:input,addEventListener(){},removeEventListener(){}};
   const flush=()=>{const next=frame;frame=null;next?.();};
   const dispose=bindDockViewport({win,doc});flush();
-  assert.equal(values.get('--dock-shell-height'),'844px','screen height stabilizes a short Process screen');
+  assert.equal(values.get('--dock-shell-height'),'756px','physical screen height must not push the dock below the visible app viewport');
   win.innerHeight=720;doc.documentElement.clientHeight=720;win.dispatchEvent(new Event('resize'));flush();
-  assert.equal(values.get('--dock-shell-height'),'844px','dismissing first-run content cannot pull the dock upward');
+  assert.equal(values.get('--dock-shell-height'),'720px','dock tracks a later viewport correction instead of keeping a stale larger floor');
   dispose();
 });
 test('dock viewport enhancement is optional without VisualViewport',()=>{

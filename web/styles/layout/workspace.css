@@ -48,8 +48,8 @@
   width: 54px;
   height: 54px;
   margin-bottom: 4px;
-  background: var(--gradient);
-  color: white;
+  background: var(--icon-blue-bg);
+  color: var(--icon-blue-fg);
   border-radius: 16px
 }
 
@@ -78,6 +78,26 @@
   min-height: 64px
 }
 
+.depth-options>.ai-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px
+}
+
+.depth-options>.ai-summary>label {
+  flex: 0 1 auto;
+  min-width: 0
+}
+
+.depth-options>.ai-summary>input[type="checkbox"] {
+  flex: none
+}
+
+.depth-options>.ai-summary>.ai-settings-trigger {
+  flex: none;
+  margin-left: auto
+}
+
 .workspace>.ai-hint {
   font-size: .8125rem;
   margin: 0 8px 6px;
@@ -86,41 +106,47 @@
 
 .photo-format-tip {
   display: grid;
-  grid-template-columns: 18px minmax(0,1fr);
-  gap: 9px;
-  margin: 12px 8px 10px;
-  padding: 12px 12px 10px;
+  grid-template-columns: 17px minmax(0,1fr) auto;
+  align-items: start;
+  gap: 8px;
+  margin: 10px 8px 8px;
+  padding: 10px 10px 10px 11px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--surface-secondary);
-  font-size: .8125rem
+  font-size: .78125rem
 }
 
 .photo-format-tip>svg {
-  width: 18px;
-  height: 18px;
-  margin-top: 3px;
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
   color: var(--accent-text)
 }
 
 .photo-format-tip p {
   color: var(--muted);
-  margin: 4px 0 0
+  margin: 3px 0 0;
+  line-height: 1.35
 }
 
 .photo-format-tip button {
-  grid-column: 2;
-  justify-self: start;
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
   min-height: 44px;
-  padding: 0 8px 0 0;
+  padding: 0 2px 0 8px;
   background: none;
   border: 0;
   color: var(--accent-text);
-  font-weight: 600
+  font-weight: 600;
+  white-space: nowrap
 }
 
 .ai-settings-trigger {
-  justify-self: end
+  position: relative;
+  justify-self: end;
+  overflow: visible
 }
 
 .ai-settings-discovery {
@@ -199,6 +225,7 @@
 
 @media(prefers-reduced-motion:reduce) {
   .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger,
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger::before,
   .ai-settings-discovery:not([hidden]) .ai-discovery-pill { animation: none }
 }
 
@@ -208,25 +235,36 @@
   }
 }
 
+@keyframes ai-settings-ring-spin {
+  0% { opacity: 0; transform: rotate(0deg) scale(.94) }
+  14% { opacity: 1; transform: rotate(70deg) scale(1.04) }
+  72% { opacity: 1; transform: rotate(560deg) scale(1.01) }
+  100% { opacity: 1; transform: rotate(720deg) scale(1) }
+}
+
 @media(max-width:767px) {
   .depth-options>.portrait-option {
     gap: 8px
   }
   .ai-settings-discovery {
-    padding-top: 0
+    display: none!important
   }
-  .ai-discovery-pill {
-    min-height: 26px;
-    gap: 5px;
-    padding: 3px 8px;
-    font-size: .6875rem
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger {
+    animation: none
   }
-  .ai-discovery-spark {
-    width: 13px;
-    height: 13px
-  }
-  .ai-discovery-arrow {
-    display: none
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    padding: 2px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg,var(--ai-blue),var(--ai-violet) 34%,var(--ai-coral) 68%,var(--ai-amber) 84%,var(--ai-blue));
+    -webkit-mask: linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    transform-origin: center;
+    animation: ai-settings-ring-spin 1.8s cubic-bezier(.18,.76,.2,1) both
   }
   .depth-options>.portrait-option label {
     flex: 1;

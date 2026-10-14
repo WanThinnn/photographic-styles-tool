@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v173`;
+const CACHE_NAME = `${CACHE_PREFIX}v177`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -97,6 +97,7 @@ const APP_SHELL = [
   "./src/dng/model-download.js",
   "./manifest.webmanifest",
   "./icons/photographic-styles.svg",
+  "./icons/photographic-styles-dark.svg",
   "./icons/icon-180.png",
   "./icons/apple-touch-icon.png",
   "./icons/apple-touch-icon-v2.png",

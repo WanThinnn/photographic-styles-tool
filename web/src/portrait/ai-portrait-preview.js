@@ -46,7 +46,7 @@ function apertureControl(input,strings){
     input.value=String(next);input.dispatchEvent(new Event('input',{bubbles:true}));
   };
   track.addEventListener('pointerdown',event=>{
-    if(event.button!==0||event.isPrimary===false)return;
+    if(input.disabled||event.button!==0||event.isPrimary===false)return;
     const rect=track.getBoundingClientRect(),center=rect.left+rect.width/2,startIndex=Number(input.value);
     drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,startIndex,center,moved:false,captured:false};
     input.focus({preventScroll:true});active(true);
@@ -104,16 +104,37 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
   const reset=document.createElement('button');reset.type='button';reset.className='ai-reset';reset.title=strings.reset;reset.setAttribute('aria-label',strings.reset);
   reset.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4M4 7h8a8 8 0 1 1-8 8"/></svg>';
   const toolbar=document.createElement('div');toolbar.className='ai-preview-toolbar';
-  const title=document.createElement('h3');title.className='ai-preview-title';title.textContent=strings.preview;
+  const photos=document.createElement('button');photos.type='button';photos.className='ai-photos-controls';photos.setAttribute('aria-expanded','false');photos.setAttribute('aria-label',strings.photosEdit);
+  photos.innerHTML='<span class="ai-photos-f" aria-hidden="true">ƒ</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>';
+  const portraitToggle=document.createElement('button');portraitToggle.type='button';portraitToggle.className='ai-portrait-toggle';portraitToggle.textContent=strings.preview;portraitToggle.setAttribute('aria-pressed','true');portraitToggle.setAttribute('aria-label',strings.portraitToggle);
   const progress=document.createElement('span');progress.className='ai-preview-progress';progress.hidden=true;progress.setAttribute('role','status');
   const spinner=document.createElement('span');spinner.className='ai-spinner';spinner.setAttribute('aria-hidden','true');
   spinner.innerHTML='<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><circle cx="20" cy="20" r="15" opacity=".18"/><path d="M20 5a15 15 0 1 1-15 15" opacity=".75"/></svg>';
   const progressLabel=document.createElement('span');progressLabel.className='ai-accessible-text';progressLabel.textContent=strings.updating;
-  progress.append(spinner,progressLabel);toolbar.append(progress,title,reset);
+  progress.append(spinner,progressLabel);
+  const photosInfo=document.createElement('p');photosInfo.className='ai-photos-info';photosInfo.textContent=strings.photosEditHint;photosInfo.hidden=true;
+  toolbar.append(photos,portraitToggle,reset,progress);
   const state=document.createElement('p');state.className='ai-preview-state';state.setAttribute('role','status');
-  host.append(toolbar,frame,instruction,aperture.element,state);
-  const showUpdating=busy=>{progress.hidden=!busy;host.setAttribute('aria-busy',String(busy));};
-  let x=.5,y=.5,displayX=.5,displayY=.5,pending=null,timer=null,version=0,disposed=false,lastCommitted=0,inFlight=null;
+  host.append(toolbar,photosInfo,frame,instruction,aperture.element,state);
+  const showUpdating=busy=>{progress.hidden=!busy;photos.hidden=busy;host.setAttribute('aria-busy',String(busy));};
+  let x=.5,y=.5,displayX=.5,displayY=.5,pending=null,timer=null,version=0,disposed=false,lastCommitted=0,inFlight=null,lastPortraitAperture=DEFAULT_APERTURE;
+  const syncPortraitState=()=>{
+    const enabled=selectedAperture(blur)!==null;
+    portraitToggle.setAttribute('aria-pressed',String(enabled));
+    portraitToggle.title=enabled?strings.portraitOn:strings.portraitOff;
+    host.classList.toggle('is-portrait-off',!enabled);
+    blur.disabled=!enabled;
+  };
+  photos.addEventListener('click',()=>{
+    const expanded=photos.getAttribute('aria-expanded')!=='true';
+    photos.setAttribute('aria-expanded',String(expanded));photosInfo.hidden=!expanded;
+  });
+  portraitToggle.addEventListener('click',()=>{
+    const enabled=selectedAperture(blur)!==null;
+    if(enabled){lastPortraitAperture=Number(blur.value);blur.value=String(APERTURES.length-1);}
+    else blur.value=String(lastPortraitAperture);
+    aperture.update();syncPortraitState();changed();commit();
+  });
   const writeLatest=latestSettingsWriter(({chosen,current},isLatest)=>onSettings(chosen,()=>!disposed&&version===current&&isLatest()));
   // The saved HEIC always starts with Portrait off and keeps editable depth.
   // Off is a preview state, not an invalid zero aperture in its depth metadata.
@@ -152,8 +173,10 @@ export function portraitPreview(result,host,strings,onSettings,{onPending=()=>{}
     const delta={ArrowLeft:[-.025,0],ArrowRight:[.025,0],ArrowUp:[0,-.025],ArrowDown:[0,.025]}[e.key];
     if(delta){e.preventDefault();focus(displayX+delta[0],displayY+delta[1]);}
   });
-  blur.addEventListener('input',changed);blur.addEventListener('change',commit);
-  reset.addEventListener('click',()=>{blur.value=String(DEFAULT_APERTURE);aperture.update();focus(.5,.5);commit();});draw();
+  blur.addEventListener('input',()=>{if(selectedAperture(blur)!==null)lastPortraitAperture=Number(blur.value);syncPortraitState();changed();});
+  blur.addEventListener('change',commit);
+  reset.addEventListener('click',()=>{blur.value=String(DEFAULT_APERTURE);lastPortraitAperture=DEFAULT_APERTURE;aperture.update();syncPortraitState();focus(.5,.5);commit();});
+  syncPortraitState();draw();
   // Histories can contain many photos. Keep live GPU contexts only for previews
   // that are visible; their canvas snapshots and settings survive suspension.
   const observer=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{host.classList.toggle('is-suspended',!entries[0].isIntersecting);if(!entries[0].isIntersecting)releaseRenderer();}):null;

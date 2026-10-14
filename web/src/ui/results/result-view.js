@@ -88,6 +88,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     }
     const ui={
       cleanup(fn){cleanups.add(fn);},
+      progress(value){presentation?.progress?.(value);},
       dispose(){
         if(disposed)return;disposed=true;
         presentation?.dispose();

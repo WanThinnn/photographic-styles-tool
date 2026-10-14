@@ -1,4 +1,4 @@
-Stylio — third-party notices
+Stylio - sthird-party notices
 
 Glass material and control styling adapted from ionic-theme-ios27.
 Source: https://github.com/rdlabo-dev/ionic-theme-ios27

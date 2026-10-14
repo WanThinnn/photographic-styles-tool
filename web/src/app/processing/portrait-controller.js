@@ -15,15 +15,15 @@ export function createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcce
     if (aiFeatures.enabled('portrait')&&!candidate.skip) await runAiCandidate(candidate);
     else {
       if(candidate.skip){candidate.state='skipped';ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');}
-      ui.output(outputFile);ui.aiBusy(false);
+      ui.output(outputFile);ui.progress?.(100);ui.aiBusy(false);
     }
   }
 
   async function runAiCandidate(candidate) {
     if (!aiFeatures.enabled('portrait') || !['new', 'failed'].includes(candidate.state)) return;
     const {ui, name, sourceFile} = candidate;
-    if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.aiBusy(false); return; }
-    candidate.state = 'running'; ui.aiState(aiText().loading);
+    if (candidate.skip) { candidate.state = 'skipped'; ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');ui.progress?.(100);ui.aiBusy(false); return; }
+    candidate.state = 'running'; ui.progress?.(90);ui.aiState(aiText().loading);
     ui.note('', 'ai-error');
     ui.aiBusy(true);
     const controller=new AbortController();candidate.controller=controller;
@@ -45,11 +45,13 @@ export function createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcce
       if(aiFeatures.enabled('style'))await import('../../recommend/style-runtime.js').then(({releaseStyleRecommender})=>releaseStyleRecommender()).catch(()=>{});
       const result = await createAiPortrait(data,(stage,progress)=>{
         lastStage=stage;
-        if(['download','modelDownload'].includes(stage)&&progress?.loaded){const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
+        const stageProgress={loading:90,modelLoading:92,modelCache:92,modelCacheWarning:92,qualityFallback:93,inference:94,inferenceCpu:94,refining:96}[stage];
+        if(stageProgress!==undefined)ui.progress?.(stageProgress);
+        if(['download','modelDownload'].includes(stage)&&progress?.loaded){const ratio=progress.total?Math.max(0,Math.min(1,progress.loaded/progress.total)):0;ui.progress?.(90+ratio*3);const percent=progress.total?` ${Math.min(100,Math.round(progress.loaded/progress.total*100))}%`:'';
           ui.aiState(`${aiText().modelDownload}${percent} · ${formatBytes(progress.loaded)}`);
         }else ui.aiState(stage==='inference'&&provider==='wasm'?aiText().inferenceCpu:aiText()[stage]||aiText().loading);
       },sourceFile,{signal:controller.signal,provider,modelId});
-      lastStage='encoding';ui.aiState(aiText().encoding);
+      lastStage='encoding';ui.progress?.(98);ui.aiState(aiText().encoding);
       const output=await exportAiPortrait(result,()=>{}, {signal:controller.signal});
       ui.cleanup(output.dispose);
       controller.signal.throwIfAborted();
@@ -65,7 +67,7 @@ export function createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcce
       catch(error){console.warn('Portrait preview unavailable; edit focus in Photos',error);}
       candidate.state = 'done';
       ui.aiView(aiFeatures.enabled('portrait'));
-      if(aiFeatures.enabled('portrait')){ui.aiState('');ui.note(aiText().ready,'ai');}
+      if(aiFeatures.enabled('portrait')){ui.progress?.(100);ui.aiState('');ui.note(aiText().ready,'ai');}
     } catch(error) {
       candidate.state = error.name==='AbortError'?'new':'failed';
       console.warn('Optional AI Portrait failed',error);
@@ -76,7 +78,7 @@ export function createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcce
       // Publish the normal fallback only after AI failed/cancelled. Never expose
       // it between Styles processing and the requested Portrait result.
       if(!candidate.aiFile||!aiFeatures.enabled('portrait'))ui.output(candidate.outputFile);
-      ui.aiBusy(false);
+      ui.progress?.(100);ui.aiBusy(false);
     }
   }
 

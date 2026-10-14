@@ -51,7 +51,7 @@ export function bindTabGlass({nav,tabs,select,win=window,doc=document}){
     nav.style.removeProperty('--lens-offset');
     if(cancel||reduced()){reset();return;}
     nav.classList.add('is-releasing');
-    timer=win.setTimeout(()=>{timer=null;reset();},220);
+    timer=win.setTimeout(()=>{timer=null;reset();},440);
   };
   const down=event=>{
     if(pointer||event.button!==0||event.isPrimary===false)return;

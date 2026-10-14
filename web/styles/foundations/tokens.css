@@ -32,6 +32,7 @@
   --glass-outline: #00000038;
   --glass-shade: #0000000a;
   --selection-fill: #0000000f;
+  --selection-active-fill: #ffffff8f;
   --ok: #23764c;
   --err: #b32a3b;
   --ai-blue: var(--blue-600);
@@ -59,6 +60,19 @@
   --appearance-icon-bg: linear-gradient(145deg,#282b31 0%,#08090b 62%,#15171b 100%);
   --appearance-icon-fg: #fff;
   --appearance-icon-half: #fff;
+  --icon-blue-bg: linear-gradient(155deg,var(--icon-blue-a),var(--icon-blue-b));
+  --icon-green-bg: linear-gradient(155deg,var(--icon-green-a),var(--icon-green-b));
+  --icon-amber-bg: linear-gradient(155deg,var(--icon-amber-a),var(--icon-amber-b));
+  --icon-violet-bg: linear-gradient(155deg,var(--icon-violet-a),var(--icon-violet-b));
+  --icon-purple-bg: linear-gradient(145deg,var(--icon-purple-a),var(--icon-purple-b));
+  --icon-orange-bg: linear-gradient(145deg,var(--icon-orange-a),var(--icon-orange-b));
+  --icon-blue-fg: #fff;
+  --icon-green-fg: #fff;
+  --icon-amber-fg: #fff;
+  --icon-violet-fg: #fff;
+  --icon-purple-fg: #fff;
+  --icon-orange-fg: #fff;
+  --icon-dark-tile: linear-gradient(145deg,#2b2b2f 0%,#171719 56%,#0d0d0f 100%);
   --card-radius: 28px;
   --control-radius: 999px;
   --capsule-radius: 999px;
@@ -85,7 +99,8 @@
   --glass-rim-bottom: #ffffff24;
   --glass-outline: #ffffff20;
   --glass-shade: #0003;
-  --selection-fill: #ffffff24;
+  --selection-fill: #0000005c;
+  --selection-active-fill: #08080bd9;
   --switch-track: #78788066;
   --ok: #83d6a7;
   --err: #ff9ca9;
@@ -106,9 +121,21 @@
   --icon-detail-orange: #ff9f0a;
   --icon-detail-green: #30d158;
   --icon-tile-shadow: inset 0 1px 1px #ffffff2b,0 .5px 1px #00000066;
-  --appearance-icon-bg: linear-gradient(145deg,#f2f2f7 0%,#d8d8de 100%);
-  --appearance-icon-fg: #111;
-  --appearance-icon-half: #111;
+  --appearance-icon-bg: var(--icon-dark-tile);
+  --appearance-icon-fg: #f5f5f7;
+  --appearance-icon-half: #f5f5f7;
+  --icon-blue-bg: var(--icon-dark-tile);
+  --icon-green-bg: var(--icon-dark-tile);
+  --icon-amber-bg: var(--icon-dark-tile);
+  --icon-violet-bg: var(--icon-dark-tile);
+  --icon-purple-bg: var(--icon-dark-tile);
+  --icon-orange-bg: var(--icon-dark-tile);
+  --icon-blue-fg: #0a84ff;
+  --icon-green-fg: #30d158;
+  --icon-amber-fg: #ff9f0a;
+  --icon-violet-fg: #bf5af2;
+  --icon-purple-fg: #bf5af2;
+  --icon-orange-fg: #ff9f0a;
     --focus-ring: #63beff;
   }
 }
@@ -128,7 +155,8 @@
   --glass-rim-bottom: #ffffff24;
   --glass-outline: #ffffff20;
   --glass-shade: #0003;
-  --selection-fill: #ffffff24;
+  --selection-fill: #0000005c;
+  --selection-active-fill: #08080bd9;
   --switch-track: #78788066;
   --ok: #83d6a7;
   --err: #ff9ca9;
@@ -149,9 +177,21 @@
   --icon-detail-orange: #ff9f0a;
   --icon-detail-green: #30d158;
   --icon-tile-shadow: inset 0 1px 1px #ffffff2b,0 .5px 1px #00000066;
-  --appearance-icon-bg: linear-gradient(145deg,#f2f2f7 0%,#d8d8de 100%);
-  --appearance-icon-fg: #111;
-  --appearance-icon-half: #111;
+  --appearance-icon-bg: var(--icon-dark-tile);
+  --appearance-icon-fg: #f5f5f7;
+  --appearance-icon-half: #f5f5f7;
+  --icon-blue-bg: var(--icon-dark-tile);
+  --icon-green-bg: var(--icon-dark-tile);
+  --icon-amber-bg: var(--icon-dark-tile);
+  --icon-violet-bg: var(--icon-dark-tile);
+  --icon-purple-bg: var(--icon-dark-tile);
+  --icon-orange-bg: var(--icon-dark-tile);
+  --icon-blue-fg: #0a84ff;
+  --icon-green-fg: #30d158;
+  --icon-amber-fg: #ff9f0a;
+  --icon-violet-fg: #bf5af2;
+  --icon-purple-fg: #bf5af2;
+  --icon-orange-fg: #ff9f0a;
   --focus-ring: #63beff;
 }
 :root[data-theme="light"] { color-scheme: light }

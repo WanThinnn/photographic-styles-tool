@@ -204,18 +204,28 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     icon.textContent=active?'':record.state==='ready'?'✓':record.state==='failed'?'!':'◷';
   }
   function card(record,{history=false}={}){
-    const button=doc.createElement('button');button.type='button';button.className='task-card';
+    const card=doc.createElement('div');card.className='task-card';card.dataset.state=record.state;
+    const open=doc.createElement('button');open.type='button';open.className='task-open';
     const icon=doc.createElement('span');icon.className='task-symbol';icon.setAttribute('aria-hidden','true');updateTaskIndicator(icon,record);
     const copy=doc.createElement('span');copy.className='task-copy';
     const name=doc.createElement('strong');name.textContent=record.name;
     const status=doc.createElement('span');status.textContent=record.status||translate('shell.queued');
     copy.append(name,status);
     if(history&&record.thumbnail){
-      const image=doc.createElement('img');image.className='task-thumbnail';image.alt='';image.src=record.thumbnail;image.setAttribute('aria-hidden','true');button.append(image);
-    }else button.append(icon);
-    button.append(copy);
-    const arrow=doc.createElement('span');arrow.className='task-chevron';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');button.append(arrow);
-    button.dataset.state=record.state;button.addEventListener('click',()=>openPhoto(record.id));return button;
+      const image=doc.createElement('img');image.className='task-thumbnail';image.alt='';image.src=record.thumbnail;image.setAttribute('aria-hidden','true');open.append(image);
+    }else open.append(icon);
+    open.append(copy);
+    if(record.state==='ready'&&record.quickAction){
+      const quick=doc.createElement('button');quick.type='button';quick.className='task-quick-action';quick.setAttribute('aria-label',record.quickLabel||translate(record.quickKind==='share'?'shell.quickshare':'shell.quickdownload'));
+      quick.innerHTML=record.quickKind==='share'
+        ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>'
+        :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>';
+      quick.addEventListener('click',event=>{event.stopPropagation();void record.quickAction();});card.append(open,quick);
+    }else{
+      const arrow=doc.createElement('span');arrow.className='task-chevron';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');open.append(arrow);card.append(open);
+    }
+    card.addEventListener('click',()=>openPhoto(record.id));
+    return card;
   }
   function render(){
     const all=[...records.values()];
@@ -241,12 +251,14 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     $('current-task').hidden=!all.length;
     // The running task is not coupled to whichever older photo is being edited.
     const current=all.find(record=>!['ready','failed','info'].includes(record.state))||all.at(-1);
-    const task=$('task-content'),next=current?card(current):null;
-    if(next&&task.firstElementChild?.dataset.result===current.id){
-      task.firstElementChild.querySelector('.task-copy>span').textContent=current.status||translate('shell.queued');
-      task.firstElementChild.querySelector('.task-copy>strong').textContent=current.name;
-      updateTaskIndicator(task.firstElementChild.querySelector('.task-symbol'),current);
-      task.firstElementChild.dataset.state=current.state;
+    const task=$('task-content'),next=current?card(current):null,currentCard=task.firstElementChild;
+    const wantsQuick=Boolean(current?.state==='ready'&&current.quickAction);
+    const hasQuick=Boolean(currentCard?.querySelector('.task-quick-action'));
+    if(next&&currentCard?.dataset.result===current.id&&wantsQuick===hasQuick){
+      currentCard.querySelector('.task-copy>span').textContent=current.status||translate('shell.queued');
+      currentCard.querySelector('.task-copy>strong').textContent=current.name;
+      updateTaskIndicator(currentCard.querySelector('.task-symbol'),current);
+      currentCard.dataset.state=current.state;
     }else{
       if(next){next.dataset.result=current.id;next.querySelector('.task-copy>span').setAttribute('role','status');}
       task.replaceChildren(...(next?[next]:[]));
@@ -272,6 +284,8 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       return {
         update(state,status){record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;render();},
         progress(value){record.progress=Number.isFinite(value)?Math.max(0,Math.min(100,value)):null;render();},
+        quickAction(kind,run,label=''){record.quickKind=kind;record.quickAction=run;record.quickLabel=label;render();},
+        source(file){record.sourceFile=file?.type==='video/quicktime'?null:file;record.thumbnail=null;record.thumbnailAttempted=false;if(record.historyCard&&thumbnailObserver&&record.sourceFile)thumbnailObserver.observe(record.historyCard);render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();
           observer?.disconnect();

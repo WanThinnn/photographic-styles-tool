@@ -266,10 +266,35 @@ body.is-settings-destination .top-github-symbol {
 }
 
 #boot {
-  color: var(--muted);
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  background: linear-gradient(100deg,var(--ai-blue),var(--ai-violet) 42%,var(--ai-coral) 68%,var(--ai-blue));
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
   font-size: .875rem;
+  font-weight: 650;
   text-align: center;
-  margin: 0
+  animation: boot-gradient-flow 3.2s ease-in-out infinite,boot-soft-pulse 1.8s ease-in-out infinite
+}
+
+#boot.err {
+  background: none;
+  color: var(--err);
+  animation: none
+}
+
+@keyframes boot-gradient-flow {
+  0%,100% { background-position: 0 50% }
+  50% { background-position: 100% 50% }
+}
+
+@keyframes boot-soft-pulse {
+  0%,100% { opacity: .72 }
+  50% { opacity: 1 }
 }
 
 #boot:empty {

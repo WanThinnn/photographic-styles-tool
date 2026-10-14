@@ -8,7 +8,7 @@ import {createAiFeatureControls} from '../../web/src/ui/ai-feature-controls.js';
 // decoding photos. Domain factories are injected at the module boundary.
 const source=readFileSync(new URL('../../web/src/app/application.js',import.meta.url),'utf8')
   .replace(/^import .*;\n/gm,'').replace('export function startApplication','function startApplication');
-function harness({manualQueue=false}={}){
+function harness({manualQueue=false,historyEntries=[]}={}){
   const nodes=new Map(),calls=[],captured={},batches=new Map();
   function batchFor(name){
     if(!batches.has(name)){
@@ -47,7 +47,9 @@ function harness({manualQueue=false}={}){
     createPhotoAnalysis:deps=>{captured.analysis=deps;return {kind:'analysis'};},
     createLivePhotoSession:deps=>{captured.live=deps;return {liveMovies:new Map(),livePhotos:[],attachMovie(){},handleMovie(){}};},
     createProfileRepository:()=>({preload:async()=>calls.push(['profiles']),ensureProfileIndex(){},getProfile(){}}),
-    createResultView:deps=>{captured.results=deps;return ()=>{};},
+    createHistoryStore:()=>({list:async()=>historyEntries,clear:async()=>calls.push(['history-clear']),remove:async()=>{},save:async()=>{}}),
+    restoredFile:entry=>entry?.file||null,
+    createResultView:deps=>{captured.results=deps;return (name,file,options={})=>{const item={name,file,options,outputs:[],states:[]};(captured.rows??=[]).push(item);return {output:(...args)=>item.outputs.push(args),set:(...args)=>item.states.push(args)};};},
     createPortraitController:deps=>{captured.portrait=deps;return {tryAiPortrait(){},runAiCandidate(){}};},
     createFileProcessor:deps=>{captured.processing=deps;return {handleFiles:async files=>{
       const batch=batchFor(files[0]);calls.push(['start',files[0]]);batch.start();
@@ -104,6 +106,21 @@ test('three-stop model range updates the displayed name and the actual processin
     assert.equal(h.node('depth-model-value').textContent,name);
     assert.equal(h.node('depth-model').parentElement.dataset.level,String(index));
   }
+});
+
+test('persistent history is restored as ready downloadable results without reprocessing',async()=>{
+  const file={name:'saved-result.heic',type:'image/heic',size:4096};
+  const h=harness({historyEntries:[{id:'persisted-1',name:'original.heic',file}]});await h.start();
+  assert.equal(h.captured.rows.length,1);
+  assert.equal(h.captured.rows[0].name,'original.heic');
+  assert.equal(h.captured.rows[0].options.historyId,'persisted-1');
+  assert.equal(h.captured.rows[0].options.restored,true);
+  assert.equal(h.captured.rows[0].outputs.length,1);
+  assert.equal(h.captured.rows[0].outputs[0][0],file);
+  assert.equal(h.captured.rows[0].outputs[0][1].metadata,false);
+  assert.equal(h.captured.rows[0].outputs[0][1].persist,false);
+  assert.equal(h.captured.rows[0].states[0][0],'st.ready');
+  assert.equal(h.captured.rows[0].states[0][1],'ok');
 });
 
 test('clearing history releases result cleanups and clears the shared Live Photo/AI session',async()=>{

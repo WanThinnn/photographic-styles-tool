@@ -43,10 +43,13 @@ test('four-tab floating dock has a separate search action and material fallbacks
 test('AI summary keeps the switch beside its label while pinning Settings to the trailing edge',()=>{
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
   const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*gap: 10px/s);
   assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-trigger \{[^}]*margin-left: auto/s);
   assert.doesNotMatch(workspace,/\.ai-settings-trigger \{[^}]*position: absolute/);
   assert.match(workspace,/ai-settings-discovery-nudge/);
+  assert.match(html,/id="enhance-ai"[^>]*>[\s\S]*?id="ai-settings-discovery"[\s\S]*?id="open-ai-settings"/);
+  assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-discovery:not\(\[hidden\]\)\+\.ai-settings-trigger \{[^}]*margin-left: 0/s);
   assert.doesNotMatch(workspace,/ai-settings-discovery:not\(\[hidden\]\)[^}]*outline: 1px solid var\(--ai-violet\)/s);
   assert.match(controls,/grid-template-columns: minmax\(0,1fr\) minmax\(120px,46%\)/);
   assert.match(controls,/@container/);
@@ -81,7 +84,7 @@ test('standalone shell keeps the intro visible, centers its copy, and anchors th
   assert.doesNotMatch(layout,/\.has-used-app \.intro/);
   assert.match(layout,/\.intro \{[^}]*text-align: center/s);
   assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*position: fixed;[^}]*top: calc\(var\(--dock-viewport-bottom,var\(--dock-shell-height,100lvh\)\)[^}]*transform: translate\(-50%,-100%\)/s);
-  assert.match(i18n,/Add Styles, Texture and Grain\.<br>Privately, on your device\./);
+  assert.match(i18n,/Portrait Lighting, Styles, Texture and Grain\.<br>Privately, on your device\./);
   assert.equal([...html.matchAll(/class="icon-button glass-surface"[^>]*><svg/g)].length>=2,true);
 });
 
@@ -111,11 +114,12 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   const css=readFileSync(new URL('../../web/styles/components/portrait-editor.css',import.meta.url),'utf8');
   const js=readFileSync(new URL('../../web/src/portrait/ai-portrait-preview.js',import.meta.url),'utf8');
   const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
-  assert.match(css,/\.ai-preview-toolbar \{[^}]*grid-template-columns: auto minmax\(96px,1fr\) 44px/s);
-  assert.match(css,/\.ai-portrait-toggle \{[^}]*background: linear-gradient\(180deg,#ffda55,#f5bf31\)/s);
+  assert.match(css,/\.ai-preview-toolbar \{[^}]*grid-template-columns: 1fr auto 1fr/s);
+  assert.match(css,/\.ai-portrait-toggle \{[^}]*border-radius: var\(--capsule-radius\);[^}]*background: linear-gradient\(180deg,#ffdf62/s);
   assert.match(css,/\.ai-portrait-toggle\[aria-pressed="false"\] \{[^}]*color: var\(--muted\)/s);
   assert.match(css,/\.result-details \+ \.ai-details \{[^}]*margin-top: -8px/s);
   assert.match(js,/className='ai-photos-controls'/);
+  assert.match(js,/class="ai-depth-effect-symbol"/);
   assert.match(js,/className='ai-portrait-toggle'/);
   assert.match(js,/portraitToggle\.setAttribute\('aria-pressed',String\(enabled\)\)/);
   assert.match(js,/photosInfo\.hidden=!expanded/);
@@ -139,7 +143,11 @@ test('settings follows iOS grouped rows with language navigation, appearance pre
   assert.match(html,/class="appearance-segment"/);
   assert.match(html,/settings\.defaultsave/);
   assert.match(html,/settings\.keepscreen/);
+  assert.match(html,/id="result-preview"/);
+  assert.match(html,/settings\.resultpreviewhint/);
   assert.match(html,/settings\.originalformat/);
+  assert.equal([...html.matchAll(/class="ai-option-icon /g)].length,5);
+  assert.match(html,/settings-icon-github/);
   assert.match(sheets,/\.language-row #lang \{[^}]*appearance: none/s);
   assert.match(sheets,/\.settings-leading-icon/);
   assert.match(layout,/\.top-github-symbol \{[^}]*translateY\(-22px\)/s);
@@ -148,6 +156,7 @@ test('settings follows iOS grouped rows with language navigation, appearance pre
   assert.match(html,/id="refresh-app"/);
   assert.match(html,/id="version">1\.0\.0</);
   assert.match(bootstrap,/registration\?\.update\?\.\(\)/);
+  assert.match(bootstrap,/stylio-result-preview-v1/);
   assert.match(bootstrap,/photographic-style-port-/);
 });
 
@@ -157,6 +166,7 @@ test('first-run notice is a single grouped card and appearance controls are inte
   const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
+  const shellLayout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   assert.match(workspace,/\.photo-format-tip \{[^}]*grid-template-columns: 17px minmax\(0,1fr\) auto;[^}]*border-radius: 16px;[^}]*background: var\(--surface-secondary\)/s);
   assert.match(workspace,/\.photo-format-tip button \{[^}]*grid-column: 3;[^}]*min-height: 44px/s);
   assert.match(html,/data-theme-value="light"/);
@@ -168,6 +178,8 @@ test('first-run notice is a single grouped card and appearance controls are inte
   assert.match(bootstrap,/theme-transition/);
   assert.match(bootstrap,/animate:true/);
   assert.match(base,/html\.theme-transition body/);
+  assert.match(shellLayout,/#boot \{[^}]*background: linear-gradient\(100deg,var\(--ai-blue\),var\(--ai-violet\)/s);
+  assert.match(shellLayout,/@keyframes boot-soft-pulse/);
   assert.match(sheets,/\.settings-row-stack/);
   assert.match(html,/id="header-guide" class="icon-button top-guide glass-surface"/);
 });
@@ -249,9 +261,9 @@ test('photo actions use a compact liquid-glass capsule that expands on interacti
   const shell=readFileSync(new URL('../../web/src/ui/shell/app-shell.js',import.meta.url),'utf8');
   const action=results.match(/\.photo-workspace \.act \{([^}]+)\}/)[1];
   assert.match(action,/bottom: max\(18px/);
-  assert.match(action,/width: min\(440px,calc\(100% - 88px\)\)/);
-  assert.match(action,/border-radius: 24px/);
-  assert.match(results,/\.photo-workspace \.act\.is-expanded \{[^}]*width: min\(720px,calc\(100% - 32px\)\)[^}]*border-radius: 28px/s);
+  assert.match(action,/width: min\(380px,calc\(100% - 112px\)\)/);
+  assert.match(action,/border-radius: 22px/);
+  assert.match(results,/\.photo-workspace \.act\.is-expanded \{[^}]*width: min\(660px,calc\(100% - 32px\)\)[^}]*border-radius: 26px/s);
   assert.match(shell,/actions\?\.addEventListener\('pointerdown',expandActions/);
   assert.match(shell,/photo\.addEventListener\('scroll',collapseActions/);
   assert.doesNotMatch(action,/border-top:/);

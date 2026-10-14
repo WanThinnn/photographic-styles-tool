@@ -1,7 +1,7 @@
 // Result DOM and output lifetime. Processing is supplied by the controller.
 import {describeInWorker} from '../../media/heic-processing.js';
 import {formatBytes} from '../result-metadata.js';
-export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell}){
+export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell,historyStore,previewEnabled=()=>true}){
   const detailIcon=key=>({
     'group.details':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/><circle cx="18" cy="17" r="2"/></svg>',
     'group.processing':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h7m4 0h5M4 12h3m4 0h9M4 17h9m4 0h3"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="17" r="2"/></svg>',
@@ -13,7 +13,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     'meta.resources':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16Z"/></svg>',
     'meta.capture':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>'
   }[key]||'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg>');
-  function row(name,sourceFile) {
+  function row(name,sourceFile,{historyId=(globalThis.crypto?.randomUUID?.()||`history-${Date.now()}-${Math.random().toString(16).slice(2)}`),restored=false}={}) {
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `<div class="result-header"><div class="name"></div><div class="status"></div></div><div class="act"></div>`;
@@ -55,7 +55,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       const details=el.querySelector('.result-details');
       if(details&&!details.querySelector('.detail-group'))details.remove();
     };
-    if(sourceFile&&sourceFile.type!=='video/quicktime'){
+    if(previewEnabled()&&sourceFile&&sourceFile.type!=='video/quicktime'){
       const figure=document.createElement('figure');figure.className='source-preview';
       const image=document.createElement('img');image.alt=name;image.loading='lazy';image.decoding='async';
       const url=URL.createObjectURL(sourceFile);image.src=url;resultUrls.add(url);
@@ -92,6 +92,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       dispose(){
         if(disposed)return;disposed=true;
         presentation?.dispose();
+        void historyStore?.remove?.(historyId);
         for(const cleanup of cleanups)cleanup();cleanups.clear();resultCleanups.delete(ui.dispose);
         for(const a of el.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
         for(let i=aiCandidates.length-1;i>=0;i--)if(aiCandidates[i].ui===ui){aiCandidates[i].controller?.abort();aiCandidates[i].state='removed';aiCandidates.splice(i,1);}
@@ -143,8 +144,9 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       },
       aiView(visible) { const view=el.querySelector('.ai-details');if(view)view.style.display=visible?'':'none';const source=el.querySelector('.source-preview');if(source)source.hidden=visible||source.dataset.unavailable==='true'; },
       async portraitPreview(result,onSettings) {
-        const {portraitPreview}=await import('../../portrait/ai-portrait-preview.js');
         el.querySelector('.ai-details')?.remove();
+        if(!previewEnabled()){this.note('','preview');return;}
+        const {portraitPreview}=await import('../../portrait/ai-portrait-preview.js');
         const source=el.querySelector('.source-preview');if(source)source.hidden=true;
         const host=document.createElement('section');host.className='ai-details';host.setAttribute('aria-label',aiText().preview);
         el.insertBefore(host,el.querySelector('.act'));
@@ -160,16 +162,30 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         for(const button of el.querySelectorAll('.act button'))button.disabled=pending;
         for(const link of el.querySelectorAll('.act a')){link.setAttribute('aria-disabled',String(pending));link.tabIndex=pending?-1:0;}
       },
-      output(file,{metadata=true}={}) {
+      output(file,{metadata=true,persist=true}={}) {
         if(disposed)return;
         const host=actions('normal');
         for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
         host.replaceChildren();
-        if(navigator.canShare?.({files:[file]})){
+        const canShare=Boolean(navigator.canShare?.({files:[file]}));
+        if(canShare){
           this.share(file,!!this.liveIdentifier);
           this.note(T('shell.sharehint'),'save');
-        }else this.note('','save');
+          presentation?.quickAction?.('share',async()=>{
+            try{await navigator.share({files:[file]});}
+            catch(error){if(error?.name!=='AbortError')console.warn('Quick share unavailable',error);}
+          },T('shell.quickshare'));
+        }else{
+          this.note('','save');
+          presentation?.quickAction?.('download',()=>{
+            const url=URL.createObjectURL(file),anchor=document.createElement('a');
+            anchor.href=url;anchor.download=file.name;anchor.hidden=true;document.body.append(anchor);anchor.click();anchor.remove();
+            setTimeout(()=>URL.revokeObjectURL(url),1000);
+          },T('shell.quickdownload'));
+        }
         this.link(file,file.name);
+        presentation?.source?.(file);
+        if(persist)void historyStore?.save?.({id:historyId,name,file});
         this.liveExporter?.setOutput(file);
         if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
           file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);}

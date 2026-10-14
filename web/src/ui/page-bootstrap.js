@@ -5,6 +5,8 @@ import {AI_STRINGS} from './ai-strings.js';
 import {getAppShell} from './shell/app-shell.js';
 const shell=getAppShell();
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
+const previewToggle=document.getElementById('result-preview');
+const previewKey='stylio-result-preview-v1';
 const themeKey='stylio-theme-v1',themeButtons=[...document.querySelectorAll('[data-theme-value]')];
 let themeTransitionTimer;
 function currentTheme(){try{const value=localStorage.getItem(themeKey);return ['light','dark','system'].includes(value)?value:'system';}catch{return 'system';}}
@@ -25,6 +27,10 @@ function applyTheme(theme,{persist=false,animate=false}={}){
 }
 applyTheme(currentTheme());
 for(const button of themeButtons)button.addEventListener('click',()=>applyTheme(button.dataset.themeValue,{persist:true,animate:true}));
+if(previewToggle){
+  try{previewToggle.checked=localStorage.getItem(previewKey)!=='off';}catch{previewToggle.checked=true;}
+  previewToggle.addEventListener('change',()=>{try{localStorage.setItem(previewKey,previewToggle.checked?'on':'off');}catch{}});
+}
 // Native selects can match :focus-visible after a tap. Keep keyboard focus on
 // the surrounding pill, without painting a rectangular ring inside it on iOS.
 for(const control of [selector,document.getElementById('depth-model')]){

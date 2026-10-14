@@ -125,15 +125,26 @@ test('task indicator shows overall percentage when supplied, with stage fallback
 test('History thumbnails decode lazily, use small cached images, and preserve result navigation',async()=>{
   const h=harness({thumbnails:true}),source={type:'image/jpeg'},record=h.shell.register(h.row(),'photo.jpg',source);
   const historyCard=h.$('history-items').firstElementChild;
-  assert.equal(historyCard.firstElementChild.className,'task-symbol');
+  assert.equal(historyCard.querySelector('.task-symbol').className,'task-symbol');
   h.intersect(historyCard);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(h.$('history-items').firstElementChild.firstElementChild.className,'task-thumbnail');
-  assert.equal(h.$('history-items').firstElementChild.firstElementChild.alt,'');
+  assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail').className,'task-thumbnail');
+  assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail').alt,'');
   h.$('history-items').firstElementChild.click();
   assert.equal(h.$('photo-workspace').open,true);
   record.dispose();
   assert.equal(h.$('history-empty').hidden,false);
+});
+
+test('ready results expose a separate quick action without replacing detail navigation',()=>{
+  const h=harness(),record=h.shell.register(h.row(),'ready.heic');let quick=0;
+  record.quickAction('download',()=>quick++,'Quick download');
+  record.update('ready','Ready');
+  const historyCard=h.$('history-items').firstElementChild,button=historyCard.querySelector('.task-quick-action');
+  assert.ok(button);
+  button.click();assert.equal(quick,1);
+  assert.equal(h.$('photo-workspace').open,false);
+  historyCard.click();assert.equal(h.$('photo-workspace').open,true);
 });
 
 test('removed results cannot be resurrected by Forward; blocked storage is harmless',()=>{

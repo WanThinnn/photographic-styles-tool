@@ -36,7 +36,7 @@ Nguồn nội bộ: `web/index.html`, `web/app.js`, `web/styles.css`, `web/src/u
 
 | Đề xuất | Quyết định và điều chỉnh |
 | --- | --- |
-| 1. Giảm hero | Đồng ý. Mobile hiển thị lời giới thiệu ngắn trong empty state lần đầu; lần sau ưu tiên Choose Photos. Dùng cờ onboarding riêng, không suy ra từ history vốn chỉ tồn tại trong phiên. |
+| 1. Giảm hero | Đồng ý. Mobile hiển thị lời giới thiệu ngắn trong empty state lần đầu; lần sau ưu tiên Choose Photos. Dùng cờ onboarding riêng, không suy ra từ History; từ v178 History có persistence cục bộ riêng cho output. |
 | 2. App shell | Theo phản hồi mới nhất: 4 màn `Process / History / Guide / Settings` trong capsule nổi, nút Search riêng; không dùng đồng thời segmented navigation và bottom tabs. |
 | 3. Upload | Mobile bỏ “or drop here”. Tên định dạng ngắn là ví dụ phổ biến, có đường dẫn xem đầy đủ. Browse Files chỉ thêm sau khi thử picker thật; web không bảo đảm hai nút mở hai picker native khác nhau. |
 | 4. Grouped surface | Đồng ý. Surface, khoảng cách và divider tạo nhóm; gradient là accent AI. Giữ tương phản trong cả hai theme. |
@@ -65,7 +65,7 @@ App bar: nhận diện Stylio gọn
 │   ├── Empty: Choose Photos + AI summary + hướng dẫn định dạng
 │   ├── Batch: task đang chạy + hàng đợi ngắn
 │   └── Kết quả mới nhất → mở photo workspace
-├── History: danh sách tác vụ phiên hiện tại → mở photo workspace
+├── History: kết quả đã lưu cục bộ trên thiết bị → mở photo workspace
 ├── AI Settings: sheet trên mobile / panel trên desktop
 ├── Guide: hướng dẫn, định dạng, giới hạn chỉnh sửa và xử lý lỗi
 └── Settings & About: language, cache, version, GitHub, MIT
@@ -270,7 +270,7 @@ Nghiệm thu: chọn 3 ảnh, chuyển History khi chạy, mở một ảnh read
 
 Nghiệm thu: Home Screen/Safari cùng tác vụ, không che nút bằng home indicator, offline warm start vẫn tìm thấy các module, đổi orientation/cỡ chữ không mất controls.
 
-Lưu ảnh/output qua reload là hạng mục riêng sau ba phase: cần IndexedDB, quota/eviction, giới hạn dung lượng và cleanup policy. Chưa đưa vào cam kết persistence của roadmap này.
+Lưu output qua reload đã được triển khai ở v178 bằng IndexedDB vì File/Blob không phù hợp với localStorage. Clear History/xóa từng result đồng bộ với store; vẫn cần theo dõi quota/eviction của Safari và chính sách giới hạn dung lượng nếu History tăng lớn.
 
 ## 9. Thứ tự ba việc mang lại tác động rõ nhất
 
@@ -665,12 +665,25 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - File processing now reports coarse overall milestones across read/decode, raster or HEIC preparation, optional AI detail/style work, Texture/Soft Skin/metadata, and Portrait. Portrait depth uses 90–100% milestones, so long GPU inference no longer leaves the activity ring numerically blank.
 - Service Worker app-shell cache increased to v177.
 
+### Persistent History / quick export / Portrait & startup polish v178
+
+- History không còn mất sau F5 hoặc app crash thông thường. Output File được lưu cục bộ bằng IndexedDB (stylio-history-v1) thay vì localStorage vì localStorage là string store dung lượng nhỏ, không phù hợp HEIC Blob. Startup khôi phục result thành trạng thái Ready mà không chạy lại encoder/model; xóa từng result và Clear History cũng xóa dữ liệu persisted. Mutation được serialize để Clear/Save không race.
+- Activity/History card có quick action riêng: thiết bị hỗ trợ Web Share hiện nút Share; còn lại hiện Download. Nút quick action là control riêng khỏi nút mở Details để keyboard/VoiceOver không phải dùng interactive control lồng nhau.
+- Settings > Processing thêm Result preview, persist bằng stylio-result-preview-v1. Khi tắt, result mới không dựng source preview hoặc Portrait interactive preview; output/share/download/metadata contract không đổi. Mặc định vẫn On.
+- About bổ sung semantic leading icon cho App version, Source code/GitHub và Open-source licenses. AI Settings cũng có icon semantic riêng cho Depth, Sharpen, Adaptive Styles, GPU và Model; token hiện có tự đổi material/glyph ở Light/Dark.
+- Portrait strip đổi sang ba vùng cân tâm 1fr / auto / 1fr: depth/aperture glass capsule trái, Portrait capsule giữa đúng tâm, Reset glass tròn phải. Depth dùng local inline symbol theo ngôn ngữ Depth Effect tham khảo từ Icons8 để giữ PWA offline và không thêm runtime dependency.
+- Share/Download floating capsule idle hẹp hơn, vẫn giữ hit target 44px; expanded state cũng gọn hơn. Result content tăng bottom inset dựa trên --actions-height nên aperture/details không còn bị toolbar đè.
+- Desktop/iPad đặt More AI features cùng hàng với Smart Enhance và ngay cạnh AI Settings action; mobile tiếp tục ẩn text và dùng gradient ring quanh icon.
+- st.preparing giữ nguyên copy nhưng đổi thành gradient xanh–tím–hồng chuyển động nhẹ + soft pulse; error state quay về màu error thường và Reduced Motion toàn cục tắt animation.
+- Service Worker app-shell cache tăng v178 và precache src/ui/history-store.js.
+- Regression hiện tại: **78 pass, 0 fail**, PWA check đạt, VI/EN/ZH mỗi ngôn ngữ 195 strings, git diff --check sạch.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.
 
 ```powershell
-rtk proxy node --test tests/web/app-shell.mjs tests/web/application.mjs tests/web/stylesheets.mjs tests/web/ai-feature-controls.mjs tests/web/style-result-metadata.mjs tests/web/module-paths.mjs tests/web/web-release.mjs tests/web/lifecycle.mjs
+rtk proxy node --test tests/web/app-shell.mjs tests/web/application.mjs tests/web/history-store.mjs tests/web/stylesheets.mjs tests/web/ai-feature-controls.mjs tests/web/style-result-metadata.mjs tests/web/module-paths.mjs tests/web/web-release.mjs tests/web/lifecycle.mjs
 rtk proxy node tests/web/check-pwa.mjs
 rtk proxy node tests/web/check-i18n.mjs
 ```

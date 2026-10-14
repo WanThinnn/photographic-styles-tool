@@ -98,6 +98,10 @@
   margin-left: auto
 }
 
+.depth-options>.ai-summary>.ai-settings-discovery:not([hidden])+.ai-settings-trigger {
+  margin-left: 0
+}
+
 .workspace>.ai-hint {
   font-size: .8125rem;
   margin: 0 8px 6px;
@@ -151,9 +155,10 @@
 
 .ai-settings-discovery {
   display: flex;
-  justify-content: flex-end;
-  margin: 0;
-  padding: 2px 0 10px;
+  align-items: center;
+  flex: none;
+  margin: 0 0 0 auto;
+  padding: 0;
   pointer-events: none
 }
 

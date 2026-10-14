@@ -12,6 +12,7 @@ import {depthModel} from '../portrait/depth-models.js';
 import {clearDownloadedAssets} from '../core/cache-cleanup.js';
 import {createAiFeatureControls,showAiSettingsHintOnce} from '../ui/ai-feature-controls.js';
 import {createResultView} from '../ui/results/result-view.js';
+import {createHistoryStore,restoredFile} from '../ui/history-store.js';
 import {createLivePhotoSession} from '../media/live-photo-session.js';
 import {createProfileRepository} from './processing/profiles.js';
 import {createPhotoAnalysis} from './processing/photo-analysis.js';
@@ -48,6 +49,8 @@ export function startApplication(){
     try{localStorage.setItem('depth-gpu-acceleration',gpuAcceleration.checked?'on':'off');}catch{}
   });
   const clearHistory = $('clear-history');
+  const historyStore=createHistoryStore();
+  const previewEnabled=()=>$('result-preview')?.checked!==false;
   const resultUrls = new Set(), resultCleanups = new Set();
   const aiCandidates = [];
   let browserReady = false, pendingTasks = 0;
@@ -74,6 +77,7 @@ export function startApplication(){
     resultCleanups.clear();
     for (const url of resultUrls) URL.revokeObjectURL(url);
     resultUrls.clear(); livePhotos.length = 0; liveMovies.clear(); aiCandidates.length = 0;
+    void historyStore.clear();
     list.replaceChildren(); fileInput.value = ''; releaseDecodeCache();
     releaseHevcEncoder(); releaseRasterEncoder(); releaseHeicProcessor();
     void import('../detail/detail-inference.js').then(({releaseDetailWorkers})=>releaseDetailWorkers()).catch(()=>{});
@@ -155,7 +159,18 @@ export function startApplication(){
   const {liveMovies,livePhotos,attachMovie,handleMovie}=createLivePhotoSession({T});
   const profiles=createProfileRepository();
   const {ensureProfileIndex,getProfile}=profiles;
-  const row=createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell});
+  const row=createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell,historyStore,previewEnabled});
+  async function restorePersistentHistory(){
+    const entries=await historyStore.list();
+    for(const entry of entries){
+      const file=restoredFile(entry);
+      if(!file)continue;
+      const ui=row(entry.name||entry.fileName||file.name,file,{historyId:entry.id,restored:true});
+      ui.output(file,{metadata:false,persist:false});
+      ui.set(T('st.ready'),'ok');
+    }
+    refreshHistoryButton();
+  }
   const {tryAiPortrait,runAiCandidate}=createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcceleration,selectedAiLevel});
   const {handleFiles}=createFileProcessor({row,T,getLanguage:()=>lang,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis});
 
@@ -215,6 +230,7 @@ export function startApplication(){
       browserReady = true;refreshHistoryButton();
       fileInput.disabled = false; drop.setAttribute('aria-disabled', 'false');
       aiFeatures.sync();
+      await restorePersistentHistory();
       showAiSettingsHintOnce({hint:$('ai-settings-discovery'),settings:aiSettings});
       $('boot').textContent = '';
       navigator.serviceWorker?.controller?.postMessage({type:'WARM_CACHE'});

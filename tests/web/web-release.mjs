@@ -14,6 +14,8 @@ test('static release versions the complete app graph and leaves immutable model 
     await mkdir(join(source,'src'),{recursive:true});await mkdir(join(source,'vendor'),{recursive:true});
     const files={
       'index.html':'<link href="styles.css"><script src="src/boot.js"></script>',
+      'styles.css':'@import url("./base.css");',
+      'base.css':'body{color:black}',
       'src/boot.js':'import "../app.js"; export {ready} from "./setup.js";',
       'app.js':'import("./src/setup.js");new Worker(new URL("./src/worker.js",import.meta.url));fetch("./vendor/model.onnx");import("./vendor/ort.mjs");',
       'sw.js':'const CACHE_PREFIX="app-";const CACHE_NAME = `${CACHE_PREFIX}v1`;const shell=["./app.js","./styles.css","./src/setup.js"];',
@@ -23,6 +25,7 @@ test('static release versions the complete app graph and leaves immutable model 
     await buildWebRelease(source,output,sha);
     const html=await readFile(join(output,'index.html'),'utf8'),app=await readFile(join(output,'app.js'),'utf8');
     assert.ok(html.includes(`styles.css?release=${sha}`));assert.ok(html.includes(`src/boot.js?release=${sha}`));
+    assert.equal(await readFile(join(output,'styles.css'),'utf8'),`@import url("./base.css?release=${sha}");`);
     assert.ok(app.includes(`./src/setup.js?release=${sha}`));assert.ok(app.includes(`./src/worker.js?release=${sha}`));
     assert.ok(app.includes('./vendor/model.onnx'));assert.ok(app.includes('"./vendor/ort.mjs"'));
     assert.equal(await readFile(join(output,'vendor/ort.js'),'utf8'),files['vendor/ort.js']);

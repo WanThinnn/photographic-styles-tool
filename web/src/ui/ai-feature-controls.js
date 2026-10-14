@@ -46,7 +46,7 @@ export function showAiSettingsHintOnce({hint,settings,storage}){
     if(storage?.getItem(key)==='opened')return;
   }catch{} // Storage restrictions must not break the AI controls.
   hint.hidden=false;
-  const summary=settings.querySelector('summary');
+  const summary=settings.querySelector('summary')||document.getElementById('open-ai-settings');
   summary.setAttribute('aria-describedby',hint.id);
   summary.addEventListener('click',()=>{
     hint.hidden=true;

@@ -1,18 +1,26 @@
 // Result DOM and output lifetime. Processing is supplied by the controller.
 import {describeInWorker} from '../../media/heic-processing.js';
 import {formatBytes} from '../result-metadata.js';
-export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton}){
-  function row(name) {
+export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell}){
+  function row(name,sourceFile) {
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `<div class="result-header"><div class="name"></div><div class="status"></div></div><div class="act"></div>`;
     el.querySelector(".name").textContent = name;
     el.querySelector(".name").title = name;
     list.appendChild(el);
+    const presentation=shell?.register(el,name);
+    el.querySelector('.status').setAttribute('role','status');
     const cleanups=new Set(),downloadedFiles=new WeakSet(),savedFiles=new WeakSet();let disposed=false;
-    function checkIcon(){
-      const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');icon.classList.add('download-check');
-      icon.innerHTML='<path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';return icon;
+    if(sourceFile&&sourceFile.type!=='video/quicktime'){
+      const figure=document.createElement('figure');figure.className='source-preview';
+      const image=document.createElement('img');image.alt=name;image.loading='lazy';image.decoding='async';
+      const url=URL.createObjectURL(sourceFile);image.src=url;resultUrls.add(url);
+      image.addEventListener('error',()=>{figure.dataset.unavailable='true';figure.hidden=true;});
+      const caption=document.createElement('figcaption');caption.dataset.i18n='shell.sourcepreview';caption.textContent=T('shell.sourcepreview');
+      figure.append(image,caption);el.insertBefore(figure,el.querySelector('.act'));
+      // Native browser rendering only; no decoder/model is downloaded for a thumbnail.
+      cleanups.add(()=>{URL.revokeObjectURL(url);resultUrls.delete(url);});
     }
     const remove=document.createElement('button');remove.type='button';remove.className='result-remove';remove.disabled=true;
     remove.setAttribute('aria-label',T('btn.removeresult'));
@@ -39,6 +47,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       cleanup(fn){cleanups.add(fn);},
       dispose(){
         if(disposed)return;disposed=true;
+        presentation?.dispose();
         for(const cleanup of cleanups)cleanup();cleanups.clear();resultCleanups.delete(ui.dispose);
         for(const a of el.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
         for(let i=aiCandidates.length-1;i>=0;i--)if(aiCandidates[i].ui===ui){aiCandidates[i].controller?.abort();aiCandidates[i].state='removed';aiCandidates.splice(i,1);}
@@ -73,6 +82,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         let state=el.querySelector('.ai-status');
         if(!state){state=document.createElement('p');state.className='ai-status';el.append(state);}
         state.textContent=text;
+        if(text)presentation?.update('processing',text);
       },
       cancelAi(controller) {
         const button=document.createElement('button');button.type='button';button.className='dl alt ai-cancel';button.textContent=aiText().cancel;
@@ -84,19 +94,21 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         if(busy){this.readyNotice||=el.querySelector('.status').textContent;this.set(aiText().loading);}
         else if(this.readyNotice){this.set(this.readyNotice,'ok');this.readyNotice=null;}
       },
-      aiView(visible) { const view=el.querySelector('.ai-details');if(view)view.style.display=visible?'':'none'; },
+      aiView(visible) { const view=el.querySelector('.ai-details');if(view)view.style.display=visible?'':'none';const source=el.querySelector('.source-preview');if(source)source.hidden=visible||source.dataset.unavailable==='true'; },
       async portraitPreview(result,onSettings) {
         const {portraitPreview}=await import('../../portrait/ai-portrait-preview.js');
         el.querySelector('.ai-details')?.remove();
+        const source=el.querySelector('.source-preview');if(source)source.hidden=true;
         const host=document.createElement('section');host.className='ai-details';host.setAttribute('aria-label',aiText().preview);
         el.insertBefore(host,el.querySelector('.act'));
         try{
           this.cleanup(portraitPreview(result,host,aiText(),onSettings,{onPending:pending=>{
             this.portraitPending=pending;if(aiFeatures.enabled('portrait'))this.outputPending(pending);refreshHistoryButton();
           }}));
-        }catch(error){host.remove();this.note(aiText().previewFailed,'preview');throw error;}
+        }catch(error){host.remove();if(source)source.hidden=source.dataset.unavailable==='true';this.note(aiText().previewFailed,'preview');throw error;}
       },
       outputPending(pending){
+        presentation?.update(pending?'updating':this.resultState||'processing',pending?aiText().updating:this.resultStatus||'');
         this.outputPendingState=pending;el.querySelector('.act').setAttribute('aria-busy',String(pending));
         for(const button of el.querySelectorAll('.act button'))button.disabled=pending;
         for(const link of el.querySelectorAll('.act a')){link.setAttribute('aria-disabled',String(pending));link.tabIndex=pending?-1:0;}
@@ -106,7 +118,12 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         const host=actions('normal');
         for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
         host.replaceChildren();
-        if(navigator.canShare?.({files:[file]}))this.share(file,!!this.liveIdentifier);
+        if(navigator.canShare?.({files:[file]})){
+          this.share(file,!!this.liveIdentifier);
+          let hint=el.querySelector('.share-hint');
+          if(!hint){hint=document.createElement('p');hint.className='share-hint';hint.dataset.i18n='shell.sharehint';el.insertBefore(hint,el.querySelector('.act'));}
+          hint.textContent=T('shell.sharehint');
+        }else el.querySelector('.share-hint')?.remove();
         this.link(file,file.name);
         this.liveExporter?.setOutput(file);
         if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
@@ -114,6 +131,9 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         this.outputPending(Boolean(this.outputPendingState));
       },
       set(text, cls) {
+        this.resultState=cls==='ok'?'ready':cls==='err'?'failed':cls==='info'?'info':'processing';
+        this.resultStatus=cls==='ok'?T('st.ready'):text;
+        presentation?.update(this.resultState,this.resultStatus);
         remove.disabled=!['ok','err','info'].includes(cls);
         const s = el.querySelector(".status");
         s.textContent = cls === 'ok' ? T("st.ready") : text;
@@ -159,9 +179,9 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         resultUrls.add(a.href);
         a.download = filename;
         const label=document.createElement('span');
-        const renderDownload=()=>{const downloaded=downloadedFiles.has(blob);a.classList.toggle('is-downloaded',downloaded);label.dataset.i18n=downloaded?'btn.downloadagain':key;label.textContent=T(label.dataset.i18n);};
-        a.className = "dl alt";
-        a.append(checkIcon(),label);renderDownload();
+        const renderDownload=()=>{const downloaded=downloadedFiles.has(blob);a.dataset.downloadStarted=String(downloaded);label.dataset.i18n=downloaded?'btn.downloadagain':key;label.textContent=T(label.dataset.i18n);};
+        a.className = group==='normal'&&!navigator.canShare?.({files:[blob]})?'dl':'dl alt';
+        a.append(label);renderDownload();
         a.addEventListener('click',e=>{if(this.outputPendingState){e.preventDefault();return;}downloadedFiles.add(blob);renderDownload();});
         actions(group).appendChild(a);
       },
@@ -183,19 +203,19 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         b.className = "dl";
         b.type = "button";
         const text=document.createElement('span');
-        const renderSave=()=>{const saved=savedFiles.has(file);b.classList.toggle('is-downloaded',saved);text.dataset.i18n=saved?'btn.saveagain':label||(live?'btn.savestill':'btn.save');text.textContent=T(text.dataset.i18n);};
-        b.append(checkIcon(),text);renderSave();
+        const renderSave=()=>{const saved=savedFiles.has(file);text.dataset.i18n=saved?'shell.shareagain':label||'shell.share';text.textContent=T(text.dataset.i18n);};
+        b.append(text);renderSave();
         b.addEventListener("click", async () => {
           if (b.disabled) return;
           b.disabled = true;
-          try { await navigator.share({ files: [file] });savedFiles.add(file);renderSave(); }
+          try { await navigator.share({ files: [file] });if(!disposed){savedFiles.add(file);renderSave();} }
           catch (e) { if (e.name !== "AbortError") {text.dataset.i18n='btn.blocked';text.textContent=T('btn.blocked');} }
           finally { b.disabled = Boolean(this.outputPendingState); }
         });
         actions(group).prepend(b);
       },
     };
-    remove.addEventListener('click',ui.dispose);resultCleanups.add(ui.dispose);return ui;
+    remove.addEventListener('click',()=>{if(confirm(T('shell.remove')))ui.dispose();});resultCleanups.add(ui.dispose);return ui;
   }
 
     return row;

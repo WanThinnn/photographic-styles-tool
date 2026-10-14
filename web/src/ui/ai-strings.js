@@ -1,6 +1,6 @@
 export const AI_STRINGS={
   "vi": {
-    "masterToggle": "Cải thiện ảnh thông minh bằng AI",
+    "masterToggle": "Cải thiện ảnh thông minh",
     "toggle": "Xoá phông và ánh sáng chân dung",
     "detailToggle": "Làm nét ảnh",
     "detailHint": "Khử nhiễu và tăng nét bằng AI trước Styles. Với HDR tương thích, gain map được tính lại theo ảnh đã xử lý.",
@@ -66,7 +66,7 @@ export const AI_STRINGS={
     "previewFailed": "Không hiển thị được preview. Bạn vẫn có thể chỉnh Portrait trong Ảnh."
   },
   "en": {
-    "masterToggle": "Smart Enhance photo with AI",
+    "masterToggle": "Smart Enhance photo",
     "toggle": "Depth Effect with Portrait Lighting",
     "detailToggle": "Sharpen Photo",
     "detailHint": "AI restoration before Styles. Compatible HDR gain maps are recalculated from the restored image.",
@@ -132,7 +132,7 @@ export const AI_STRINGS={
     "previewFailed": "Preview unavailable. You can still edit Portrait in Photos."
   },
   "zh": {
-    "masterToggle": "使用 AI 增强照片",
+    "masterToggle": "增强照片",
     "toggle": "AI 景深效果",
     "detailToggle": "照片锐化",
     "detailHint": "在添加风格前使用 AI 修复细节。对于兼容的 HDR，会根据处理后的图像重新计算增益图。",

@@ -1,3 +1,4 @@
+import {getAppShell} from '../ui/shell/app-shell.js';
 import {VERSION} from '../styles/port.js';
 import {loadLibheif,releaseDecodeCache} from '../media/decode.js';
 import {pickLanguage,rememberLanguage,applyLanguage,t} from '../ui/i18n.js';
@@ -19,6 +20,7 @@ import {createFileProcessor} from './processing/file-processor.js';
 
 // App wiring and session lifecycle; domain workflows live in their modules.
 export function startApplication(){
+  const shell=getAppShell();
   const $ = (id) => document.getElementById(id);
   const fileInput = $("file"), drop = $("drop"), list = $("list");
   const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), aiStyleSuggest=$("ai-style-suggest"), enhanceAi = $("enhance-ai");
@@ -26,24 +28,12 @@ export function startApplication(){
   const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
   const modelLevels=['lite','standard','pro'];
   const aiSettings=$('ai-settings');
-  const aiSettingsSummary=aiSettings?.querySelector('summary');
-  if(aiSettings&&aiSettingsSummary){
-    aiSettingsSummary.addEventListener('click',event=>{
-      if(!aiSettings.open||aiSettings.classList.contains('is-closing'))return;
-      if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-      event.preventDefault();
-      aiSettings.classList.add('is-closing');
-      const close=()=>{aiSettings.open=false;aiSettings.classList.remove('is-closing');};
-      aiSettings.querySelector('.ai-settings-panel')?.addEventListener('animationend',close,{once:true});
-      setTimeout(()=>{if(aiSettings.classList.contains('is-closing'))close();},220);
-    });
-  }
 
   const selectedAiLevel=()=>modelLevels[Number(modelSelector.value)];
   function renderModel(){
     const name=depthModel(selectedAiLevel()).label;
     $('depth-model-value').textContent=name;modelSelector.setAttribute('aria-valuetext',name);
-    modelSelector.parentElement.style.setProperty('--model-position',['14px','50%','calc(100% - 14px)'][Number(modelSelector.value)]);
+    modelSelector.parentElement.style.setProperty('--model-position',['20px','50%','calc(100% - 20px)'][Number(modelSelector.value)]);
     modelSelector.parentElement.dataset.level=modelSelector.value;
   }
   let clearingAssets=false,assetStatus='';
@@ -79,6 +69,7 @@ export function startApplication(){
   }
   clearHistory.addEventListener('click', () => {
     if (pendingTasks) return;
+    if(!confirm(T('shell.clear').replace('{count}',String(list.childElementCount))))return;
     for (const cleanup of resultCleanups) cleanup();
     resultCleanups.clear();
     for (const url of resultUrls) URL.revokeObjectURL(url);
@@ -93,7 +84,7 @@ export function startApplication(){
     if(clearAssets.disabled)return;
     clearingAssets=true;assetStatus='cleaning';translateAi();refreshHistoryButton();
     aiFeatures.sync();
-    modelSelector.disabled=gpuAcceleration.disabled=true;
+    $('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
     fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
     try{
       releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
@@ -102,7 +93,7 @@ export function startApplication(){
       releaseDetailWorkers();releaseStyleRecommender();await releaseOrtModels();
       await clearDownloadedAssets();assetStatus='cleaned';
     }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
-    finally{clearingAssets=false;aiFeatures.sync();modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+    finally{clearingAssets=false;aiFeatures.sync();$('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
   });
   const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
   function translateAi() {
@@ -164,7 +155,7 @@ export function startApplication(){
   const {liveMovies,livePhotos,attachMovie,handleMovie}=createLivePhotoSession({T});
   const profiles=createProfileRepository();
   const {ensureProfileIndex,getProfile}=profiles;
-  const row=createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton});
+  const row=createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell});
   const {tryAiPortrait,runAiCandidate}=createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcceleration,selectedAiLevel});
   const {handleFiles}=createFileProcessor({row,T,getLanguage:()=>lang,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis});
 
@@ -180,9 +171,6 @@ export function startApplication(){
     enqueueFiles([...e.dataTransfer.files]);
   });
   drop.addEventListener("click", () => { if (browserReady) fileInput.click(); });
-  drop.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (browserReady) fileInput.click(); }
-  });
   fileInput.addEventListener("change", () => {
     enqueueFiles([...fileInput.files]);
     fileInput.value = "";
@@ -192,7 +180,7 @@ export function startApplication(){
     lang = $("lang").value;
     rememberLanguage(lang);
     applyLanguage(lang);
-    translateAi();
+    translateAi();shell.render();
   });
 
   // Visit counter behind the README badge. The only request this site makes to a

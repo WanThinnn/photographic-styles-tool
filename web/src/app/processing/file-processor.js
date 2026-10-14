@@ -16,7 +16,7 @@ import {shouldRenderStyleDisplay} from '../../recommend/style-display-render.js'
 export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis}){
     const {addMissingSoftSkin,ensureDecode,stagePercent,modelDownloadStatus,styleProgress,styleResultNote,adaptiveStyleCompletionNotice,recommendHeicStyle}=analysis;
   async function handleFile(file) {
-    const ui = row(file.name);
+    const ui = row(file.name,file);
     const inputSize = file.size;
     try {
       ui.set(T("st.reading"));

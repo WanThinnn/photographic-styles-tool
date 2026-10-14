@@ -2,6 +2,8 @@
 // carries English fallbacks, so a cold/failed script load never leaves blank UI.
 import {applyLanguage,pickLanguage,rememberLanguage,t} from './i18n.js';
 import {AI_STRINGS} from './ai-strings.js';
+import {getAppShell} from './shell/app-shell.js';
+const shell=getAppShell();
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
 // Native selects can match :focus-visible after a tap. Keep keyboard focus on
 // the surrounding pill, without painting a rectangular ring inside it on iOS.
@@ -23,7 +25,9 @@ document.getElementById('ios-format-dismiss').addEventListener('click',()=>{
 });
 function render(){
   const lang=selector.value,strings=AI_STRINGS[lang]||AI_STRINGS.en;
+  document.getElementById('enhance-ai-label').textContent=strings.masterToggle;
   applyLanguage(lang);document.getElementById('ai-portrait-label').textContent=strings.toggle;
+  shell.render();
   document.getElementById('ai-portrait-hint').textContent=strings.hint;
   document.getElementById('ai-settings-label').textContent=strings.settings;
   document.getElementById('gpu-acceleration-label').textContent=strings.acceleration;

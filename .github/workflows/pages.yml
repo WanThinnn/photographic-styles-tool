@@ -63,7 +63,7 @@ jobs:
         run: node --test tests/web/module-paths.mjs
 
       - name: Check application wiring and session cleanup
-        run: node tests/web/application.mjs
+        run: node --test tests/web/application.mjs tests/web/app-shell.mjs tests/web/stylesheets.mjs
 
       - name: Check static release asset versioning
         run: node --test tests/web/web-release.mjs

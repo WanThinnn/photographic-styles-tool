@@ -1,0 +1,97 @@
+/* Primitive → semantic → component roles. Glass recipes: see THIRD_PARTY_NOTICES.txt. */
+:root {
+  color-scheme: light dark;
+  --blue-600: #0894ff;
+  --violet-500: #a768db;
+  --coral-500: #f16f86;
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --bg: #f2f2f7;
+  --surface: #fff;
+  --surface-secondary: #e9e9ef;
+  --fg: #1c1c1e;
+  --muted: #63636b;
+  --line: #3c3c431f;
+  --accent: var(--blue-600);
+  --accent-text: #006fbe;
+  --on-accent: #071c2d;
+  --switch-thumb: #fff;
+  --switch-track: #78788033;
+  --glass-rgb: 255 255 255;
+  --glass-opacity: .53;
+  --glass-opacity-scale: 1;
+  --glass-blur-scale: 1;
+  --glass-blur: 6px;
+  --glass-rim-top: #ffffffa6;
+  --glass-rim-bottom: #ffffffa6;
+  --glass-outline: #00000038;
+  --glass-shade: #0000000a;
+  --selection-fill: #0000000f;
+  --ok: #23764c;
+  --err: #b32a3b;
+  --ai-blue: var(--blue-600);
+  --ai-violet: var(--violet-500);
+  --ai-coral: var(--coral-500);
+  --ai-amber: #df9d49;
+  --gradient: linear-gradient(115deg,var(--ai-blue),var(--ai-violet) 48%,var(--ai-coral));
+  --card-radius: 28px;
+  --control-radius: 999px;
+  --capsule-radius: 999px;
+  --sheet-radius: 32px;
+  --tab-height: 54px;
+  --sheet-shadow: 0 24px 100px #0003;
+  --duration-fast: 160ms;
+  --spring-ease: cubic-bezier(.2,.8,.2,1.15);
+  --focus-ring: #006fbe;
+}
+@media(prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) {
+  --bg: #000;
+  --surface: #1c1c1e;
+  --surface-secondary: #2c2c2e;
+  --fg: #f5f5f7;
+  --muted: #b6b6bf;
+  --line: #ffffff20;
+  --accent-text: #63beff;
+  --glass-rgb: 62 62 62;
+  --glass-opacity: .5;
+  --glass-rim-top: #ffffff35;
+  --glass-rim-bottom: #ffffff24;
+  --glass-outline: #ffffff20;
+  --glass-shade: #0003;
+  --selection-fill: #ffffff24;
+  --switch-track: #78788066;
+  --ok: #83d6a7;
+  --err: #ff9ca9;
+    --focus-ring: #63beff;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000;
+  --surface: #1c1c1e;
+  --surface-secondary: #2c2c2e;
+  --fg: #f5f5f7;
+  --muted: #b6b6bf;
+  --line: #ffffff20;
+  --accent-text: #63beff;
+  --glass-rgb: 62 62 62;
+  --glass-opacity: .5;
+  --glass-rim-top: #ffffff35;
+  --glass-rim-bottom: #ffffff24;
+  --glass-outline: #ffffff20;
+  --glass-shade: #0003;
+  --selection-fill: #ffffff24;
+  --switch-track: #78788066;
+  --ok: #83d6a7;
+  --err: #ff9ca9;
+  --focus-ring: #63beff;
+}
+:root[data-theme="light"] { color-scheme: light }
+@media(prefers-contrast:more) {
+  :root { --muted: var(--fg); --line: currentColor }
+}

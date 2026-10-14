@@ -33,7 +33,8 @@ function harness({manualQueue=false}={}){
     nodes.set(id,n);return n;
   }
   const context={console,Event,setTimeout,clearTimeout,
-    document:{getElementById:node,createElement:node},
+    document:{getElementById:node,createElement:node,querySelectorAll:()=>[]},
+    getAppShell:()=>({register(){},render(){}}),confirm:()=>true,
     localStorage:{getItem:()=>null,setItem(){}},sessionStorage:{getItem:()=>true},
     navigator:{serviceWorker:{controller:{postMessage:message=>calls.push(['worker',message.type])}}},
     matchMedia:()=>({matches:false}),
@@ -72,7 +73,10 @@ test('application initializes one shared session and supplies live language/sett
   h.node('lang').value='vi';await h.node('lang').fire('change');
   assert.equal(h.captured.processing.getLanguage(),'vi');
   h.node('depth-model').value='2';
+  await h.node('depth-model').fire('input');
   assert.equal(h.captured.processing.selectedAiLevel(),'pro');
+  assert.equal(h.node('depth-model-value').textContent,'pro');
+  assert.equal(h.node('depth-model').parentElement.dataset.level,'2');
   assert.ok(h.calls.some(([type,value])=>type==='worker'&&value==='WARM_CACHE'));
 });
 
@@ -90,6 +94,16 @@ test('separate picker/drop batches remain serialized and cache cleanup stays loc
     [['start','first'],['end','first'],['start','second'],['end','second']]);
   assert.equal(h.node('clear-assets').disabled,false);
   assert.equal(h.node('clear-history').disabled,false);
+});
+
+test('three-stop model range updates the displayed name and the actual processing level',async()=>{
+  const h=harness();await h.start();
+  for(const [index,name]of ['lite','standard','pro'].entries()){
+    h.node('depth-model').value=String(index);await h.node('depth-model').fire('input');
+    assert.equal(h.captured.processing.selectedAiLevel(),name);
+    assert.equal(h.node('depth-model-value').textContent,name);
+    assert.equal(h.node('depth-model').parentElement.dataset.level,String(index));
+  }
 });
 
 test('clearing history releases result cleanups and clears the shared Live Photo/AI session',async()=>{

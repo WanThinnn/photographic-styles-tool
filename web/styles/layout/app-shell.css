@@ -3,7 +3,7 @@ main {
   max-width: 720px;
   min-height: 100svh;
   margin: auto;
-  padding: calc(env(safe-area-inset-top,0px) + 12px) max(24px,env(safe-area-inset-right,0px)) calc(var(--tab-height) + env(safe-area-inset-bottom,0px) + 32px) max(24px,env(safe-area-inset-left,0px))
+  padding: calc(env(safe-area-inset-top,0px) + 18px) max(24px,env(safe-area-inset-right,0px)) calc(var(--tab-height) + env(safe-area-inset-bottom,0px) + 32px) max(24px,env(safe-area-inset-left,0px))
 }
 
 .top {
@@ -38,25 +38,45 @@ h1 {
 }
 
 .top-guide {
+  position: relative;
   width: 44px;
   height: 44px;
   min-height: 44px;
   margin-left: auto;
   color: var(--fg);
-  transform-origin: center;
+  overflow: hidden
+}
+
+.top-guide svg {
+  position: absolute;
+  width: 21px;
+  height: 21px;
   transition: transform 280ms var(--spring-ease),opacity 180ms ease;
   will-change: transform,opacity
 }
 
-body.is-settings-destination .top-guide {
-  transform: translateY(68px) scale(.78) rotate(18deg);
-  opacity: 0;
-  pointer-events: none
+.top-help-symbol {
+  transform: translateY(0) scale(1) rotate(0);
+  opacity: 1
 }
 
-.top-guide svg {
-  width: 21px;
-  height: 21px
+.top-github-symbol {
+  transform: translateY(-22px) scale(.72) rotate(-18deg);
+  opacity: 0
+}
+
+body.is-settings-destination .top-help-symbol {
+  transform: translateY(22px) scale(.72) rotate(18deg);
+  opacity: 0
+}
+
+body.is-settings-destination .top-github-symbol {
+  transform: translateY(0) scale(1) rotate(0);
+  opacity: 1
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .top-guide svg { transition: none }
 }
 
 .app-screen {
@@ -84,8 +104,8 @@ body.is-settings-destination .top-guide {
 }
 
 .intro h2 {
-  font-size: 2rem;
-  letter-spacing: -.04em;
+  font-size: 2.25rem;
+  letter-spacing: -.045em;
   margin: 0 0 12px
 }
 
@@ -110,7 +130,7 @@ body.is-settings-destination .top-guide {
   z-index: 10;
   /* Top + dynamic viewport avoids Safari's stale fixed-bottom anchor.
      Keyboard height is supplied only while Search is focused. */
-  top: calc(var(--dock-viewport-bottom,100dvh) - max(10px,calc(env(safe-area-inset-bottom,0px) - 12px)));
+  top: calc(var(--dock-viewport-bottom,var(--dock-shell-height,100lvh)) - max(10px,calc(env(safe-area-inset-bottom,0px) - 12px)));
   left: 50%;
   transform: translate(-50%,-100%);
   display: flex;
@@ -118,12 +138,6 @@ body.is-settings-destination .top-guide {
   gap: 8px;
   width: min(36rem,calc(100% - 32px));
   max-width: calc(100% - max(16px,env(safe-area-inset-left,0px)) - max(16px,env(safe-area-inset-right,0px)))
-}
-
-.app-dock.is-viewport-recalibrating {
-  opacity: 0;
-  pointer-events: none;
-  transition: none!important
 }
 
 .app-tabs {
@@ -167,8 +181,8 @@ body.is-settings-destination .top-guide {
   width: calc((100% - 8px) / 4);
   border-radius: var(--capsule-radius);
   background: var(--selection-fill);
-  translate: calc(var(--tab-index,0) * 100%) 0;
-  transition: translate 280ms var(--spring-ease);
+  transform: translate3d(var(--lens-offset,calc(var(--tab-index,0) * 100%)),0,0);
+  transition: transform 280ms var(--spring-ease);
   pointer-events: none
 }
 .app-tabs svg {
@@ -220,6 +234,7 @@ body.is-settings-destination .top-guide {
 
 @media(max-width:767px) {
   main {
+    padding-top: calc(env(safe-area-inset-top,0px) + 24px);
     padding-inline: max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))
   }
   .top {
@@ -246,7 +261,7 @@ body.is-settings-destination .top-guide {
     padding: 0 0 2px
   }
   .intro h2 {
-    font-size: 1.625rem
+    font-size: 2rem
   }
   .intro .sub {
     font-size: .875rem
@@ -265,12 +280,13 @@ body.is-settings-destination .top-guide {
 
 @media(display-mode:standalone) {
   main {
-    min-height: 100dvh
+    min-height: 100svh
   }
   .app-dock {
-    top: auto;
-    bottom: calc(max(8px,calc(env(safe-area-inset-bottom,0px) - 10px)) + var(--dock-keyboard-offset,0px));
-    transform: translateX(-50%)
+    position: fixed;
+    top: calc(var(--dock-viewport-bottom,var(--dock-shell-height,100lvh)) - max(10px,calc(env(safe-area-inset-bottom,0px) - 12px)));
+    bottom: auto;
+    transform: translate(-50%,-100%)
   }
 }
 

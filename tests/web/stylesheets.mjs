@@ -29,7 +29,7 @@ test('four-tab floating dock has a separate search action and material fallbacks
   const material=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const dock=layout.match(/\.app-dock \{([^}]+)\}/)[1];
-  assert.match(dock,/position: fixed/);assert.match(dock,/top: calc\(var\(--dock-viewport-bottom,100dvh\)/);assert.doesNotMatch(dock,/\n  bottom:/);
+  assert.match(dock,/position: fixed/);assert.match(dock,/top: calc\(var\(--dock-viewport-bottom,var\(--dock-shell-height,100lvh\)\)/);assert.doesNotMatch(dock,/\n  bottom:/);
   assert.match(layout,/min-height: var\(--tab-height\)/);
   assert.match(layout,/\.app-tabs button \{[^}]*color: var\(--nav-idle\)/s);
   assert.match(material,/prefers-reduced-transparency:reduce/);assert.match(material,/prefers-contrast:more/);
@@ -45,6 +45,8 @@ test('AI summary is centered in a single grid and model range stays beside its l
   const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
   assert.match(workspace,/grid-template-columns: minmax\(0,1fr\) 63px 44px/);
   assert.doesNotMatch(workspace,/\.ai-settings-trigger \{[^}]*position: absolute/);
+  assert.match(workspace,/ai-settings-discovery-nudge/);
+  assert.doesNotMatch(workspace,/ai-settings-discovery:not\(\[hidden\]\)[^}]*outline: 1px solid var\(--ai-violet\)/s);
   assert.match(controls,/grid-template-columns: minmax\(0,1fr\) minmax\(120px,46%\)/);
   assert.match(controls,/@container/);
 });
@@ -65,7 +67,7 @@ test('standalone shell keeps the intro visible, centers its copy, and anchors th
   const i18n=readFileSync(new URL('../../web/src/ui/i18n.js',import.meta.url),'utf8');
   assert.doesNotMatch(layout,/\.has-used-app \.intro/);
   assert.match(layout,/\.intro \{[^}]*text-align: center/s);
-  assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*top: auto;[^}]*bottom: calc\(max\(8px,calc\(env\(safe-area-inset-bottom,0px\) - 10px\)\) \+ var\(--dock-keyboard-offset,0px\)\)/);
+  assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*position: fixed;[^}]*top: calc\(var\(--dock-viewport-bottom,var\(--dock-shell-height,100lvh\)\)[^}]*transform: translate\(-50%,-100%\)/s);
   assert.match(i18n,/Add Styles, Texture and Grain\.<br>Privately, on your device\./);
   assert.equal([...html.matchAll(/class="icon-button glass-surface"[^>]*><svg/g)].length>=2,true);
 });
@@ -77,6 +79,9 @@ test('portrait aperture keeps the yellow selector centered while the ruler moves
   assert.match(css,/\.ai-aperture-origin \{/);
   assert.match(js,/className='ai-aperture-origin'/);
   assert.match(js,/ruler\.style\.transform=.*-index\*TICK_SPACING/);
+  assert.match(css,/\.ai-aperture-track \{[^}]*touch-action: pan-y/s);
+  assert.match(js,/track\.addEventListener\('pointermove'/);
+  assert.match(js,/drag\.startIndex-dx\/TICK_SPACING/);
   assert.doesNotMatch(js,/selection\.style\.left/);
 });
 
@@ -85,16 +90,22 @@ test('settings follows iOS grouped rows with language navigation, appearance pre
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
-  assert.match(html,/class="settings-github icon-button glass-surface" href="https:\/\/github\.com\/WanThinnn\/stylio"/);
+  assert.match(html,/class="top-github-symbol"/);
+  assert.doesNotMatch(html,/class="settings-github icon-button glass-surface"/);
   assert.match(html,/class="settings-nav-row language-row"/);
+  assert.match(html,/class="settings-leading-icon settings-icon-blue"/);
+  assert.doesNotMatch(sheets,/\.language-row \.settings-leading-icon \{/);
+  assert.match(html,/class="settings-leading-icon settings-icon-appearance"/);
+  assert.match(sheets,/\.settings-icon-appearance \{[^}]*linear-gradient/s);
   assert.match(html,/class="appearance-segment"/);
   assert.match(html,/settings\.defaultsave/);
   assert.match(html,/settings\.keepscreen/);
   assert.match(html,/settings\.originalformat/);
   assert.match(sheets,/\.language-row #lang \{[^}]*appearance: none/s);
   assert.match(sheets,/\.settings-leading-icon/);
-  assert.match(layout,/body\.is-settings-destination \.top-guide \{[^}]*translateY\(68px\)/s);
-  assert.match(sheets,/@keyframes settings-github-arrive/);
+  assert.match(layout,/\.top-github-symbol \{[^}]*translateY\(-22px\)/s);
+  assert.match(layout,/body\.is-settings-destination \.top-help-symbol \{[^}]*translateY\(22px\)/s);
+  assert.match(layout,/body\.is-settings-destination \.top-github-symbol \{[^}]*translateY\(0\)/s);
   assert.match(html,/id="refresh-app"/);
   assert.match(html,/id="version">1\.0\.0</);
   assert.match(bootstrap,/registration\?\.update\?\.\(\)/);
@@ -132,6 +143,16 @@ test('search and sheet surfaces suppress browser-blue focus frames without remov
   assert.doesNotMatch(sheets,/\.language-row:has\(#lang:focus-visible\) \{[^}]*var\(--focus-ring\)/s);
   assert.match(base,/:focus-visible \{[^}]*outline: 3px solid var\(--focus-ring\)/s);
 });
+test('sheets close with motion and the full-screen photo header protects the Dynamic Island safe area',()=>{
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
+  assert.match(sheets,/\.sheet\.is-closing \{[^}]*sheet-out/s);
+  assert.match(sheets,/@keyframes sheet-out/);
+  assert.match(results,/@media\(max-width:767px\)[\s\S]*?\.photo-workspace>\.sheet-header \{[^}]*padding-top: calc\(20px \+ env\(safe-area-inset-top,0px\)\)[^}]*backdrop-filter: none/s);
+  assert.match(results,/\.photo-workspace\[open\] \{[^}]*photo-workspace-in/s);
+  assert.match(results,/\.photo-workspace:focus,[\s\S]*?\.photo-workspace:focus-visible \{[^}]*outline: none/s);
+});
+
 test('photo actions use the shared liquid-glass material as a floating capsule',()=>{
   const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
   const materials=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');
@@ -145,9 +166,13 @@ test('photo actions use the shared liquid-glass material as a floating capsule',
 });
 test('tab glass has a pressed lens without nested backdrop filters and preserves accessibility fallbacks',()=>{
   const css=readFileSync(new URL('../../web/styles/components/navigation-effects.css',import.meta.url),'utf8');
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   assert.match(css,/\.app-tabs\.is-pressing::before/);
   assert.match(css,/scale: 1\.12 1\.36/);
   assert.match(css,/touch-action: pan-y pinch-zoom/);
+  assert.match(layout,/transform: translate3d\(var\(--lens-offset,calc\(var\(--tab-index,0\) \* 100%\)\),0,0\)/);
+  assert.match(css,/\.app-tabs\.is-dragging::before/);
+  assert.match(css,/contain: paint/);
   assert.match(css,/prefers-reduced-motion:reduce/);
   assert.match(css,/prefers-reduced-transparency:reduce/);
   assert.match(css,/forced-colors:active/);

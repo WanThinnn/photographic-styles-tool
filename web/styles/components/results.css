@@ -154,6 +154,34 @@
   overscroll-behavior: contain
 }
 
+.photo-workspace[open] {
+  animation: photo-workspace-in 220ms var(--spring-ease)
+}
+
+.photo-workspace.is-closing {
+  animation: photo-workspace-out 170ms ease-in both
+}
+
+.photo-workspace:focus,
+.photo-workspace:focus-visible {
+  outline: none
+}
+
+@keyframes photo-workspace-in {
+  from { opacity: 0; transform: translateY(20px) scale(.985) }
+  to { opacity: 1; transform: none }
+}
+
+@keyframes photo-workspace-out {
+  from { opacity: 1; transform: none }
+  to { opacity: 0; transform: translateY(16px) scale(.99) }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .photo-workspace[open],
+  .photo-workspace.is-closing { animation: none }
+}
+
 .photo-workspace>.sheet-header {
   background: var(--bg)
 }
@@ -385,7 +413,12 @@
     border-radius: 0
   }
   .photo-workspace>.sheet-header {
-    padding-top: calc(8px + env(safe-area-inset-top,0px))
+    padding-top: calc(20px + env(safe-area-inset-top,0px));
+    min-height: calc(72px + env(safe-area-inset-top,0px));
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 1px 0 var(--line)
   }
   .row {
     padding: 16px max(20px,env(safe-area-inset-right,0px)) calc(var(--actions-height) + 24px) max(20px,env(safe-area-inset-left,0px))

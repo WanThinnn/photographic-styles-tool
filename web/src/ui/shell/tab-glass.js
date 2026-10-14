@@ -1,35 +1,54 @@
 // Lightweight press/drag lens, adapted from ionic-theme-ios27 (MIT notice in web/).
 // Presentation previews do not navigate; release commits one real destination.
-// Native button clicks/keyboard semantics remain available without Pointer Events.
+// Pointer moves are frame-coalesced and use cached geometry so iOS WebKit does
+// not perform repeated layout reads while compositing Liquid Glass.
 export function bindTabGlass({nav,tabs,select,win=window,doc=document}){
   if(!win.PointerEvent)return ()=>{};
-  let pointer=null,timer=null,suppressClick=false;
+  let pointer=null,timer=null,suppressClick=false,moveFrame=null,pendingMove=null;
   const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const clearTimer=()=>{if(timer!==null)win.clearTimeout(timer);timer=null;};
-  const preview=index=>{
-    tabs.forEach((tab,i)=>tab.classList.toggle('is-previewed',i===index));
-    nav.style.setProperty('--lens-center',center(tabs[index])+'px');
+  const geometry=()=>{
+    const bar=nav.getBoundingClientRect(),rects=tabs.map(tab=>tab.getBoundingClientRect());
+    const baseLeft=rects[0].left-bar.left;
+    return {
+      bar,baseLeft,
+      lefts:rects.map(rect=>rect.left-bar.left),
+      centers:rects.map(rect=>rect.left-bar.left+rect.width/2),
+      widths:rects.map(rect=>rect.width)
+    };
   };
-  const center=tab=>{
-    const bar=nav.getBoundingClientRect(),rect=tab.getBoundingClientRect();
-    return rect.left-bar.left+rect.width/2;
+  const setPreview=(index,offset)=>{
+    if(pointer?.previewIndex!==index){
+      tabs.forEach((tab,i)=>tab.classList.toggle('is-previewed',i===index));
+      if(pointer)pointer.previewIndex=index;
+    }
+    nav.style.setProperty('--lens-offset',offset+'px');
+  };
+  const preview=index=>{
+    const g=geometry(),offset=g.lefts[index]-g.baseLeft;
+    if(pointer)Object.assign(pointer,g);
+    setPreview(index,offset);
   };
   const reset=()=>{
-    nav.classList.remove('is-pressing','is-releasing');
-    nav.style.removeProperty('--lens-center');
+    nav.classList.remove('is-pressing','is-dragging','is-releasing');
+    nav.style.removeProperty('--lens-offset');
     tabs.forEach(tab=>tab.classList.remove('is-previewed'));
+  };
+  const cancelMoveFrame=()=>{
+    pendingMove=null;
+    if(moveFrame!==null){win.cancelAnimationFrame(moveFrame);moveFrame=null;}
   };
   const release=(cancel=false)=>{
     if(!pointer)return;
-    const state=pointer;pointer=null;
+    const state=pointer;pointer=null;cancelMoveFrame();
     try{nav.releasePointerCapture(state.id);}catch{}
     if(!cancel){
       suppressClick=true;
       select(tabs[state.index].dataset.screen);
     }
-    nav.classList.remove('is-pressing');
+    nav.classList.remove('is-pressing','is-dragging');
     tabs.forEach(tab=>tab.classList.remove('is-previewed'));
-    nav.style.removeProperty('--lens-center');
+    nav.style.removeProperty('--lens-offset');
     if(cancel||reduced()){reset();return;}
     nav.classList.add('is-releasing');
     timer=win.setTimeout(()=>{timer=null;reset();},220);
@@ -39,34 +58,39 @@ export function bindTabGlass({nav,tabs,select,win=window,doc=document}){
     const target=event.target.closest?.('[data-screen]'),index=tabs.indexOf(target);
     if(index<0)return;
     clearTimer();reset();suppressClick=false;
-    pointer={id:event.pointerId,index,startX:event.clientX,startY:event.clientY,dragging:false};
-    preview(index);nav.classList.add('is-pressing');
+    const g=geometry();
+    pointer={id:event.pointerId,index,previewIndex:-1,startX:event.clientX,startY:event.clientY,dragging:false,...g};
+    setPreview(index,g.lefts[index]-g.baseLeft);nav.classList.add('is-pressing');
     try{nav.setPointerCapture(event.pointerId);}catch{}
   };
-  const move=event=>{
+  const applyMove=event=>{
+    moveFrame=null;
     if(!pointer||pointer.id!==event.pointerId)return;
     const dx=event.clientX-pointer.startX,dy=event.clientY-pointer.startY;
     if(!pointer.dragging&&Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){release(true);return;}
     if(Math.abs(dx)<4&&!pointer.dragging)return;
-    pointer.dragging=true;
-    const bar=nav.getBoundingClientRect(),x=event.clientX-bar.left;
-    let nearest=0;
-    tabs.forEach((tab,index)=>{if(Math.abs(center(tab)-x)<Math.abs(center(tabs[nearest])-x))nearest=index;});
+    if(!pointer.dragging){pointer.dragging=true;nav.classList.add('is-dragging');}
+    const x=event.clientX-pointer.bar.left,centers=pointer.centers;
+    let nearest=0,best=Math.abs(centers[0]-x);
+    for(let i=1;i<centers.length;i++){const distance=Math.abs(centers[i]-x);if(distance<best){best=distance;nearest=i;}}
     pointer.index=nearest;
-    tabs.forEach((tab,index)=>tab.classList.toggle('is-previewed',index===nearest));
-    const first=center(tabs[0]),last=center(tabs.at(-1));
-    nav.style.setProperty('--lens-center',Math.max(first,Math.min(last,x))+'px');
+    const width=pointer.widths[nearest],min=pointer.lefts[0],max=pointer.lefts.at(-1);
+    const desired=Math.max(min,Math.min(max,x-width/2));
+    setPreview(nearest,desired-pointer.baseLeft);
+  };
+  const move=event=>{
+    if(!pointer||pointer.id!==event.pointerId)return;
+    pendingMove=event;
+    if(moveFrame===null)moveFrame=win.requestAnimationFrame(()=>{const next=pendingMove;pendingMove=null;if(next)applyMove(next);});
   };
   const up=event=>{
     if(!pointer||pointer.id!==event.pointerId)return;
-    move(event);if(!pointer)return;
-    const bar=nav.getBoundingClientRect();
+    cancelMoveFrame();applyMove(event);if(!pointer)return;
+    const bar=pointer.bar;
     release(event.clientX<bar.left-8||event.clientX>bar.right+8||event.clientY<bar.top-24||event.clientY>bar.bottom+24);
   };
   const cancel=()=>release(true);
   const click=event=>{
-    // Pointer release owns the destination; a synthetic click may still name the
-    // originally pressed tab after dragging. Never navigate to that stale target.
     if(suppressClick&&event.detail>0){suppressClick=false;event.preventDefault();event.stopImmediatePropagation();}
   };
   const keydown=event=>{
@@ -78,9 +102,9 @@ export function bindTabGlass({nav,tabs,select,win=window,doc=document}){
     if(!['Enter',' '].includes(event.key))return;
     clearTimer();reset();
   };
-  const blur=()=>{cancel();clearTimer();reset();};
+  const blur=()=>{cancel();clearTimer();cancelMoveFrame();reset();};
   nav.addEventListener('pointerdown',down);
-  doc.addEventListener('pointermove',move);doc.addEventListener('pointerup',up);
+  doc.addEventListener('pointermove',move,{passive:true});doc.addEventListener('pointerup',up);
   doc.addEventListener('pointercancel',cancel);
   nav.addEventListener('lostpointercapture',cancel);
   nav.addEventListener('click',click,true);

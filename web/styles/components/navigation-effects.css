@@ -4,16 +4,19 @@
 .app-tabs {
   touch-action: pan-y pinch-zoom;
   user-select: none;
-  -webkit-user-select: none
+  -webkit-user-select: none;
+  contain: paint;
+  isolation: isolate;
+  transform: translateZ(0);
+  backface-visibility: hidden
 }
 .app-tabs::before {
-  left: var(--lens-center,calc(4px + (100% - 8px) * (var(--tab-index,0) + .5) / 4));
-  translate: none;
-  transform: translateX(-50%);
   transform-origin: center;
   border: .5px solid transparent;
   scale: 1;
-  transition: left 280ms var(--spring-ease),scale 220ms var(--spring-ease),background 180ms,box-shadow 220ms
+  contain: paint;
+  will-change: transform,scale;
+  transition: transform 280ms var(--spring-ease),scale 220ms var(--spring-ease),background 180ms,box-shadow 220ms
 }
 .app-tabs.is-pressing::before,
 .app-tabs.is-releasing::before {
@@ -30,7 +33,21 @@
 }
 .app-tabs.is-pressing::before {
   scale: 1.12 1.36;
-  transition: left 80ms linear,scale 200ms var(--spring-ease),background 120ms,box-shadow 180ms
+  transition: transform 80ms linear,scale 200ms var(--spring-ease),background 120ms,box-shadow 180ms
+}
+
+.app-tabs.is-dragging::before {
+  transition: scale 160ms var(--spring-ease),background 120ms,box-shadow 160ms
+}
+
+@media(pointer:coarse) {
+  .app-tabs.is-dragging::before {
+    box-shadow:
+      inset 0 1px 1px var(--glass-rim-top),
+      inset 0 -1px 1px var(--glass-rim-bottom),
+      0 0 0 .5px var(--glass-outline),
+      0 3px 10px var(--glass-shade)
+  }
 }
 .app-tabs.is-pressing button[aria-current="page"]:not(.is-previewed) { color: var(--muted) }
 .app-tabs button.is-previewed { color: var(--accent-text) }

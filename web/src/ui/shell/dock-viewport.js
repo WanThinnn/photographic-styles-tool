@@ -1,87 +1,95 @@
-// CSS owns the resting dock position. VisualViewport is used only for a real
-// Search keyboard resize. Standalone iOS PWAs can resume with a stale fixed
-// compositor snapshot; repeated hidden one-pixel scroll nudges refresh that
-// snapshot after WebKit finishes restoring the Home Screen scene.
+// Resting dock placement is CSS-driven, but standalone iOS WebKit can report a
+// too-small viewport unit after relaunch. Keep one explicit shell-height value
+// from the real layout viewport, and reserve VisualViewport only for Search's
+// software keyboard.
 export function bindDockViewport({win=window,doc=document}={}){
   const dock=doc.querySelector('.app-dock'),input=doc.getElementById('history-search');
   const field=doc.getElementById('history-search-field'),viewport=win.visualViewport;
-  if(!dock||!input||!viewport)return ()=>{};
-  const later=win.setTimeout?.bind(win)||setTimeout,cancelLater=win.clearTimeout?.bind(win)||clearTimeout;
-  let frame=null,keyboardSignal=false,recalibrateFrame=null,restoreFrame=null,retryTimers=[];
+  if(!dock?.style||!input)return ()=>{};
+  const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;
+  const requestFrame=win.requestAnimationFrame?.bind(win)||(fn=>later(fn,0));
+  const cancelFrame=win.cancelAnimationFrame?.bind(win)||clearLater;
+  let frame=null,shellFrame=null,keyboardSignal=false,retryTimers=[],shellFloor=0;
   const standalone=()=>win.matchMedia?.('(display-mode: standalone)')?.matches===true||win.navigator?.standalone===true;
-  const clear=()=>{
+  const clearKeyboard=()=>{
     dock.style.removeProperty('--dock-viewport-bottom');
     dock.style.removeProperty('--dock-keyboard-offset');
   };
+  const applyShellHeight=()=>{
+    shellFrame=null;
+    if(!standalone())return;
+    const docHeight=Number(doc.documentElement?.clientHeight)||0;
+    const inner=Number(win.innerHeight)||0;
+    const screenHeight=Number(win.screen?.availHeight)||Number(win.screen?.height)||0;
+    const plausibleScreen=screenHeight>=inner&&(!inner||screenHeight<=inner*1.25)?screenHeight:0;
+    const measured=Math.max(inner,docHeight,plausibleScreen);
+    shellFloor=Math.max(shellFloor,measured);
+    if(shellFloor>0)dock.style.setProperty('--dock-shell-height',shellFloor+'px');
+  };
+  const scheduleShell=()=>{
+    if(shellFrame===null)shellFrame=requestFrame(applyShellHeight);
+  };
+  const refreshShell=()=>{
+    for(const timer of retryTimers)clearLater(timer);
+    retryTimers=[];
+    if(!standalone())return;
+    scheduleShell();
+    for(const delay of [80,240,520]){
+      let timer;
+      timer=later(()=>{
+        retryTimers=retryTimers.filter(id=>id!==timer);
+        scheduleShell();
+      },delay);
+      retryTimers.push(timer);
+    }
+  };
+  if(!viewport){
+    refreshShell();
+    return ()=>{
+      if(shellFrame!==null)cancelFrame(shellFrame);
+      for(const timer of retryTimers)clearLater(timer);
+      dock.style.removeProperty('--dock-shell-height');
+    };
+  }
   const searchFocused=()=>doc.activeElement===input&&field?.hidden===false&&dock.classList?.contains?.('is-searching');
   const update=()=>{
     frame=null;
-    if(!keyboardSignal||!searchFocused()||Math.abs(viewport.scale-1)>.01){clear();return;}
+    if(!keyboardSignal||!searchFocused()||Math.abs(viewport.scale-1)>.01){clearKeyboard();return;}
     const bottom=Number(viewport.height)+Number(viewport.offsetTop),layoutHeight=Number(win.innerHeight);
     const offset=Number.isFinite(bottom)&&Number.isFinite(layoutHeight)?layoutHeight-bottom:0;
     if(bottom>0&&offset>=80&&offset<=Math.min(420,layoutHeight*.65)){
       dock.style.setProperty('--dock-viewport-bottom',bottom+'px');
       dock.style.setProperty('--dock-keyboard-offset',offset+'px');
-    }else clear();
+    }else clearKeyboard();
   };
-  const schedule=()=>{if(frame===null)frame=win.requestAnimationFrame(update);};
-  const cancelPulse=()=>{
-    if(recalibrateFrame!==null){win.cancelAnimationFrame(recalibrateFrame);recalibrateFrame=null;}
-    if(restoreFrame!==null){win.cancelAnimationFrame(restoreFrame);restoreFrame=null;}
-    dock.classList?.remove?.('is-viewport-recalibrating');
-  };
-  const cancelRecalibration=()=>{
-    cancelPulse();
-    for(const timer of retryTimers)cancelLater(timer);
-    retryTimers=[];
-  };
-  const pulseViewport=()=>{
-    if(!standalone()||typeof win.scrollTo!=='function'||searchFocused()||doc.visibilityState==='hidden')return;
-    cancelPulse();
-    dock.classList?.add?.('is-viewport-recalibrating');
-    recalibrateFrame=win.requestAnimationFrame(()=>{
-      recalibrateFrame=null;
-      const x=Number(win.scrollX)||0,y=Number(win.scrollY)||0,delta=y>0?-1:1;
-      win.scrollTo(x,y+delta);
-      restoreFrame=win.requestAnimationFrame(()=>{
-        restoreFrame=null;win.scrollTo(x,y);
-        // Force a geometry read before revealing the composited glass layer.
-        void dock.getBoundingClientRect?.();
-        dock.classList?.remove?.('is-viewport-recalibrating');
-      });
-    });
-  };
-  const recalibrate=()=>{
-    keyboardSignal=false;clear();cancelRecalibration();
-    if(!standalone()||searchFocused())return;
-    // The first pulse handles normal launches. Delayed retries cover the iOS
-    // warm-resume path where fixed/backdrop layers settle hundreds of ms later.
-    pulseViewport();
-    for(const delay of [90,280,650]){
-      let timer;
-      timer=later(()=>{
-        retryTimers=retryTimers.filter(id=>id!==timer);
-        pulseViewport();
-      },delay);
-      retryTimers.push(timer);
-    }
-  };
-  const viewportResize=()=>{if(searchFocused())keyboardSignal=true;schedule();};
+  const schedule=()=>{if(frame===null)frame=requestFrame(update);};
+  const viewportResize=()=>{if(searchFocused())keyboardSignal=true;else refreshShell();schedule();};
   const viewportScroll=()=>{if(keyboardSignal)schedule();};
-  const focus=()=>{cancelRecalibration();keyboardSignal=false;clear();};
-  const reset=()=>{keyboardSignal=false;clear();if(frame!==null){win.cancelAnimationFrame(frame);frame=null;}cancelRecalibration();};
-  const resume=()=>{reset();recalibrate();};
+  const focus=()=>{keyboardSignal=false;clearKeyboard();};
+  const reset=()=>{
+    keyboardSignal=false;clearKeyboard();
+    if(frame!==null){cancelFrame(frame);frame=null;}
+    refreshShell();
+  };
   viewport.addEventListener('resize',viewportResize);viewport.addEventListener('scroll',viewportScroll);
   input.addEventListener('focus',focus);input.addEventListener('blur',reset);
-  win.addEventListener('pagehide',reset);win.addEventListener('pageshow',resume);win.addEventListener('orientationchange',resume);
-  const visibility=()=>{if(doc.visibilityState!=='visible')reset();else recalibrate();};
+  const orientationReset=()=>{shellFloor=0;reset();};
+  win.addEventListener('resize',refreshShell);win.addEventListener('pagehide',clearKeyboard);
+  win.addEventListener('pageshow',reset);win.addEventListener('orientationchange',orientationReset);
+  const visibility=()=>{if(doc.visibilityState==='visible')reset();else clearKeyboard();};
   doc.addEventListener?.('visibilitychange',visibility);
-  recalibrate();
+  clearKeyboard();refreshShell();
   return ()=>{
-    reset();
+    clearKeyboard();
+    if(frame!==null)cancelFrame(frame);
+    if(shellFrame!==null)cancelFrame(shellFrame);
+    for(const timer of retryTimers)clearLater(timer);
+    retryTimers=[];
+    dock.style.removeProperty('--dock-shell-height');
     viewport.removeEventListener('resize',viewportResize);viewport.removeEventListener('scroll',viewportScroll);
     input.removeEventListener('focus',focus);input.removeEventListener('blur',reset);
-    win.removeEventListener('pagehide',reset);win.removeEventListener('pageshow',resume);win.removeEventListener('orientationchange',resume);
+    win.removeEventListener('resize',refreshShell);win.removeEventListener('pagehide',clearKeyboard);
+    win.removeEventListener('pageshow',reset);win.removeEventListener('orientationchange',orientationReset);
     doc.removeEventListener?.('visibilitychange',visibility);
   };
 }

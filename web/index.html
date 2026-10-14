@@ -28,9 +28,9 @@
       <h1 data-i18n="meta.title">Stylio</h1>
       <span class="tagline" data-i18n="app.tagline">Photographic Styles for your photos</span>
     </div>
-    <button id="header-guide" class="icon-button top-guide glass-surface" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 4.5 1.2c-.8 1.1-2.3 1.4-2.3 3"/><path d="M12 17h.01"/></svg>
-      <span class="sr-only" data-i18n="shell.guide">Guide</span>
+    <button id="header-guide" class="icon-button top-guide glass-surface" type="button" aria-label="Guide">
+      <svg class="top-help-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 4.5 1.2c-.8 1.1-2.3 1.4-2.3 3"/><path d="M12 17h.01"/></svg>
+      <svg class="top-github-symbol" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .08 1.53 1.06 1.53 1.06.9 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.64-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.72 0 0 .84-.28 2.75 1.05A9.34 9.34 0 0 1 12 6.95c.85 0 1.7.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.46.1 2.72.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.59.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"/></svg>
     </button>
   </header>
 
@@ -67,7 +67,7 @@
     </button>
   </div>
   <p id="ai-settings-discovery" class="ai-settings-discovery" hidden><span id="ai-settings-discovery-copy">More AI features</span></p>
-  <dialog id="ai-settings" class="sheet" aria-labelledby="ai-sheet-title">
+  <dialog id="ai-settings" class="sheet" aria-labelledby="ai-sheet-title" tabindex="-1">
     <header class="sheet-header"><button type="button" class="icon-button glass-surface" data-close-dialog aria-labelledby="close-ai-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-ai-label" class="sr-only" data-i18n="shell.closeai">Close AI settings</span></button><h2 id="ai-sheet-title" data-i18n="shell.aisettings">AI settings</h2></header>
     <div class="sheet-body ai-settings-panel">
     <h3 class="group-title" data-i18n="shell.effects">Effects</h3>
@@ -140,23 +140,23 @@
   </section>
   <div id="list"></div>
   <div class="app-dock">
-    <nav class="app-tabs glass-surface" aria-label="Stylio">
-      <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span data-i18n="shell.history">History</span><span id="history-count" class="tab-count" hidden></span></button>
-      <button type="button" data-screen="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15M6 8h3M6 11h3M15 8h3M15 11h3"/></svg><span data-i18n="shell.guide">Guide</span></button>
-      <button class="app-tab" data-screen="settings" aria-controls="settings-screen" type="button" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.6 2a8 8 0 0 0-1.6.9l-2-.5-2.5 4.2 1.5 1.5a8 8 0 0 0 0 1.8l-1.5 1.5 2.5 4.2 2-.5a8 8 0 0 0 1.6.9l.6 2h5l.6-2a8 8 0 0 0 1.6-.9l2 .5 2.5-4.2-1.5-1.5a8 8 0 0 0 0-1.8l1.5-1.5-2.5-4.2-2 .5a8 8 0 0 0-1.6-.9l-.6-2Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="shell.settings">Settings</span></button>
-    </nav>
-    <div id="history-search-field" class="dock-search-field glass-surface" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-      <label for="history-search" class="sr-only" data-i18n="shell.search">Search history</label>
-      <input id="history-search" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" aria-controls="history-items" placeholder="Search history">
-      <button id="clear-search" type="button" class="search-clear" hidden aria-labelledby="clear-search-label">×<span id="clear-search-label" class="sr-only" data-i18n="shell.clearsearch">Clear search</span></button>
-    </div>
-    <button id="toggle-search" class="icon-button dock-search glass-surface" type="button" aria-expanded="false" aria-controls="history-search-field" aria-labelledby="search-button-label">
-      <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-      <svg class="search-close-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-      <span id="search-button-label" class="sr-only" data-i18n="shell.search">Search history</span>
-    </button>
+  <nav class="app-tabs glass-surface" aria-label="Stylio">
+    <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span data-i18n="shell.history">History</span><span id="history-count" class="tab-count" hidden></span></button>
+    <button type="button" data-screen="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15M6 8h3M6 11h3M15 8h3M15 11h3"/></svg><span data-i18n="shell.guide">Guide</span></button>
+    <button class="app-tab" data-screen="settings" aria-controls="settings-screen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.6 2a8 8 0 0 0-1.6.9l-2-.5-2.5 4.2 1.5 1.5a8 8 0 0 0 0 1.8l-1.5 1.5 2.5 4.2 2-.5a8 8 0 0 0 1.6.9l.6 2h5l.6-2a8 8 0 0 0 1.6-.9l2 .5 2.5-4.2-1.5-1.5a8 8 0 0 0 0-1.8l1.5-1.5-2.5-4.2-2 .5a8 8 0 0 0-1.6-.9l-.6-2Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="shell.settings">Settings</span></button>
+  </nav>
+  <div id="history-search-field" class="dock-search-field glass-surface" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+    <label for="history-search" class="sr-only" data-i18n="shell.search">Search history</label>
+    <input id="history-search" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" aria-controls="history-items" placeholder="Search history">
+    <button id="clear-search" type="button" class="search-clear" hidden aria-labelledby="clear-search-label">×<span id="clear-search-label" class="sr-only" data-i18n="shell.clearsearch">Clear search</span></button>
   </div>
+  <button id="toggle-search" class="icon-button dock-search glass-surface" type="button" aria-expanded="false" aria-controls="history-search-field" aria-labelledby="search-button-label">
+    <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+    <svg class="search-close-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    <span id="search-button-label" class="sr-only" data-i18n="shell.search">Search history</span>
+  </button>
+</div>
   <section id="guide-screen" class="app-screen guide-screen" hidden aria-labelledby="guide-title">
     <div class="screen-heading"><h2 id="guide-title" data-i18n="shell.guide">Guide</h2></div>
     <div class="help-content guide-content">
@@ -171,9 +171,6 @@
   <section id="settings-screen" class="app-screen settings-screen" hidden aria-labelledby="settings-title">
     <div class="screen-heading settings-heading">
       <h2 id="settings-title" data-i18n="shell.settings">Settings</h2>
-      <a class="settings-github icon-button glass-surface" href="https://github.com/WanThinnn/stylio" target="_blank" rel="noopener noreferrer" aria-label="Open Stylio on GitHub">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .08 1.53 1.06 1.53 1.06.9 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.64-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.72 0 0 .84-.28 2.75 1.05A9.34 9.34 0 0 1 12 6.95c.85 0 1.7.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.46.1 2.72.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.59.69.49A10.25 10.25 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"/></svg>
-      </a>
     </div>
     <div class="settings-content">
       <h3 class="group-title" data-i18n="shell.preferences">Preferences</h3>
@@ -189,7 +186,15 @@
 
       <h3 class="group-title" data-i18n="settings.appearance">Appearance</h3>
       <div class="settings-group appearance-card">
-        <div class="settings-row-copy"><strong id="appearance-control-label" data-i18n="settings.appearance">Appearance</strong><span data-i18n="settings.appearancehint">Choose how Stylio looks on this device.</span></div>
+        <div class="settings-appearance-heading">
+          <span class="settings-leading-icon settings-icon-appearance" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="7.5"/>
+              <path d="M12 4.5a7.5 7.5 0 0 0 0 15Z"/>
+            </svg>
+          </span>
+          <div class="settings-row-copy"><strong id="appearance-control-label" data-i18n="settings.appearance">Appearance</strong><span data-i18n="settings.appearancehint">Choose how Stylio looks on this device.</span></div>
+        </div>
         <div class="appearance-segment" role="group" aria-labelledby="appearance-control-label">
           <button type="button" class="appearance-option" data-theme-value="light" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg><span data-i18n="settings.light">Light</span></button>
           <button type="button" class="appearance-option is-selected" data-theme-value="system" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="3"/><path d="M8 22h8M12 19v3"/></svg><span data-i18n="settings.system">System</span></button>
@@ -234,7 +239,7 @@
     </div>
   </section>
 </main>
-<dialog id="photo-workspace" class="photo-workspace" aria-labelledby="photo-title">
+<dialog id="photo-workspace" class="photo-workspace" aria-labelledby="photo-title" tabindex="-1">
   <header class="sheet-header"><button type="button" class="icon-button glass-surface" id="close-photo" aria-labelledby="close-photo-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-photo-label" class="sr-only" data-i18n="shell.closephoto">Close photo</span></button><h2 id="photo-title" data-i18n="shell.photo">Photo</h2></header>
   <div id="photo-content"></div>
 </dialog>

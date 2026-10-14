@@ -6,10 +6,10 @@ import {bindTabGlass} from '../../web/src/ui/shell/tab-glass.js';
 
 // Small DOM adapter: tests exercise the same shell interface as the browser,
 // not HTML/source snapshots. No decoder, encoder, model or filesystem fixtures.
-function harness({blockedStorage=false,initialState=null,deferBack=false,thumbnails=false}={}){
+function harness({blockedStorage=false,initialState=null,deferBack=false,thumbnails=false,standalone=false}={}){
   let doc;
   class Element extends EventTarget{
-    constructor(tag='div'){super();this.tagName=tag;this.children=[];this.dataset={};this.attrs=new Map();this.css=new Map();this.style={setProperty:(k,v)=>this.css.set(k,v)};this.hidden=false;this.open=false;this.className='';this.classes=new Set();this.classList={toggle:(k,enabled)=>{if(enabled)this.classes.add(k);else this.classes.delete(k);},add:k=>this.classes.add(k)};}
+    constructor(tag='div'){super();this.tagName=tag;this.children=[];this.dataset={};this.attrs=new Map();this.css=new Map();this.style={setProperty:(k,v)=>this.css.set(k,v)};this.hidden=false;this.open=false;this.className='';this.classes=new Set();this.classList={toggle:(k,enabled)=>{if(enabled)this.classes.add(k);else this.classes.delete(k);},add:k=>this.classes.add(k),remove:k=>this.classes.delete(k),contains:k=>this.classes.has(k)};}
     get childNodes(){return [...this.children];}
     get firstElementChild(){return this.children[0];}
     get isConnected(){return !!this.parentElement||this===doc.body;}
@@ -23,6 +23,7 @@ function harness({blockedStorage=false,initialState=null,deferBack=false,thumbna
     remove(){if(this.parentElement){const siblings=this.parentElement.children;siblings.splice(siblings.indexOf(this),1);this.parentElement=null;}}
     focus(){doc.activeElement=this;}
     blur(){if(doc.activeElement===this)doc.activeElement=null;}
+    scrollTo(_x,y){this.scrollTop=y;}
     click(){this.focus();this.dispatchEvent(new Event('click'));}
     showModal(){this.open=true;}
     close(){this.open=false;}
@@ -44,11 +45,13 @@ function harness({blockedStorage=false,initialState=null,deferBack=false,thumbna
   for(const id of ['photo-workspace','photo-content','close-photo','photo-title','settings-screen','guide-screen','history-search','toggle-search','history-search-field','clear-search','search-button-label','history-search-summary','history-no-matches','.app-tabs','.app-dock','header-guide','open-ai-settings','ai-settings','depth-model','history-items','history-empty','history-count','current-task','task-content','process-screen','history-screen']){
     const el=new Element();nodes.set(id,el);doc.body.append(el);
   }
+  const main=new Element('main');main.scrollTop=0;nodes.set('main',main);doc.body.append(main);
   const tabs=['process','history','guide','settings'].map(name=>{const el=new Element('button');el.dataset.screen=name;doc.body.append(el);return el;});
   const sheets=['ai-settings'].map(id=>nodes.get(id));
   for(const sheet of sheets){const button=new Element('button');button.closeButton=true;sheet.append(button);}
   const storage=new Map(),entries=[initialState];let cursor=0,pendingBack;
   const win=new EventTarget();win.scrollY=0;win.scrollTo=(_x,y)=>win.scrollY=y;
+  win.navigator={standalone};win.matchMedia=query=>({matches:standalone&&query==='(display-mode: standalone)'});
   let intersection;
   if(thumbnails){
     win.IntersectionObserver=class {constructor(callback){intersection=callback;}observe(){}unobserve(){}};
@@ -150,6 +153,7 @@ test('Settings is a destination, keeps results, restores scroll, and participate
 test('AI controls remain a quick modal sheet rather than a navigation destination',()=>{
   const h=harness();h.$('open-ai-settings').click();
   assert.equal(h.$('ai-settings').open,true);
+  assert.equal(h.doc.activeElement,h.$('ai-settings'),'dialog surface owns initial focus instead of the close button');
   assert.equal(h.$('process-screen').hidden,false);
 });
 
@@ -178,7 +182,7 @@ test('four destinations include a standalone Guide and Settings, with Back and s
     h.tabs[index].click();
     assert.equal(h.$(name+'-screen').hidden,false);
     assert.equal(h.tabs[index].getAttribute('aria-current'),'page');
-    assert.equal(h.$('header-guide').getAttribute('aria-hidden'),String(name==='settings'));
+    assert.equal(h.$('header-guide').getAttribute('aria-label'),name==='settings'?'GitHub':'shell.guide');
     assert.equal(h.doc.body.classes.has('is-settings-destination'),name==='settings');
     for(const other of ['process','history','guide','settings'])if(other!==name)assert.equal(h.$(other+'-screen').hidden,true);
   }
@@ -214,33 +218,26 @@ test('browser Back closes search and leaves the selected destination valid',()=>
 });
 
 
-test('standalone PWA refreshes a stale fixed viewport on resume and only lifts for a real Search keyboard resize',()=>{
-  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map(),classes=new Set();
-  viewport.height=550;viewport.offsetTop=24;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=700;win.scrollX=0;win.scrollY=42;
-  win.matchMedia=()=>({matches:true});win.navigator={standalone:true};
-  const scrolls=[];win.scrollTo=(x,y)=>{scrolls.push([x,y]);win.scrollX=x;win.scrollY=y;};
+test('dock clears stale offsets on resume and only lifts for a real Search keyboard resize',()=>{
+  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map(),classes=new Set(['is-searching']);
+  viewport.height=550;viewport.offsetTop=24;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=700;
   let frame,scheduled=0;win.requestAnimationFrame=fn=>{frame=fn;scheduled++;return scheduled;};win.cancelAnimationFrame=()=>frame=null;
   const flush=()=>{const next=frame;frame=null;next?.();};
   const dock={
     style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)},
-    classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
-    getBoundingClientRect:()=>({height:60})
+    classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)}
   };
-  const field={hidden:true};
+  const field={hidden:false};
   const doc={activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?field:input};
   values.set('--dock-viewport-bottom','stale');values.set('--dock-keyboard-offset','180px');
   const dispose=bindDockViewport({win,doc});
-  assert.equal(classes.has('is-viewport-recalibrating'),true);
-  flush();assert.deepEqual(scrolls.at(-1),[0,41]);
-  flush();assert.deepEqual(scrolls.at(-1),[0,42]);
-  assert.equal(classes.has('is-viewport-recalibrating'),false);
-  win.dispatchEvent(new Event('pageshow'));flush();flush();
-  assert.equal(values.has('--dock-viewport-bottom'),false,'warm PWA resume clears restored viewport state');
+  assert.equal(values.has('--dock-viewport-bottom'),false,'binding clears stale inline viewport state');
   assert.equal(values.has('--dock-keyboard-offset'),false);
+  win.dispatchEvent(new Event('pageshow'));
+  assert.equal(values.has('--dock-keyboard-offset'),false,'warm resume does not invent a resting offset');
 
-  field.hidden=false;classes.add('is-searching');doc.activeElement=input;
-  input.dispatchEvent(new Event('focus'));
-  assert.equal(values.has('--dock-keyboard-offset'),false,'focus alone never trusts a stale VisualViewport');
+  doc.activeElement=input;input.dispatchEvent(new Event('focus'));
+  assert.equal(values.has('--dock-keyboard-offset'),false,'focus alone never trusts stale geometry');
   const beforeKeyboard=scheduled;
   viewport.dispatchEvent(new Event('resize'));viewport.dispatchEvent(new Event('scroll'));
   assert.equal(scheduled,beforeKeyboard+1,'resize/scroll coalesce into one frame');flush();
@@ -251,8 +248,23 @@ test('standalone PWA refreshes a stale fixed viewport on resume and only lifts f
   viewport.scale=1.5;viewport.dispatchEvent(new Event('resize'));flush();
   assert.equal(values.has('--dock-keyboard-offset'),false,'pinch zoom is never treated as a keyboard');
   viewport.scale=1;win.dispatchEvent(new Event('pagehide'));
-  assert.equal(values.has('--dock-keyboard-offset'),false,'pagehide clears state before WebKit snapshots the PWA');
+  assert.equal(values.has('--dock-keyboard-offset'),false,'pagehide clears keyboard offsets');
   dispose();viewport.dispatchEvent(new Event('resize'));assert.equal(frame,null);
+});
+test('standalone dock keeps the full iPhone shell height when short content changes viewport reporting',()=>{
+  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
+  viewport.height=720;viewport.offsetTop=0;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=756;
+  win.screen={height:844,availHeight:844};win.navigator={standalone:true};win.matchMedia=()=>({matches:true});
+  let frame;win.requestAnimationFrame=fn=>{frame=fn;return 1;};win.cancelAnimationFrame=()=>frame=null;
+  win.setTimeout=()=>1;win.clearTimeout=()=>{};
+  const dock={style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)},classList:{contains:()=>false}};
+  const doc={documentElement:{clientHeight:756},activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?{hidden:true}:input,addEventListener(){},removeEventListener(){}};
+  const flush=()=>{const next=frame;frame=null;next?.();};
+  const dispose=bindDockViewport({win,doc});flush();
+  assert.equal(values.get('--dock-shell-height'),'844px','screen height stabilizes a short Process screen');
+  win.innerHeight=720;doc.documentElement.clientHeight=720;win.dispatchEvent(new Event('resize'));flush();
+  assert.equal(values.get('--dock-shell-height'),'844px','dismissing first-run content cannot pull the dock upward');
+  dispose();
 });
 test('dock viewport enhancement is optional without VisualViewport',()=>{
   assert.doesNotThrow(()=>bindDockViewport({win:{},doc:{querySelector:()=>({}),getElementById:()=>({})}})());
@@ -280,18 +292,19 @@ function glassHarness({reduced=false}={}){
     const tab=target();tab.dataset={screen:name};tab.closest=()=>tab;
     tab.getBoundingClientRect=()=>({left:index*100,right:(index+1)*100,width:100});return tab;
   });
-  let scheduled;
+  let scheduled,frame;
   win.PointerEvent=function(){};
   win.matchMedia=()=>({matches:reduced});
   win.setTimeout=fn=>{scheduled=fn;return 1;};win.clearTimeout=()=>scheduled=null;
+  win.requestAnimationFrame=fn=>{frame=fn;return 2;};win.cancelAnimationFrame=()=>frame=null;
   const dispose=bindTabGlass({nav,tabs,doc,win,select:name=>selected.push(name)});
-  return {nav,tabs,doc,win,selected,dispose,settle(){scheduled?.();scheduled=null;}};
+  return {nav,tabs,doc,win,selected,dispose,flushFrame(){const next=frame;frame=null;next?.();},settle(){scheduled?.();scheduled=null;}};
 }
 test('glass lens previews a press without navigating, then commits once and settles',()=>{
   const h=glassHarness();h.nav.fire('pointerdown',{target:h.tabs[1],clientX:150});
   assert.equal(h.nav.classList.contains('is-pressing'),true);
   assert.deepEqual(h.selected,[]);
-  assert.equal(h.nav.style.getPropertyValue('--lens-center'),'150px');
+  assert.equal(h.nav.style.getPropertyValue('--lens-offset'),'100px');
   h.doc.fire('pointerup',{clientX:150});
   assert.deepEqual(h.selected,['history']);
   assert.equal(h.nav.classList.contains('is-releasing'),true);
@@ -312,7 +325,7 @@ test('cancel, vertical scrolling, window blur and outside release do not navigat
   const h=glassHarness();
   for(const action of ['pointercancel','vertical','blur','outside']){
     h.nav.fire('pointerdown',{target:h.tabs[0]});
-    if(action==='vertical')h.doc.fire('pointermove',{clientX:52,clientY:90});
+    if(action==='vertical'){h.doc.fire('pointermove',{clientX:52,clientY:90});h.flushFrame();}
     else if(action==='blur')h.win.fire('blur');
     else h.doc.fire(action==='outside'?'pointerup':action,{clientX:action==='outside'?450:50});
     assert.equal(h.nav.classList.contains('is-pressing'),false);

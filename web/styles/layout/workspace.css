@@ -131,8 +131,17 @@
 }
 
 .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger {
-  outline: 1px solid var(--ai-violet);
-  outline-offset: 2px
+  outline: none;
+  animation: ai-settings-discovery-nudge 720ms var(--spring-ease) 180ms 2
+}
+
+@keyframes ai-settings-discovery-nudge {
+  0%,100% { scale: 1; box-shadow: var(--control-shadow,0 2px 10px #00000012) }
+  45% { scale: 1.08; box-shadow: 0 5px 18px #0000001c }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger { animation: none }
 }
 
 @media(hover:hover) {

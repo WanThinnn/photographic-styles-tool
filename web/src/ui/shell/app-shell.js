@@ -28,7 +28,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     for(const name of screens)$(name+'-screen').hidden=name!==next;
     const settingsActive=next==='settings',guideAction=$('header-guide');
     doc.body.classList.toggle('is-settings-destination',settingsActive);
-    guideAction.setAttribute('aria-hidden',String(settingsActive));guideAction.tabIndex=settingsActive?-1:0;
+    guideAction.setAttribute('aria-label',settingsActive?'GitHub':translate('shell.guide'));
     for(const button of tabs){if(button.dataset.screen===next)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');}
     doc.querySelector('.app-tabs').style.setProperty('--tab-index',String(screens.indexOf(next)));
     win.scrollTo(0,positions[next]);
@@ -92,7 +92,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       win.history.replaceState({...win.history.state,stylioTab:destination},'');
       win.history.pushState({stylioPhoto:id,stylioTab:destination},'');
     }
-    photo.showModal();photo.scrollTop=0;
+    photo.showModal();photo.scrollTop=0;photo.focus({preventScroll:true});
     record.measureActions?.();
   }
   photo.addEventListener('cancel',event=>{event.preventDefault();closePhoto();});
@@ -115,20 +115,33 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     win.history.replaceState({...win.history.state,stylioTab:destination},'');
     win.history.pushState({stylioTab:next},'');showScreen(next);
   }
-  $('header-guide')?.addEventListener('click',()=>navigate('guide'));
+  $('header-guide')?.addEventListener('click',()=>{
+    if(destination==='settings'){win.open?.('https://github.com/WanThinnn/stylio','_blank','noopener,noreferrer');return;}
+    navigate('guide');
+  });
   for(const button of tabs)button.addEventListener('click',()=>navigate(button.dataset.screen));
   bindTabGlass({nav:doc.querySelector('.app-tabs'),tabs,select:navigate,win,doc});
   for(const [trigger,id]of [['open-ai-settings','ai-settings']]){
     const sheet=$(id);
+    let closingTimer;
+    const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;
+    const closeSheet=()=>{
+      if(!sheet.open||sheet.classList.contains('is-closing'))return;
+      if(win.matchMedia?.('(prefers-reduced-motion: reduce)').matches){sheet.close();return;}
+      sheet.classList.add('is-closing');
+      closingTimer=later(()=>{closingTimer=null;sheet.classList.remove('is-closing');sheet.close();},175);
+    };
     $(trigger).addEventListener('click',()=>{
       for(const other of doc.querySelectorAll('dialog[open]'))if(other!==sheet)other.close();
-      sheet.showModal();
+      if(closingTimer!==undefined){clearLater(closingTimer);closingTimer=undefined;}
+      sheet.classList.remove('is-closing');sheet.showModal();sheet.focus({preventScroll:true});
     });
-    sheet.querySelector('[data-close-dialog]').addEventListener('click',()=>sheet.close());
+    sheet.querySelector('[data-close-dialog]').addEventListener('click',closeSheet);
+    sheet.addEventListener('cancel',event=>{event.preventDefault();closeSheet();});
     sheet.addEventListener('click',event=>{
       if(event.target!==sheet)return;
       const rect=sheet.getBoundingClientRect();
-      if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)sheet.close();
+      if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeSheet();
     });
   }
   let used=false;try{used=win.localStorage.getItem('stylio-has-processed')==='1';}catch{}

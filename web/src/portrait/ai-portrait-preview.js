@@ -39,13 +39,43 @@ function apertureControl(input,strings){
   };
   const active=enabled=>{adjusting=enabled;control.classList.toggle('is-adjusting',enabled);update();};
   const events=new AbortController(),options={signal:events.signal};
-  input.addEventListener('pointerdown',()=>active(true),options);
-  window.addEventListener('pointerup',()=>{if(adjusting)active(false);},options);
-  window.addEventListener('pointercancel',()=>{if(adjusting)active(false);},options);
-  window.addEventListener('blur',()=>{if(adjusting)active(false);},options);
+  let drag=null;
+  const setIndex=index=>{
+    const next=Math.max(0,Math.min(APERTURES.length-1,index));
+    if(Number(input.value)===next)return;
+    input.value=String(next);input.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  track.addEventListener('pointerdown',event=>{
+    if(event.button!==0||event.isPrimary===false)return;
+    const rect=track.getBoundingClientRect(),center=rect.left+rect.width/2,startIndex=Number(input.value);
+    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,startIndex,center,moved:false,captured:false};
+    input.focus({preventScroll:true});active(true);
+  },options);
+  track.addEventListener('pointermove',event=>{
+    if(!drag||drag.id!==event.pointerId)return;
+    const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY;
+    if(!drag.moved&&Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){drag=null;active(false);return;}
+    if(Math.abs(dx)<4&&!drag.moved)return;
+    drag.moved=true;
+    if(!drag.captured){try{track.setPointerCapture(event.pointerId);drag.captured=true;}catch{}}
+    event.preventDefault();
+    setIndex(Math.round(drag.startIndex-dx/TICK_SPACING));
+  },options);
+  const finishDrag=event=>{
+    if(!drag||drag.id!==event.pointerId)return;
+    if(!drag.moved){
+      const offset=(event.clientX-drag.center)/TICK_SPACING;
+      setIndex(Math.round(drag.startIndex+offset));
+    }else input.dispatchEvent(new Event('change',{bubbles:true}));
+    try{if(drag.captured)track.releasePointerCapture(event.pointerId);}catch{}
+    drag=null;active(false);
+  };
+  track.addEventListener('pointerup',finishDrag,options);
+  track.addEventListener('pointercancel',event=>{if(drag?.id===event.pointerId){drag=null;active(false);}},options);
+  window.addEventListener('blur',()=>{drag=null;if(adjusting)active(false);},options);
   input.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))active(true);},options);
   input.addEventListener('keyup',()=>active(false),options);
-  input.addEventListener('blur',()=>active(false),options);
+  input.addEventListener('blur',()=>{if(!drag)active(false);},options);
   input.addEventListener('input',update,options);update();
   return {element:control,update,dispose:()=>events.abort()};
 }

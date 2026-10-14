@@ -554,6 +554,52 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Tất cả current-version identifiers chuyển lên `1.0.0`: Python package metadata, uv lock project entry, Python `VERSION`, Web `VERSION`, Settings version, README EN/ZH và facts current coverage. Các dòng lịch sử/changelog `v0.6.2` được giữ nguyên vì mô tả mốc phát hành cũ, không phải current version.
 - Warm-reopen PWA nudge giờ không chỉ chạy một lần lúc bind. Standalone launch/resume pulse ngay và retry sau 90ms, 280ms và 650ms; mỗi pulse ẩn dock, scroll 1px, trả lại đúng vị trí cũ, ép geometry read rồi hiện lại. Retry bị hủy khi Search focus/pagehide để không can thiệp keyboard path.
 - Service Worker app-shell cache tăng v163.
+### Cập nhật sau đối chiếu `ref/ionic-theme-ios27/docs` và kiểm chứng iPhone lần 4
+
+- Đã đọc/đối chiếu `animation.md`, `features.md`, `special-markup.md`, `native-ui-shell.md` và `feedback.md`. Các điểm áp dụng cho Web shell của Stylio: gesture effect chỉ là presentation layer; navigation thật vẫn do app sở hữu; 44px glass controls; Reduced Motion; tab bar nằm trong safe area; drag không được ép layout mỗi pointer event; native UIKit shell chỉ áp dụng cho Capacitor nên Stylio Web/PWA giữ CSS fallback.
+- Tab glass được tối ưu riêng cho WebKit iOS: geometry của bar/tabs chỉ đo một lần khi pointer-down, pointer-move được coalesce theo `requestAnimationFrame`, chỉ đổi preview class khi target tab thay đổi, lens chuyển bằng compositor `translate3d` thay vì animate `left`, và coarse-pointer drag giảm shadow cost. `contain: paint` + isolated compositing layer tránh repaint lan sang cả dock. Đây là khác biệt chính so với Windows trước đó vốn chịu layout/backdrop compositing nhẹ hơn.
+- Hero `A new mood.` tăng lên 36px desktop / 32px mobile.
+- AI Settings có `sheet-out` animation khi đóng bằng X, backdrop hoặc Escape; Reduced Motion đóng ngay.
+- Photo detail mobile tăng safe-area top và header trở thành translucent blur 22px/saturate để nội dung cuộn phía sau được xử lý giống iOS scroll-edge chrome, tránh cảm giác header/dynamic island dính trực tiếp vào nội dung.
+- Aperture ruler không còn phụ thuộc native invisible range cho touch drag: track tự xử lý horizontal Pointer Events, drag trái/phải đổi từng aperture theo tick spacing, tap vẫn chọn tick, vertical pan vẫn được nhường cho scroll, input range tiếp tục giữ keyboard/AT semantics.
+- PWA warm-reopen fix cũ bằng auto-scroll nudge được bỏ vì kiểm chứng iPhone cho thấy không ổn định. Kiến trúc standalone đổi hẳn: `.app-dock` được đưa ra ngoài `<main>`, `body` khóa scroll, `<main>` trở thành internal scroll container, và dock dùng `position:absolute` ở viewport shell thay cho `position:fixed + backdrop-filter`. Như vậy WebKit không còn phải restore fixed composited glass layer sau lần mở app thứ 2. `dock-viewport.js` giờ chỉ xử lý keyboard offset, không tự scroll trang nữa.
+- Top-right Help/GitHub giờ là cùng một glass control với hai symbol chồng nhau. Guide/Process ↔ Settings crossfade + translate/rotate hai chiều trong cùng control nên cả Guide → Settings và Settings → Guide đều có transition; ở Settings control mở GitHub.
+- Service Worker app-shell cache tăng v164.
+
+**Cần iPhone test lại:** (1) giữ và kéo lens qua 4 tab liên tục; (2) đóng/mở PWA ít nhất 3 lần, không chạm/scroll trước khi nhìn dock; (3) kéo aperture liên tục f/1.4 → f/16 → Off; (4) mở/đóng AI Settings; (5) cuộn Photo detail dưới Dynamic Island.
+### Hotfix regression toolbar sau thay đổi standalone shell
+
+- Revert kiến trúc `body overflow:hidden + main internal scroll + dock absolute` vì kiểm chứng thực tế cho thấy dock bị treo/sai hành vi.
+- `.app-dock` được đưa lại vào trong `<main>` và trở về `position: fixed`.
+- Riêng standalone PWA không dùng `bottom` nữa; dock neo bằng `top: calc(var(--dock-viewport-bottom,100svh) - safe-area)` + `translateY(-100%)`. `100svh` ổn định hơn dynamic viewport khi warm reopen, còn VisualViewport chỉ ghi đè `--dock-viewport-bottom` lúc keyboard Search thực sự làm viewport co lại.
+- Khôi phục document scroll bình thường; bỏ toàn bộ internal-scroll abstraction trong app-shell.
+- Service Worker app-shell cache tăng v165.
+
+### Cập nhật theo ảnh iPhone 4:20–4:24
+
+- Hạ nội dung chính thêm xuống khỏi status-bar/Dynamic Island: mobile main dùng `safe-area-inset-top + 24px` (desktop +18px). Photo detail mobile cũng tăng top inset lên `+20px`; bỏ backdrop blur ở header Photo để tránh toàn bộ chrome phía trên bị mờ như ảnh kiểm chứng.
+- Photo detail mở từ Activity hoặc History có `photo-workspace-in` (fade + translate + scale nhẹ, 220ms spring). Dialog tự focus vào chính surface thay vì nút X để tránh blue focus ring tức thời; Reduced Motion tắt animation.
+- Selected tab lens đổi hình học: resting lens dùng `translate3d(--lens-offset / tab-index)` với cùng left/width như 4 button; khi drag, offset lấy trực tiếp từ rect thật của tab thay vì tính tâm 1/4. Điều này loại bỏ sai lệch kính so với icon/text trên iOS và vẫn giữ frame-coalesced drag.
+- Aperture bỏ viền xanh WebKit: invisible range tự bỏ outline; track keyboard focus chỉ giữ inset neutral 0.5px theo `--line`.
+- Service Worker app-shell cache tăng v166.
+### Cập nhật AI discovery + dock viewport v167
+
+- Bỏ viền tím cứng quanh AI Settings khi discovery hint còn hiện. First-use cue chuyển thành nudge/scale nhẹ 2 nhịp bằng glass shadow trung tính; `More AI features` vẫn giữ nguyên và Reduced Motion tắt animation.
+- AI Settings dialog thêm `tabindex=-1` và sau `showModal()` focus vào chính dialog surface, không còn auto-focus nút X gây blue focus ring trên iOS.
+- Dock không còn neo trực tiếp vào `100svh`, vì ảnh iPhone cho thấy small viewport unit thấp hơn viewport PWA thực tế và làm toolbar nằm quá cao. CSS dùng `--dock-shell-height` với fallback `100lvh`; standalone JS đo `max(window.innerHeight, documentElement.clientHeight)` lúc bind/pageshow/visibility/orientation/resize và retry sau 80/240/520ms. VisualViewport vẫn chỉ override khi Search keyboard thực sự mở.
+- Thêm regression test xác nhận standalone dock lấy 844px layout viewport dù VisualViewport đang báo 720px.
+- Service Worker app-shell cache tăng v167.
+### Settings icon polish v168
+
+- `App language` bỏ icon globe standalone màu đen; dùng lại `settings-leading-icon settings-icon-blue` 30×30 bo góc, cùng hệ icon với Processing/On this device.
+- `Appearance` có thêm leading icon theo hướng iOS Settings: ô vuông bo góc tối với glyph nửa sáng/nửa tối, đặt cùng hàng title + description; segmented Light/System/Dark giữ nguyên logic.
+- Service Worker app-shell cache tăng v168.
+### Dock stability + Appearance icon v169
+
+- Root cause mới của dock được thu hẹp từ ảnh iPhone: Process ngắn (sau Got it) báo viewport thấp hơn, còn Settings hoặc first-run notice dài làm viewport report đúng. `dock-viewport.js` giờ dùng `screen.availHeight/screen.height` làm floor hợp lệ cho standalone iPhone nếu không lệch quá 25% so với `innerHeight`, và shell height chỉ được phép tăng trong cùng orientation; dismiss notice không thể kéo dock lên nữa. Orientation change reset floor và đo lại.
+- Appearance icon được chỉnh sát iOS Settings hơn: square 34×34 nền đen/graphite, bo 10px, viền highlight rất nhẹ; glyph là vòng tròn trắng outline với nửa trái trắng, nửa phải để nền đen hiện qua, thay cho circle fill cũ.
+- Regression mới mô phỏng Process screen ngắn: `innerHeight/clientHeight=756`, iPhone screen=844 rồi tụt còn 720 sau khi dismiss notice; dock vẫn phải giữ 844px.
+- Service Worker app-shell cache tăng v169.
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

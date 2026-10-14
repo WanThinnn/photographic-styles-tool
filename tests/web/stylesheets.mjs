@@ -209,6 +209,16 @@ test('light destructive confirmation uses the higher-contrast iOS-like palette w
   assert.match(sheets,/:root\[data-theme="dark"\] \.ios-confirm-dialog \{[^}]*--confirm-bg: rgb\(var\(--glass-rgb\) \/ \.78\)/s);
 });
 
+test('popup and confirm overlays use compact iOS-style entrance motion with reduced-motion fallbacks',()=>{
+  const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  assert.match(results,/\.task-action-menu \{[^}]*transform-origin: right center;[^}]*animation: task-popover-in 220ms cubic-bezier\(\.32,\.72,0,1\) both/s);
+  assert.match(results,/@keyframes task-popover-in \{[\s\S]*?scale\(\.92\)[\s\S]*?scale\(1\)/s);
+  assert.match(results,/@media\(prefers-reduced-motion:reduce\) \{[\s\S]*?\.task-action-menu,[\s\S]*?animation: none/s);
+  assert.match(sheets,/\.ios-confirm-dialog\[open\] \{[^}]*animation: ios-alert-in 240ms cubic-bezier\(\.32,\.72,0,1\) both/s);
+  assert.match(sheets,/\.ios-confirm-dialog\[open\]::backdrop \{[^}]*animation: ios-alert-backdrop-in 180ms ease-out both/s);
+});
+
 test('first-run notice is a single grouped card and appearance controls are interactive and persisted',()=>{
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
@@ -282,7 +292,7 @@ test('mobile header is fixed and adds a light full-bar blur only after content r
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
   assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 24px\)[^}]*border-bottom: \.5px solid transparent;[^}]*background: var\(--bg\)/s);
-  assert.match(layout,/\.top\.has-scroll-divider \{[^}]*border-bottom-color: var\(--line\);[^}]*background: color-mix\(in srgb,var\(--bg\) 82%,transparent\);[^}]*backdrop-filter: blur\(18px\) saturate\(135%\);[^}]*-webkit-backdrop-filter: blur\(18px\) saturate\(135%\)/s);
+  assert.match(layout,/\.top\.has-scroll-divider \{[^}]*border-bottom-color: var\(--line\);[^}]*background: color-mix\(in srgb,var\(--bg\) 70%,transparent\);[^}]*backdrop-filter: blur\(30px\) saturate\(165%\);[^}]*-webkit-backdrop-filter: blur\(30px\) saturate\(165%\)/s);
   assert.match(bootstrap,/classList\.toggle\('has-scroll-divider',window\.scrollY>12\)/);
   assert.match(bootstrap,/window\.addEventListener\('scroll',queueTopBarDivider,\{passive:true\}\)/);
   assert.doesNotMatch(layout,/\.top\.is-scrolled::before/);
@@ -297,7 +307,11 @@ test('iPhone Safari gets a visual Add to Home Screen guide while standalone and 
   assert.match(html,/id="ios-install-guide" class="ios-install-guide"[^>]*aria-modal="true"[^>]*hidden/);
   assert.match(html,/install-step-icon-neutral/);assert.match(html,/install-step-icon-blue/);assert.match(html,/install-step-icon-violet/);assert.match(html,/install-step-app/);
   assert.match(html,/class="install-guide-orbit install-guide-orbit-model"><svg class="ai-model-network-symbol"/);
-  assert.match(layout,/\.ios-install-guide \{[^}]*position: fixed;[^}]*z-index: 100;[^}]*overflow-y: auto;[^}]*background: var\(--bg\);[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 12px\)[^;]*max\(calc\(env\(safe-area-inset-bottom,0px\) \+ 28px\),132px\)/s);
+  assert.match(layout,/\.ios-install-guide \{[^}]*position: fixed;[^}]*z-index: 100;[^}]*overflow-y: auto;[^}]*touch-action: pan-y;[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*background: var\(--bg\);[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 12px\)[^;]*max\(calc\(env\(safe-area-inset-bottom,0px\) \+ 28px\),132px\)/s);
+  assert.match(layout,/\.ios-install-guide :focus,[\s\S]*?\.ios-install-guide :focus-visible \{[^}]*outline: none!important;[^}]*outline-offset: 0!important/s);
+  assert.match(layout,/\.ios-install-guide\.is-leaving \{[^}]*animation: install-guide-out 280ms cubic-bezier\(\.32,\.72,0,1\) both/s);
+  assert.match(layout,/main\.is-install-guide-entering \{[^}]*animation: install-app-in 320ms cubic-bezier\(\.32,\.72,0,1\) both/s);
+  assert.match(layout,/\.install-guide-continue \{[^}]*transition: transform 380ms cubic-bezier\(\.37,\.36,\.03,1\.34\)/s);
   assert.match(layout,/\.install-guide-shell \{[^}]*display: grid;[^}]*gap: 18px/s);
   assert.match(layout,/\.install-guide-hero \{[^}]*min-height: 172px;[^}]*border-radius: 32px/s);
   assert.match(layout,/\.install-guide-step \{[^}]*min-height: 70px;[^}]*padding: 11px 16px/s);
@@ -309,6 +323,11 @@ test('iPhone Safari gets a visual Add to Home Screen guide while standalone and 
   assert.match(bootstrap,/!\/\(CriOS\|FxiOS\|EdgiOS\|OPiOS\)\/i\.test\(userAgent\)/);
   assert.match(bootstrap,/navigator\.standalone===true\|\|matchMedia\('\(display-mode: standalone\)'\)\.matches/);
   assert.match(bootstrap,/if\(iphoneSafari&&!standalone\)/);
+  assert.match(bootstrap,/installGuide\.classList\.add\('is-leaving'\)/);
+  assert.match(bootstrap,/appMain\?\.classList\.add\('is-install-guide-entering'\)/);
+  assert.match(bootstrap,/setTimeout\(finishInstallGuideClose,320\)/);
+  assert.match(bootstrap,/installGuide\.addEventListener\('dblclick',preventInstallGuideZoom,\{passive:false\}\)/);
+  assert.match(bootstrap,/installGuide\.addEventListener\('touchmove',preventInstallGuideZoom,\{passive:false\}\)/);
   assert.match(fixture,/fixtureParams\.get\('state'\)==='install-guide'/);
   assert.match(strings,/"install\.title": "Use Stylio like an app"/);
   assert.match(strings,/"install\.menutitle": "Open Safari menu"/);

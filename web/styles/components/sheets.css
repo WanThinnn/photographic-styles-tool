@@ -40,6 +40,14 @@ dialog::backdrop {
   -webkit-backdrop-filter: blur(7px)
 }
 
+.ios-confirm-dialog[open] {
+  animation: ios-alert-in 240ms cubic-bezier(.32,.72,0,1) both
+}
+
+.ios-confirm-dialog[open]::backdrop {
+  animation: ios-alert-backdrop-in 180ms ease-out both
+}
+
 .ios-confirm-card {
   margin: 0;
   padding: 14px;
@@ -560,6 +568,16 @@ footer a {
   color: inherit
 }
 
+@keyframes ios-alert-in {
+  from { opacity: 0; transform: translateY(8px) scale(.965) }
+  to { opacity: 1; transform: none }
+}
+
+@keyframes ios-alert-backdrop-in {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
 @keyframes sheet-in {
   from {
     opacity: 0;
@@ -583,6 +601,8 @@ footer a {
 }
 
 @media(prefers-reduced-motion:reduce) {
+  .ios-confirm-dialog[open],
+  .ios-confirm-dialog[open]::backdrop,
   .sheet[open],.sheet.is-closing { animation: none }
 }
 

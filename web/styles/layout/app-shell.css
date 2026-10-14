@@ -271,9 +271,39 @@ body.is-settings-destination .top-github-symbol {
   inset: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   background: var(--bg);
   color: var(--fg);
   padding: calc(env(safe-area-inset-top,0px) + 12px) max(20px,env(safe-area-inset-right,0px)) max(calc(env(safe-area-inset-bottom,0px) + 28px),132px) max(20px,env(safe-area-inset-left,0px))
+}
+
+.ios-install-guide button,
+.ios-install-guide a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent
+}
+
+.ios-install-guide button {
+  appearance: none;
+  -webkit-appearance: none
+}
+
+.ios-install-guide :focus,
+.ios-install-guide :focus-visible {
+  outline: none!important;
+  outline-offset: 0!important
+}
+
+.ios-install-guide.is-leaving {
+  pointer-events: none;
+  animation: install-guide-out 280ms cubic-bezier(.32,.72,0,1) both
+}
+
+main.is-install-guide-entering {
+  animation: install-app-in 320ms cubic-bezier(.32,.72,0,1) both
 }
 
 .ios-install-guide[hidden] { display: none }
@@ -422,7 +452,24 @@ body.is-install-guide-open { overflow: hidden }
   border-radius: 16px;
   background: var(--surface-secondary);
   color: var(--accent-text);
-  font: 650 .9375rem/1.2 var(--sans)
+  box-shadow: inset 0 .5px 0 rgb(255 255 255 / .18),inset 0 -.5px 0 rgb(0 0 0 / .06);
+  font: 650 .9375rem/1.2 var(--sans);
+  transform: translateZ(0);
+  transition: transform 380ms cubic-bezier(.37,.36,.03,1.34),background-color 180ms ease
+}
+
+.install-guide-continue:active {
+  transform: scale(1.025) translateZ(0)
+}
+
+@keyframes install-guide-out {
+  from { opacity: 1; transform: translateY(0) scale(1) }
+  to { opacity: 0; transform: translateY(-6px) scale(.992) }
+}
+
+@keyframes install-app-in {
+  from { opacity: .45 }
+  to { opacity: 1 }
 }
 
 #boot {
@@ -534,10 +581,10 @@ body.is-install-guide-open { overflow: hidden }
   }
   .top.has-scroll-divider {
     border-bottom-color: var(--line);
-    background: color-mix(in srgb,var(--bg) 82%,transparent);
-    box-shadow: 0 1px 10px rgb(0 0 0 / .035);
-    backdrop-filter: blur(18px) saturate(135%);
-    -webkit-backdrop-filter: blur(18px) saturate(135%)
+    background: color-mix(in srgb,var(--bg) 70%,transparent);
+    box-shadow: 0 1px 14px rgb(0 0 0 / .05);
+    backdrop-filter: blur(30px) saturate(165%);
+    -webkit-backdrop-filter: blur(30px) saturate(165%)
   }
   h1 {
     font-size: 1.5rem;

@@ -72,11 +72,30 @@ const iphoneSafari=/iPhone|iPod/i.test(userAgent)
   &&/Safari/i.test(userAgent)
   &&!/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(userAgent);
 const standalone=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
-function closeInstallGuide(){
+let installGuideClosing=false;
+function finishInstallGuideClose(){
   installGuide.hidden=true;
+  installGuide.classList.remove('is-leaving');
+  appMain?.classList.remove('is-install-guide-entering');
   document.body.classList.remove('is-install-guide-open');
   appMain?.removeAttribute('inert');
+  installGuideClosing=false;
 }
+function closeInstallGuide(){
+  if(installGuideClosing||installGuide.hidden)return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+    finishInstallGuideClose();return;
+  }
+  installGuideClosing=true;
+  installGuide.classList.add('is-leaving');
+  appMain?.classList.add('is-install-guide-entering');
+  setTimeout(finishInstallGuideClose,320);
+}
+function preventInstallGuideZoom(event){
+  if(event.type==='dblclick'||event.touches?.length>1)event.preventDefault();
+}
+installGuide.addEventListener('dblclick',preventInstallGuideZoom,{passive:false});
+installGuide.addEventListener('touchmove',preventInstallGuideZoom,{passive:false});
 if(iphoneSafari&&!standalone){
   installGuide.hidden=false;
   document.body.classList.add('is-install-guide-open');

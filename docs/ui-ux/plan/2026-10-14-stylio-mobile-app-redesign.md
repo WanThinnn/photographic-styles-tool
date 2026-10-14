@@ -798,6 +798,15 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v192**.
 - Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
 
+### Install-guide transition / stronger navbar material / overlay motion v193
+
+- Continue in Safari now exits through a short 280ms guide fade/lift while the app fades in over 320ms; reduced-motion remains immediate. The CTA uses a restrained press expansion based on the iOS27 reference button motion curve.
+- The install guide disables double-tap and multi-touch zoom more aggressively while preserving one-finger vertical scrolling, and explicitly suppresses focus/tab outlines on the guide surface.
+- The scrolled mobile navbar material is stronger: 70% app background with 30px blur and 165% saturation.
+- After reviewing the reference `ion-button`, `ion-alert`, `ion-popover`, `ion-action-sheet`, `ion-toast`, glass utilities and transition code, only relevant patterns were adopted: History overflow gets a trailing-edge scale/fade popover entrance; destructive confirm gets a compact alert/backdrop entrance. No unused Ionic-like components were added.
+- Service Worker tăng **v193**.
+- Regression: **87/87 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

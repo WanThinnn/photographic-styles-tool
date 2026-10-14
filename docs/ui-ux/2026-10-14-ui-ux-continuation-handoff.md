@@ -2,14 +2,14 @@
 
 > Mục đích: đây là tài liệu bàn giao trực tiếp cho AI/agent tiếp theo. Đọc file này trước khi sửa UI/UX. Nếu có mâu thuẫn giữa lịch sử cũ và trạng thái hiện tại, ưu tiên: **code hiện tại trong working tree → tài liệu này → mục mới nhất trong `docs/ui-ux/plan/2026-10-14-stylio-mobile-app-redesign.md` → các mục lịch sử cũ**.
 
-> **Checkpoint 2026-10-15:** người dùng xác nhận redesign đã xong; working tree đã sạch trước task mới. Các danh sách UI modified bên dưới là lịch sử bàn giao, không phải trạng thái git hiện tại. Task mới chỉ sửa pipeline đen Glow/Soft Skin với telephoto iOS 18 trên cùng nhánh, không sửa UI. Cache v191; chi tiết tiến độ và bước thử Photos còn chờ ở [processing guide](../web/processing-guide.md#active-processing-handoff--2026-10-15-ios-18-telephoto-texture) và `facts.md` §10.74. Chưa commit/push thay đổi mới này.
+> **Checkpoint 2026-10-15:** baseline redesign + processing work đã được gom vào commit `8e5d975` và push. Sau đó người dùng mở lại UI pass để sửa live Safari theme sync và polish PWA/iOS27 motion; working tree hiện có batch v192–v193 chưa commit/push. Processing history vẫn ở [processing guide](../web/processing-guide.md#active-processing-handoff--2026-10-15-ios-18-telephoto-texture) và `facts.md` §10.74.
 
 ## 1. Trạng thái repository hiện tại
 
 - Workspace: `photographic-styles-tool`.
 - Nhánh làm việc hiện tại theo plan: `feature/ui-ux-redesign`.
 - Working tree **đang có thay đổi chưa commit/push**. Không reset, checkout, rebase, stash, merge hoặc xóa các thay đổi đang có nếu người dùng chưa yêu cầu rõ.
-- UI shell hiện ở Service Worker cache **v192**: `web/sw.js`.
+- UI shell hiện ở Service Worker cache **v193**: `web/sw.js`.
 - PWA là static HTML/CSS/JS, không chuyển sang React/Ionic/React Native. Các repo trong `ref/` chỉ dùng làm reference.
 - `facts.md` là sổ thí nghiệm kỹ thuật dài hạn. **Không sửa facts.md cho các thay đổi UI/UX thông thường.**
 - Các install icon PWA/Home Screen vẫn dùng bản xanh mặc định. **Không tạo cơ chế dynamic dark install icon.** iOS quyết định appearance ở Home Screen. Dark icon nội bộ của app chỉ dùng cho header/app shell.
@@ -556,7 +556,7 @@ Nếu thêm setting mới:
 
 ## 20. Service Worker và offline
 
-`web/sw.js` hiện cache `photographic-style-port-v192`.
+`web/sw.js` hiện cache `photographic-style-port-v193`.
 
 Mọi module/UI asset mới cần dùng offline phải được thêm vào `APP_SHELL` nếu phù hợp.
 
@@ -636,9 +636,9 @@ Nếu user gửi screenshot mới, ưu tiên screenshot thực tế trên thiế
 
 ## 24. Test suite hiện tại
 
-Mốc regression gần nhất sau v192:
+Mốc regression gần nhất sau v193:
 
-- main lightweight suite: **86/86 pass**
+- main lightweight suite: **87/87 pass**
 - language tests: **3/3 pass**
 - PWA check: pass
 - i18n check: pass
@@ -857,7 +857,18 @@ Batch v190 đã nằm trong commit `8e5d975` cùng các thay đổi tiếp theo;
 - Service Worker cache tăng **v192**.
 - Regression: **86/86 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
 
-Chưa commit/push. Working tree v192 là base hiện hành.
+Batch v192 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 39. Batch v193 — install-guide transition / stronger navbar material / overlay motion
+
+- `Continue in Safari` không còn làm guide biến mất tức thì. Khi nhấn, guide fade + lift nhẹ trong 280ms, app phía dưới fade-in 320ms; reduced-motion vẫn đóng ngay. CTA có press expansion rất nhẹ theo curve `380ms cubic-bezier(.37,.36,.03,1.34)` lấy cảm hứng từ `ref/ionic-theme-ios27/src/styles/components/ion-button.scss`.
+- Install guide khóa double-tap/pinch zoom mạnh hơn bằng `touch-action: pan-y`, `user-select:none`, guide-level `dblclick` + multi-touch prevention; focus/tab outline bị suppress riêng trong guide bên cạnh rule toàn cục.
+- Navbar khi content chạm tới tăng material rõ hơn: nền 70%, `blur(30px) saturate(165%)`, shadow nhẹ; vẫn full-width và chỉ kích hoạt sau ngưỡng scroll.
+- Audit `ref/ionic-theme-ios27/src`: alert/action-sheet/popover/toast/glass/button/transition. Không thêm component vô dụng chỉ để giống Ionic. Hai phần phù hợp nhất được mang sang: History overflow popup có scale/fade entrance 220ms từ trailing edge; destructive confirm dialog có native-like alert entrance + backdrop fade. Cả hai có reduced-motion fallback.
+- Service Worker cache tăng **v193**.
+- Regression: **87/87 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+Chưa commit/push. Working tree v193 là base hiện hành.
 
 ---
 

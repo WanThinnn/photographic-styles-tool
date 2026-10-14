@@ -189,11 +189,18 @@
     0 7px 22px var(--glass-shade);
   backdrop-filter: blur(20px) saturate(165%);
   -webkit-backdrop-filter: blur(20px) saturate(165%);
-  transform: translateY(-50%)
+  transform: translateY(-50%);
+  transform-origin: right center;
+  animation: task-popover-in 220ms cubic-bezier(.32,.72,0,1) both
 }
 
 .task-action-menu[hidden] {
   display: none
+}
+
+@keyframes task-popover-in {
+  from { opacity: 0; transform: translateY(-50%) scale(.92) }
+  to { opacity: 1; transform: translateY(-50%) scale(1) }
 }
 
 .task-action-item {
@@ -289,6 +296,7 @@
 }
 
 @media(prefers-reduced-motion:reduce) {
+  .task-action-menu,
   .photo-workspace[open],
   .photo-workspace.is-closing { animation: none }
 }

@@ -27,6 +27,12 @@ if(fixtureParams.get('state')==='resource-error'){
   const retry=document.createElement('button');retry.className='app-error-retry';retry.type='button';retry.textContent=T('btn.retry');
   boot.append(icon,copy,retry);
 }
+if(fixtureParams.get('state')==='install-guide'){
+  tools.hidden=true;
+  const guide=$('ios-install-guide'),main=document.querySelector('main');
+  guide.hidden=false;document.body.classList.add('is-install-guide-open');main.setAttribute('inert','');
+  $('install-guide-continue').addEventListener('click',()=>{guide.hidden=true;document.body.classList.remove('is-install-guide-open');main.removeAttribute('inert');});
+}
 let result,version=0;
 function action(label,fn){const button=document.createElement('button');button.type='button';button.textContent=label;button.addEventListener('click',fn);tools.append(button);}
 action('Add sample result',()=>{

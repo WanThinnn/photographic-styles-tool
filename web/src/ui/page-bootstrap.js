@@ -35,6 +35,41 @@ function applyTheme(theme,{persist=false,animate=false}={}){
 }
 applyTheme(currentTheme());
 for(const button of themeButtons)button.addEventListener('click',()=>applyTheme(button.dataset.themeValue,{persist:true,animate:true}));
+
+const topBar=document.querySelector('.top');
+let topBarFrame=0;
+function syncTopBarDivider(){
+  topBarFrame=0;
+  topBar?.classList.toggle('has-scroll-divider',window.scrollY>12);
+}
+function queueTopBarDivider(){
+  if(!topBarFrame)topBarFrame=requestAnimationFrame(syncTopBarDivider);
+}
+window.addEventListener('scroll',queueTopBarDivider,{passive:true});
+window.addEventListener('pageshow',syncTopBarDivider);
+syncTopBarDivider();
+
+const installGuide=document.getElementById('ios-install-guide');
+const installGuideContinue=document.getElementById('install-guide-continue');
+const appMain=document.querySelector('main');
+const userAgent=navigator.userAgent||'';
+const iphoneSafari=/iPhone|iPod/i.test(userAgent)
+  &&/AppleWebKit/i.test(userAgent)
+  &&/Safari/i.test(userAgent)
+  &&!/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(userAgent);
+const standalone=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+function closeInstallGuide(){
+  installGuide.hidden=true;
+  document.body.classList.remove('is-install-guide-open');
+  appMain?.removeAttribute('inert');
+}
+if(iphoneSafari&&!standalone){
+  installGuide.hidden=false;
+  document.body.classList.add('is-install-guide-open');
+  appMain?.setAttribute('inert','');
+}
+installGuideContinue?.addEventListener('click',closeInstallGuide);
+
 if(previewToggle){
   try{previewToggle.checked=localStorage.getItem(previewKey)!=='off';}catch{previewToggle.checked=true;}
   previewToggle.addEventListener('change',()=>{try{localStorage.setItem(previewKey,previewToggle.checked?'on':'off');}catch{}});

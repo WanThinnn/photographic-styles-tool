@@ -21,6 +21,46 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<section id="ios-install-guide" class="ios-install-guide" role="dialog" aria-modal="true" aria-labelledby="install-guide-title" hidden>
+  <div class="install-guide-shell">
+    <div class="install-guide-hero" aria-hidden="true">
+      <span class="install-guide-orbit install-guide-orbit-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg></span>
+      <span class="install-guide-orbit install-guide-orbit-spark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.3 4.2 4.2 1.3-4.2 1.3L12 14l-1.3-4.2-4.2-1.3 4.2-1.3Z"/><path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7Z"/></svg></span>
+      <span class="install-guide-orbit install-guide-orbit-sliders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h3m4 0h9M4 12h9m4 0h3M4 18h3m4 0h9"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg></span>
+      <span class="install-guide-orbit install-guide-orbit-model"><svg class="ai-model-network-symbol" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.7 4.3 7.8v12.4l9.7 5.1 9.7-5.1V7.8Z"/><path d="M14 2.7v22.6M4.3 7.8l19.4 12.4M23.7 7.8 4.3 20.2M4.3 14h19.4M14 14 4.3 7.8M14 14l9.7-6.2M14 14l9.7 6.2M14 14l-9.7 6.2"/><circle cx="14" cy="2.7" r="1.55"/><circle cx="4.3" cy="7.8" r="1.55"/><circle cx="23.7" cy="7.8" r="1.55"/><circle cx="4.3" cy="20.2" r="1.55"/><circle cx="23.7" cy="20.2" r="1.55"/><circle cx="14" cy="25.3" r="1.55"/><circle cx="14" cy="14" r="1.8"/></svg></span>
+      <span class="install-guide-app-mark">
+        <img class="install-guide-logo-light" src="icons/photographic-styles.svg" alt="">
+        <img class="install-guide-logo-dark" src="icons/photographic-styles-dark.svg" alt="">
+      </span>
+    </div>
+    <div class="install-guide-copy">
+      <h2 id="install-guide-title" data-i18n="install.title">Use Stylio like an app</h2>
+      <p data-i18n="install.lede">Add Stylio to your Home Screen for the full-screen experience and more room for photos.</p>
+    </div>
+    <div class="install-guide-steps">
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-icon-neutral" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>
+        <span><strong data-i18n="install.menutitle">Open Safari menu</strong><small data-i18n="install.menuhint">Tap the three-line menu in Safari's bottom bar.</small></span>
+      </div>
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><rect x="5" y="10" width="14" height="11" rx="3"/></svg></span>
+        <span><strong data-i18n="install.step1">Tap Share</strong><small data-i18n="install.step1hint">Choose Share from the Safari menu.</small></span>
+      </div>
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
+        <span><strong data-i18n="install.step2">Add to Home Screen</strong><small data-i18n="install.step2hint">Choose Add to Home Screen in the share sheet.</small></span>
+      </div>
+      <div class="install-guide-step">
+        <span class="install-step-icon install-step-app" aria-hidden="true">
+          <img class="install-guide-logo-light" src="icons/photographic-styles.svg" alt="">
+          <img class="install-guide-logo-dark" src="icons/photographic-styles-dark.svg" alt="">
+        </span>
+        <span><strong data-i18n="install.step3">Open Stylio</strong><small data-i18n="install.step3hint">Launch it from Home Screen to use Stylio without Safari's tab bar.</small></span>
+      </div>
+    </div>
+    <button id="install-guide-continue" class="install-guide-continue" type="button" data-i18n="install.continue">Continue in Safari</button>
+  </div>
+</section>
 <main>
   <header class="top">
     <span class="app-logo" aria-hidden="true">

@@ -666,7 +666,9 @@ footer a {
 .ai-settings-panel>.portrait-option.depth-model-row>.ai-option-copy {
   grid-column: 2;
   grid-row: 1;
-  max-width: 13rem
+  max-width: 13rem;
+  padding-left: 7px;
+  box-sizing: border-box
 }
 
 .ai-settings-panel>.portrait-option.depth-model-row>.ai-option-copy .ai-hint {

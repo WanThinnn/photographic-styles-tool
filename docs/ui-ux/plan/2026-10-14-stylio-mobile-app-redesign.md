@@ -757,6 +757,39 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v186**.
 - Regression: **85/85 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
 
+### iPhone Safari install guide / navbar divider / spacing polish v187
+
+- AI Settings Model copy is offset 7px inside its existing grid cell, yielding the same ~16px visual icon-to-copy spacing as the GPU row without shifting the icon or slider.
+- The fixed mobile navbar starts with a transparent bottom border; only when content reaches it (`scrollY > 12`) does `.has-scroll-divider` reveal the .5px separator. No blur/glass material is reintroduced.
+- Mobile Stylio title increases to 1.5rem/720 beside the 40px app icon.
+- The original-format hint now breaks before `→ Format` consistently in VI/EN/ZH and the English HTML fallback.
+- Non-standalone iPhone Safari gets a full-screen, icon-led Add to Home Screen onboarding page inspired by the Try Galaxy flow. It is intentionally excluded from iPad, desktop platforms and alternate iOS browsers; standalone PWA launches skip it.
+- The install guide has semantic Light/Dark artwork, three visual steps, and a Continue in Safari escape hatch. Manual fixture: `?state=install-guide&lang=vi&theme=light`.
+- Service Worker tăng **v187**.
+- Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **215 strings**.
+
+### Messenger-like navbar blur / richer install guide v188
+
+- The fixed mobile navbar stays solid at the top of the page. Once content reaches it (`scrollY > 12`), the same full-width bar becomes subtly translucent with `blur(18px) saturate(135%)`, a .5px separator and a minimal shadow. It remains a navigation bar, not a floating glass card.
+- The install-guide hero now has the missing lower-right black AI model/network tile, reusing the neural-network SVG from AI Settings so all four corners feel balanced.
+- Modern Safari onboarding gains a first three-line-menu step before Share. The sequence is now Safari menu → Share → Add to Home Screen → Open Stylio, localized in VI/EN/ZH.
+- Service Worker tăng **v188**.
+- Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+### Dark install icon / Safari bottom-bar clearance v189
+
+- The Open Stylio step now uses the same light/dark icon pair as the install-guide app mark, so dark mode no longer shows the blue light icon.
+- The full-screen install guide reserves at least 132px beneath its content (or the larger safe-area-derived value), keeping Continue in Safari and the final row clear of Safari's bottom tab/address bar.
+- Service Worker tăng **v189**.
+- Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+### Compact install guide above Safari chrome v190
+
+- The install guide is vertically tightened so the CTA starts higher before any manual scroll: top inset +12px, shell gaps 18px, hero 172px, step rows 70px, and copy spacing 8px.
+- The existing 132px bottom reserve remains as a fallback scroll clearance, but the initial composition now moves upward by roughly 50px, keeping Continue in Safari clear of the bottom Safari bar on typical iPhone viewports.
+- Service Worker tăng **v190**.
+- Regression: **86/86 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

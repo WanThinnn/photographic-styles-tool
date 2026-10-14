@@ -7,7 +7,7 @@
 - Workspace: `photographic-styles-tool`.
 - Nhánh làm việc hiện tại theo plan: `feature/ui-ux-redesign`.
 - Working tree **đang có thay đổi chưa commit/push**. Không reset, checkout, rebase, stash, merge hoặc xóa các thay đổi đang có nếu người dùng chưa yêu cầu rõ.
-- UI shell hiện ở Service Worker cache **v186**: `web/sw.js`.
+- UI shell hiện ở Service Worker cache **v190**: `web/sw.js`.
 - PWA là static HTML/CSS/JS, không chuyển sang React/Ionic/React Native. Các repo trong `ref/` chỉ dùng làm reference.
 - `facts.md` là sổ thí nghiệm kỹ thuật dài hạn. **Không sửa facts.md cho các thay đổi UI/UX thông thường.**
 - Các install icon PWA/Home Screen vẫn dùng bản xanh mặc định. **Không tạo cơ chế dynamic dark install icon.** iOS quyết định appearance ở Home Screen. Dark icon nội bộ của app chỉ dùng cho header/app shell.
@@ -554,7 +554,7 @@ Nếu thêm setting mới:
 
 ## 20. Service Worker và offline
 
-`web/sw.js` hiện cache `photographic-style-port-v186`.
+`web/sw.js` hiện cache `photographic-style-port-v190`.
 
 Mọi module/UI asset mới cần dùng offline phải được thêm vào `APP_SHELL` nếu phù hợp.
 
@@ -634,13 +634,13 @@ Nếu user gửi screenshot mới, ưu tiên screenshot thực tế trên thiế
 
 ## 24. Test suite hiện tại
 
-Mốc regression gần nhất sau v186:
+Mốc regression gần nhất sau v190:
 
-- main lightweight suite: **85/85 pass**
+- main lightweight suite: **86/86 pass**
 - language tests: **3/3 pass**
 - PWA check: pass
 - i18n check: pass
-- VI/EN/ZH: **206 strings mỗi ngôn ngữ**
+- VI/EN/ZH: **217 strings mỗi ngôn ngữ**
 - private Portrait UI fixture của lượt v182 chưa hoàn tất: harness dài đã timeout ở cả 120s và 180s trước khi trả assertion; static Portrait/layout regression trong main suite vẫn pass. Mốc v181 trước đó đã pass fixture 18 layout/theme/language combinations.
 
 Các lệnh project đã dùng gần nhất:
@@ -804,7 +804,48 @@ Batch v185 được thay thế ngay trong cùng working tree bởi v186; chưa c
 - Service Worker cache tăng **v186**.
 - Regression: **85/85 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
 
-Chưa commit/push. Working tree v186 là base hiện hành.
+Batch v186 đã được commit và push ở `3e2574f`; batch v187 bắt đầu từ mốc đó.
+
+## 34. Batch v187 — iPhone Safari install guide / navbar divider / spacing polish
+
+- AI Settings Model row giữ nguyên vị trí icon nhưng thêm `padding-left:7px` cho copy. Với icon 34px nằm trong cột 36px + grid gap 8px, khoảng nhìn thấy từ mép icon tới chữ thành ~16px, khớp GPU row phía trên.
+- Mobile navbar không có separator khi ở đầu trang. Main content bắt đầu thấp hơn navbar 12px; khi `scrollY > 12`, JS chỉ gắn `.has-scroll-divider` để bật border `.5px`. Không blur, không glass, không shadow.
+- Tên Stylio trên mobile tăng lên `1.5rem`/720 để cân với icon 40px.
+- First-run original-format notice có line break trước `→ Format` trong cả VI/EN/ZH; HTML fallback hiện tại cũng giữ break này.
+- Thêm full-screen Add to Home Screen guide dành riêng cho iPhone Safari khi chưa chạy standalone. iPad, macOS, Windows, Android và iOS Chrome/Firefox/Edge không bị chặn. Guide dùng icon app + photo/spark/sliders artwork, ba step icon-led, theo Light/Dark semantic tokens; có nút Continue in Safari cho trường hợp người dùng vẫn muốn dùng browser.
+- Standalone PWA (`navigator.standalone` hoặc `display-mode: standalone`) bỏ qua guide hoàn toàn. UI fixture hỗ trợ `?state=install-guide&lang=vi&theme=light` để test trên desktop.
+- Service Worker cache tăng **v187**.
+- Regression: **86/86 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **215 strings**.
+
+Batch v187 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 35. Batch v188 — Messenger-like navbar blur / richer install guide
+
+- Mobile navbar vẫn opaque khi ở đầu trang. Khi `scrollY > 12`, cùng class `.has-scroll-divider` giờ bật material nhẹ cho **toàn bộ thanh**: nền `var(--bg)` pha 82%, `blur(18px) saturate(135%)`, separator `.5px` và shadow rất nhẹ. Không dùng floating glass card; hiệu ứng bám full-width giống navigation bar của Messenger.
+- Hero của Add to Home Screen guide đủ bốn corner icons: green sliders, violet spark, blue photo và **black AI model/network icon** lấy đúng SVG neural-network đang dùng trong AI Settings.
+- Flow cài PWA trên Safari mới có thêm bước đầu `Open Safari menu` với icon ba gạch. Sau đó mới `Share` → `Add to Home Screen` → `Open Stylio`; copy VI/EN/ZH cập nhật tương ứng.
+- Service Worker cache tăng **v188**.
+- Regression: **86/86 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+Batch v188 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 36. Batch v189 — dark install icon / Safari bottom-bar clearance
+
+- `Open Stylio` trong Add to Home Screen guide không còn hard-code icon light. Row này giờ dùng cùng cặp `photographic-styles.svg` / `photographic-styles-dark.svg` và theme selectors như app mark chính, nên dark mode chuyển sang icon đen đúng thiết kế.
+- Install guide tăng bottom padding lên tối thiểu `132px` (vẫn cộng safe-area khi lớn hơn) để nút `Continue in Safari` và phần cuối nội dung luôn nằm trên Safari bottom tab/address bar thay vì bị che.
+- Service Worker cache tăng **v189**.
+- Regression: **86/86 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+Batch v189 tiếp tục được refine trong cùng working tree; chưa commit/push riêng.
+
+## 37. Batch v190 — compact install guide above Safari chrome
+
+- Để `Continue in Safari` không còn nằm sát/đè dưới Safari bottom bar ở trạng thái mở ban đầu, install guide được nén nhẹ theo chiều dọc thay vì chỉ tăng bottom padding: top inset giảm `safe-area + 24px → +12px`, shell gap `22px → 18px`, hero `184px → 172px`, mỗi step `74px → 70px`, description margin `10px → 8px`.
+- Khoảng reserve `132px` phía dưới vẫn giữ làm fallback khi cần cuộn, nhưng nút CTA giờ được đẩy lên khoảng ~50px ngay ở trạng thái ban đầu, gần đúng với vị trí người dùng thấy sau khi tự cuộn nhẹ.
+- Service Worker cache tăng **v190**.
+- Regression: **86/86 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
+
+Chưa commit/push. Working tree v190 là base hiện hành.
 
 ---
 

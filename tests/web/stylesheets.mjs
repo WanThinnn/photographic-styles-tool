@@ -110,6 +110,7 @@ test('process header and Smart Enhance controls use a tighter native grouping',(
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
   assert.match(layout,/\.app-logo \{[^}]*width: 40px;[^}]*height: 40px/s);
   assert.match(layout,/h1 \{[^}]*font-size: 1\.375rem;[^}]*font-weight: 700/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?h1 \{[^}]*font-size: 1\.5rem;[^}]*font-weight: 720/s);
   assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*background: var\(--bg\)/s);
   assert.match(layout,/@media\(max-width:767px\)[\s\S]*?main \{[^}]*padding-top: calc\(env\(safe-area-inset-top,0px\) \+ 94px\)/s);
   assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*align-items: center/s);
@@ -154,6 +155,7 @@ test('AI Settings model row keeps a wide inline slider and vertically centered n
   assert.match(controls,/\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.75fr\) minmax\(150px,1\.35fr\)/s);
   assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(108px,\.9fr\) minmax\(140px,1\.1fr\)/s);
   assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-icon \{[^}]*align-self: center;[^}]*justify-self: center/s);
+  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-copy \{[^}]*padding-left: 7px;[^}]*box-sizing: border-box/s);
   assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-copy \.ai-hint \{[^}]*text-wrap: balance/s);
   assert.match(sheets,/@container \(max-width:22rem\)[\s\S]*?\.depth-model-control \{[^}]*grid-column: 3;[^}]*grid-row: 1;[^}]*min-width: 128px/s);
   assert.match(html,/class="ai-model-network-symbol" viewBox="0 0 28 28"/);
@@ -214,9 +216,11 @@ test('first-run notice is a single grouped card and appearance controls are inte
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
   const shellLayout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const strings=readFileSync(new URL('../../web/src/ui/i18n.js',import.meta.url),'utf8');
   assert.match(workspace,/\.photo-format-tip \{[^}]*grid-template-columns: 17px minmax\(0,1fr\) auto;[^}]*margin: 10px 0 8px;[^}]*border-radius: 16px;[^}]*background: var\(--surface-secondary\)/s);
   assert.match(workspace,/\.photo-format-tip>svg \{[^}]*align-self: center;[^}]*margin-top: 0/s);
   assert.match(workspace,/\.photo-format-tip button \{[^}]*grid-column: 3;[^}]*min-height: 44px/s);
+  assert.match(strings,/"tip\.firstbody": "Select photos → <b>•••<\/b> → <b>Options<\/b><br>→ <b>Format<\/b> → <b>Current<\/b>\."/);
   assert.match(html,/data-theme-value="light"/);
   assert.match(html,/data-theme-value="system"/);
   assert.match(html,/data-theme-value="dark"/);
@@ -266,13 +270,42 @@ test('browser focus and Tab rings are visually suppressed across the app',()=>{
   assert.match(portrait,/\.ai-aperture-track:has\(input:focus-visible\) \{[^}]*box-shadow: none/s);
   assert.doesNotMatch(portrait,/outline: 2px solid #0894ff/);
 });
-test('mobile header is a fixed opaque navigation bar without scroll blur',()=>{
+test('mobile header is fixed and adds a light full-bar blur only after content reaches it',()=>{
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
-  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 24px\)[^}]*border-bottom: \.5px solid var\(--line\);[^}]*background: var\(--bg\)/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 24px\)[^}]*border-bottom: \.5px solid transparent;[^}]*background: var\(--bg\)/s);
+  assert.match(layout,/\.top\.has-scroll-divider \{[^}]*border-bottom-color: var\(--line\);[^}]*background: color-mix\(in srgb,var\(--bg\) 82%,transparent\);[^}]*backdrop-filter: blur\(18px\) saturate\(135%\);[^}]*-webkit-backdrop-filter: blur\(18px\) saturate\(135%\)/s);
+  assert.match(bootstrap,/classList\.toggle\('has-scroll-divider',window\.scrollY>12\)/);
+  assert.match(bootstrap,/window\.addEventListener\('scroll',queueTopBarDivider,\{passive:true\}\)/);
   assert.doesNotMatch(layout,/\.top\.is-scrolled::before/);
-  assert.doesNotMatch(layout,/@media\(max-width:767px\)[\s\S]*?\.top::before \{/s);
-  assert.doesNotMatch(bootstrap,/topBarScrollFrame|queueTopBarMaterial|is-scrolled/);
+});
+
+test('iPhone Safari gets a visual Add to Home Screen guide while standalone and non-iPhone clients stay in the app',()=>{
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
+  const strings=readFileSync(new URL('../../web/src/ui/i18n.js',import.meta.url),'utf8');
+  const fixture=readFileSync(new URL('./fixtures/mobile-shell.js',import.meta.url),'utf8');
+  assert.match(html,/id="ios-install-guide" class="ios-install-guide"[^>]*aria-modal="true"[^>]*hidden/);
+  assert.match(html,/install-step-icon-neutral/);assert.match(html,/install-step-icon-blue/);assert.match(html,/install-step-icon-violet/);assert.match(html,/install-step-app/);
+  assert.match(html,/class="install-guide-orbit install-guide-orbit-model"><svg class="ai-model-network-symbol"/);
+  assert.match(layout,/\.ios-install-guide \{[^}]*position: fixed;[^}]*z-index: 100;[^}]*overflow-y: auto;[^}]*background: var\(--bg\);[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 12px\)[^;]*max\(calc\(env\(safe-area-inset-bottom,0px\) \+ 28px\),132px\)/s);
+  assert.match(layout,/\.install-guide-shell \{[^}]*display: grid;[^}]*gap: 18px/s);
+  assert.match(layout,/\.install-guide-hero \{[^}]*min-height: 172px;[^}]*border-radius: 32px/s);
+  assert.match(layout,/\.install-guide-step \{[^}]*min-height: 70px;[^}]*padding: 11px 16px/s);
+  assert.match(layout,/\.install-guide-orbit-model \{[^}]*right: 28px;[^}]*bottom: 24px;[^}]*background: var\(--appearance-icon-bg\)/s);
+  assert.match(html,/class="install-step-icon install-step-app"[^>]*>[\s\S]*?install-guide-logo-light[\s\S]*?photographic-styles\.svg[\s\S]*?install-guide-logo-dark[\s\S]*?photographic-styles-dark\.svg/s);
+  assert.match(layout,/\.install-step-app \{[^}]*position: relative;[^}]*overflow: hidden/s);
+  assert.match(layout,/\.install-step-app img \{[^}]*position: absolute;[^}]*inset: 0/s);
+  assert.match(bootstrap,/const iphoneSafari=\/iPhone\|iPod\/i\.test\(userAgent\)/);
+  assert.match(bootstrap,/!\/\(CriOS\|FxiOS\|EdgiOS\|OPiOS\)\/i\.test\(userAgent\)/);
+  assert.match(bootstrap,/navigator\.standalone===true\|\|matchMedia\('\(display-mode: standalone\)'\)\.matches/);
+  assert.match(bootstrap,/if\(iphoneSafari&&!standalone\)/);
+  assert.match(fixture,/fixtureParams\.get\('state'\)==='install-guide'/);
+  assert.match(strings,/"install\.title": "Use Stylio like an app"/);
+  assert.match(strings,/"install\.menutitle": "Open Safari menu"/);
+  assert.match(strings,/"install\.menuhint": "Tap the three-line menu in Safari's bottom bar\."/);
+  assert.match(strings,/"install\.step1hint": "Choose Share from the Safari menu\."/);
 });
 
 test('resource failures use native-style banners and stacked labels keep compact title-to-description spacing',()=>{

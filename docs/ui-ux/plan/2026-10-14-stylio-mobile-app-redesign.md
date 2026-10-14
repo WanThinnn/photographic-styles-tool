@@ -514,11 +514,46 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 
 - Đối chiếu trực tiếp `ref/ionic-theme-ios27`: settings demo dùng GitHub icon-only ở toolbar phải và grouped inset rows; ion-button dùng glass control material với rim/pressed expansion. Stylio giữ Web UI, không chuyển Ionic.
 - Photo workspace action bar không còn dính sát đáy/full-width: Share/Download nằm trong capsule glass nổi, có safe-area bottom gap, bo 28px, shared glass material, primary/secondary action tách rõ; không lồng thêm backdrop-filter trong từng nút.
-- Settings được mở rộng thành grouped layout: App language dạng iOS navigation row (globe, value, chevron), Appearance Light/System/Dark ở mức presentation-only, Processing mock rows cho default save action / keep screen awake / prefer original format, On this device, About.
-- Appearance và các processing preference mới chỉ là giao diện theo yêu cầu, chưa áp dụng/persist behavior. Language, Clear cache và link hiện có vẫn hoạt động.
+- Settings được mở rộng thành grouped layout: App language dạng iOS navigation row (globe, value, chevron), Appearance Light/System/Dark, Processing mock rows cho default save action / keep screen awake / prefer original format, On this device, About.
+- Appearance hiện đã hoạt động thật và persist bằng `stylio-theme-v1`: Light/Dark đặt `data-theme`, System trả về media preference của thiết bị. Các processing preference mới vẫn chỉ là presentation UI. Language, Clear cache và link hiện có vẫn hoạt động.
 - Góc phải tiêu đề Settings có GitHub glass button mở `https://github.com/WanThinnn/stylio`; repository đã được xác nhận qua GitHub connector là public repo `WanThinnn/stylio`.
 - About có version, Source code và Open-source licenses. Footer rút gọn để tránh lặp quá nhiều link.
-- I18n VI/EN/ZH bổ sung đủ copy mới; SW tăng lên v159 để PWA nhận layout mới.
+- I18n VI/EN/ZH bổ sung đủ copy mới; SW hiện v160 để PWA nhận layout mới.
+### Cập nhật theo lượt iPhone warm-reopen
+
+- Tỉ lệ bottom navigation mobile tăng từ 54px lên 60px, nhãn mobile tăng nhẹ lên 11px và dock standalone hạ thấp thêm khoảng 10px so với full safe-area inset để gần hình học tab bar iOS hơn.
+- Lỗi PWA được thu hẹp: lần đầu sau Add to Home Screen đúng, các lần reopen mới nhảy dock. `dock-viewport.js` giờ xóa mọi inline viewport/keyboard offset ở `pagehide`, `pageshow`, orientation và visibility restore; chỉ nâng dock sau khi Search đang mở + input có focus + iOS phát một VisualViewport resize thật với keyboard delta hợp lệ (80–420px). Focus hoặc viewport stale sau resume không còn đủ điều kiện để dịch dock.
+- First-run photo format notice đổi thành một grouped secondary card bo 18px, bỏ border-bottom riêng nên không còn hai đường separator liên tiếp trước Smart Enhance.
+- Clear cache đổi thành một cell hai dòng: icon và stack title/description cùng grid, tránh baseline lệch.
+- Appearance Light/System/Dark đã bật interaction + persistence; inline bootstrap áp theme trước CSS để giảm flash khi mở PWA.
+- Hero mobile tăng nhẹ từ 24px lên 26px.
+- Header chung có thêm nút Help/Guide glass icon-only ở góc phải, theo pattern toolbar action của iOS 27; bấm mở Guide và bottom tab state đồng bộ.
+- Regression mới kiểm tra warm PWA restore stale offsets, keyboard resize thật, theme persistence markup, notice một card, Clear-cache stack và header Guide.
+
+**Vẫn cần iPhone xác nhận:** đóng PWA hoàn toàn rồi mở lại 2–3 lần liên tiếp; dock phải giữ cùng vị trí ở mọi lần. Sau đó mở Search để xác nhận keyboard vẫn đẩy dock lên đúng và hạ lại khi đóng bàn phím.
+### Cập nhật focus surfaces và warm-reopen compositor
+
+- Search input và dialog sheet không còn dùng global blue `:focus-visible` outline. Search vẫn giữ neutral glass inset khi keyboard focus; global focus ring vẫn tồn tại cho các control khác để không xóa accessibility focus toàn app.
+- Warm-reopen PWA được xử lý thêm ở compositor layer: khi standalone bind/pageshow/visibility resume, dock tạm ẩn trong hai animation frames, page được nudge 1px rồi trả về đúng `scrollX/scrollY`, sau đó đọc geometry và hiện dock lại. Đây mô phỏng chính thao tác scroll nhẹ mà iPhone hiện cần để WebKit recompute fixed/backdrop-filter layer.
+- `history.scrollRestoration` đặt `manual` khi trình duyệt hỗ trợ để tránh browser tự restore scroll cạnh tranh với app shell.
+- Keyboard path vẫn riêng: dock chỉ nhận VisualViewport offset sau Search focus + resize hợp lệ; recalibration bị hủy ngay khi Search focus.
+- SW tăng v161. Regression mới xác nhận scroll nudge trả đúng vị trí cũ, class recalibration được gỡ, keyboard vẫn nâng dock, Search/Sheet không còn blue focus frame.
+
+**Thiết bị cần xác nhận lại:** mở PWA từ lần 2 trở đi mà không chạm/scroll; dock phải xuất hiện đúng vị trí ngay sau launch. Search focus không được có khung xanh; AI Settings surface không được có khung xanh, nhưng nút X vẫn có keyboard focus indication khi dùng bàn phím.
+### Cập nhật Settings polish sau kiểm chứng iPhone
+
+- Header chung chỉ hiện Help/Guide ở Process/History/Guide; khi vào Settings, Help được ẩn để góc phải chỉ còn GitHub action của Settings, tránh hai icon tròn xếp dọc.
+- Bottom tab idle color đổi từ `--muted` sang `--nav-idle` đậm hơn (`#3a3a3c` light, `#d1d1d6` dark), giữ selected state màu accent và Search icon dùng foreground hiện có.
+- Appearance Light/System/Dark có transition ngắn 200–240ms cho background/color/border/shadow khi người dùng bấm; reduced-motion không chạy transition. Persist/theme bootstrap giữ nguyên.
+- Language select bỏ browser-blue focus ring cả ở select và surrounding row; keyboard focus chỉ còn neutral inset 0.5px theo `--line`, pointer focus không vẽ ring.
+- SW tăng v162. Regression xác nhận Settings ẩn header Help, idle nav dùng token đậm hơn, theme transition tồn tại và Language không còn dùng `--focus-ring`.
+### Cập nhật transition header, app refresh và version 1.0.0
+
+- Khi chuyển vào Settings, Help action ở header không biến mất tức thì: nó trượt xuống khoảng 68px, thu nhỏ/xoay nhẹ rồi fade; GitHub action trong Settings chạy animation ngược từ vị trí phía trên xuống vị trí cuối, tạo cảm giác một control đổi vai trò thay vì hai icon bật/tắt cứng. Reduced Motion vẫn tắt animation qua rule toàn cục.
+- Thêm `Update Stylio` trong On this device. Action gọi `ServiceWorkerRegistration.update()`, xóa các app-shell cache có prefix `photographic-style-port-`, fetch lại `index.html` với `cache: reload`, rồi reload. Model cache riêng không bị xóa. Có status i18n VI/EN/ZH và fallback lỗi mạng.
+- Tất cả current-version identifiers chuyển lên `1.0.0`: Python package metadata, uv lock project entry, Python `VERSION`, Web `VERSION`, Settings version, README EN/ZH và facts current coverage. Các dòng lịch sử/changelog `v0.6.2` được giữ nguyên vì mô tả mốc phát hành cũ, không phải current version.
+- Warm-reopen PWA nudge giờ không chỉ chạy một lần lúc bind. Standalone launch/resume pulse ngay và retry sau 90ms, 280ms và 650ms; mỗi pulse ẩn dock, scroll 1px, trả lại đúng vị trí cũ, ép geometry read rồi hiện lại. Retry bị hủy khi Search focus/pagehide để không can thiệp keyboard path.
+- Service Worker app-shell cache tăng v163.
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

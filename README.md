@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Current version: v0.6.2
+Current version: v1.0.0
 
 This fork is maintained by **Elio (aka WanThinnn)**. It builds on
 [Shalielie by nathanatgit](https://github.com/nathanatgit/Shalielie), retaining the

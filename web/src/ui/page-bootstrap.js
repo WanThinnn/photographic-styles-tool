@@ -5,6 +5,26 @@ import {AI_STRINGS} from './ai-strings.js';
 import {getAppShell} from './shell/app-shell.js';
 const shell=getAppShell();
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
+const themeKey='stylio-theme-v1',themeButtons=[...document.querySelectorAll('[data-theme-value]')];
+let themeTransitionTimer;
+function currentTheme(){try{const value=localStorage.getItem(themeKey);return ['light','dark','system'].includes(value)?value:'system';}catch{return 'system';}}
+function applyTheme(theme,{persist=false,animate=false}={}){
+  const root=document.documentElement;
+  if(animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    root.classList.add('theme-transition');void root.offsetWidth;
+    clearTimeout(themeTransitionTimer);
+    themeTransitionTimer=setTimeout(()=>root.classList.remove('theme-transition'),280);
+  }
+  if(theme==='system')delete root.dataset.theme;
+  else root.dataset.theme=theme;
+  for(const button of themeButtons){
+    const selected=button.dataset.themeValue===theme;
+    button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
+  }
+  if(persist)try{localStorage.setItem(themeKey,theme);}catch{}
+}
+applyTheme(currentTheme());
+for(const button of themeButtons)button.addEventListener('click',()=>applyTheme(button.dataset.themeValue,{persist:true,animate:true}));
 // Native selects can match :focus-visible after a tap. Keep keyboard focus on
 // the surrounding pill, without painting a rectangular ring inside it on iOS.
 for(const control of [selector,document.getElementById('depth-model')]){
@@ -38,6 +58,26 @@ function render(){
 selector.value=pickLanguage();render();
 const change=()=>{rememberLanguage(selector.value);render();};
 selector.addEventListener('change',change);
+
+const refreshApp=document.getElementById('refresh-app'),refreshStatus=document.getElementById('refresh-app-status');
+refreshApp?.addEventListener('click',async()=>{
+  refreshApp.disabled=true;refreshStatus.textContent=t(selector.value,'settings.updating');
+  try{
+    const registration=await navigator.serviceWorker?.getRegistration?.('./')||await navigator.serviceWorker?.getRegistration?.();
+    await registration?.update?.();
+    if(globalThis.caches){
+      const names=await caches.keys();
+      await Promise.all(names.filter(name=>name.startsWith('photographic-style-port-')).map(name=>caches.delete(name)));
+    }
+    try{await fetch(new URL('./index.html',location.href),{cache:'reload'});}catch{}
+    await new Promise(resolve=>setTimeout(resolve,220));
+    location.reload();
+  }catch(error){
+    console.warn('App update failed',error);
+    refreshStatus.textContent=t(selector.value,'settings.updatefailed');
+    refreshApp.disabled=false;
+  }
+});
 async function loadApplication(){
   let lastError;
   for(let attempt=0;attempt<3;attempt++){

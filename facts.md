@@ -3,7 +3,7 @@
 How `photographic_style_port.py` changes the metadata of a normal HEIC so that Apple Photos
 offers the Photographic Styles palette (风格 / 调色板), Portrait editing and, on iOS 27,
 Texture/Grain (质感 / 颗粒). It covers everything tried from the early V-series experiments to
-v0.6.2: what worked, what failed, and what is still open. Usage, testing and the version history
+v1.0.0: what worked, what failed, and what is still open. Usage, testing and the version history
 are in the [README](README.md).
 
 **Status labels**

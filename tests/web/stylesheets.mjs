@@ -31,6 +31,7 @@ test('four-tab floating dock has a separate search action and material fallbacks
   const dock=layout.match(/\.app-dock \{([^}]+)\}/)[1];
   assert.match(dock,/position: fixed/);assert.match(dock,/top: calc\(var\(--dock-viewport-bottom,100dvh\)/);assert.doesNotMatch(dock,/\n  bottom:/);
   assert.match(layout,/min-height: var\(--tab-height\)/);
+  assert.match(layout,/\.app-tabs button \{[^}]*color: var\(--nav-idle\)/s);
   assert.match(material,/prefers-reduced-transparency:reduce/);assert.match(material,/prefers-contrast:more/);
   assert.match(material,/prefers-reduced-motion:reduce/);assert.match(material,/forced-colors:active/);
   assert.equal([...html.matchAll(/data-screen="/g)].length,4);
@@ -64,7 +65,7 @@ test('standalone shell keeps the intro visible, centers its copy, and anchors th
   const i18n=readFileSync(new URL('../../web/src/ui/i18n.js',import.meta.url),'utf8');
   assert.doesNotMatch(layout,/\.has-used-app \.intro/);
   assert.match(layout,/\.intro \{[^}]*text-align: center/s);
-  assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*top: auto;[^}]*bottom: calc\(max\(10px,env\(safe-area-inset-bottom,0px\)\) \+ var\(--dock-keyboard-offset,0px\)\)/);
+  assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*top: auto;[^}]*bottom: calc\(max\(8px,calc\(env\(safe-area-inset-bottom,0px\) - 10px\)\) \+ var\(--dock-keyboard-offset,0px\)\)/);
   assert.match(i18n,/Add Styles, Texture and Grain\.<br>Privately, on your device\./);
   assert.equal([...html.matchAll(/class="icon-button glass-surface"[^>]*><svg/g)].length>=2,true);
 });
@@ -82,6 +83,8 @@ test('portrait aperture keeps the yellow selector centered while the ruler moves
 test('settings follows iOS grouped rows with language navigation, appearance preview and GitHub toolbar action',()=>{
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
   assert.match(html,/class="settings-github icon-button glass-surface" href="https:\/\/github\.com\/WanThinnn\/stylio"/);
   assert.match(html,/class="settings-nav-row language-row"/);
   assert.match(html,/class="appearance-segment"/);
@@ -90,8 +93,45 @@ test('settings follows iOS grouped rows with language navigation, appearance pre
   assert.match(html,/settings\.originalformat/);
   assert.match(sheets,/\.language-row #lang \{[^}]*appearance: none/s);
   assert.match(sheets,/\.settings-leading-icon/);
+  assert.match(layout,/body\.is-settings-destination \.top-guide \{[^}]*translateY\(68px\)/s);
+  assert.match(sheets,/@keyframes settings-github-arrive/);
+  assert.match(html,/id="refresh-app"/);
+  assert.match(html,/id="version">1\.0\.0</);
+  assert.match(bootstrap,/registration\?\.update\?\.\(\)/);
+  assert.match(bootstrap,/photographic-style-port-/);
 });
 
+test('first-run notice is a single grouped card and appearance controls are interactive and persisted',()=>{
+  const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
+  const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
+  const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
+  assert.match(workspace,/\.photo-format-tip \{[^}]*border: 0;[^}]*border-radius: 18px;[^}]*background: var\(--surface-secondary\)/s);
+  assert.match(html,/data-theme-value="light"/);
+  assert.match(html,/data-theme-value="system"/);
+  assert.match(html,/data-theme-value="dark"/);
+  assert.doesNotMatch(html,/data-theme-value="(?:light|system|dark)"[^>]*aria-disabled="true"/);
+  assert.match(bootstrap,/stylio-theme-v1/);
+  assert.match(bootstrap,/root\.dataset\.theme/);
+  assert.match(bootstrap,/theme-transition/);
+  assert.match(bootstrap,/animate:true/);
+  assert.match(base,/html\.theme-transition body/);
+  assert.match(sheets,/\.settings-row-stack/);
+  assert.match(html,/id="header-guide" class="icon-button top-guide glass-surface"/);
+});
+test('search and sheet surfaces suppress browser-blue focus frames without removing control focus styles globally',()=>{
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
+  assert.match(layout,/#history-search:focus,[\s\S]*?#history-search:focus-visible \{[^}]*outline: none;[^}]*box-shadow: none/s);
+  assert.match(layout,/\.dock-search-field:has\(#history-search:focus-visible\) \{[^}]*box-shadow: inset 0 0 0 \.5px var\(--glass-outline\)/s);
+  assert.match(sheets,/\.sheet:focus,[\s\S]*?\.sheet:focus-visible \{[^}]*outline: none/s);
+  assert.match(sheets,/\.language-row #lang:focus,[\s\S]*?\.language-row #lang:focus-visible \{[^}]*outline: none;[^}]*box-shadow: none/s);
+  assert.match(sheets,/\.language-row:has\(#lang:focus-visible\) \{[^}]*outline: none;[^}]*box-shadow: inset 0 0 0 \.5px var\(--line\)/s);
+  assert.doesNotMatch(sheets,/\.language-row:has\(#lang:focus-visible\) \{[^}]*var\(--focus-ring\)/s);
+  assert.match(base,/:focus-visible \{[^}]*outline: 3px solid var\(--focus-ring\)/s);
+});
 test('photo actions use the shared liquid-glass material as a floating capsule',()=>{
   const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
   const materials=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');

@@ -17,6 +17,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-v2.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192-v2.png">
+<script>try{const t=localStorage.getItem('stylio-theme-v1');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch{}</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -27,6 +28,10 @@
       <h1 data-i18n="meta.title">Stylio</h1>
       <span class="tagline" data-i18n="app.tagline">Photographic Styles for your photos</span>
     </div>
+    <button id="header-guide" class="icon-button top-guide glass-surface" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 4.5 1.2c-.8 1.1-2.3 1.4-2.3 3"/><path d="M12 17h.01"/></svg>
+      <span class="sr-only" data-i18n="shell.guide">Guide</span>
+    </button>
   </header>
 
   <section id="process-screen" class="app-screen" aria-label="Process">
@@ -184,11 +189,11 @@
 
       <h3 class="group-title" data-i18n="settings.appearance">Appearance</h3>
       <div class="settings-group appearance-card">
-        <div class="settings-row-copy"><strong data-i18n="settings.appearance">Appearance</strong><span data-i18n="settings.appearancehint">Choose how Stylio looks. Theme behavior is coming next.</span></div>
-        <div class="appearance-segment" role="group" aria-label="Appearance preview">
-          <button type="button" class="appearance-option" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg><span data-i18n="settings.light">Light</span></button>
-          <button type="button" class="appearance-option is-selected" aria-pressed="true" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="3"/><path d="M8 22h8M12 19v3"/></svg><span data-i18n="settings.system">System</span></button>
-          <button type="button" class="appearance-option" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 15.3A8 8 0 0 1 8.7 4a8.3 8.3 0 1 0 11.3 11.3Z"/></svg><span data-i18n="settings.dark">Dark</span></button>
+        <div class="settings-row-copy"><strong id="appearance-control-label" data-i18n="settings.appearance">Appearance</strong><span data-i18n="settings.appearancehint">Choose how Stylio looks on this device.</span></div>
+        <div class="appearance-segment" role="group" aria-labelledby="appearance-control-label">
+          <button type="button" class="appearance-option" data-theme-value="light" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg><span data-i18n="settings.light">Light</span></button>
+          <button type="button" class="appearance-option is-selected" data-theme-value="system" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="15" rx="3"/><path d="M8 22h8M12 19v3"/></svg><span data-i18n="settings.system">System</span></button>
+          <button type="button" class="appearance-option" data-theme-value="dark" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 15.3A8 8 0 0 1 8.7 4a8.3 8.3 0 1 0 11.3 11.3Z"/></svg><span data-i18n="settings.dark">Dark</span></button>
         </div>
       </div>
 
@@ -203,14 +208,22 @@
 
       <h3 class="group-title" data-i18n="shell.storage">On this device</h3>
       <div class="settings-group settings-cache">
-        <button id="clear-assets" type="button" class="settings-nav-row settings-action-row" aria-describedby="clear-assets-hint" disabled><span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path class="cache-icon" d="M7 21h14M3 17a2 2 0 0 1 0-2.8L14.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L9.8 21H7ZM8 10l8 8"/><path class="cache-done" d="m5 12 4 4L19 6"/><path class="cache-spinner" d="M20 12a8 8 0 1 1-4-6.93"/></svg></span><span id="clear-assets-label" class="settings-row-label">Clear cache</span></button>
+        <button id="refresh-app" type="button" class="settings-nav-row settings-action-row">
+          <span class="settings-leading-icon settings-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6v5h-5"/><path d="M18.3 16a7 7 0 1 1 .8-7L20 11"/></svg></span>
+          <span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.updateapp">Update Stylio</span><span class="settings-inline-note" data-i18n="settings.updatehint">Check for a newer app shell and refresh cached files.</span></span>
+        </button>
+        <div class="settings-separator"></div>
+        <button id="clear-assets" type="button" class="settings-nav-row settings-action-row" aria-describedby="clear-assets-hint" disabled>
+          <span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path class="cache-icon" d="M7 21h14M3 17a2 2 0 0 1 0-2.8L14.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L9.8 21H7ZM8 10l8 8"/><path class="cache-done" d="m5 12 4 4L19 6"/><path class="cache-spinner" d="M20 12a8 8 0 1 1-4-6.93"/></svg></span>
+          <span class="settings-row-stack"><span id="clear-assets-label" class="settings-row-label">Clear cache</span><span class="settings-inline-note" data-i18n="shell.cachehint">Downloaded tools can be removed safely. Photos and preferences are kept.</span></span>
+        </button>
+        <p id="refresh-app-status" class="sr-only" role="status"></p>
         <p id="clear-assets-hint" class="sr-only">Removes downloaded tools; keeps photos and preferences. Tools download again when needed.</p><p id="clear-assets-status" class="sr-only" role="status"></p>
-        <p class="settings-copy" data-i18n="shell.cachehint">Downloaded tools can be removed safely. Photos and preferences are kept.</p>
       </div>
 
       <h3 class="group-title" data-i18n="settings.about">About</h3>
       <div class="settings-group settings-about">
-        <div class="settings-nav-row settings-static-row"><span class="settings-row-label" data-i18n="settings.appversion">App version</span><span class="settings-row-value" id="version">0.6.2-web</span></div>
+        <div class="settings-nav-row settings-static-row"><span class="settings-row-label" data-i18n="settings.appversion">App version</span><span class="settings-row-value" id="version">1.0.0</span></div>
         <div class="settings-separator"></div>
         <a class="settings-nav-row" href="https://github.com/WanThinnn/stylio" target="_blank" rel="noopener noreferrer"><span class="settings-row-label" data-i18n="settings.sourcecode">Source code</span><span class="settings-row-value">GitHub</span><span class="settings-chevron" aria-hidden="true"></span></a>
         <div class="settings-separator"></div>

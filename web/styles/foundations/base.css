@@ -24,6 +24,22 @@ body {
   background: var(--bg)
 }
 
+html.theme-transition body,
+html.theme-transition main,
+html.theme-transition .workspace,
+html.theme-transition .settings-group,
+html.theme-transition .photo-format-tip,
+html.theme-transition .appearance-segment,
+html.theme-transition .appearance-option,
+html.theme-transition .glass-surface,
+html.theme-transition .sheet {
+  transition:
+    background-color 240ms ease,
+    color 200ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease
+}
+
 button,input,select {
   font: inherit
 }

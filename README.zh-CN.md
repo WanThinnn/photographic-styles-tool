@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-当前版本：v0.6.2
+当前版本：v1.0.0
 
 此分支由 **Elio（aka WanThinnn）** 维护，基于
 [nathanatgit 的 Shalielie](https://github.com/nathanatgit/Shalielie)。保留原作者的

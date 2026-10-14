@@ -14,6 +14,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   bindDockViewport({doc,win});
   let destination='process',selected=null,serial=0,opener=null,scroll=0,returning=false,pendingOpen=null;
   const sessionId=win.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2);
+  try{if('scrollRestoration' in win.history)win.history.scrollRestoration='manual';}catch{}
   const screens=['process','history','guide','settings'],positions={process:0,history:0,guide:0,settings:0};
   // Navigation preferences are small; image bytes and result IDs stay in memory.
   try{const saved=win.sessionStorage.getItem('stylio-screen');destination=screens.includes(saved)?saved:'process';}catch{}
@@ -25,6 +26,9 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     positions[destination]=win.scrollY;destination=next;
     try{win.sessionStorage.setItem('stylio-screen',next);}catch{}
     for(const name of screens)$(name+'-screen').hidden=name!==next;
+    const settingsActive=next==='settings',guideAction=$('header-guide');
+    doc.body.classList.toggle('is-settings-destination',settingsActive);
+    guideAction.setAttribute('aria-hidden',String(settingsActive));guideAction.tabIndex=settingsActive?-1:0;
     for(const button of tabs){if(button.dataset.screen===next)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');}
     doc.querySelector('.app-tabs').style.setProperty('--tab-index',String(screens.indexOf(next)));
     win.scrollTo(0,positions[next]);
@@ -111,6 +115,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     win.history.replaceState({...win.history.state,stylioTab:destination},'');
     win.history.pushState({stylioTab:next},'');showScreen(next);
   }
+  $('header-guide')?.addEventListener('click',()=>navigate('guide'));
   for(const button of tabs)button.addEventListener('click',()=>navigate(button.dataset.screen));
   bindTabGlass({nav:doc.querySelector('.app-tabs'),tabs,select:navigate,win,doc});
   for(const [trigger,id]of [['open-ai-settings','ai-settings']]){

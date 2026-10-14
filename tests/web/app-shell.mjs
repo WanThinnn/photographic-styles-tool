@@ -41,7 +41,7 @@ function harness({blockedStorage=false,initialState=null,deferBack=false,thumbna
       if(selector==='dialog[open]')return [...sheets,nodes.get('photo-workspace')].filter(el=>el.open);
       throw Error('Unexpected selector '+selector);
     }};
-  for(const id of ['photo-workspace','photo-content','close-photo','photo-title','settings-screen','guide-screen','history-search','toggle-search','history-search-field','clear-search','search-button-label','history-search-summary','history-no-matches','.app-tabs','.app-dock','open-ai-settings','ai-settings','depth-model','history-items','history-empty','history-count','current-task','task-content','process-screen','history-screen']){
+  for(const id of ['photo-workspace','photo-content','close-photo','photo-title','settings-screen','guide-screen','history-search','toggle-search','history-search-field','clear-search','search-button-label','history-search-summary','history-no-matches','.app-tabs','.app-dock','header-guide','open-ai-settings','ai-settings','depth-model','history-items','history-empty','history-count','current-task','task-content','process-screen','history-screen']){
     const el=new Element();nodes.set(id,el);doc.body.append(el);
   }
   const tabs=['process','history','guide','settings'].map(name=>{const el=new Element('button');el.dataset.screen=name;doc.body.append(el);return el;});
@@ -178,8 +178,13 @@ test('four destinations include a standalone Guide and Settings, with Back and s
     h.tabs[index].click();
     assert.equal(h.$(name+'-screen').hidden,false);
     assert.equal(h.tabs[index].getAttribute('aria-current'),'page');
+    assert.equal(h.$('header-guide').getAttribute('aria-hidden'),String(name==='settings'));
+    assert.equal(h.doc.body.classes.has('is-settings-destination'),name==='settings');
     for(const other of ['process','history','guide','settings'])if(other!==name)assert.equal(h.$(other+'-screen').hidden,true);
   }
+  h.tabs[0].click();h.$('header-guide').click();
+  assert.equal(h.$('guide-screen').hidden,false);
+  assert.equal(h.tabs[2].getAttribute('aria-current'),'page');
 });
 test('search filters session results locally, handles Vietnamese accents and restores destination',()=>{
   const h=harness();
@@ -209,29 +214,44 @@ test('browser Back closes search and leaves the selected destination valid',()=>
 });
 
 
-test('dock uses visual viewport only for keyboard focus, then clears stale offsets and respects pinch zoom',()=>{
-  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
-  viewport.height=550;viewport.offsetTop=24;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=700;
-  let frame,scheduled=0;win.requestAnimationFrame=fn=>{frame=fn;scheduled++;return 1;};win.cancelAnimationFrame=()=>frame=null;
+test('standalone PWA refreshes a stale fixed viewport on resume and only lifts for a real Search keyboard resize',()=>{
+  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map(),classes=new Set();
+  viewport.height=550;viewport.offsetTop=24;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=700;win.scrollX=0;win.scrollY=42;
+  win.matchMedia=()=>({matches:true});win.navigator={standalone:true};
+  const scrolls=[];win.scrollTo=(x,y)=>{scrolls.push([x,y]);win.scrollX=x;win.scrollY=y;};
+  let frame,scheduled=0;win.requestAnimationFrame=fn=>{frame=fn;scheduled++;return scheduled;};win.cancelAnimationFrame=()=>frame=null;
   const flush=()=>{const next=frame;frame=null;next?.();};
-  const dock={style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)}};
-  const doc={activeElement:null,querySelector:()=>dock,getElementById:()=>input};
+  const dock={
+    style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)},
+    classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
+    getBoundingClientRect:()=>({height:60})
+  };
+  const field={hidden:true};
+  const doc={activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?field:input};
+  values.set('--dock-viewport-bottom','stale');values.set('--dock-keyboard-offset','180px');
   const dispose=bindDockViewport({win,doc});
-  win.dispatchEvent(new Event('pageshow'));flush();
-  assert.equal(values.has('--dock-viewport-bottom'),false,'PWA startup uses dynamic CSS viewport, not cached visual viewport dimensions');
-  doc.activeElement=input;input.dispatchEvent(new Event('focus'));flush();
+  assert.equal(classes.has('is-viewport-recalibrating'),true);
+  flush();assert.deepEqual(scrolls.at(-1),[0,41]);
+  flush();assert.deepEqual(scrolls.at(-1),[0,42]);
+  assert.equal(classes.has('is-viewport-recalibrating'),false);
+  win.dispatchEvent(new Event('pageshow'));flush();flush();
+  assert.equal(values.has('--dock-viewport-bottom'),false,'warm PWA resume clears restored viewport state');
+  assert.equal(values.has('--dock-keyboard-offset'),false);
+
+  field.hidden=false;classes.add('is-searching');doc.activeElement=input;
+  input.dispatchEvent(new Event('focus'));
+  assert.equal(values.has('--dock-keyboard-offset'),false,'focus alone never trusts a stale VisualViewport');
+  const beforeKeyboard=scheduled;
+  viewport.dispatchEvent(new Event('resize'));viewport.dispatchEvent(new Event('scroll'));
+  assert.equal(scheduled,beforeKeyboard+1,'resize/scroll coalesce into one frame');flush();
   assert.equal(values.get('--dock-viewport-bottom'),'574px');
   assert.equal(values.get('--dock-keyboard-offset'),'126px');
-  viewport.height=500;viewport.dispatchEvent(new Event('resize'));viewport.dispatchEvent(new Event('scroll'));
-  assert.equal(scheduled,3,'resize/scroll coalesce into one frame');flush();
-  assert.equal(values.get('--dock-viewport-bottom'),'524px');
+  viewport.height=500;viewport.dispatchEvent(new Event('resize'));flush();
   assert.equal(values.get('--dock-keyboard-offset'),'176px');
   viewport.scale=1.5;viewport.dispatchEvent(new Event('resize'));flush();
-  assert.equal(values.has('--dock-viewport-bottom'),false,'no forced zoom compensation');
-  assert.equal(values.has('--dock-keyboard-offset'),false);
-  viewport.scale=1;viewport.dispatchEvent(new Event('resize'));flush();
-  doc.activeElement=null;input.dispatchEvent(new Event('blur'));
-  assert.equal(values.has('--dock-viewport-bottom'),false,'clear immediately even if keyboard resize is late');flush();
+  assert.equal(values.has('--dock-keyboard-offset'),false,'pinch zoom is never treated as a keyboard');
+  viewport.scale=1;win.dispatchEvent(new Event('pagehide'));
+  assert.equal(values.has('--dock-keyboard-offset'),false,'pagehide clears state before WebKit snapshots the PWA');
   dispose();viewport.dispatchEvent(new Event('resize'));assert.equal(frame,null);
 });
 test('dock viewport enhancement is optional without VisualViewport',()=>{

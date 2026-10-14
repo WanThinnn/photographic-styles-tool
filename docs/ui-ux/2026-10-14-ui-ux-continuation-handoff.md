@@ -7,7 +7,7 @@
 - Workspace: `photographic-styles-tool`.
 - Nhánh làm việc hiện tại theo plan: `feature/ui-ux-redesign`.
 - Working tree **đang có thay đổi chưa commit/push**. Không reset, checkout, rebase, stash, merge hoặc xóa các thay đổi đang có nếu người dùng chưa yêu cầu rõ.
-- UI shell hiện ở Service Worker cache **v184**: `web/sw.js`.
+- UI shell hiện ở Service Worker cache **v186**: `web/sw.js`.
 - PWA là static HTML/CSS/JS, không chuyển sang React/Ionic/React Native. Các repo trong `ref/` chỉ dùng làm reference.
 - `facts.md` là sổ thí nghiệm kỹ thuật dài hạn. **Không sửa facts.md cho các thay đổi UI/UX thông thường.**
 - Các install icon PWA/Home Screen vẫn dùng bản xanh mặc định. **Không tạo cơ chế dynamic dark install icon.** iOS quyết định appearance ở Home Screen. Dark icon nội bộ của app chỉ dùng cho header/app shell.
@@ -554,7 +554,7 @@ Nếu thêm setting mới:
 
 ## 20. Service Worker và offline
 
-`web/sw.js` hiện cache `photographic-style-port-v184`.
+`web/sw.js` hiện cache `photographic-style-port-v186`.
 
 Mọi module/UI asset mới cần dùng offline phải được thêm vào `APP_SHELL` nếu phù hợp.
 
@@ -634,9 +634,9 @@ Nếu user gửi screenshot mới, ưu tiên screenshot thực tế trên thiế
 
 ## 24. Test suite hiện tại
 
-Mốc regression gần nhất sau v184:
+Mốc regression gần nhất sau v186:
 
-- main lightweight suite: **84/84 pass**
+- main lightweight suite: **85/85 pass**
 - language tests: **3/3 pass**
 - PWA check: pass
 - i18n check: pass
@@ -783,7 +783,28 @@ Batch v183 hiện đã nằm trong local commit `0ce47db` (`feature/ui-ux-redesi
 - Service Worker cache tăng **v184**.
 - Regression hiện tại: **84/84 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
 
-Chưa commit/push. Working tree v184 là base hiện hành.
+Batch v184 đã nằm trong commit `afdbd2a` và đã đồng bộ với `origin/feature/ui-ux-redesign` trước khi batch v185 bắt đầu.
+
+## 32. Batch v185 — scroll-edge header glass / notice alignment / balanced model copy
+
+- Info icon của `Keep the original photo format` được căn giữa theo chiều dọc của toàn row bằng `align-self:center`; text và `Got it` giữ layout hiện tại.
+- Fixed mobile header giữ trong suốt khi ở đầu trang. Khi `window.scrollY > 8`, `page-bootstrap.js` gắn `.is-scrolled`; lúc đó header mới bật pseudo-surface Liquid Glass nhẹ (`blur(16px)`, saturate, translucent fill/border/shadow). Scroll về đầu trang thì material biến mất lại.
+- Model row trong AI Settings tăng phần copy và giảm tỷ trọng slider vừa đủ: desktop/mobile sheet dùng `36px + min 108px + min 140px`; narrow container dùng `34px + min 92px + min 128px`. Hint dùng `text-wrap: balance` nên copy ngắn không còn rơi thành nhiều dòng lệch.
+- UI-only fixture hỗ trợ `?state=resource-error&lang=en&theme=light` để ép render đúng banner `err.resources` mà không cần làm hỏng app/resource thật; fixture này không ship trong release.
+- Service Worker cache tăng **v185**.
+- Regression hiện tại: **85/85 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
+
+Batch v185 được thay thế ngay trong cùng working tree bởi v186; chưa commit/push riêng.
+
+## 33. Batch v186 — fixed native nav bar / Apple system blue
+
+- Bỏ hoàn toàn scroll-triggered Liquid Glass/blur ở mobile top header. Header giờ là một navigation bar cố định full-width: `top:0`, nền opaque `var(--bg)`, separator `.5px`, và padding top vẫn giữ `safe-area + 24px` nên icon/tên app không chui lên vùng Dynamic Island.
+- Không còn `.top::before`, `.top.is-scrolled` hay JS scroll listener dành cho header. Nội dung scroll phía dưới bị che bởi navbar thay vì hòa/blur xuyên qua, gần hành vi Messenger/iOS navigation bar hơn.
+- Accent blue chuyển sang Apple system blue: Light `#007AFF`, Dark `#0A84FF`. `--accent`, `--accent-text`, AI blue, selected tab, switches/progress và action links cùng đi theo semantic token này. Text/icon đặt trên nền accent chuyển sang trắng.
+- Service Worker cache tăng **v186**.
+- Regression: **85/85 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
+
+Chưa commit/push. Working tree v186 là base hiện hành.
 
 ---
 

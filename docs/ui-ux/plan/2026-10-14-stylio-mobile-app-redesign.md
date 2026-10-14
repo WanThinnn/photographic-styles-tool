@@ -740,6 +740,23 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker tăng **v184**.
 - Regression: **84/84 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
 
+### Scroll-edge header glass / notice alignment / balanced model copy v185
+
+- First-use format notice keeps its full width; the info icon now centers vertically against the row instead of sitting near the first text line.
+- Mobile fixed header is transparent at rest. `page-bootstrap.js` toggles `.is-scrolled` only after `scrollY > 8`; the mobile header pseudo-surface then enables a subtle 16px Liquid Glass blur, translucent material, outline and light shadow. Returning to the top removes the material.
+- AI Settings Model row gives short copy more width and uses `text-wrap: balance`, while keeping the range control inline and usable on narrow sheets.
+- Manual UI fixture accepts `state=resource-error` plus language/theme query parameters, allowing deterministic visual inspection of the real `err.resources` banner styles without breaking resource loading.
+- Service Worker tăng **v185**.
+- Regression: **85/85 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
+
+### Fixed native nav bar / Apple system blue v186
+
+- The mobile top bar no longer uses a scroll-triggered blur or glass pseudo-surface. It is a full-width fixed navigation bar with an opaque app background and a subtle bottom separator, while preserving the existing Dynamic Island/safe-area vertical offset.
+- All header scroll-state JS was removed; content simply scrolls underneath the fixed bar and is visually occluded, matching a conventional Messenger/iOS navigation bar.
+- Primary semantic blue now follows Apple system blue exactly: `#007AFF` in Light and `#0A84FF` in Dark. Accent-filled controls use white foreground text/icons.
+- Service Worker tăng **v186**.
+- Regression: **85/85 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

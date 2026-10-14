@@ -1,7 +1,7 @@
 /* Primitive → semantic → component roles. Glass recipes: see THIRD_PARTY_NOTICES.txt. */
 :root {
   color-scheme: light dark;
-  --blue-600: #0894ff;
+  --blue-600: #007aff;
   --violet-500: #a768db;
   --coral-500: #f16f86;
   --space-1: .25rem;
@@ -18,8 +18,8 @@
   --nav-idle: #3a3a3c;
   --line: #3c3c431f;
   --accent: var(--blue-600);
-  --accent-text: #006fbe;
-  --on-accent: #071c2d;
+  --accent-text: #007aff;
+  --on-accent: #fff;
   --switch-thumb: #fff;
   --switch-track: #78788033;
   --glass-rgb: 255 255 255;
@@ -81,10 +81,11 @@
   --sheet-shadow: 0 24px 100px #0003;
   --duration-fast: 160ms;
   --spring-ease: cubic-bezier(.2,.8,.2,1.15);
-  --focus-ring: #006fbe;
+  --focus-ring: #007aff;
 }
 @media(prefers-color-scheme:dark) {
   :root:not([data-theme="light"]) {
+  --blue-600: #0a84ff;
   --bg: #000;
   --surface: #1c1c1e;
   --surface-secondary: #2c2c2e;
@@ -92,7 +93,7 @@
   --muted: #b6b6bf;
   --nav-idle: #d1d1d6;
   --line: #ffffff20;
-  --accent-text: #63beff;
+  --accent-text: #0a84ff;
   --glass-rgb: 62 62 62;
   --glass-opacity: .5;
   --glass-rim-top: #ffffff35;
@@ -136,11 +137,12 @@
   --icon-violet-fg: #bf5af2;
   --icon-purple-fg: #bf5af2;
   --icon-orange-fg: #ff9f0a;
-    --focus-ring: #63beff;
+  --focus-ring: #0a84ff;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --blue-600: #0a84ff;
   --bg: #000;
   --surface: #1c1c1e;
   --surface-secondary: #2c2c2e;
@@ -148,7 +150,7 @@
   --muted: #b6b6bf;
   --nav-idle: #d1d1d6;
   --line: #ffffff20;
-  --accent-text: #63beff;
+  --accent-text: #0a84ff;
   --glass-rgb: 62 62 62;
   --glass-opacity: .5;
   --glass-rim-top: #ffffff35;
@@ -192,7 +194,7 @@
   --icon-violet-fg: #bf5af2;
   --icon-purple-fg: #bf5af2;
   --icon-orange-fg: #ff9f0a;
-  --focus-ring: #63beff;
+  --focus-ring: #0a84ff;
 }
 :root[data-theme="light"] { color-scheme: light }
 @media(prefers-contrast:more) {

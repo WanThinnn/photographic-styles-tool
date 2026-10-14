@@ -124,7 +124,8 @@
 .photo-format-tip>svg {
   width: 17px;
   height: 17px;
-  margin-top: 2px;
+  align-self: center;
+  margin-top: 0;
   color: var(--accent-text)
 }
 

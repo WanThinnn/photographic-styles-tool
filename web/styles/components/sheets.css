@@ -651,7 +651,7 @@ footer a {
 .ai-option-icon-neutral { background: var(--appearance-icon-bg); color: var(--appearance-icon-fg) }
 
 .ai-settings-panel>.portrait-option.depth-model-row {
-  grid-template-columns: 36px minmax(82px,.72fr) minmax(150px,1.28fr);
+  grid-template-columns: 36px minmax(108px,.9fr) minmax(140px,1.1fr);
   gap: 8px;
   align-items: center
 }
@@ -669,6 +669,10 @@ footer a {
   max-width: 13rem
 }
 
+.ai-settings-panel>.portrait-option.depth-model-row>.ai-option-copy .ai-hint {
+  text-wrap: balance
+}
+
 .ai-settings-panel>.portrait-option.depth-model-row>.depth-model-control {
   grid-column: 3;
   grid-row: 1;
@@ -678,12 +682,12 @@ footer a {
 
 @container (max-width:22rem) {
   .ai-settings-panel>.portrait-option.depth-model-row {
-    grid-template-columns: 34px minmax(48px,.55fr) minmax(112px,1.45fr);
+    grid-template-columns: 34px minmax(92px,.9fr) minmax(128px,1.1fr);
     gap: 6px
   }
   .ai-settings-panel>.portrait-option.depth-model-row>.depth-model-control {
     grid-column: 3;
     grid-row: 1;
-    min-width: 112px
+    min-width: 128px
   }
 }

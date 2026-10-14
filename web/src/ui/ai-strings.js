@@ -1,7 +1,7 @@
 export const AI_STRINGS={
   "vi": {
     "masterToggle": "Cải thiện ảnh thông minh",
-    "toggle": "Xoá phông và ánh sáng chân dung",
+    "toggle": "Hiệu ứng độ sâu và ánh sáng",
     "detailToggle": "Làm nét ảnh",
     "detailHint": "Khử nhiễu và tăng nét bằng AI trước Styles. Với HDR tương thích, gain map được tính lại theo ảnh đã xử lý.",
     "styleToggle": "Phong cách Thích ứng",
@@ -74,7 +74,7 @@ export const AI_STRINGS={
   },
   "en": {
     "masterToggle": "Smart Enhance photo",
-    "toggle": "Depth Effect with Portrait Lighting",
+    "toggle": "Lighting Depth Effect",
     "detailToggle": "Sharpen Photo",
     "detailHint": "AI restoration before Styles. Compatible HDR gain maps are recalculated from the restored image.",
     "styleToggle": "Adaptive Styles",

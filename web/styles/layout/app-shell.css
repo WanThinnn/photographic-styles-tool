@@ -361,11 +361,15 @@ body.is-settings-destination .top-github-symbol {
   .top {
     position: fixed;
     z-index: 12;
-    top: calc(env(safe-area-inset-top,0px) + 24px);
-    left: 50%;
-    width: min(680px,calc(100% - max(20px,env(safe-area-inset-left,0px)) - max(20px,env(safe-area-inset-right,0px))));
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: calc(env(safe-area-inset-top,0px) + 82px);
     margin-bottom: 0;
-    transform: translateX(-50%)
+    padding: calc(env(safe-area-inset-top,0px) + 24px) max(20px,env(safe-area-inset-right,0px)) 10px max(20px,env(safe-area-inset-left,0px));
+    border-bottom: .5px solid var(--line);
+    background: var(--bg);
+    box-sizing: border-box
   }
   .tagline {
     display: none

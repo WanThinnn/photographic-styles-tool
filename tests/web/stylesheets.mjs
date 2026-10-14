@@ -55,10 +55,14 @@ test('AI summary keeps the switch beside its label while pinning Settings to the
   assert.doesNotMatch(controls,/@container \(max-width: 22rem\)/);
 });
 
-test('old bright blue is shared and scrollbar hiding does not disable normal scrolling',()=>{
+test('Apple system blue drives app accents and scrollbar hiding does not disable normal scrolling',()=>{
   const tokens=readFileSync(new URL('../../web/styles/foundations/tokens.css',import.meta.url),'utf8');
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
-  assert.match(tokens,/--blue-600: #0894ff/);
+  assert.match(tokens,/--blue-600: #007aff/);
+  assert.match(tokens,/--accent-text: #007aff/);
+  assert.match(tokens,/@media\(prefers-color-scheme:dark\)[\s\S]*?--blue-600: #0a84ff;[\s\S]*?--accent-text: #0a84ff/s);
+  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--blue-600: #0a84ff;[\s\S]*?--accent-text: #0a84ff/s);
+  assert.match(tokens,/--on-accent: #fff/);
   assert.match(base,/scrollbar-width: none/);assert.match(base,/\*::-webkit-scrollbar \{[^}]*display: none/);
   assert.match(base,/html \{[^}]*touch-action: pan-x pan-y/s);
   assert.match(base,/body \{[^}]*touch-action: pan-x pan-y/s);
@@ -106,7 +110,7 @@ test('process header and Smart Enhance controls use a tighter native grouping',(
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
   assert.match(layout,/\.app-logo \{[^}]*width: 40px;[^}]*height: 40px/s);
   assert.match(layout,/h1 \{[^}]*font-size: 1\.375rem;[^}]*font-weight: 700/s);
-  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: calc\(env\(safe-area-inset-top,0px\) \+ 24px\);[^}]*transform: translateX\(-50%\)/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*background: var\(--bg\)/s);
   assert.match(layout,/@media\(max-width:767px\)[\s\S]*?main \{[^}]*padding-top: calc\(env\(safe-area-inset-top,0px\) \+ 94px\)/s);
   assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*align-items: center/s);
   assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-trigger \{[^}]*margin-left: auto/s);
@@ -148,9 +152,10 @@ test('AI Settings model row keeps a wide inline slider and vertically centered n
   const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   assert.match(controls,/\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.75fr\) minmax\(150px,1\.35fr\)/s);
-  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.72fr\) minmax\(150px,1\.28fr\)/s);
+  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(108px,\.9fr\) minmax\(140px,1\.1fr\)/s);
   assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-icon \{[^}]*align-self: center;[^}]*justify-self: center/s);
-  assert.match(sheets,/@container \(max-width:22rem\)[\s\S]*?\.depth-model-control \{[^}]*grid-column: 3;[^}]*grid-row: 1;[^}]*min-width: 112px/s);
+  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-copy \.ai-hint \{[^}]*text-wrap: balance/s);
+  assert.match(sheets,/@container \(max-width:22rem\)[\s\S]*?\.depth-model-control \{[^}]*grid-column: 3;[^}]*grid-row: 1;[^}]*min-width: 128px/s);
   assert.match(html,/class="ai-model-network-symbol" viewBox="0 0 28 28"/);
   assert.match(controls,/\.ai-model-network-symbol \{[^}]*width: 25px;[^}]*height: 25px/s);
   assert.match(strings,/"modelHint": "Lite is faster\. Pro gives finer AI results\."/);
@@ -210,6 +215,7 @@ test('first-run notice is a single grouped card and appearance controls are inte
   const base=readFileSync(new URL('../../web/styles/foundations/base.css',import.meta.url),'utf8');
   const shellLayout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   assert.match(workspace,/\.photo-format-tip \{[^}]*grid-template-columns: 17px minmax\(0,1fr\) auto;[^}]*margin: 10px 0 8px;[^}]*border-radius: 16px;[^}]*background: var\(--surface-secondary\)/s);
+  assert.match(workspace,/\.photo-format-tip>svg \{[^}]*align-self: center;[^}]*margin-top: 0/s);
   assert.match(workspace,/\.photo-format-tip button \{[^}]*grid-column: 3;[^}]*min-height: 44px/s);
   assert.match(html,/data-theme-value="light"/);
   assert.match(html,/data-theme-value="system"/);
@@ -260,6 +266,15 @@ test('browser focus and Tab rings are visually suppressed across the app',()=>{
   assert.match(portrait,/\.ai-aperture-track:has\(input:focus-visible\) \{[^}]*box-shadow: none/s);
   assert.doesNotMatch(portrait,/outline: 2px solid #0894ff/);
 });
+test('mobile header is a fixed opaque navigation bar without scroll blur',()=>{
+  const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
+  const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*padding: calc\(env\(safe-area-inset-top,0px\) \+ 24px\)[^}]*border-bottom: \.5px solid var\(--line\);[^}]*background: var\(--bg\)/s);
+  assert.doesNotMatch(layout,/\.top\.is-scrolled::before/);
+  assert.doesNotMatch(layout,/@media\(max-width:767px\)[\s\S]*?\.top::before \{/s);
+  assert.doesNotMatch(bootstrap,/topBarScrollFrame|queueTopBarMaterial|is-scrolled/);
+});
+
 test('resource failures use native-style banners and stacked labels keep compact title-to-description spacing',()=>{
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const results=readFileSync(new URL('../../web/styles/components/results.css',import.meta.url),'utf8');
@@ -267,10 +282,13 @@ test('resource failures use native-style banners and stacked labels keep compact
   const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
   const bootstrap=readFileSync(new URL('../../web/src/ui/page-bootstrap.js',import.meta.url),'utf8');
   const application=readFileSync(new URL('../../web/src/app/application.js',import.meta.url),'utf8');
+  const fixture=readFileSync(new URL('./fixtures/mobile-shell.js',import.meta.url),'utf8');
   assert.match(layout,/#boot\.err\.app-error-banner \{[^}]*grid-template-columns: 30px minmax\(0,1fr\) auto;[^}]*border-radius: 18px;[^}]*background: color-mix/s);
   assert.match(results,/\.status\.err \{[^}]*grid-template-columns: 24px minmax\(0,1fr\);[^}]*border-radius: 14px;[^}]*background: color-mix/s);
   assert.match(bootstrap,/showBootError\(t\(selector\.value,'err\.resources'\),t\(selector\.value,'btn\.retry'\)\)/);
   assert.match(application,/showBootError\(T\(e\?\.code==='BROWSER_INSECURE_CONTEXT'\?'err\.setup':'err\.resources'\)\)/);
+  assert.match(fixture,/fixtureParams\.get\('state'\)==='resource-error'/);
+  assert.match(fixture,/copy\.textContent=T\('err\.resources'\)/);
   assert.match(controls,/\.ai-hint \{[^}]*line-height: 1\.4;[^}]*margin: 2px 0 0/s);
   assert.match(sheets,/\.settings-row-stack \{[^}]*gap: 2px/s);
   assert.match(sheets,/\.settings-inline-note \{[^}]*line-height: 1\.35/s);

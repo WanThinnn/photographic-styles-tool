@@ -9,7 +9,7 @@ import {releaseHevcEncoder as releaseRasterEncoder} from '../raster/ffmpeg-hevc.
 import {releaseHeicProcessor} from '../media/heic-processing.js';
 import {waitForVisiblePage} from '../ui/processing-scheduler.js';
 import {depthModel} from '../portrait/depth-models.js';
-import {clearDownloadedAssets} from '../core/cache-cleanup.js';
+import {clearDownloadedAssets,clearAllAppCaches} from '../core/cache-cleanup.js';
 import {createAiFeatureControls,showAiSettingsHintOnce} from '../ui/ai-feature-controls.js';
 import {createResultView} from '../ui/results/result-view.js';
 import {createHistoryStore,restoredFile} from '../ui/history-store.js';
@@ -27,8 +27,9 @@ export function startApplication(){
   const fileInput = $("file"), drop = $("drop"), list = $("list");
   const aiPortrait = $("ai-portrait"), aiDetail = $("ai-detail"), aiStyleSuggest=$("ai-style-suggest"), enhanceAi = $("enhance-ai");
   const gpuAcceleration=$('gpu-acceleration');
-  const modelSelector=$('depth-model'),clearAssets=$('clear-assets');
+  const modelSelector=$('depth-model'),clearAssets=$('clear-assets'),fullCleanup=$('full-cleanup');
   const modelLevels=['lite','standard','pro'];
+  const appStorageKeys=['psport.lang','stylio-theme-v1','stylio-result-preview-v1','photo-format-tip-dismissed-v1','stylio-ai-settings-hint-v2','stylio-has-processed','depth-model','depth-gpu-acceleration'];
   const aiSettings=$('ai-settings');
 
   const selectedAiLevel=()=>modelLevels[Number(modelSelector.value)];
@@ -38,7 +39,7 @@ export function startApplication(){
     modelSelector.parentElement.style.setProperty('--model-position',['20px','50%','calc(100% - 20px)'][Number(modelSelector.value)]);
     modelSelector.parentElement.dataset.level=modelSelector.value;
   }
-  let clearingAssets=false,assetStatus='';
+  let clearingAssets=false,fullCleaning=false,assetStatus='';
   try{const saved=localStorage.getItem('depth-model')||'standard';depthModel(saved);modelSelector.value=modelLevels.indexOf(saved);}catch{}
 
   renderModel();
@@ -58,12 +59,13 @@ export function startApplication(){
   const aiFeatures=createAiFeatureControls({
     master:enhanceAi,
     features:{portrait:aiPortrait,detail:aiDetail,style:aiStyleSuggest},
-    isAvailable:()=>browserReady&&!clearingAssets,
+    isAvailable:()=>browserReady&&!clearingAssets&&!fullCleaning,
   });
   function refreshHistoryButton() {
     clearHistory.hidden = !list.childElementCount;
     clearHistory.disabled = pendingTasks > 0;
-    clearAssets.disabled=!browserReady||pendingTasks>0||clearingAssets||aiCandidates.some(candidate=>candidate.ui.portraitPending);
+    clearAssets.disabled=!browserReady||pendingTasks>0||clearingAssets||fullCleaning||aiCandidates.some(candidate=>candidate.ui.portraitPending);
+    fullCleanup.disabled=!browserReady||pendingTasks>0||clearingAssets||fullCleaning||aiCandidates.some(candidate=>candidate.ui.portraitPending);
   }
   function queueTask(task) {
     pendingTasks++; refreshHistoryButton();
@@ -104,6 +106,42 @@ export function startApplication(){
       await clearDownloadedAssets();assetStatus='cleaned';
     }catch(error){console.warn('Cache cleanup unavailable',error);assetStatus='cleanupFailed';}
     finally{clearingAssets=false;aiFeatures.sync();$('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=false;fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));translateAi();refreshHistoryButton();}
+  });
+  fullCleanup.addEventListener('click',async()=>{
+    if(fullCleanup.disabled)return;
+    if(!await confirmAction({
+      title:T('confirm.resettitle'),detail:T('confirm.resetdetail'),confirmLabel:T('action.reset'),cancelLabel:T('action.cancel')
+    }))return;
+    fullCleaning=true;fullCleanup.setAttribute('aria-busy','true');$('full-cleanup-status').textContent=T('settings.fullcleaning');
+    refreshHistoryButton();aiFeatures.sync();
+    $('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=true;
+    fileInput.disabled=true;drop.setAttribute('aria-disabled','true');
+    let reloading=false;
+    try{
+      for(const cleanup of [...resultCleanups])cleanup();
+      resultCleanups.clear();
+      for(const url of resultUrls)URL.revokeObjectURL(url);
+      resultUrls.clear();livePhotos.length=0;liveMovies.clear();aiCandidates.length=0;
+      if(historyStore.destroy)await historyStore.destroy();else await historyStore.clear();list.replaceChildren();fileInput.value='';
+      releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
+      const [{releaseOrtModels},{releaseDetailWorkers},{releaseStyleRecommender}]=await Promise.all([
+        import('../vision/ort-vision.js'),import('../detail/detail-inference.js'),import('../recommend/style-runtime.js')]);
+      releaseDetailWorkers();releaseStyleRecommender();await releaseOrtModels();
+      await clearAllAppCaches();
+      for(const key of appStorageKeys)try{localStorage.removeItem(key);}catch{}
+      for(const key of ['stylio-screen','counted'])try{sessionStorage.removeItem(key);}catch{}
+      $('full-cleanup-status').textContent='';
+      reloading=true;location.reload();
+    }catch(error){
+      console.warn('Full Stylio cleanup unavailable',error);
+      $('full-cleanup-status').textContent=T('settings.fullcleanupfailed');
+    }finally{
+      if(!reloading){
+        fullCleaning=false;fullCleanup.removeAttribute('aria-busy');
+        $('model-options').disabled=modelSelector.disabled=gpuAcceleration.disabled=false;
+        fileInput.disabled=!browserReady;drop.setAttribute('aria-disabled',String(!browserReady));aiFeatures.sync();refreshHistoryButton();
+      }
+    }
   });
   const aiText = () => AI_STRINGS[lang] || AI_STRINGS.en;
   function translateAi() {
@@ -171,7 +209,9 @@ export function startApplication(){
     for(const entry of entries){
       const file=restoredFile(entry);
       if(!file)continue;
-      const ui=row(entry.name||entry.fileName||file.name,file,{historyId:entry.id,restored:true,restoredPreview:entry.preview||null});
+      const ui=row(entry.name||entry.fileName||file.name,file,{
+        historyId:entry.id,restored:true,restoredPreview:entry.preview||null,restoredThumbnail:entry.thumbnail||null
+      });
       ui.output(file,{metadata:false,persist:false});
       ui.set(T('st.ready'),'ok');
     }

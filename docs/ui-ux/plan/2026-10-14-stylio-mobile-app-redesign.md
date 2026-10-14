@@ -712,6 +712,17 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - Service Worker app-shell cache tăng v181 và precache confirm-dialog module.
 - Regression: **79/79 suite pass**, **3/3 language tests pass**, PWA/i18n checks đạt, VI/EN/ZH mỗi ngôn ngữ 199 strings, git diff --check sạch; private Portrait control fixture **1/1 pass** trên 18 layout/theme/language combinations.
 
+### Persistent History thumbnail / Full cleanup / visual polish v182
+
+- History thumbnail JPEG nhỏ giờ được persist trực tiếp trong IndexedDB record (`thumbnail`) và restore qua `restoredThumbnail`, tách khỏi Result Preview snapshot. Reload/F5 không còn rơi về dấu check chỉ vì source file của phiên cũ không còn trong memory.
+- Model glyph đổi sang geometry vuông 28×28, render 25×25 để tăng chiều cao và giữ cân optical trong tile.
+- Portrait ƒ giảm vòng xuống 24px, stroke mảnh hơn và dùng system/SF-like typography nhẹ hơn.
+- Custom destructive dialog Light mode tăng contrast theo reference iOS: card sáng/đục hơn, body copy tối hơn, secondary destructive capsule tách rõ; Dark mode giữ material cũ.
+- Settings thêm `Reset Stylio`: custom confirmation rồi xóa History IndexedDB, session/result resources, preference keys, downloaded AI/tool caches và app-shell cache thuộc đúng Stylio project. Không clear toàn bộ origin storage/cache để tránh ảnh hưởng sibling GitHub Pages; sau cleanup app reload và tái tạo shell sạch.
+- `history-store.js` có `destroy()` để đóng/xóa database; `cache-cleanup.js` có `clearAllAppCaches()` scope theo project path/cache families.
+- Service Worker tăng **v182**.
+- Regression: **82/82 main lightweight tests pass**, **3/3 language tests pass**, PWA/i18n pass, VI/EN/ZH **206 strings**. Private Portrait browser fixture trong lượt này timeout ở 120s và 180s trước khi trả assertion; static Portrait/layout regression vẫn pass.
+
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

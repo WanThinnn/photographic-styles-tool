@@ -87,6 +87,7 @@ test('separate picker/drop batches remain serialized and cache cleanup stays loc
   h.node('file').files=['first'];await h.node('file').fire('change');
   await h.node('drop').fire('drop',{preventDefault(){},dataTransfer:{files:['second']}});
   assert.equal(h.node('clear-assets').disabled,true);
+  assert.equal(h.node('full-cleanup').disabled,true);
   assert.equal(h.node('clear-history').disabled,true);
   await h.waitForStart('first');
   assert.deepEqual(h.calls.filter(([type])=>type==='start'),[['start','first']]);
@@ -95,6 +96,7 @@ test('separate picker/drop batches remain serialized and cache cleanup stays loc
   assert.deepEqual(h.calls.filter(([type])=>['start','end'].includes(type)),
     [['start','first'],['end','first'],['start','second'],['end','second']]);
   assert.equal(h.node('clear-assets').disabled,false);
+  assert.equal(h.node('full-cleanup').disabled,false);
   assert.equal(h.node('clear-history').disabled,false);
 });
 
@@ -109,13 +111,14 @@ test('three-stop model range updates the displayed name and the actual processin
 });
 
 test('persistent history is restored as ready downloadable results without reprocessing',async()=>{
-  const file={name:'saved-result.heic',type:'image/heic',size:4096},preview={type:'image/jpeg',size:2048};
-  const h=harness({historyEntries:[{id:'persisted-1',name:'original.heic',file,preview}]});await h.start();
+  const file={name:'saved-result.heic',type:'image/heic',size:4096},preview={type:'image/jpeg',size:2048},thumbnail='data:image/jpeg;base64,thumb';
+  const h=harness({historyEntries:[{id:'persisted-1',name:'original.heic',file,preview,thumbnail}]});await h.start();
   assert.equal(h.captured.rows.length,1);
   assert.equal(h.captured.rows[0].name,'original.heic');
   assert.equal(h.captured.rows[0].options.historyId,'persisted-1');
   assert.equal(h.captured.rows[0].options.restored,true);
   assert.equal(h.captured.rows[0].options.restoredPreview,preview);
+  assert.equal(h.captured.rows[0].options.restoredThumbnail,thumbnail);
   assert.equal(h.captured.rows[0].outputs.length,1);
   assert.equal(h.captured.rows[0].outputs[0][0],file);
   assert.equal(h.captured.rows[0].outputs[0][1].metadata,false);

@@ -8,6 +8,7 @@ test('history storage degrades safely when IndexedDB is unavailable',async()=>{
   await store.save({id:'one',name:'original.heic',file});
   await store.remove('one');
   await store.clear();
+  await store.destroy();
   assert.deepEqual(await store.list(),[]);
 });
 

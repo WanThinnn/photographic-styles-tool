@@ -138,6 +138,15 @@ test('History thumbnails decode lazily, use small cached images, and preserve re
   assert.equal(h.$('history-empty').hidden,false);
 });
 
+test('restored History can render a persisted thumbnail without decoding the result again',()=>{
+  const h=harness(),source={type:'image/heic'};
+  const record=h.shell.register(h.row(),'saved.heic',source,{thumbnail:'data:image/jpeg;base64,thumb'});
+  record.update('ready','Ready');
+  const thumb=h.$('history-items').firstElementChild.querySelector('.task-thumbnail');
+  assert.equal(thumb.className,'task-thumbnail');
+  assert.equal(thumb.src,'data:image/jpeg;base64,thumb');
+});
+
 test('ready results group share/download/delete actions behind one overflow control',()=>{
   const h=harness(),record=h.shell.register(h.row(),'ready.heic');let shared=0,downloaded=0,removed=0;
   record.quickActions([

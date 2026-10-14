@@ -5,7 +5,7 @@ import {releaseLibheif} from '../../web/src/codecs/libheif-lifecycle.js';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {waitForVisiblePage} from '../../web/src/ui/processing-scheduler.js';
-import {clearDownloadedAssets} from '../../web/src/core/cache-cleanup.js';
+import {clearDownloadedAssets,clearAllAppCaches} from '../../web/src/core/cache-cleanup.js';
 import {MODEL_CACHE_NAME} from '../../web/src/core/model-download.js';
 import {depthModel,asDisparity} from '../../web/src/portrait/depth-models.js';
 
@@ -33,6 +33,26 @@ test('download cleanup is scoped and preserves photos, shell, and sibling projec
   assert.equal(entries.get(MODEL_CACHE_NAME).size,2);assert.equal(entries.get('photographic-style-port-v100').size,3);assert.equal(entries.get('unrelated-app').size,1);
   assert.deepEqual(await clearDownloadedAssets({cacheStorage,base:'https://example.com/tool/'}),{count:0,bytes:0});
   await assert.rejects(clearDownloadedAssets({cacheStorage:null}),/unavailable/);
+});
+
+test('full app cache cleanup removes this project while preserving sibling-project entries',async()=>{
+  const entries=new Map([
+    [MODEL_CACHE_NAME,new Map([
+      ['https://example.com/tool/vendor/ai-portrait/model.onnx',new Response('ours')],
+      ['https://example.com/other/vendor/ai-portrait/model.onnx',new Response('sibling')],
+    ])],
+    ['photographic-style-port-v181',new Map([
+      ['https://example.com/tool/index.html',new Response('ours')],
+      ['https://example.com/other/index.html',new Response('sibling')],
+    ])],
+    ['unrelated-app',new Map([['https://example.com/tool/index.html',new Response('other cache')]])],
+  ]);
+  const cacheStorage={keys:async()=>[...entries.keys()],open:async name=>{
+    const map=entries.get(name);return {keys:async()=>[...map.keys()].map(url=>({url})),delete:async r=>map.delete(r.url)};
+  },delete:async name=>entries.delete(name)};
+  assert.deepEqual(await clearAllAppCaches({cacheStorage,base:'https://example.com/tool/'}),{count:2});
+  assert.equal(entries.get(MODEL_CACHE_NAME).size,1);assert.equal(entries.get('photographic-style-port-v181').size,1);assert.equal(entries.get('unrelated-app').size,1);
+  assert.deepEqual(await clearAllAppCaches({cacheStorage:null}),{count:0});
 });
 
 test('depth choices reject unknown models and convert positive V3 depth to near-bright disparity',()=>{

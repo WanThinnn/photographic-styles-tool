@@ -14,7 +14,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     'meta.resources':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16Z"/></svg>',
     'meta.capture':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>'
   }[key]||'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg>');
-  function row(name,sourceFile,{historyId=(globalThis.crypto?.randomUUID?.()||`history-${Date.now()}-${Math.random().toString(16).slice(2)}`),restored=false,restoredPreview=null}={}) {
+  function row(name,sourceFile,{historyId=(globalThis.crypto?.randomUUID?.()||`history-${Date.now()}-${Math.random().toString(16).slice(2)}`),restored=false,restoredPreview=null,restoredThumbnail=null}={}) {
     const el = document.createElement("div");
     el.className = "row";
     const previewSource=restoredPreview||sourceFile;
@@ -24,10 +24,16 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     el.querySelector(".name").textContent = name;
     el.querySelector(".name").title = name;
     list.appendChild(el);
-    const presentation=shell?.register(el,name,previewSource);
+    let previewSnapshotPromise=Promise.resolve(restoredPreview||null),persistedOutput=null,historyThumbnail=restoredThumbnail||null;
+    const persistHistory=()=>persistedOutput&&previewSnapshotPromise.then(preview=>historyStore?.save?.({
+      id:historyId,name,file:persistedOutput,preview,thumbnail:historyThumbnail
+    }));
+    const presentation=shell?.register(el,name,previewSource,{
+      thumbnail:restoredThumbnail,
+      onThumbnail:thumbnail=>{historyThumbnail=thumbnail;void persistHistory();}
+    });
     el.querySelector('.status').setAttribute('role','status');
     const cleanups=new Set(),downloadedFiles=new WeakSet(),savedFiles=new WeakSet();let disposed=false;
-    let previewSnapshotPromise=Promise.resolve(restoredPreview||null);
     const ensureDetails=()=>{
       let details=el.querySelector('.result-details');
       if(details)return details;
@@ -210,7 +216,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         else presentation?.quickAction?.(quickActions[0].kind,quickActions[0].run,quickActions[0].label);
         this.link(file,file.name);
         presentation?.source?.(file);
-        if(persist)void previewSnapshotPromise.then(preview=>historyStore?.save?.({id:historyId,name,file,preview}));
+        if(persist){persistedOutput=file;void persistHistory();}
         this.liveExporter?.setOutput(file);
         if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
           file.arrayBuffer().then(b=>this.metadata(new Uint8Array(b),this.inputSize||file.size,{...this.metadataOptions,outputEpoch})).catch(console.warn);}

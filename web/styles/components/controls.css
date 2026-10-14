@@ -301,8 +301,8 @@ input[role="switch"]:disabled {
   min-width: 150px
 }
 .ai-model-network-symbol {
-  width: 27px;
-  height: 23px
+  width: 25px;
+  height: 25px
 }
 @media(prefers-reduced-motion:reduce) {
   input[role="switch"]:active::after,.depth-model-slider:has(input:active) .model-knob { scale: 1 }

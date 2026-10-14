@@ -17,16 +17,20 @@ dialog::backdrop {
 }
 
 .ios-confirm-dialog {
+  --confirm-bg: rgb(246 246 248 / .94);
+  --confirm-detail: #48484a;
+  --confirm-secondary: #e7e7ec;
+  --confirm-cancel-fg: #fff;
   width: min(330px,calc(100% - 32px));
   margin: auto;
   padding: 0;
-  border: .5px solid var(--glass-outline);
+  border: .5px solid #ffffffd1;
   border-radius: 28px;
   color: var(--fg);
-  background: rgb(var(--glass-rgb) / .78);
-  box-shadow: inset 0 1px 1px var(--glass-rim-top),0 18px 46px #0005;
-  backdrop-filter: blur(30px) saturate(165%);
-  -webkit-backdrop-filter: blur(30px) saturate(165%);
+  background: var(--confirm-bg);
+  box-shadow: inset 0 1px 1px #fff,0 20px 54px #0000003d;
+  backdrop-filter: blur(34px) saturate(155%);
+  -webkit-backdrop-filter: blur(34px) saturate(155%);
   overflow: hidden
 }
 
@@ -57,7 +61,7 @@ dialog::backdrop {
 
 .ios-confirm-copy p {
   margin: 5px 0 0;
-  color: var(--muted);
+  color: var(--confirm-detail);
   font-size: .875rem;
   line-height: 1.35
 }
@@ -77,13 +81,35 @@ dialog::backdrop {
 
 .ios-confirm-cancel {
   background: var(--accent);
-  color: var(--on-accent)
+  color: var(--confirm-cancel-fg)
 }
 
 .ios-confirm-destructive {
-  background: var(--surface-secondary);
-  color: var(--err)
+  background: var(--confirm-secondary);
+  color: #d70015
 }
+
+@media(prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) .ios-confirm-dialog {
+    --confirm-bg: rgb(var(--glass-rgb) / .78);
+    --confirm-detail: var(--muted);
+    --confirm-secondary: var(--surface-secondary);
+    --confirm-cancel-fg: #fff;
+    border-color: var(--glass-outline);
+    box-shadow: inset 0 1px 1px var(--glass-rim-top),0 18px 46px #0005
+  }
+  :root:not([data-theme="light"]) .ios-confirm-destructive { color: var(--err) }
+}
+
+:root[data-theme="dark"] .ios-confirm-dialog {
+  --confirm-bg: rgb(var(--glass-rgb) / .78);
+  --confirm-detail: var(--muted);
+  --confirm-secondary: var(--surface-secondary);
+  --confirm-cancel-fg: #fff;
+  border-color: var(--glass-outline);
+  box-shadow: inset 0 1px 1px var(--glass-rim-top),0 18px 46px #0005
+}
+:root[data-theme="dark"] .ios-confirm-destructive { color: var(--err) }
 
 .sheet[open] {
   animation: sheet-in 180ms ease-out
@@ -212,7 +238,12 @@ dialog::backdrop {
 .settings-icon-green { background: var(--icon-green-bg); color: var(--icon-green-fg) }
 .settings-icon-amber { background: var(--icon-amber-bg); color: var(--icon-amber-fg) }
 .settings-icon-violet { background: var(--icon-violet-bg); color: var(--icon-violet-fg) }
+.settings-icon-red { background: linear-gradient(155deg,#ff7168,#ff3b30); color: #fff }
 .settings-icon-github { background: var(--icon-dark-tile); color: #fff }
+@media(prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) .settings-icon-red { background: var(--icon-dark-tile); color: #ff453a }
+}
+:root[data-theme="dark"] .settings-icon-red { background: var(--icon-dark-tile); color: #ff453a }
 
 .settings-row-label {
   min-width: 0;
@@ -409,6 +440,10 @@ dialog::backdrop {
 .settings-action-row:disabled {
   opacity: .55;
   cursor: wait
+}
+
+.settings-destructive-row .settings-row-label {
+  color: var(--err)
 }
 
 .settings-row-stack {

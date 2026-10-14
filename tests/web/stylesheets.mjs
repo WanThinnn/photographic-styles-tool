@@ -115,7 +115,7 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   const js=readFileSync(new URL('../../web/src/portrait/ai-portrait-preview.js',import.meta.url),'utf8');
   const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
   assert.match(css,/\.ai-preview-toolbar \{[^}]*grid-template-columns: 1fr auto 1fr/s);
-  assert.match(css,/\.ai-mode-f \{[^}]*border: 1\.5px solid currentColor;[^}]*border-radius: 50%/s);
+  assert.match(css,/\.ai-mode-f \{[^}]*width: 24px;[^}]*height: 24px;[^}]*border: 1\.15px solid currentColor;[^}]*border-radius: 50%;[^}]*font-family: -apple-system/s);
   assert.match(css,/\.ai-photo-mode\[aria-pressed="true"\] \{[^}]*color: #c08b00/s);
   assert.doesNotMatch(css,/\.ai-photo-mode\[aria-pressed="true"\] \{[^}]*background:/s);
   assert.match(css,/\.ai-preview-actions \{[^}]*justify-self: end;[^}]*gap: 0;[^}]*border-radius: var\(--capsule-radius\);[^}]*background: rgb\(var\(--glass-rgb\) \/ \.52\)/s);
@@ -149,7 +149,8 @@ test('AI Settings model row keeps a wide inline slider and vertically centered n
   assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.72fr\) minmax\(150px,1\.28fr\)/s);
   assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-icon \{[^}]*align-self: center;[^}]*justify-self: center/s);
   assert.match(sheets,/@container \(max-width:22rem\)[\s\S]*?\.depth-model-control \{[^}]*grid-column: 3;[^}]*grid-row: 1;[^}]*min-width: 112px/s);
-  assert.match(html,/class="ai-model-network-symbol" viewBox="0 0 28 24"/);
+  assert.match(html,/class="ai-model-network-symbol" viewBox="0 0 28 28"/);
+  assert.match(controls,/\.ai-model-network-symbol \{[^}]*width: 25px;[^}]*height: 25px/s);
   assert.match(strings,/"modelHint": "Lite is faster\. Pro gives finer AI results\."/);
 });
 
@@ -182,10 +183,21 @@ test('settings follows iOS grouped rows with language navigation, appearance pre
   assert.match(layout,/body\.is-settings-destination \.top-help-symbol \{[^}]*translateY\(22px\)/s);
   assert.match(layout,/body\.is-settings-destination \.top-github-symbol \{[^}]*translateY\(0\)/s);
   assert.match(html,/id="refresh-app"/);
+  assert.match(html,/id="full-cleanup"/);
+  assert.match(html,/settings\.fullcleanuphint/);
+  assert.match(sheets,/\.settings-icon-red \{[^}]*#ff3b30/s);
   assert.match(html,/id="version">1\.0\.0</);
   assert.match(bootstrap,/registration\?\.update\?\.\(\)/);
   assert.match(bootstrap,/stylio-result-preview-v1/);
   assert.match(bootstrap,/photographic-style-port-/);
+});
+
+test('light destructive confirmation uses the higher-contrast iOS-like palette while dark keeps semantic materials',()=>{
+  const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
+  assert.match(sheets,/\.ios-confirm-dialog \{[^}]*--confirm-bg: rgb\(246 246 248 \/ \.94\);[^}]*--confirm-detail: #48484a;[^}]*--confirm-secondary: #e7e7ec/s);
+  assert.match(sheets,/\.ios-confirm-cancel \{[^}]*background: var\(--accent\);[^}]*color: var\(--confirm-cancel-fg\)/s);
+  assert.match(sheets,/\.ios-confirm-destructive \{[^}]*background: var\(--confirm-secondary\);[^}]*color: #d70015/s);
+  assert.match(sheets,/:root\[data-theme="dark"\] \.ios-confirm-dialog \{[^}]*--confirm-bg: rgb\(var\(--glass-rgb\) \/ \.78\)/s);
 });
 
 test('first-run notice is a single grouped card and appearance controls are interactive and persisted',()=>{

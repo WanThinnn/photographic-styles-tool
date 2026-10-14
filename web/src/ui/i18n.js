@@ -655,6 +655,21 @@ const STORE_KEY = "psport.lang";
 Object.assign(STRINGS.vi, {'st.texturerepaired':'đã sửa tương thích Texture', 'meta.camera':'Máy ảnh', 'meta.dimensions':'Kích thước', 'meta.size':'Dung lượng', 'meta.resources':'Dữ liệu ảnh', 'meta.depth':'Depth gốc', 'meta.capture':'Chụp lúc', 'details.processing':'Xử lý', 'details.photo':'Thông tin ảnh'});
 Object.assign(STRINGS.en, {'st.texturerepaired':'Texture compatibility repaired', 'meta.camera':'Camera', 'meta.dimensions':'Dimensions', 'meta.size':'File size', 'meta.resources':'Image data', 'meta.depth':'Source depth', 'meta.capture':'Captured', 'details.processing':'Processing', 'details.photo':'Photo information'});
 Object.assign(STRINGS.zh, {'st.texturerepaired':'已修复质感兼容性', 'meta.camera':'相机', 'meta.dimensions':'尺寸', 'meta.size':'文件大小', 'meta.resources':'图像数据', 'meta.depth':'原始深度', 'meta.capture':'拍摄时间', 'details.processing':'处理', 'details.photo':'照片信息'});
+Object.assign(STRINGS.vi, {
+  'settings.fullcleanup':'Đặt lại Stylio','settings.fullcleanuphint':'Xóa lịch sử, tùy chọn, model AI đã tải và bộ nhớ đệm của ứng dụng.',
+  'settings.fullcleaning':'Đang xóa dữ liệu Stylio…','settings.fullcleanupfailed':'Không thể xóa toàn bộ dữ liệu lúc này.',
+  'confirm.resettitle':'Xóa toàn bộ dữ liệu Stylio trên thiết bị này?','confirm.resetdetail':'Lịch sử, tùy chọn, model AI đã tải và tệp ứng dụng lưu đệm sẽ bị xóa. Hành động này không thể hoàn tác.','action.reset':'Xóa sạch'
+});
+Object.assign(STRINGS.en, {
+  'settings.fullcleanup':'Reset Stylio','settings.fullcleanuphint':'Remove history, preferences, downloaded AI models and cached app files.',
+  'settings.fullcleaning':'Removing Stylio data…','settings.fullcleanupfailed':'Could not remove all Stylio data right now.',
+  'confirm.resettitle':'Remove all Stylio data from this device?','confirm.resetdetail':'History, preferences, downloaded AI models and cached app files will be removed. This cannot be undone.','action.reset':'Erase All'
+});
+Object.assign(STRINGS.zh, {
+  'settings.fullcleanup':'重置 Stylio','settings.fullcleanuphint':'删除历史记录、偏好设置、已下载的 AI 模型和应用缓存文件。',
+  'settings.fullcleaning':'正在删除 Stylio 数据…','settings.fullcleanupfailed':'目前无法删除全部 Stylio 数据。',
+  'confirm.resettitle':'删除此设备上的全部 Stylio 数据？','confirm.resetdetail':'历史记录、偏好设置、已下载的 AI 模型和应用缓存文件都将被删除。此操作无法撤销。','action.reset':'全部删除'
+});
 STRINGS.vi['ai.download'] = 'Tải bản depth';
 STRINGS.en['ai.download'] = 'Download depth test';
 STRINGS.zh['ai.download'] = '下载深度测试';

@@ -106,7 +106,7 @@
       <input type="checkbox" id="gpu-acceleration" checked role="switch" aria-describedby="gpu-acceleration-hint">
     </div>
     <div class="depth-model-row portrait-option">
-      <span class="ai-option-icon ai-option-icon-neutral" aria-hidden="true"><svg class="ai-model-network-symbol" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.7 4.3 7.2v9.6l9.7 4.5 9.7-4.5V7.2Z"/><path d="M14 2.7v18.6M4.3 7.2l19.4 9.6M23.7 7.2 4.3 16.8M4.3 12h19.4M14 12 4.3 7.2M14 12l9.7-4.8M14 12l9.7 4.8M14 12l-9.7 4.8"/><circle cx="14" cy="2.7" r="1.55"/><circle cx="4.3" cy="7.2" r="1.55"/><circle cx="23.7" cy="7.2" r="1.55"/><circle cx="4.3" cy="16.8" r="1.55"/><circle cx="23.7" cy="16.8" r="1.55"/><circle cx="14" cy="21.3" r="1.55"/><circle cx="14" cy="12" r="1.8"/></svg></span>
+      <span class="ai-option-icon ai-option-icon-neutral" aria-hidden="true"><svg class="ai-model-network-symbol" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.7 4.3 7.8v12.4l9.7 5.1 9.7-5.1V7.8Z"/><path d="M14 2.7v22.6M4.3 7.8l19.4 12.4M23.7 7.8 4.3 20.2M4.3 14h19.4M14 14 4.3 7.8M14 14l9.7-6.2M14 14l9.7 6.2M14 14l-9.7 6.2"/><circle cx="14" cy="2.7" r="1.55"/><circle cx="4.3" cy="7.8" r="1.55"/><circle cx="23.7" cy="7.8" r="1.55"/><circle cx="4.3" cy="20.2" r="1.55"/><circle cx="23.7" cy="20.2" r="1.55"/><circle cx="14" cy="25.3" r="1.55"/><circle cx="14" cy="14" r="1.8"/></svg></span>
       <div class="ai-option-copy">
       <label for="depth-model" id="depth-model-label">Model</label>
       <p id="depth-model-hint" class="ai-hint">Lite is faster. Pro gives finer AI results.</p>
@@ -259,8 +259,14 @@
           <span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path class="cache-icon" d="M7 21h14M3 17a2 2 0 0 1 0-2.8L14.2 3a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L9.8 21H7ZM8 10l8 8"/><path class="cache-done" d="m5 12 4 4L19 6"/><path class="cache-spinner" d="M20 12a8 8 0 1 1-4-6.93"/></svg></span>
           <span class="settings-row-stack"><span id="clear-assets-label" class="settings-row-label">Clear cache</span><span class="settings-inline-note" data-i18n="shell.cachehint">Downloaded tools can be removed safely. Photos and preferences are kept.</span></span>
         </button>
+        <div class="settings-separator"></div>
+        <button id="full-cleanup" type="button" class="settings-nav-row settings-action-row settings-destructive-row" aria-describedby="full-cleanup-hint" disabled>
+          <span class="settings-leading-icon settings-icon-red" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></span>
+          <span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.fullcleanup">Reset Stylio</span><span id="full-cleanup-hint" class="settings-inline-note" data-i18n="settings.fullcleanuphint">Remove history, preferences, downloaded AI models and cached app files.</span></span>
+        </button>
         <p id="refresh-app-status" class="sr-only" role="status"></p>
         <p id="clear-assets-hint" class="sr-only">Removes downloaded tools; keeps photos and preferences. Tools download again when needed.</p><p id="clear-assets-status" class="sr-only" role="status"></p>
+        <p id="full-cleanup-status" class="sr-only" role="status"></p>
       </div>
 
       <h3 class="group-title" data-i18n="settings.about">About</h3>

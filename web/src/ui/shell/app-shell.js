@@ -193,6 +193,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       const context=canvas.getContext?.('2d');if(!context)return;
       context.drawImage(bitmap,0,0);
       record.thumbnail=canvas.toDataURL('image/jpeg',0.7);
+      record.onThumbnail?.(record.thumbnail);
       render();
     }catch{/* Browser could not decode this file; preserve its status icon. */}
     finally{bitmap?.close?.();record.thumbnailPending=false;}
@@ -300,8 +301,13 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   showScreen(destination);
   return {
     render,
-    register(el,name,sourceFile){
-      const id='result-'+sessionId+'-'+(++serial),record={id,el,name,state:'queued',status:'',progress:null,sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile};records.set(id,record);
+    register(el,name,sourceFile,{thumbnail=null,onThumbnail=null}={}){
+      const id='result-'+sessionId+'-'+(++serial),record={
+        id,el,name,state:'queued',status:'',progress:null,
+        sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile,
+        thumbnail:typeof thumbnail==='string'&&thumbnail?thumbnail:null,
+        onThumbnail:typeof onThumbnail==='function'?onThumbnail:null,
+      };records.set(id,record);
       const actions=el.querySelector('.act');
       record.actions=actions;
       record.measureActions=()=>el.style.setProperty('--actions-height',`${actions.getBoundingClientRect().height}px`);

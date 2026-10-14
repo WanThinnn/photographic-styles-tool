@@ -61,12 +61,12 @@ export function createHistoryStore({indexedDB=globalThis.indexedDB}={}){
         return Array.isArray(results)?results.sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0)):[];
       }catch(error){console.warn('Could not restore Stylio history',error);return [];}
     },
-    async save({id,name,file,preview=null,readyNotice=''}) {
+    async save({id,name,file,preview=null,thumbnail=null,readyNotice=''}) {
       if(!id||!file)return;
       try{
         await mutate(()=>withStore('readwrite',store=>{
           store.put({
-            id,name,file,preview,fileName:file.name||name||'Stylio.HEIC',type:file.type||'application/octet-stream',
+            id,name,file,preview,thumbnail,fileName:file.name||name||'Stylio.HEIC',type:file.type||'application/octet-stream',
             lastModified:file.lastModified||Date.now(),readyNotice,updatedAt:Date.now()
           });
         }));
@@ -78,6 +78,18 @@ export function createHistoryStore({indexedDB=globalThis.indexedDB}={}){
     },
     async clear(){
       try{await mutate(()=>withStore('readwrite',store=>{store.clear();}));}catch(error){console.warn('Could not clear Stylio history',error);}
+    },
+    async destroy(){
+      if(!indexedDB)return;
+      try{
+        await mutation;
+        const db=databasePromise?await databasePromise:null;db?.close?.();databasePromise=undefined;
+        await new Promise((resolve,reject)=>{
+          const request=indexedDB.deleteDatabase(DB_NAME);
+          request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error||Error('Could not delete Stylio history'));
+          request.onblocked=()=>reject(Error('Stylio history is open in another tab'));
+        });
+      }catch(error){console.warn('Could not delete Stylio history database',error);throw error;}
     }
   };
 }

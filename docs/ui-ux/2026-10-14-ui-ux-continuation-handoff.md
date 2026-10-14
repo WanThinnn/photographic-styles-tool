@@ -7,7 +7,7 @@
 - Workspace: `photographic-styles-tool`.
 - Nhánh làm việc hiện tại theo plan: `feature/ui-ux-redesign`.
 - Working tree **đang có thay đổi chưa commit/push**. Không reset, checkout, rebase, stash, merge hoặc xóa các thay đổi đang có nếu người dùng chưa yêu cầu rõ.
-- UI shell hiện ở Service Worker cache **v181**: `web/sw.js`.
+- UI shell hiện ở Service Worker cache **v182**: `web/sw.js`.
 - PWA là static HTML/CSS/JS, không chuyển sang React/Ionic/React Native. Các repo trong `ref/` chỉ dùng làm reference.
 - `facts.md` là sổ thí nghiệm kỹ thuật dài hạn. **Không sửa facts.md cho các thay đổi UI/UX thông thường.**
 - Các install icon PWA/Home Screen vẫn dùng bản xanh mặc định. **Không tạo cơ chế dynamic dark install icon.** iOS quyết định appearance ở Home Screen. Dark icon nội bộ của app chỉ dùng cho header/app shell.
@@ -311,8 +311,9 @@ Behavior:
 - Off: result mới không dựng source preview/Portrait interactive preview để giảm memory/work.
 - On: source preview được dựng.
 - sau v181, app tạo một JPEG snapshot display-size từ preview và lưu cùng History record trong IndexedDB.
-- reload app: History restore dùng `entry.preview` để hiển thị preview lại.
-- không lưu full source photo lần thứ hai chỉ để preview.
+- từ v182, thumbnail History 40px được persist riêng khỏi Result Preview; vì vậy F5/relaunch vẫn có thumbnail kể cả khi snapshot preview không được dùng.
+- reload app: History restore dùng `entry.preview` để hiển thị preview lại và `entry.thumbnail` cho card History/Activity.
+- không lưu full source photo lần thứ hai chỉ để preview/thumbnail.
 
 Lưu ý implementation hiện tại:
 - `result-view.js` dùng `previewSnapshotPromise`;
@@ -336,6 +337,7 @@ Record hiện gồm:
 - `name`
 - `file`
 - `preview`
+- `thumbnail`
 - `fileName`
 - `type`
 - `lastModified`
@@ -552,7 +554,7 @@ Nếu thêm setting mới:
 
 ## 20. Service Worker và offline
 
-`web/sw.js` hiện cache `photographic-style-port-v181`.
+`web/sw.js` hiện cache `photographic-style-port-v182`.
 
 Mọi module/UI asset mới cần dùng offline phải được thêm vào `APP_SHELL` nếu phù hợp.
 
@@ -632,15 +634,14 @@ Nếu user gửi screenshot mới, ưu tiên screenshot thực tế trên thiế
 
 ## 24. Test suite hiện tại
 
-Mốc regression gần nhất sau v181:
+Mốc regression gần nhất sau v182:
 
-- main lightweight suite: **79/79 pass**
+- main lightweight suite: **82/82 pass**
 - language tests: **3/3 pass**
 - PWA check: pass
 - i18n check: pass
-- VI/EN/ZH: **199 strings mỗi ngôn ngữ**
-- private Portrait UI fixture: **1/1 pass**, 18 layout/theme/language combinations
-- diff check trước bàn giao: sạch
+- VI/EN/ZH: **206 strings mỗi ngôn ngữ**
+- private Portrait UI fixture của lượt v182 chưa hoàn tất: harness dài đã timeout ở cả 120s và 180s trước khi trả assertion; static Portrait/layout regression trong main suite vẫn pass. Mốc v181 trước đó đã pass fixture 18 layout/theme/language combinations.
 
 Các lệnh project đã dùng gần nhất:
 
@@ -749,6 +750,19 @@ Khi sửa component, chạy test gần nhất trước, rồi mới chạy suite
 - regression tests cập nhật.
 
 Chưa commit/push. Mọi agent tiếp theo phải coi working tree này là base hiện hành.
+
+## 29. Batch v182 — persistent thumbnails / reset app / iOS visual polish
+
+- History thumbnail không còn chỉ sống trong memory của shell. Thumbnail JPEG nhỏ được callback từ `app-shell.js` về `result-view.js`, lưu chung IndexedDB record qua `history-store.js`, rồi truyền lại bằng `restoredThumbnail` khi reload. Luồng này độc lập với setting Result Preview nên F5/relaunch vẫn giữ thumbnail card.
+- Model network glyph chuyển sang canvas vuông 28×28 và render 25×25 trong tile để cân cả chiều ngang lẫn chiều dọc; layout slider/copy không đổi.
+- Portrait ƒ control giảm vòng ngoài còn 24px, stroke mảnh 1.15px, glyph dùng system/SF stack nhẹ hơn để gần Photos hơn và không còn cảm giác thô/to.
+- iOS destructive dialog ở Light mode dùng material gần trắng đục hơn, detail text tối hơn, secondary Delete capsule rõ hơn và chữ Cancel trắng trên accent. Dark-mode giữ semantic glass/material trước đó.
+- Settings thêm destructive row `Reset Stylio`. Sau custom confirmation, flow xóa History IndexedDB, Blob/result session hiện tại, các preference key Stylio trong local/session storage, model/tool caches và app-shell cache thuộc đúng project rồi reload. Không dùng `localStorage.clear()` và cache cleanup có scope theo project để không xóa dữ liệu sibling GitHub Pages cùng origin.
+- `historyStore.destroy()` đóng rồi xóa database `stylio-history-v1`; fallback vẫn an toàn khi IndexedDB không khả dụng.
+- Service Worker cache tăng **v182**.
+- Regression hiện tại: **82/82 main suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **206 strings**. Private Portrait browser fixture chưa hoàn tất trong lượt này vì timeout ở 120s và 180s; static Portrait/layout tests đều pass.
+
+Chưa commit/push. Mọi agent tiếp theo phải coi working tree v182 này là base hiện hành.
 
 ---
 

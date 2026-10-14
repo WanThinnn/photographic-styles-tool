@@ -26,3 +26,20 @@ export async function clearDownloadedAssets({cacheStorage=globalThis.caches,base
   }
   return {count,bytes};
 }
+
+export async function clearAllAppCaches({cacheStorage=globalThis.caches,base=new URL('../../',import.meta.url)}={}){
+  if(!cacheStorage)return {count:0};
+  const scope=new URL(base),names=await cacheStorage.keys();
+  let count=0;
+  for(const name of names){
+    if(name!==MODEL_CACHE_NAME&&!name.startsWith('photographic-style-depth-assets-')&&!name.startsWith('photographic-style-port-'))continue;
+    const cache=await cacheStorage.open(name);
+    for(const request of await cache.keys()){
+      const url=new URL(request.url),local=url.origin===scope.origin&&url.pathname.startsWith(scope.pathname),
+        remoteDependency=name===MODEL_CACHE_NAME&&dependencies.has(url.href);
+      if((local||remoteDependency)&&await cache.delete(request))count++;
+    }
+    if((await cache.keys()).length===0)await cacheStorage.delete(name);
+  }
+  return {count};
+}

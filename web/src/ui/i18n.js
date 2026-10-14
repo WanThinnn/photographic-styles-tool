@@ -121,6 +121,12 @@ export const STRINGS = {
     "help.live": "Lưu vào Ảnh chỉ lưu ảnh tĩnh. Xuất cặp Live Photo cần video MOV gốc tương ứng và công cụ nhập tương thích.",
     "help.slow": "Lần đầu cần tải công cụ xử lý. AI được tải khi cần và lưu để dùng lại. Với ảnh lớn, hãy xử lý từng ảnh.",
     "help.language": "Ngôn ngữ mặc định theo trình duyệt. App luôn ưu tiên và ghi nhớ ngôn ngữ bạn chọn.",
+    "guide.steps.short": "Chọn ảnh, xử lý, lưu rồi tinh chỉnh trong Ảnh.",
+    "guide.formats.short": "Định dạng hỗ trợ, HDR, Live Photo và ảnh gốc.",
+    "guide.edit.short": "Stylio giữ được gì và Ảnh có thể làm mất gì.",
+    "guide.trouble.short": "Tải lần đầu, ảnh lớn và thời gian chụp.",
+    "guide.seemore": "Xem thêm",
+    "guide.showless": "Thu gọn",
     "date.kept": "Thời gian chụp trong file:",
     "t.date": "<b>Ngày chụp</b>: file giữ metadata thời gian chụp gốc. Ảnh và iCloud có thể gán ngày lưu; web không kiểm soát được ngày trong thư viện.",
     "date.missing": "Không đọc được thời gian chụp gốc. Ứng dụng Ảnh có thể dùng ngày nhập ảnh.",
@@ -130,7 +136,7 @@ export const STRINGS = {
     "app.tagline": "Phong cách nhiếp ảnh cho ảnh của bạn",
     "p.author": "bởi Elio",
     "h.notice": "Trước khi bắt đầu",
-    "n.1": "Công cụ thử nghiệm, không chính thức và không liên kết với Apple.",
+    "n.1": "Được phát triển độc lập và có mã nguồn mở. Không liên kết với Apple.",
     "n.2": "File HEIC của Apple chỉ chứa ảnh tĩnh. Hãy giữ ảnh gốc.",
     "app.lede": "Thêm Phong cách, Kết cấu và Hạt.<br>Xử lý riêng tư trên thiết bị của bạn.",
     "drop.big": "Chọn ảnh",
@@ -287,6 +293,12 @@ export const STRINGS = {
     "err.resources": "Some required app files could not be loaded. Try again; if the site was just updated, wait a few seconds and reload.",
     "lang.label": "Language",
     "help.language": "The default language follows your browser. Your language choice is remembered and always takes priority.",
+    "guide.steps.short": "Choose, process, save, then fine-tune in Photos.",
+    "guide.formats.short": "Supported formats, HDR, Live Photo and originals.",
+    "guide.edit.short": "What Stylio can preserve—and what Photos may omit.",
+    "guide.trouble.short": "First-run downloads, large photos and capture dates.",
+    "guide.seemore": "See more",
+    "guide.showless": "Show less",
     "h.conversiondetails": "Details",
     "h.help": "Help & information",
     "h.editlimits": "iPhone 16/17 photos with edited Styles or Portrait",
@@ -307,7 +319,7 @@ export const STRINGS = {
     "p.author": "by Elio",
 
     "h.notice": "Before you start",
-    "n.1": "Experimental, unofficial software, not affiliated with Apple.",
+    "n.1": "Independently developed and open-source. Not affiliated with Apple.",
     "n.2": "An Apple HEIC holds only the still image. Keep your original photos.",
     "app.lede": "Add Styles, Texture and Grain.<br>Privately, on your device.",
     "drop.big": "Choose photos",
@@ -489,6 +501,12 @@ export const STRINGS = {
     "err.resources": "部分应用资源未能加载。请重试；如果网站刚更新，请等待几秒后重新载入。",
     "lang.label": "语言",
     "help.language": "默认语言跟随浏览器。手动选择的语言会被记住，并始终优先。",
+    "guide.steps.short": "选取、处理并保存，然后在照片中继续微调。",
+    "guide.formats.short": "支持的格式、HDR、实况照片与原始文件。",
+    "guide.edit.short": "Stylio 能保留什么，以及照片可能缺失什么。",
+    "guide.trouble.short": "首次下载、大照片与拍摄时间。",
+    "guide.seemore": "查看更多",
+    "guide.showless": "收起",
     "h.conversiondetails": "详情",
     "h.help": "帮助与说明",
     "h.editlimits": "已编辑风格或人像的 iPhone 16/17 照片",
@@ -519,7 +537,7 @@ export const STRINGS = {
     "p.author": "由 Elio 修改",
 
     "h.notice": "注意事项",
-    "n.1": "实验性非官方工具，与 Apple 无关。",
+    "n.1": "独立开发的开源软件，与 Apple 无关联。",
     "n.2": "Apple 的 HEIC 文件只包含静态图像，请保留原图。",
     "app.lede": "添加风格、质感与颗粒。<br>照片仅在本设备上处理。",
     "drop.big": "选取照片",
@@ -610,9 +628,9 @@ export const STRINGS = {
 };
 
 const STORE_KEY = "psport.lang";
-Object.assign(STRINGS.vi, {'st.texturerepaired':'đã sửa tương thích Texture', 'meta.camera':'Máy ảnh', 'meta.dimensions':'Kích thước', 'meta.size':'Dung lượng', 'meta.resources':'Dữ liệu ảnh', 'meta.depth':'Depth gốc', 'meta.capture':'Chụp lúc'});
-Object.assign(STRINGS.en, {'st.texturerepaired':'Texture compatibility repaired', 'meta.camera':'Camera', 'meta.dimensions':'Dimensions', 'meta.size':'File size', 'meta.resources':'Image data', 'meta.depth':'Source depth', 'meta.capture':'Captured'});
-Object.assign(STRINGS.zh, {'st.texturerepaired':'已修复质感兼容性', 'meta.camera':'相机', 'meta.dimensions':'尺寸', 'meta.size':'文件大小', 'meta.resources':'图像数据', 'meta.depth':'原始深度', 'meta.capture':'拍摄时间'});
+Object.assign(STRINGS.vi, {'st.texturerepaired':'đã sửa tương thích Texture', 'meta.camera':'Máy ảnh', 'meta.dimensions':'Kích thước', 'meta.size':'Dung lượng', 'meta.resources':'Dữ liệu ảnh', 'meta.depth':'Depth gốc', 'meta.capture':'Chụp lúc', 'details.processing':'Xử lý', 'details.photo':'Thông tin ảnh'});
+Object.assign(STRINGS.en, {'st.texturerepaired':'Texture compatibility repaired', 'meta.camera':'Camera', 'meta.dimensions':'Dimensions', 'meta.size':'File size', 'meta.resources':'Image data', 'meta.depth':'Source depth', 'meta.capture':'Captured', 'details.processing':'Processing', 'details.photo':'Photo information'});
+Object.assign(STRINGS.zh, {'st.texturerepaired':'已修复质感兼容性', 'meta.camera':'相机', 'meta.dimensions':'尺寸', 'meta.size':'文件大小', 'meta.resources':'图像数据', 'meta.depth':'原始深度', 'meta.capture':'拍摄时间', 'details.processing':'处理', 'details.photo':'照片信息'});
 STRINGS.vi['ai.download'] = 'Tải bản depth';
 STRINGS.en['ai.download'] = 'Download depth test';
 STRINGS.zh['ai.download'] = '下载深度测试';

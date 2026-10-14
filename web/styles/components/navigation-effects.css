@@ -5,7 +5,8 @@
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
-  contain: paint;
+  overflow: visible;
+  contain: layout style;
   isolation: isolate;
   transform: translateZ(0);
   backface-visibility: hidden
@@ -32,7 +33,7 @@
     0 6px 18px var(--glass-shade)
 }
 .app-tabs.is-pressing::before {
-  scale: 1.12 1.36;
+  scale: 1.15 1.4;
   transition: transform 80ms linear,scale 200ms var(--spring-ease),background 120ms,box-shadow 180ms
 }
 

@@ -92,6 +92,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       win.history.replaceState({...win.history.state,stylioTab:destination},'');
       win.history.pushState({stylioPhoto:id,stylioTab:destination},'');
     }
+    record.actions?.classList.remove('is-expanded');
     photo.showModal();photo.scrollTop=0;photo.focus({preventScroll:true});
     record.measureActions?.();
   }
@@ -237,8 +238,14 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     register(el,name,sourceFile){
       const id='result-'+sessionId+'-'+(++serial),record={id,el,name,state:'queued',status:'',sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile};records.set(id,record);
       const actions=el.querySelector('.act');
+      record.actions=actions;
       record.measureActions=()=>el.style.setProperty('--actions-height',`${actions.getBoundingClientRect().height}px`);
       const observer=win.ResizeObserver?new win.ResizeObserver(record.measureActions):null;
+      const expandActions=()=>actions?.classList.add('is-expanded');
+      const collapseActions=()=>actions?.classList.remove('is-expanded');
+      actions?.addEventListener('pointerdown',expandActions,{passive:true});
+      actions?.addEventListener('focusin',expandActions);
+      photo.addEventListener('scroll',collapseActions,{passive:true});
       if(actions)observer?.observe(actions);
       doc.body.classList.add('has-used-app');try{win.localStorage.setItem('stylio-has-processed','1');}catch{}
       render();
@@ -246,7 +253,11 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
         update(state,status){record.state=state;record.status=status;render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();
-          observer?.disconnect();if(record.historyCard)thumbnailObserver?.unobserve(record.historyCard);
+          observer?.disconnect();
+          actions?.removeEventListener('pointerdown',expandActions);
+          actions?.removeEventListener('focusin',expandActions);
+          photo.removeEventListener('scroll',collapseActions);
+          if(record.historyCard)thumbnailObserver?.unobserve(record.historyCard);
           records.delete(id);record.thumbnail=null;record.sourceFile=null;render();
           if(wasSelected)tabs.find(button=>button.dataset.screen===destination)?.focus({preventScroll:true});
         },

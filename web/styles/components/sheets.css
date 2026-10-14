@@ -131,7 +131,7 @@ dialog::backdrop {
   height: 30px;
   border-radius: 8px;
   color: #fff;
-  box-shadow: inset 0 0 0 .5px #ffffff40
+  box-shadow: var(--icon-tile-shadow)
 }
 
 .settings-leading-icon svg {
@@ -139,10 +139,10 @@ dialog::backdrop {
   height: 19px
 }
 
-.settings-icon-blue { background: linear-gradient(155deg,#58a9ff,#1778f2) }
-.settings-icon-green { background: linear-gradient(155deg,#73df8b,#2dbb52) }
-.settings-icon-amber { background: linear-gradient(155deg,#ffc45a,#f29a18) }
-.settings-icon-violet { background: linear-gradient(155deg,#b68cff,#8059df) }
+.settings-icon-blue { background: linear-gradient(155deg,var(--icon-blue-a),var(--icon-blue-b)) }
+.settings-icon-green { background: linear-gradient(155deg,var(--icon-green-a),var(--icon-green-b)) }
+.settings-icon-amber { background: linear-gradient(155deg,var(--icon-amber-a),var(--icon-amber-b)) }
+.settings-icon-violet { background: linear-gradient(155deg,var(--icon-violet-a),var(--icon-violet-b)) }
 
 .settings-row-label {
   min-width: 0;
@@ -249,12 +249,9 @@ dialog::backdrop {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  color: #fff;
-  background: linear-gradient(145deg,#282b31 0%,#08090b 62%,#15171b 100%);
-  box-shadow:
-    inset 0 1px 1px #ffffff2e,
-    inset 0 -1px 1px #0009,
-    0 0 0 .5px #0008
+  color: var(--appearance-icon-fg);
+  background: var(--appearance-icon-bg);
+  box-shadow: var(--icon-tile-shadow),0 0 0 .5px var(--glass-outline)
 }
 
 .settings-icon-appearance svg {

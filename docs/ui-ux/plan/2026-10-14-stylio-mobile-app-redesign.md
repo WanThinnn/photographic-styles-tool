@@ -607,6 +607,29 @@ Thumbnail History đã triển khai dạng lazy: chỉ tạo JPEG thumbnail rộ
 - iOS Safari fallback chặn `gesturestart/gesturechange/gestureend` với non-passive `preventDefault()` vì một số WebKit build vẫn cho pinch dù viewport/CSS đã khóa.
 - Mục tiêu là giữ fixed Liquid Glass dock gắn với app shell khi người dùng dùng hai ngón hoặc double-tap, gần hành vi native app hơn. Text sizing/accessibility semantics còn lại giữ nguyên.
 - Service Worker app-shell cache tăng v170.
+### Details / Guide information-density polish v171
+
+- Đối chiếu thêm `ref/ionic-theme-ios27/docs/animation.md`, `features.md`, `special-markup.md` và `feedback.md`: giữ presentation effects tách khỏi navigation/selection semantics, dùng 44px-class glass controls, disclosure thay vì dồn toàn bộ copy lên màn hình, và tôn trọng Reduced Motion.
+- Photo action bar giờ có 2 trạng thái như iOS toolbar: idle compact (`max 440px`, button 42px) và expanded khi pointer/focus (`max 720px`, button 50px). Cuộn Photo detail sẽ collapse bar về compact; ResizeObserver tiếp tục cập nhật `--actions-height` nên content inset thay đổi theo bar thật.
+- Photo Details giảm mật độ chữ bằng icon-led rows: Details summary có icon riêng; các note dùng info icon; Camera / Dimensions / File size / Image data / Captured có native-style square icons và separator rows thay cho grid text 2 cột.
+- Guide không còn render 5 card dài cùng lúc. 4 nhóm chính chuyển sang `<details>` disclosure cards, mỗi card có colored native-style icon, một summary ngắn và `See more / Show less`; nội dung dài chỉ xuất hiện khi mở card. Có animation reveal nhẹ và Reduced Motion fallback.
+- Bổ sung 6 chuỗi i18n cho Guide ở VI/EN/ZH; Service Worker app-shell cache tăng v171.
+### Tab glass / badges / AI discovery polish v172
+
+- Tab lens fix: `.app-tabs` no longer uses `contain: paint`, which was clipping the enlarged glass inside the platter. It keeps `overflow: visible` + `contain: layout style`; held lens now uses the reference theme's large scale `1.15 × 1.4`, so the glass can visibly grow beyond the toolbar like the iOS27 reference.
+- History count badge is now anchored to a dedicated `tab-icon-wrap`, not the button center. This keeps the badge on the icon's top-right on laptop/iPad horizontal tabs and mobile vertical tabs; badge size/weight was optically rebalanced to 16px / 625.
+- Toolbar symbols use heavier SF-Symbol-like weights: idle tab strokes 2.05, selected 2.35, search 2.15, with round caps/joins. This follows Apple's guidance that SF Symbols provide weight/scale variants aligned with text and improves icon legibility/contrast.
+- First-use `More AI features` is now a real discovery callout instead of bare copy: compact accent pill, sparkle symbol, up-right direction symbol, pointer tail toward AI Settings, entrance motion, plus the existing settings-button nudge. Reduced Motion disables both animations.
+- Service Worker app-shell cache increased to v172.
+### Photo Details grouping / dark icon palette / AI discovery v173
+
+- Photo Details được tổ chức lại thành hai cấp rõ ràng: `Processing` và `Photo information`. Summary `Details` dùng icon lớn 34px, group dùng icon 30px, item dùng icon 26px; metadata không còn là một danh sách phẳng.
+- Root cause icon dư đã được loại bỏ: `note('')` giờ xóa note/group thay vì tạo placeholder có icon rỗng. Metadata không còn dựng bằng `this.note('', 'metadata')`.
+- Phần trên Photo được rút gọn: status `Ready` chỉ còn check indicator + label; mô tả conversion và hướng dẫn `Save Image` được chuyển vào `Details > Processing`. Portrait advice cũng chuyển vào Details thay vì nằm riêng ngoài luồng.
+- Dark mode icon palette được semantic hóa ở tokens: Settings/Guide tile gradients, Photo Details accent colors và Appearance icon đều có light/dark variants. Appearance icon đảo sang nền sáng/glyph tối ở Dark Mode giống hệ Settings iOS; toolbar/currentColor icons tiếp tục tự đổi theo foreground.
+- `More AI features` quay về hướng compact/glass: pill trong suốt, text gradient brand, sparkle + arrow nhỏ; mobile ẩn arrow để tiết kiệm không gian. Animation dùng một lần spring overshoot/settle và settings button scale 1.12→.98→1, bám pattern press-spring của reference theme và tắt hoàn toàn với Reduced Motion.
+- Đối chiếu thêm `ionic-theme-ios27` Animation/Features/Special Markup: effect chỉ là presentation layer, press state dùng spring/overshoot, dark mode cần theme variables cho từng component. Apple HIG cũng nhấn mạnh press state rõ ràng và symbol/icon phải thích nghi appearance/contrast.
+- Service Worker app-shell cache tăng v173.
 ### Lệnh kiểm tra nhẹ
 
 Theo RTK.md, mọi lệnh shell bắt đầu bằng `rtk`.

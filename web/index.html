@@ -66,7 +66,7 @@
       <span id="ai-settings-label" class="sr-only">AI settings</span>
     </button>
   </div>
-  <p id="ai-settings-discovery" class="ai-settings-discovery" hidden><span id="ai-settings-discovery-copy">More AI features</span></p>
+  <p id="ai-settings-discovery" class="ai-settings-discovery" hidden><span class="ai-discovery-pill"><svg class="ai-discovery-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2Z"/><path d="m18.5 13 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7Z"/></svg><span id="ai-settings-discovery-copy">More AI features</span><svg class="ai-discovery-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M10 7h7v7"/></svg></span></p>
   <dialog id="ai-settings" class="sheet" aria-labelledby="ai-sheet-title" tabindex="-1">
     <header class="sheet-header"><button type="button" class="icon-button glass-surface" data-close-dialog aria-labelledby="close-ai-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-ai-label" class="sr-only" data-i18n="shell.closeai">Close AI settings</span></button><h2 id="ai-sheet-title" data-i18n="shell.aisettings">AI settings</h2></header>
     <div class="sheet-body ai-settings-panel">
@@ -141,7 +141,7 @@
   <div id="list"></div>
   <div class="app-dock">
   <nav class="app-tabs glass-surface" aria-label="Stylio">
-    <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span data-i18n="shell.history">History</span><span id="history-count" class="tab-count" hidden></span></button>
+    <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><span class="tab-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span id="history-count" class="tab-count" hidden></span></span><span data-i18n="shell.history">History</span></button>
     <button type="button" data-screen="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15M6 8h3M6 11h3M15 8h3M15 11h3"/></svg><span data-i18n="shell.guide">Guide</span></button>
     <button class="app-tab" data-screen="settings" aria-controls="settings-screen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.6 2a8 8 0 0 0-1.6.9l-2-.5-2.5 4.2 1.5 1.5a8 8 0 0 0 0 1.8l-1.5 1.5 2.5 4.2 2-.5a8 8 0 0 0 1.6.9l.6 2h5l.6-2a8 8 0 0 0 1.6-.9l2 .5 2.5-4.2-1.5-1.5a8 8 0 0 0 0-1.8l1.5-1.5-2.5-4.2-2 .5a8 8 0 0 0-1.6-.9l-.6-2Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="shell.settings">Settings</span></button>
   </nav>
@@ -160,12 +160,39 @@
   <section id="guide-screen" class="app-screen guide-screen" hidden aria-labelledby="guide-title">
     <div class="screen-heading"><h2 id="guide-title" data-i18n="shell.guide">Guide</h2></div>
     <div class="help-content guide-content">
-      <section><h2 data-i18n="h.steps">How to use</h2><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></section>
-      <section><h2 data-i18n="h.formats">Formats and processing</h2><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></section>
-      <section><h2 data-i18n="h.editlimits">iPhone 16/17 photos with edited Styles or Portrait</h2><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></section>
-      <section><h2 data-i18n="h.trouble">Troubleshooting</h2><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p>
-        <p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></section>
-      <section><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p><p data-i18n="help.language">The default language follows your browser. Your language choice is remembered and always takes priority.</p></section>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.steps">How to use</strong><span data-i18n="guide.steps.short">Choose, process, save, then fine-tune in Photos.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.steps">Choose a photo, wait for Ready, then save the copy. Open it in iPhone Photos → Edit to adjust Styles. Texture and Grain require iOS 27.</p><p data-i18n="tip.body">On iOS versions that support it, select your photos, then tap <b>•••</b> in the bottom-left corner → <b>Options</b> → <b>Format</b> → <b>Current</b>. This sends the original HEIC instead of a converted JPEG. If a photo is still rejected, choose <b>Browse</b> and pick it from Files.</p></div>
+      </details>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-purple" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 17l8 4 8-4"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.formats">Formats and processing</strong><span data-i18n="guide.formats.short">Supported formats, HDR, Live Photo and originals.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.formats">HEIC, JPG, PNG, DNG, WebP, GIF, BMP and AVIF are supported. DNG is developed to sRGB and exported as HEIC, no longer RAW. Animated images use one frame.</p><p data-i18n="help.original">Keep your originals. To retain Styles, HDR and Portrait editing on iPhone 16 or later photos, add Texture to the original HEIC before editing in Photos. An edited export may lack the required data.</p><p data-i18n="help.live">Save to Photos saves a still image. Live Photo exports need the matching original MOV and a compatible importer.</p></div>
+      </details>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-orange" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/><path d="M18 5h3v3"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.editlimits">Edited Styles or Portrait</strong><span data-i18n="guide.edit.short">What Stylio can preserve—and what Photos may omit.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.editlimits">Photos with changed Styles or Portrait enabled in Photos may export without their original editing data. If native Styles remain in the file, the tool only adds Texture/Grain and keeps existing data. Otherwise, creating new Styles may change colours and cannot restore missing HDR or your chosen Styles.</p><p data-i18n="help.portraitlimits">A Portrait viewing menu does not guarantee aperture ƒ or Portrait Lighting controls in Edit. The tool keeps depth data present in the file but cannot retrieve edit history from your Photos library. Keep your originals and check the copy on your iPhone before replacing anything.</p></div>
+      </details>
+      <details class="guide-card">
+        <summary>
+          <span class="guide-icon guide-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6a4 4 0 0 0-5 5L4 16l4 4 5-5a4 4 0 0 0 5-5l-3 3-3-3Z"/></svg></span>
+          <span class="guide-summary-copy"><strong data-i18n="h.trouble">Troubleshooting</strong><span data-i18n="guide.trouble.short">First-run downloads, large photos and capture dates.</span></span>
+          <span class="guide-more"><span data-i18n="guide.seemore">See more</span><span data-i18n="guide.showless">Show less</span></span>
+        </summary>
+        <div class="guide-card-body"><p data-i18n="help.slow">The first conversion downloads processing tools. AI is downloaded when needed and kept for reuse. For large photos, process one at a time.</p><p data-i18n="t.date"><b>Capture date</b>: the file keeps its original capture metadata. Photos and iCloud may assign the date you save it; the web app cannot control that library date.</p></div>
+      </details>
+      <div class="guide-footnote"><span class="guide-footnote-icon" aria-hidden="true">i</span><p data-i18n="n.1">Experimental, unofficial software, not affiliated with Apple.</p></div>
     </div>
   </section>
   <section id="settings-screen" class="app-screen settings-screen" hidden aria-labelledby="settings-title">

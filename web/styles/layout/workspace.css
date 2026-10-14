@@ -124,24 +124,82 @@
 }
 
 .ai-settings-discovery {
+  display: flex;
+  justify-content: flex-end;
   margin: 0;
-  font-size: .8125rem;
-  color: var(--muted);
-  padding: 0 0 12px
+  padding: 2px 0 10px;
+  pointer-events: none
+}
+
+.ai-discovery-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  margin-right: 1px;
+  padding: 4px 9px;
+  border: .5px solid var(--glass-outline);
+  border-radius: var(--capsule-radius);
+  background:
+    linear-gradient(180deg,#ffffff12,#00000005),
+    rgb(var(--glass-rgb) / .42);
+  box-shadow:
+    inset 0 1px 1px var(--glass-rim-top),
+    inset 0 -1px 1px var(--glass-rim-bottom),
+    0 3px 12px var(--glass-shade);
+  color: var(--accent-text);
+  font-size: .75rem;
+  font-weight: 650;
+  line-height: 1.2;
+  transform-origin: right center
+}
+
+#ai-settings-discovery-copy {
+  background: var(--gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent
+}
+
+.ai-discovery-spark {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--ai-violet)
+}
+
+.ai-discovery-arrow {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--ai-coral)
+}
+
+.ai-settings-discovery:not([hidden]) .ai-discovery-pill {
+  animation: ai-discovery-spring 620ms cubic-bezier(.18,.86,.22,1.18) both
 }
 
 .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger {
   outline: none;
-  animation: ai-settings-discovery-nudge 720ms var(--spring-ease) 180ms 2
+  animation: ai-settings-discovery-nudge 560ms cubic-bezier(.18,.86,.22,1.18) 120ms 1
+}
+
+@keyframes ai-discovery-spring {
+  0% { opacity: 0; transform: translateX(8px) scale(.88) }
+  58% { opacity: 1; transform: translateX(-2px) scale(1.1) }
+  78% { transform: translateX(0) scale(.98) }
+  100% { opacity: 1; transform: none }
 }
 
 @keyframes ai-settings-discovery-nudge {
-  0%,100% { scale: 1; box-shadow: var(--control-shadow,0 2px 10px #00000012) }
-  45% { scale: 1.08; box-shadow: 0 5px 18px #0000001c }
+  0%,100% { scale: 1 }
+  55% { scale: 1.12 }
+  78% { scale: .98 }
 }
 
 @media(prefers-reduced-motion:reduce) {
-  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger { animation: none }
+  .depth-options:has(.ai-settings-discovery:not([hidden])) .ai-settings-trigger,
+  .ai-settings-discovery:not([hidden]) .ai-discovery-pill { animation: none }
 }
 
 @media(hover:hover) {
@@ -153,6 +211,22 @@
 @media(max-width:767px) {
   .depth-options>.portrait-option {
     gap: 8px
+  }
+  .ai-settings-discovery {
+    padding-top: 0
+  }
+  .ai-discovery-pill {
+    min-height: 26px;
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: .6875rem
+  }
+  .ai-discovery-spark {
+    width: 13px;
+    height: 13px
+  }
+  .ai-discovery-arrow {
+    display: none
   }
   .depth-options>.portrait-option label {
     flex: 1;

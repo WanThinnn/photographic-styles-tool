@@ -2,6 +2,17 @@
 import {describeInWorker} from '../../media/heic-processing.js';
 import {formatBytes} from '../result-metadata.js';
 export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell}){
+  const detailIcon=key=>({
+    'group.details':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/><circle cx="18" cy="17" r="2"/></svg>',
+    'group.processing':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h7m4 0h5M4 12h3m4 0h9M4 17h9m4 0h3"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="17" r="2"/></svg>',
+    'group.photo':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg>',
+    'detail.save':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>',
+    'meta.camera':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h4l1.4-2h5.2L16 7h4v11H4Z"/><circle cx="12" cy="12.5" r="3.4"/></svg>',
+    'meta.dimensions':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>',
+    'meta.size':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7Z"/><path d="M14 3v5h5"/></svg>',
+    'meta.resources':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16Z"/></svg>',
+    'meta.capture':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>'
+  }[key]||'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/></svg>');
   function row(name,sourceFile) {
     const el = document.createElement("div");
     el.className = "row";
@@ -12,6 +23,38 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     const presentation=shell?.register(el,name,sourceFile);
     el.querySelector('.status').setAttribute('role','status');
     const cleanups=new Set(),downloadedFiles=new WeakSet(),savedFiles=new WeakSet();let disposed=false;
+    const ensureDetails=()=>{
+      let details=el.querySelector('.result-details');
+      if(details)return details;
+      details=document.createElement('details');details.className='result-details';
+      const summary=document.createElement('summary');
+      const summaryIcon=document.createElement('span');summaryIcon.className='details-summary-icon';summaryIcon.innerHTML=detailIcon('group.details');
+      const summaryLabel=document.createElement('span');summaryLabel.textContent=T('h.conversiondetails');
+      summary.append(summaryIcon,summaryLabel);details.append(summary);
+      el.insertBefore(details,el.querySelector('.act'));
+      return details;
+    };
+    const ensureDetailGroup=(kind,labelKey,iconKey)=>{
+      const details=ensureDetails();
+      let group=details.querySelector(`[data-detail-group="${kind}"]`);
+      if(group)return group.querySelector('.detail-group-body');
+      group=document.createElement('section');group.className='detail-group';group.dataset.detailGroup=kind;
+      const heading=document.createElement('h3');heading.className='detail-group-title';
+      const icon=document.createElement('span');icon.className='detail-group-icon';icon.innerHTML=detailIcon(iconKey);
+      const label=document.createElement('span');label.dataset.i18n=labelKey;label.textContent=T(labelKey);
+      heading.append(icon,label);
+      const body=document.createElement('div');body.className='detail-group-body';group.append(heading,body);
+      const metadata=details.querySelector('[data-detail-group="metadata"]');
+      if(kind==='processing'&&metadata)details.insertBefore(group,metadata);else details.append(group);
+      return body;
+    };
+    const pruneDetailGroup=group=>{
+      if(!group)return;
+      const body=group.querySelector('.detail-group-body');
+      if(body&&!body.children.length)group.remove();
+      const details=el.querySelector('.result-details');
+      if(details&&!details.querySelector('.detail-group'))details.remove();
+    };
     if(sourceFile&&sourceFile.type!=='video/quicktime'){
       const figure=document.createElement('figure');figure.className='source-preview';
       const image=document.createElement('img');image.alt=name;image.loading='lazy';image.decoding='async';
@@ -66,17 +109,20 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
           ['meta.resources', [raster ? 'SDR' : m.hdr ? 'HDR' : 'SDR', ...(m.depth ? [T('meta.depth')] : []), ...(raw ? ['RAW → HEIC'] : [])].join(' · ')]];
         if (m.capture) values.push(['meta.capture', `${m.capture.date}${m.capture.subsec ? '.' + m.capture.subsec : ''}${m.capture.offset ? ' ' + m.capture.offset : ''}`]);
         // Reuse the compact native details control; metadata never includes GPS or face regions.
-        el.querySelector('.result-metadata')?.remove();
-        this.note('', 'metadata');
-        const note = el.querySelector('[data-note="metadata"]');
+        const metadataBody=ensureDetailGroup('metadata','details.photo','group.photo');
+        metadataBody.querySelector('.result-metadata')?.remove();
         const grid = document.createElement('dl'); grid.className = 'result-metadata';
         for (const [key, value] of values) {
           if (!value) continue;
-          const field = document.createElement('div'), label = document.createElement('dt'), content = document.createElement('dd');
+          const field = document.createElement('div'), icon=document.createElement('span'), copy=document.createElement('span');
+          const label = document.createElement('dt'), content = document.createElement('dd');
+          field.className='result-meta-row';field.dataset.meta=key;
+          icon.className='result-meta-icon';icon.innerHTML=detailIcon(key);
+          copy.className='result-meta-copy';
           label.dataset.i18n = key; label.textContent = T(key); content.textContent = value;
-          field.append(label, content); grid.append(field);
+          copy.append(label,content);field.append(icon,copy);grid.append(field);
         }
-        note.replaceWith(grid);
+        metadataBody.append(grid);
       },
       aiState(text) {
         let state=el.querySelector('.ai-status');
@@ -120,10 +166,8 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         host.replaceChildren();
         if(navigator.canShare?.({files:[file]})){
           this.share(file,!!this.liveIdentifier);
-          let hint=el.querySelector('.share-hint');
-          if(!hint){hint=document.createElement('p');hint.className='share-hint';hint.dataset.i18n='shell.sharehint';el.insertBefore(hint,el.querySelector('.act'));}
-          hint.textContent=T('shell.sharehint');
-        }else el.querySelector('.share-hint')?.remove();
+          this.note(T('shell.sharehint'),'save');
+        }else this.note('','save');
         this.link(file,file.name);
         this.liveExporter?.setOutput(file);
         if(metadata){const outputEpoch=this.outputEpoch=(this.outputEpoch||0)+1;
@@ -139,7 +183,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         s.textContent = cls === 'ok' ? T("st.ready") : text;
         delete s.dataset.i18n;
         el.classList.toggle('is-ready', cls === 'ok');
-        if (cls !== 'ok') el.querySelector('.result-notice')?.remove();
+        if (cls !== 'ok') this.note('','result');
         if (cls === 'info') {
           const icon = document.createElement('span');
           icon.className = 'status-info-icon'; icon.textContent = 'i'; icon.setAttribute('aria-hidden', 'true');
@@ -148,30 +192,30 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         if (cls === 'ok') {
           const label = document.createElement('span');
           label.dataset.i18n = 'st.ready'; label.textContent = T('st.ready');
-          const notice = document.createElement('span'); notice.className = 'result-notice';
-          notice.textContent = ' — ' + text.replace(`${T('st.ready')} — `, '');
-          s.replaceChildren(label, notice);
+          const detail=text.replace(`${T('st.ready')} — `,'').trim();
+          s.replaceChildren(label);
+          if(detail&&detail!==T('st.ready'))this.note(detail,'result');else this.note('','result');
         }
         s.className = `status ${cls || ""}`;
       },
       note(text, kind = "live") {
         let note = el.querySelector(`[data-note="${kind}"]`);
+        if(!text){
+          const group=note?.closest('.detail-group');
+          note?.remove();
+          pruneDetailGroup(group);
+          return;
+        }
         if (!note) {
           note = document.createElement("p");
-          note.className = "live-note";
+          note.className = "live-note detail-note-row";
           note.dataset.note = kind;
-          let details = el.querySelector('.result-details');
-          if (!details) {
-            details = document.createElement('details');
-            const summary = document.createElement('summary');
-            summary.textContent = T("h.conversiondetails");
-            details.className = 'result-details';
-            details.append(summary);
-            el.appendChild(details);
-          }
-          details.appendChild(note);
+          const icon=document.createElement('span');icon.className='detail-note-icon';icon.innerHTML=detailIcon(kind==='save'?'detail.save':undefined);
+          const copy=document.createElement('span');copy.className='detail-note-copy';note.append(icon,copy);
+          ensureDetailGroup('processing','details.processing','group.processing').appendChild(note);
         }
-        note.textContent = text;
+        const copy=note.querySelector('.detail-note-copy');
+        if(copy)copy.textContent=text;else note.textContent=text;
       },
       link(blob, filename, key = "btn.download", group = 'normal') {
         const a = document.createElement("a");
@@ -186,8 +230,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         actions(group).appendChild(a);
       },
       portraitAdvice(text) {
-        const advice=document.createElement('p');advice.className='portrait-advice';advice.textContent=text;
-        el.insertBefore(advice,el.querySelector('.act'));
+        this.note(text,'portrait-advice');
       },
       adaptiveStyleAdvice(text) {
         let advice=el.querySelector('.adaptive-style-advice');

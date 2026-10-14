@@ -44,7 +44,8 @@
   min-height: var(--tab-height)
 }
 .photo-workspace .act { --glass-blur: 20px; --glass-opacity: .58 }
-.app-tabs button[aria-current="page"] svg { stroke-width: 2.2 }
+.app-tabs button[aria-current="page"] svg { stroke-width: 2.35 }
+.dock-search svg { stroke-width: 2.15; stroke-linecap: round; stroke-linejoin: round }
 @media(prefers-reduced-motion:reduce) {
   .icon-button.glass-surface:active { scale: 1 }
 }

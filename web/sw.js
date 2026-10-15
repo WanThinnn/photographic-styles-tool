@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v196`;
+const CACHE_NAME = `${CACHE_PREFIX}v202`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -118,6 +118,22 @@ const APP_SHELL = [
   "./src/core/exif.js",
   "./src/styles/style-preservation.js",
   "./src/styles/style-capabilities.js",
+  "./src/compatibility/versions.js",
+  "./src/compatibility/contract-registry.js",
+  "./src/compatibility/errors.js",
+  "./src/compatibility/graph-policy.js",
+  "./src/compatibility/contract-fingerprint.js",
+  "./src/compatibility/contract-signature.js",
+  "./src/compatibility/contract-classifier.js",
+  "./src/compatibility/target-registry.js",
+  "./src/compatibility/recovery-preflight.js",
+  "./src/compatibility/conversion-plan.js",
+  "./src/compatibility/mutation-budget.js",
+  "./src/compatibility/semantic-diff.js",
+  "./src/compatibility/output-verifier.js",
+  "./src/compatibility/adapters/index.js",
+  "./src/compatibility/legacy-sanitize.js",
+  "./src/compatibility/legacy-export.js",
   "./src/ui/startup.js",
   "./src/media/heic-worker.js",
   "./src/media/heic-processing.js",

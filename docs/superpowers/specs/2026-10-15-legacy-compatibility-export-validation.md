@@ -2,7 +2,7 @@
 
 Date: 2026-10-15  
 Branch: `feature/legacy-compatibility-export`  
-Status: **validation specification only — no implementation in this branch**
+Status: **automated structural validation implemented; physical Apple Photos qualification remains mandatory for real future contracts**
 
 ## 1. Purpose
 
@@ -19,6 +19,30 @@ A structurally valid HEIC can still fail in Apple Photos in ways that desktop te
 - a file may work once and lose editability after save/reopen.
 
 This document defines the evidence required before a source adapter or target baseline is treated as production-compatible.
+
+### Current implementation / release gate state
+
+The branch now has the complete structural safety foundation:
+
+- canonical contract fingerprinting and unknown-resource detection run before Apple-specific mutation;
+- current known iPhone 16/17 contracts remain on the existing native path;
+- older/non-native input continues through the existing mature import/porting path;
+- unsupported future HEIF/container/essential-property contracts are preserve-only and keep source bytes unchanged;
+- eligible iPhone 16/17 editing-layer changes can use the bounded generic recovery path, which preserves proven photographic/HDR/depth roles and rebuilds only the known editing contract;
+- the target registry is explicit and currently marks its baseline as structural-only, not physically qualified;
+- the real source-adapter registry is intentionally empty until a genuine future source contract is captured and researched;
+- deterministic conversion plans, mutation-budget checks, output self-checks, sanitized inspector/comparer/manifest tooling, stable diagnostic error codes and a compatibility Details report are implemented.
+
+Automated regression currently records **313 passing tests, 15 optional fixture skips and 0 failures** across the compatibility path and the existing native/non-native/Portrait/HDR/UI pipelines used for this work. PWA asset checks, VI/EN/ZH copy checks, static-release checks, target-manifest build/validation and syntax checks also pass.
+
+Release gates remain deliberately split:
+
+- **Gate A (Safe Mode / structural firewall): complete.**
+- **Generic editing-layer recovery: structurally exercised, but it is not a source-specific future adapter and is not evidence of future Apple Photos behavior.**
+- **Gate B (real adapter / device-qualified experimental export): closed** because no genuine future changed-contract fixture and no physically validated source adapter exist.
+- **Gate C (normal user claim of a specific future-iOS conversion): closed** until the full physical matrix below passes.
+
+The compatibility result shown in the web UI therefore reports preservation/rebuild facts without claiming that an arbitrary future contract has been “verified by Apple Photos.” Exact contract IDs remain developer diagnostics.
 
 ## 2. Validation layers
 
@@ -577,12 +601,16 @@ Use stable failure categories for diagnostics:
 - `unsupported-container-layout`
 - `adapter-ambiguous`
 - `target-profile-missing`
+- `target-disabled`
 - `semantic-mapping-incomplete`
 - `mutation-budget-violation`
 - `payload-preservation-failed`
 - `target-classification-failed`
 - `auxiliary-conversion-failed`
 - `physical-validation-pending`
+- `preflight-failed`
+- `resource-limit-exceeded`
+- `ambiguous-dependency`
 
 User-facing copy can stay simple; diagnostics should preserve the exact category.
 
@@ -699,3 +727,46 @@ round-trip inspection
 ```
 
 This validation standard is intentionally stricter than the current normal porting path because Legacy Compatibility Export will be used specifically when Apple has changed a contract and incorrect assumptions are most dangerous.
+
+## 32. Compatibility Firewall v2 structural qualification
+
+The Firewall v2 automated suite now explicitly validates the conditions that must be true before generic recovery is allowed.
+
+The compatibility-specific suite contains 56 passing tests and zero failures in the current workspace. It exercises:
+
+- current real iPhone 16 fixtures remaining `known-compatible` and never entering recovery;
+- current iPhone 18 native Texture evidence remaining on its established preservation route;
+- deterministic fingerprint v2 and canonical structural signatures, including re-validation of signatures from sanitized manifests;
+- MakerNote tag inventory, malformed/duplicate-tag fail-closed handling and the extended TIFF types used by real Apple fixtures;
+- preflight no-op for known native input;
+- bounded editing-only future recovery;
+- source-byte, metadata-payload, plist, URI, per-item reference/property and extent resource limits;
+- unknown essential properties;
+- unknown non-essential properties attached to protected resources;
+- duplicate editing contract families;
+- dangling references;
+- recursive editing `dimg` graph detection;
+- unsupported `iloc`, `iref`, `ipma` and primary codec assumptions;
+- unknown future Styles schema, unreadable Styles, new Styles keys and MakerNote `0x54` changes;
+- future Texture versions and the `0x65` native Texture marker, including `0x65` appearing on iPhone 16 beside an otherwise known Texture graph;
+- unknown editing reference types;
+- future `photo:metadata:` tags;
+- future `photo:aux:` tags being classified as photographic and therefore preserve-only;
+- unknown editing resources gaining a dependency on real native depth;
+- generic sanitizer preservation of primary/HDR resources;
+- real iPhone 16 Pro 24 MP/HDR payload preservation;
+- Live Photo content-identifier preservation;
+- deterministic conversion-plan v3 allowlists and plan-authoritative MakerNote mutation permissions;
+- target postflight with exact Texture-on/off expectation, duplicate-family checks and target signature reporting;
+- semantic role, protected-topology and non-MakerNote capture-Exif preservation, including recursive protection and role propagation through depth/matte `dimg` descendants;
+- sanitizer verification before target building and a frozen postflight boundary with no HDR/Soft Skin/AI Portrait mutation afterward;
+- atomic exact-source fallback on discovery, classification, preflight, sanitizer, builder or postflight failure;
+- rejection of preserved primary-tile mutation;
+- rejection of undeclared output resources;
+- parser fallback for recognizable but unsupported HEIC;
+- worker-level preflight, safe export and normal compatibility export;
+- idempotent reprocessing of converted output.
+
+The wider regression pass used for Firewall v2 records **313 passing tests, 15 optional private-fixture skips and zero failures** across compatibility, native Styles/Texture, Portrait/depth, HDR, raster/non-native import, Live Photo, date preservation, UI/application lifecycle, Suggested Styles, startup/history and module-path checks. PWA, static-release and VI/EN/ZH copy consistency checks also pass.
+
+This remains structural qualification only. It does not open Gate B or Gate C. A real future source contract still requires original fixtures and physical Apple Photos import → edit → save → close → reopen → edit-again evidence before an adapter may be described as device-qualified.

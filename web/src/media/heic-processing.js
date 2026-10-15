@@ -39,6 +39,18 @@ export const repairTextureInWorker = (data, opts) => run({operation:'repair-text
 export const restoreNativePortraitInWorker = (data,opts) => run({operation:'native-portrait',data,opts});
 export const describeInWorker = data => run({operation: 'metadata', data});
 export const installSoftSkinInWorker = (data,people,opts) => run({operation:'soft-skin',data,people,opts});
+export const preflightLegacyCompatibilityInWorker=(data,opts={})=>
+  run({operation:'legacy-compatibility-preflight',data,opts});
+export function legacyCompatibilityInWorker(data, profile, opts = {}) {
+  const {decode,...settings}=opts;
+  return run({operation:'legacy-compatibility',data,profile,opts:{...settings,decode:Boolean(decode)}},
+    decode?options=>decode(data,options):undefined);
+}
+export function safeLegacyCompatibilityInWorker(data,profile,opts={}){
+  const {decode,...settings}=opts;
+  return run({operation:'legacy-compatibility-safe',data,profile,opts:{...settings,decode:Boolean(decode)}},
+    decode?options=>decode(data,options):undefined);
+}
 export function patchInWorker(data, profile, opts = {}) {
   const {decode, ...settings} = opts;
   return run({operation: 'patch', data, profile, opts: {...settings, decode: Boolean(decode)}},

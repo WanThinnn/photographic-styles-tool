@@ -156,12 +156,32 @@ unused reference thumbnail and keeps the photo's own primary and Styles data.
 
 Compatibility is based on file contents, not the EXIF Software/iOS label.
 Native Styles schemas 13, 14, 16 and flag-bearing 131087/131088 are understood by the
-current exporter. Unknown schemas retain the additive Texture route and their
-original Styles, but skip added Soft Skin and AI Portrait with an informational
-message. Extra keys inside supported Styles payloads remain byte-exact.
-This guard is not a promise that future Photos renderers will accept every
-output. New contracts require real original fixtures and import/edit/save/reopen
-testing; rewriting an iOS version string cannot convert an unknown contract.
+current exporter. Known iPhone 16/17 contracts continue through the established
+native-preservation route unchanged. For iPhone 16/17 only, an unknown Apple
+contract is intercepted before Texture, Soft Skin or Portrait mutation. A second
+Compatibility Firewall preflight then validates graph boundaries, resource limits,
+extents, properties, references and protected primary/HDR/depth/matte roles before
+any compatibility profile, decoder or thumbnail work is allowed.
+When the change is demonstrably confined to the editing layer and the underlying
+HEIF/photo/HDR/depth contract remains proven, Stylio can create a separate Legacy
+Compatibility copy: it removes the unverified editing layer and rebuilds the same
+known Styles/Texture graph used by the mature non-native porting path. The conversion
+plan and two-way mutation budget reject undeclared source changes as well as
+undeclared new output resources. If the future change reaches the container, codec,
+a protected essential/non-essential property, a new photographic auxiliary, or an
+unknown dependency crosses into HDR/depth/photo resources, the file is preserve-only
+instead of being guessed at. A recognizable HEIC that the current parser cannot
+understand is likewise returned byte-for-byte as a preserved copy. Extra keys inside
+supported current Styles payloads remain byte-exact.
+For a compatibility or preserve-only result, **Details → Apple compatibility** shows
+the user-facing contract outcome: newer Apple source format, known compatibility
+target (when rebuilt), whether photo/HDR/depth data were preserved, and any editing
+metadata that was intentionally not carried forward. Exact internal contract IDs stay
+in developer diagnostics rather than the normal result UI.
+This is not a promise that every future Photos renderer or future contract is already
+qualified. New source contracts still require original fixtures and physical
+import/edit/save/reopen testing; rewriting an iOS version string is never treated as
+a real conversion.
 
 
 ### Active processing handoff — 2026-10-15, iOS 18 telephoto Texture

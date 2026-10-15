@@ -10,7 +10,7 @@ import {photoCaptureDate} from '../../media/photo-date.js';
 import {preserveNativeStyles,styleReconstructionRisk,nativeTextureCapture} from '../../styles/style-preservation.js';
 import {releaseHevcEncoder} from '../../codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from '../../raster/ffmpeg-hevc.js';
-import {readImageFile,addTextureInWorker,repairTextureInWorker,restoreNativePortraitInWorker,patchInWorker,releaseHeicProcessor} from '../../media/heic-processing.js';
+import {readImageFile,addTextureInWorker,repairTextureInWorker,restoreNativePortraitInWorker,preflightLegacyCompatibilityInWorker,legacyCompatibilityInWorker,patchInWorker,releaseHeicProcessor} from '../../media/heic-processing.js';
 import {waitForVisiblePage} from '../../ui/processing-scheduler.js';
 import {shouldRenderStyleDisplay} from '../../recommend/style-display-render.js';
 export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis}){
@@ -93,8 +93,52 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         return;
       }
       if (format !== "heic") { ui.set(T("err.notheic"), "err"); return; }
+      const preserveUnsupportedApple=(reason)=>{
+        // Keep a future HEIF/HEIC source usable whenever discovery or contract
+        // classification is outside our proven parser. Do not leak a partial
+        // interpretation into the native pipeline.
+        console.warn('Apple HEIC contract is newer than the current compatibility parser; preserving source',reason);
+        const preservedName=file.name.replace(/\.[^.]+$/,'')+'_Preserved.HEIC';
+        const preservedFile=new File([bytes],preservedName,{type:'image/heic',lastModified:file.lastModified});
+        ui.readyNotice=`${T('st.ready')} — ${T('st.original')}`;
+        ui.note(T('warn.futurepreserved'),'compatibility');
+        ui.compatibilityReport?.([
+          ['compat.mode',T('compat.preserveonly')],['compat.source',T('compat.sourcefuture')],
+          ['compat.target','—'],['compat.image',T('compat.preserved')],
+          ['compat.hdr',T('compat.unknown')],['compat.depth',T('compat.unknown')],
+          ['compat.loss',T('compat.lossnone')],
+        ]);
+        ui.output(preservedFile);overall(100);ui.aiBusy(false);
+      };
+      if(!input.discovery){preserveUnsupportedApple(input.discoveryError);return;}
       overall(12);let d = input.discovery;
-      if(aiFeatures.enabled('detail')){
+      const {classifyPhotoContract}=await import('../../compatibility/contract-classifier.js');
+      let compatibility;
+      try{compatibility=classifyPhotoContract(bytes);}
+      catch(error){preserveUnsupportedApple(error);return;}
+      let compatibilityPreflight=null;
+      if(compatibility.status==='unknown-apple-contract'&&compatibility.recovery.eligible){
+        try{
+          compatibilityPreflight=await preflightLegacyCompatibilityInWorker(bytes,{});
+        }catch(error){
+          console.warn('Compatibility preflight unavailable; preserving future source HEIC',error);
+          compatibilityPreflight={eligible:false,decision:'preserve-only',
+            blockers:[{code:'preflight-worker-failed',detail:String(error?.message||error)}]};
+        }
+      }
+      const legacyRecovery=compatibility.status==='unknown-apple-contract'
+        &&compatibility.recovery.eligible&&compatibilityPreflight?.eligible===true;
+      const preserveFuture=compatibility.status==='unknown-apple-contract'&&!legacyRecovery;
+      const compatibilityReport=(mode,target,loss)=>ui.compatibilityReport?.([
+        ['compat.mode',mode],
+        ['compat.source',T('compat.sourcefuture')],
+        ['compat.target',target],
+        ['compat.image',T('compat.preserved')],
+        ['compat.hdr',compatibility.fingerprint.roles.hdrGrid!==null?T('compat.preserved'):T('compat.notpresent')],
+        ['compat.depth',compatibility.fingerprint.roles.depthItems.length?T('compat.preserved'):T('compat.notpresent')],
+        ['compat.loss',loss],
+      ]);
+      if(aiFeatures.enabled('detail')&&compatibility.status!=='unknown-apple-contract'){
         if(d.hdrGrid!==null&&d.hdrTiles?.length){
           if(!globalThis.crossOriginIsolated){
             ui.note(`${aiText().detailSkipped} ${T("err.reloadencoder")}`,'detail');
@@ -126,21 +170,110 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
           }
         }else ui.note(aiText().detailHeic,'detail');
       }
+      if(aiFeatures.enabled('detail')&&compatibility.status==='unknown-apple-contract')
+        ui.note(T('warn.compatdetail'),'detail');
 
-      overall(36);const textureOnly = preserveNativeStyles(bytes,d);
-      const nativeTexture = nativeTextureCapture(bytes,d);
-      const {nativePortraitBaseState}=await import('../../portrait/ai-portrait-container.js');
-      const portraitState=nativePortraitBaseState(bytes,d);
-      const rebuildNativePortrait=textureOnly&&d.stylesItem===null&&portraitState!==null;
-      const preserveIncomplete = textureOnly && d.stylesItem === null&&!rebuildNativePortrait;
+      const unknownAppleContract=compatibility.status==='unknown-apple-contract';
+      // Unknown contracts must not enter any of the mature native interpreters before
+      // the Compatibility Firewall has either rebuilt them or chosen preserve-only.
+      // Those helpers intentionally understand today's contracts, not arbitrary
+      // future Apple graphs.
+      overall(36);
+      const textureOnly=unknownAppleContract?false:preserveNativeStyles(bytes,d);
+      const nativeTexture=unknownAppleContract?false:nativeTextureCapture(bytes,d);
+      let portraitState=null;
+      if(!unknownAppleContract){
+        const {nativePortraitBaseState}=await import('../../portrait/ai-portrait-container.js');
+        portraitState=nativePortraitBaseState(bytes,d);
+      }
+      const rebuildNativePortrait=!legacyRecovery&&!preserveFuture&&textureOnly&&d.stylesItem===null&&portraitState!==null;
+      let preserveIncomplete = preserveFuture || (!legacyRecovery&&textureOnly&&d.stylesItem===null&&!rebuildNativePortrait);
+      let compatibilityRecovered=false;
       let sharpBackgroundEvidence=null;
-      let restorePortrait=portraitState==='legacy-photo-base';
-      if (styleReconstructionRisk(bytes,d)&&!rebuildNativePortrait) ui.note(T('warn.textureonly'),'style-rebuild');
-      const liveIdentifier = photoContentIdentifier(bytes);
+      let restorePortrait=!legacyRecovery&&!preserveFuture&&portraitState==='legacy-photo-base';
+      if (!unknownAppleContract&&styleReconstructionRisk(bytes,d)&&!rebuildNativePortrait) ui.note(T('warn.textureonly'),'style-rebuild');
+      let liveIdentifier=null;
+      try{liveIdentifier=photoContentIdentifier(bytes);}
+      catch(error){
+        if(!unknownAppleContract)throw error;
+        console.warn('Live Photo metadata unavailable for future Apple contract; preserving still image',error);
+      }
       ui.liveIdentifier=liveIdentifier;
       const sep = getLanguage() === "zh" ? "、" : ", ";
       let data, bits, suffix, adaptiveStyleRecommendation=null;
-      if (nativeTexture && !hasTexture(d.infos)) {
+      if (legacyRecovery) {
+        // Unknown future iPhone 16/17 editing contracts never enter the proven
+        // native mutation path. Strip only Apple editing-layer resources, keep
+        // photographic/HDR/depth payloads, then rebuild the same known contract
+        // used by Stylio's mature non-native porting path.
+        ui.note(T('warn.futurecontract'),'compatibility');
+        ui.set(T('st.legacycompat'));overall(38);
+        try{
+          // Compatibility Firewall v2 runs before profile/model/thumbnail work.
+          // The classifier only identifies a candidate future editing contract;
+          // this graph-level preflight is the final authority to mutate it.
+          const preflight=compatibilityPreflight;
+          if(!preflight?.eligible){
+            const error=Error('Compatibility preflight refused this future Apple contract');
+            error.code='COMPATIBILITY_PREFLIGHT_BLOCKED';error.details=preflight;throw error;
+          }
+          if(preflight.sourceSignature!==compatibility.sourceSignature){
+            const error=Error('Compatibility preflight/source signature mismatch');
+            error.code='COMPATIBILITY_PREFLIGHT_MISMATCH';
+            error.details={classified:compatibility.sourceSignature,preflight:preflight.sourceSignature};
+            throw error;
+          }
+          const needsExperimental=d.hdrGrid===null||!styleDeltaSize(...dimensionsForItem(d.props,d.primary));
+          const index=await ensureProfileIndex(),name=profileFor(index,d,needsExperimental);
+          const profile=await getProfile(name);
+          let linearThumb=undefined;
+          if(d.thumbnail===null){
+            if(!globalThis.crossOriginIsolated)throw Error('Compatibility thumbnail generation requires cross-origin isolation');
+            const {generateLinearThumbnail}=await import('../../codecs/linear-thumbnail.js');
+            linearThumb=await generateLinearThumbnail(bytes,progress=>{
+              if(progress.stage==='modelDownload'){
+                overall(mapped(38,46,progress.loaded,progress.total));
+                ui.set(`${T('st.encoderload')} ${(progress.loaded/1048576).toFixed(1)} MB`);
+              }else{
+                overall(progress.stage==='encode'?46:42);
+                ui.set(T(progress.stage==='encode'?'st.thumbnail':'st.legacycompat'));
+              }
+            });
+          }
+          const canDecode=await ensureDecode(bytes);overall(50);
+          const opts=canDecode
+            ?{decode:decodeToRgb,sceneStats:'target',lightMaps:'target',linearThumb,experimental:needsExperimental,texture:true,targetProfileName:name}
+            :{sceneStats:'donor',linearThumb,experimental:needsExperimental,texture:true,targetProfileName:name};
+          let report;
+          ({data,report}=await legacyCompatibilityInWorker(bytes,profile,opts));overall(62);
+          if(report.patch?.decodeError)console.warn('compatibility decoder unavailable:',report.patch.decodeError);
+          bits=[T('st.legacycompatible')];
+          if(report.patch?.texture!=='off')bits.push(T('st.texture'));
+          if(needsExperimental)bits.push(T('st.experimental'));
+          suffix='_LegacyCompatible.HEIC';
+          compatibilityRecovered=true;
+          ui.note(T('warn.legacycompat'),'legacy-compatibility');
+          compatibilityReport(T('st.legacycompatible'),T('compat.targetknown'),T('compat.lossediting'));
+        }catch(error){
+          // Recovery is an optional compatibility route. A future file that
+          // exceeds its proven structural assumptions must still be returned
+          // byte-for-byte instead of becoming an application-level failure.
+          console.warn('Legacy compatibility recovery unavailable; preserving source HEIC',error);
+          data=bytes;overall(58);bits=[T('st.original')];suffix='_Preserved.HEIC';
+          preserveIncomplete=true;
+          ui.note(T('warn.futurepreserved'),'compatibility');
+          compatibilityReport(T('compat.preserveonly'),'—',T('compat.lossnone'));
+        }
+      } else if (preserveFuture) {
+        // We can parse the file but one of its photographic Apple auxiliaries or
+        // container assumptions is outside the recovery contract. Preserve the
+        // source byte-for-byte instead of guessing.
+        data=bytes;overall(58);
+        bits=[T('st.original')];
+        suffix='_Preserved.HEIC';
+        ui.note(T('warn.futurepreserved'),'compatibility');
+        compatibilityReport(T('compat.preserveonly'),'—',T('compat.lossnone'));
+      } else if (nativeTexture && !hasTexture(d.infos)) {
         // iPhone 18+ native captures can expose Texture/Film through capture metadata
         // without the grafted texture_styles/matte graph. Never graft a second Texture
         // contract onto those files; Photos already owns the native render path.
@@ -233,9 +366,16 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         if (needsExperimental) bits.push(T("st.experimental"));
         suffix = needsExperimental ? "_ExperimentalStyle.HEIC" : "_PhotographicStyle.HEIC";
       }
-      if (!preserveIncomplete){
-        overall(64);data=await addMissingSoftSkin(data,file,ui,{nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes});overall(72);
-      }else overall(72);
+      if (!preserveIncomplete&&!compatibilityRecovered){
+        overall(64);data=await addMissingSoftSkin(data,file,ui,{
+          nativeStyles:textureOnly||d.stylesItem!==null,sourceBytes:bytes,
+        });overall(72);
+      }else{
+        // A compatibility export is already postflight-verified against its
+        // mutation plan. Do not append Soft Skin after that verification
+        // boundary; a second pass can process the now-known target normally.
+        overall(72);
+      }
       if(restorePortrait&&!preserveIncomplete){
         overall(74);const restored=await restoreNativePortraitInWorker(data,{sharpBackgroundEvidence});
         if(restored.data){data=restored.data;bits.push(T('st.portraitrestored'));}
@@ -266,7 +406,12 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
       const outName = file.name.replace(/\.[^.]+$/, "") + suffix;
       // On iPhone the share sheet lands the file straight in Photos; elsewhere a plain
       // download is the shorter route.
-      const date = photoCaptureDate(data);
+      let date=null;
+      try{date=photoCaptureDate(data);}
+      catch(error){
+        if(!unknownAppleContract)throw error;
+        console.warn('Capture date unavailable for future Apple contract; keeping file bytes unchanged',error);
+      }
       const shareFile = new File([data], outName, { type: "image/heic",
         ...(date?.timestamp !== undefined ? {lastModified:date.timestamp} : {}) });
       showCaptureDate(ui, date);
@@ -287,10 +432,13 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
         livePhotos.push(photo);
         attachMovie(photo);
       }
-      overall(90);await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
+      overall(90);
+      // Keep the first compatibility copy frozen at the verified target
+      // boundary. Optional AI Portrait may be applied on a later normal pass.
+      if(!unknownAppleContract)await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
       adaptiveStyleCompletionNotice(ui,adaptiveStyleRecommendation);
       if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));
-      else if(portraitState&&portraitState!=='existing-renderer'&&!restorePortrait)
+      else if(!compatibilityRecovered&&portraitState&&portraitState!=='existing-renderer'&&!restorePortrait)
         ui.portraitAdvice(T(portraitState==='portrait-capture'?'warn.portraiton':'warn.portraitunknown'));
     } catch (e) {
       // Past the format sniff, every remaining rejection means the same thing to a

@@ -89,15 +89,25 @@ export async function patch(targetData, profile, opts = {}) {
   // A capture can retain its selected Style even when an export omitted the
   // Styles auxiliary graph. Keep that selection when adding the missing graph.
   let selection,selectionCompatibility;
+  const compatibilityStyleFallback=opts.compatibilityStyleFallback==='profile';
   if(canCarryStyleSelection){
     try{selection=extractAppleMakerNoteTag(extractItem(targetData,td.iloc,td.exifItem));}
-    catch(error){if(!error.message.includes('tag 0x54 not found'))throw error;}
+    catch(error){
+      if(!error.message.includes('tag 0x54 not found')&&!compatibilityStyleFallback)throw error;
+    }
+  }
+  let marker=null;
+  if(selection){
+    try{marker=parseBplist(selection.payload);}
+    catch(error){if(!compatibilityStyleFallback)throw error;selection=null;}
+    if(selection&&(![1,7].includes(selection.type)||!(marker instanceof Map)||marker.get('0')!==1
+      ||!Number.isInteger(marker.get('4'))||marker.get('4')<1
+      ||!['1','2'].every(key=>Number.isFinite(marker.get(key))))){
+      if(!compatibilityStyleFallback)throw Error(UNSUPPORTED);
+      selection=null;marker=null;
+    }
   }
   if(selection){
-    const marker=parseBplist(selection.payload);
-    if(![1,7].includes(selection.type)||!(marker instanceof Map)||marker.get('0')!==1
-      ||!Number.isInteger(marker.get('4'))||marker.get('4')<1
-      ||!['1','2'].every(key=>Number.isFinite(marker.get(key))))throw Error(UNSUPPORTED);
     let payload=selection.payload;
     // K was phone-tested on an incomplete 16 Pro Bright export with these
     // adjustments and ISO HDR parameters. Automatic use requires measured
@@ -122,6 +132,7 @@ export async function patch(targetData, profile, opts = {}) {
       manifest:{...profile.manifest,smartstyle_makernote_type:selectionCompatibility==='portrait-standard'
         ?profile.manifest.smartstyle_makernote_type??7:selection.type}};
   }
+  else if(compatibilityStyleFallback)selectionCompatibility='legacy-profile-marker';
   else if(nativePortraitRebuild)selectionCompatibility='portrait-standard';
   // Suggested Styles v1 is strictly for legacy/non-native graph construction.
   // A real native capture selection is protected even when its exported graph is incomplete.

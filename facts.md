@@ -3575,3 +3575,186 @@ Lightweight sequential checks: Texture 9 pass / 4 optional skips; Portrait expor
 or concurrent test runners were started. There is a separate working-tree change
 to the install-guide SVG in web/index.html; it is unrelated and left untouched by
 this processing task.
+
+## 10.75 — Legacy Compatibility Export foundation and iPhone 16/17 future-contract recovery (2026-10-15)
+
+The `feature/legacy-compatibility-export` branch now implements the defensive
+architecture proposed after §10.40. The normal pipeline remains authoritative:
+known iPhone 16/17 contracts continue through the existing native-preservation
+route; iPhone 18+ native Texture/Film detection remains unchanged; iPhone 15 and
+older, Android/raster imports and screenshots continue through the established
+non-native construction path. Compatibility recovery is entered only when an
+iPhone 16/17 file has concrete evidence of an unknown Apple editing contract.
+
+A canonical contract fingerprint now inventories HEIF container versions/layout,
+item/reference/property topology, primary/HDR codec roles, Styles schema, Texture
+contract, Apple auxiliary/tag URIs and relevant MakerNote evidence. The classifier
+detects unknown Styles/Texture payloads, new Apple tag namespaces, editing reference
+types, changed 0x54 selection contracts, an unexpected 0x65 native-Texture marker
+on 16/17, unknown essential properties and future container/codec layouts before
+the native mutators run. Container/core changes that are not proven safe are
+preserve-only; they are not forced through the legacy builder.
+
+For an unknown 16/17 contract whose photographic/container roles still satisfy the
+known recovery contract, the exporter strips only the Apple editing layer and
+reuses the mature non-native `patch()` path to rebuild the known editable
+Styles/StyleDelta/linear-thumbnail/2026 Texture graph around the source photo.
+Primary tiles, HDR resources, thumbnail, native depth, classic mattes and capture
+EXIF remain source-owned. A valid legacy 0x54 selection is retained; an unknown
+future 0x54 falls back to the validated profile marker rather than rejecting the
+photo. If a future 0x65 Texture marker appears on 16/17, it is removed only in the
+compatibility copy before the 2026 Texture graph is installed, avoiding two
+competing Texture contracts. No EXIF Software/iOS version string is rewritten.
+
+The compatibility mutation budget is stricter than the ordinary output check. Every
+source item not explicitly removed must still exist, non-EXIF source payloads and
+their property associations must remain byte-identical, surviving source references
+must remain exact, and all Apple MakerNote tags except the explicitly rebuilt 0x54
+and explicitly removed 0x65 case must remain type/payload identical. The output is
+rediscovered and must classify as the known target contract. Reprocessing that
+output is a no-op rather than adding duplicate editing resources.
+
+A future HEIC whose brand is recognizable but whose container cannot yet be parsed
+is no longer rejected as a processing failure: the read worker returns the original
+bytes with a discovery error and the UI publishes an exact `_Preserved.HEIC`
+copy. Likewise, any generic recovery failure falls back atomically to the untouched
+source and disables downstream Soft Skin/AI Portrait mutation for that result.
+This gives future releases a safe preservation state even when automatic recovery
+cannot run.
+
+Developer tooling now includes contract inspection/comparison and target-manifest
+generation. Sanitized mode removes filenames/item identifiers and payload hashes,
+retaining only contract-relevant structural evidence; target manifests require a
+neutral evidence ID, reject private/binary fields and explicitly record that physical
+Apple Photos qualification is still pending. The comparer reports semantic item,
+reference/property, MakerNote and payload-hash changes plus source primary/HDR/depth
+preservation in its non-sanitized research mode. The runtime target report also
+records the exact existing profile family selected by `profileFor()`, rather than
+pretending one donor graph covers every geometry.
+
+The target registry is explicit and currently marks the known baseline as
+`structural-only` with `physicalApplePhotos: false` and normal-user qualification
+disabled. The true source-adapter registry is intentionally empty: generic
+editing-layer recovery is a bounded fallback, not a claim that a future source
+contract has been semantically mapped. Adapter matching fails on ambiguity and the
+compatibility layer now uses stable diagnostic categories such as
+`unknown-source-contract`, `unsupported-container-layout`,
+`adapter-ambiguous`, `mutation-budget-violation` and
+`target-classification-failed`.
+
+The result UI now adds a compact **Apple compatibility** section only for compatibility
+or preserve-only results. It reports the source as a newer Apple format, whether a
+known compatibility target was rebuilt, photo/HDR/depth preservation and intentional
+loss of unrecognized editing metadata. Exact contract IDs stay in developer
+diagnostics; user-facing copy no longer describes an arbitrary future conversion as
+physically “verified”.
+
+Sequential regression after these changes records 287 passing tests, 15 optional
+fixture skips and zero failures across Legacy Compatibility, native Styles/Texture,
+Portrait/depth/HDR, raster/non-native import, Live Photo, date preservation,
+application/lifecycle/app-shell, Suggested Styles, startup/history and related
+suites. PWA asset consistency, static-release checks and VI/EN/ZH copy checks pass;
+all compatibility modules and the three developer tools pass `node --check`.
+Service-worker cache is v199 for the expanded compatibility module graph.
+
+This is strong structural coverage, not evidence that an arbitrary future Apple
+contract has already been physically validated. No genuine iOS 27.2/27.3/28
+changed-contract fixture exists in this work. The generic rebuild intentionally
+handles editing-layer changes while preserving the known photographic contract;
+a future change to depth/HDR auxiliary semantics, essential properties, codec or
+container layout remains preserve-only until an explicit adapter and physical
+Photos import/edit/save/reopen test exist. That boundary is deliberate: the goal
+is to keep future 16/17 photos usable without sacrificing the proven native and
+non-native pipelines through speculative rewrites.
+
+## 10.76 — Compatibility Firewall v2 hardening (2026-10-15)
+
+The compatibility subsystem was hardened again without changing the established
+routing contract. `known-compatible` photos still enter the pre-existing native
+pipeline, and `non-native` sources still enter the mature raster/non-native
+construction path. Only `unknown-apple-contract` is eligible to reach the new
+Compatibility Firewall.
+
+Contract fingerprinting is now version 2. Besides the prior Styles, Texture,
+MakerNote, Apple URI and container evidence, the fingerprint records item/reference/
+property counts, semantic property and reference topology, construction methods,
+editing-family multiplicity, and both essential and non-essential unknown property
+types. A canonical sanitized representation produces a deterministic 128-bit
+structural signature (`c2-...`). This signature is a lookup identity only; it is
+not treated as a cryptographic authenticity mechanism and never replaces fixture
+evidence or device validation.
+
+A graph policy now defines protected semantic photo resources independently of
+editing item IDs. The protected set includes primary/grid tiles, HDR, native depth,
+classic/Apple photographic mattes and auxiliaries, thumbnail and capture Exif.
+Editing graph closure is calculated separately. Unknown references crossing from
+editing metadata into a protected role fail closed unless the relation is one of the
+known target relationships. A future Apple `photo:aux:` tag is deliberately treated
+as photographic/preserve-only, not as disposable metadata merely because it uses
+the `tag:apple.com` namespace.
+
+`recovery-preflight.js` is the final mutation authority for future candidates. It
+runs before compatibility profile loading, image decode or thumbnail generation and
+checks source/file complexity limits, HEIF item/extents/construction methods, dangling
+references, property associations, unknown properties, duplicate editing families,
+editing graph cycles and cross-boundary dependencies. Unknown changes are classified
+as discardable editing changes, photographic semantic changes, container changes or
+ambiguous dependencies; generic rebuild is authorized only when all reasons belong
+to the discardable editing layer and the graph remains inside the proven photo
+contract.
+
+Compatibility state is independently versioned (`engine=2`, `fingerprint=2`,
+`plan=3`, `report=2`, `target-registry=2`). The target registry now carries
+explicit invariants, qualification state and a kill switch, so a historical target
+can be disabled after a future Photos regression without modifying native processing.
+The real source-adapter registry remains empty. Future adapters must declare exact
+contract signatures or an explicitly reviewed predicate, fixture/research evidence,
+capabilities, allowed mutations, information loss and physical Apple Photos
+qualification; normal-user availability is forbidden until physical qualification
+is true, and ambiguous adapter matches are rejected.
+
+The conversion plan is now v3 and lists exact source signature, planned removed
+editing IDs, allowed added target families, permitted MakerNote changes, property/
+reference mutation boundaries and information loss. Mutation-budget verification is
+two-way: it rejects both undeclared changes to surviving source resources and
+undeclared resources/references introduced by the rebuilt output. Target postflight
+also verifies the target schema/version families, URI/property/reference allowlists,
+duplicate resource limits and safe editing/photo boundaries. A final semantic role
+diff independently proves that protected photographic resources remain unchanged.
+
+The exporter has an atomic safe wrapper and worker operation. Any parser, preflight,
+sanitizer, builder, mutation-budget, semantic-preservation or target-verification
+failure returns the exact source bytes and a structured failure report; partially
+rebuilt bytes are never exposed as a result. The web processing route additionally
+executes preflight before expensive compatibility work. Existing current native
+photos never execute this path because classification leaves them on the native
+route.
+
+Developer research tooling now includes canonical signatures and optional preflight
+in the inspector, a standalone preflight command, semantic/cross-boundary reporting
+in the comparer, versioned target-manifest build/validation, strict adapter-manifest
+validation and a scaffold command that creates a **disabled** exact-signature adapter
+skeleton for a future fixture. Sanitized diagnostic modes remove filenames, payload
+hashes and item identifiers.
+
+Firewall-specific tests now record 56 passing tests and zero failures. They cover
+real current iPhone 16 routing, iPhone 18 Texture routing, unknown essential and
+non-essential properties, duplicate editing families, dangling refs, editing cycles,
+unsupported iloc/iref/ipma/codec variants, future Styles/Texture/MakerNote changes (including iPhone 16 `0x65` even when a known Texture graph is present),
+future metadata vs photographic auxiliaries, depth cross-boundary dependencies,
+resource limits, real iPhone 16 Pro 24 MP/HDR preservation, Live Photo identifier
+preservation, recursive protected `dimg` closure, non-MakerNote Exif preservation, plan v3, two-way mutation budgets, semantic preservation, atomic
+fallback and worker APIs.
+
+The broader Firewall v2 verification pass records **313 passing tests, 15 optional
+private-fixture skips and zero failures** across compatibility, native Styles/Texture,
+Portrait/depth/HDR, raster/non-native import, Live Photo, date preservation,
+application/lifecycle/app-shell, Suggested Styles, startup/history and module-path
+suites. PWA, static-release and VI/EN/ZH copy checks pass. Service-worker cache is
+v201 for the expanded compatibility module graph.
+
+The remaining boundary is intentional: no genuine future changed-contract iOS
+fixture exists yet, so no source-specific adapter can be truthfully implemented or
+physically qualified in advance. The system is prepared to preserve unknown future
+files, automatically recover only demonstrably editing-layer-only changes, and make a
+real adapter straightforward to add once future A/B fixtures exist.

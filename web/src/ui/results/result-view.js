@@ -278,6 +278,20 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         a.addEventListener('click',e=>{if(this.outputPendingState){e.preventDefault();return;}downloadedFiles.add(blob);renderDownload();});
         actions(group).appendChild(a);
       },
+      compatibilityReport(entries) {
+        const body=ensureDetailGroup('compatibility','details.compatibility','group.processing');
+        body.querySelector('.compatibility-report')?.remove();
+        const grid=document.createElement('dl');grid.className='result-metadata compatibility-report';
+        for(const [key,value] of entries||[]){
+          if(value===undefined||value===null||value==='')continue;
+          const field=document.createElement('div'),copy=document.createElement('span');
+          const label=document.createElement('dt'),content=document.createElement('dd');
+          field.className='result-meta-row';field.dataset.meta=key;
+          copy.className='result-meta-copy';label.dataset.i18n=key;label.textContent=T(key);content.textContent=String(value);
+          copy.append(label,content);field.append(copy);grid.append(field);
+        }
+        body.append(grid);
+      },
       portraitAdvice(text) {
         this.note(text,'portrait-advice');
       },

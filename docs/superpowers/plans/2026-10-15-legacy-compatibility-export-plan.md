@@ -2,7 +2,7 @@
 
 Date: 2026-10-15  
 Branch: `feature/legacy-compatibility-export`  
-Status: **planning only — do not implement on this documentation branch**
+Status: **Compatibility Firewall v2 implementation complete for structural safety: fingerprint/signature v2, graph preflight, semantic boundary policy, target/adapters gates, plan v3, two-way mutation budget, atomic fallback and developer tooling; future source-specific qualification remains fixture-driven**
 
 ## 1. Scope of this plan
 
@@ -752,6 +752,8 @@ This avoids mixing reverse-engineering evidence with implementation guesses.
 
 A release should use three levels.
 
+Current branch state: **Gate A is implemented and structurally validated.** The bounded generic iPhone 16/17 editing-layer recovery is also implemented as a fail-safe bridge, but it is not a source-specific future adapter. Gate B and Gate C remain closed because the real adapter registry is intentionally empty and no genuine future changed-contract fixture has completed physical Apple Photos validation.
+
 ### Gate A — Safe Mode only
 
 - classifier ships;
@@ -778,7 +780,7 @@ Current branch:
 
 `feature/legacy-compatibility-export`
 
-This branch is documentation-only.
+This branch now contains the shared compatibility foundation and generic iPhone 16/17 recovery implementation. Future source-specific adapters should still be isolated into focused branches once real future fixtures exist.
 
 Later implementation should preferably split into focused branches, for example:
 
@@ -852,3 +854,29 @@ Every compatibility decision should be explainable as:
 > “We observed this exact source contract, validated this semantic mapping, rebuilt this exact target contract, changed only these declared resources, and verified the result in Apple Photos.”
 
 If a change cannot be explained that way, it does not belong in Legacy Compatibility Export.
+
+## 30. Compatibility Firewall v2 hardening — implemented
+
+The post-plan hardening pass adds a second safety boundary without changing the established native or non-native routes.
+
+Implemented work:
+
+- contract fingerprint format upgraded to v2 with semantic property/reference topology, unknown non-essential properties and editing-family multiplicity;
+- canonical deterministic structural signatures added for exact adapter matching;
+- compatibility engine, fingerprint, plan, report and target-registry versions separated;
+- graph policy centralizes protected photo/HDR/depth/matte/Exif roles and editing-graph closure; protected photographic resources recursively include their `dimg` descendants so depth/matte grid tiles inherit the preservation boundary;
+- strict preflight runs before compatibility profile loading, decoding or thumbnail generation;
+- preflight checks resource limits, extent bounds, construction methods, dangling references, property associations, graph cycles and editing-to-photo dependencies;
+- unknown Apple `photo:aux:` resources are photographic/preserve-only by default;
+- target registry gained qualification metadata, invariants and a kill switch;
+- future adapter descriptors require evidence, capabilities, allowed mutations, information loss and qualification; normal-user availability cannot precede physical Apple Photos validation;
+- conversion plans are v3 and carry exact allowed removed IDs, target-added families, MakerNote changes and mutation policy;
+- mutation budget is two-way: undeclared source mutation and undeclared output additions both fail; capture Exif outside explicitly budgeted MakerNote edits is semantically compared field-by-field and must remain unchanged;
+- target postflight validates schemas, families, URI/property/reference allowlists and editing/photo boundaries;
+- final semantic role diff verifies preserved photo resources independently of item IDs;
+- safe exporter and worker API return the exact source on any recovery failure;
+- inspector/comparer/preflight/manifest/adapter tooling was expanded for future research;
+- synthetic regressions cover unknown essential/non-essential properties, duplicate contracts, dangling refs, cycles, unsupported container variants, new Apple auxiliaries, depth cross-boundary dependencies and resource limits;
+- real iPhone 16 HDR, native depth and Live Photo fixtures exercise preservation invariants.
+
+The first true source-specific adapter remains deliberately unimplemented. The registry stays empty until a genuine changed future contract is available for A/B research and physical Photos validation. This is not incomplete generic recovery; it is the release gate that prevents speculative conversion logic from becoming part of the normal pipeline.

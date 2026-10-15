@@ -17,12 +17,31 @@ export async function executeJob(job, decode) {
   if (job.operation === 'read') {
     const bytes = new Uint8Array(await job.file.arrayBuffer());
     const format = imageFormat(bytes);
-    return {bytes, format, discovery: format === 'heic' ? discoverHeic(bytes) : null};
+    let discovery=null,discoveryError=null;
+    if(format==='heic'){
+      try{discovery=discoverHeic(bytes);}
+      catch(error){discoveryError=String(error?.message||error);}
+    }
+    return {bytes,format,discovery,discoveryError};
   }
   if (job.operation === 'texture') return keepEditableHdr(addTexture(job.data,job.opts),job.data);
   if (job.operation === 'repair-texture') return keepEditableHdr(repairTextureCurve(job.data,job.opts),job.data);
   if (job.operation === 'metadata') return describeHeic(job.data);
   if (job.operation === 'soft-skin') return {data:installSoftSkin(job.data,job.people,job.opts)};
+  if (job.operation === 'legacy-compatibility-preflight') {
+    const {preflightLegacyCompatibilityExport}=await import('../compatibility/recovery-preflight.js');
+    return preflightLegacyCompatibilityExport(job.data,job.opts);
+  }
+  if (job.operation === 'legacy-compatibility'||job.operation === 'legacy-compatibility-safe') {
+    const {legacyCompatibilityExport,safeLegacyCompatibilityExport}=await import('../compatibility/legacy-export.js');
+    const opts={...job.opts};
+    if(opts.decode)opts.decode=(_data,options)=>decode(options);
+    const runExport=job.operation==='legacy-compatibility-safe'?safeLegacyCompatibilityExport:legacyCompatibilityExport;
+    // Compatibility export verifies its final bytes against a strict mutation
+    // budget and protected HDR/depth topology. Never run the ordinary HDR
+    // normalizer after that verification boundary.
+    return runExport(job.data,job.profile,opts);
+  }
   if (job.operation === 'native-portrait') {
     const {restoreNativePortrait}=await import('../portrait/ai-portrait-export.js');
     const {nativePortraitBaseState}=await import('../portrait/ai-portrait-container.js');

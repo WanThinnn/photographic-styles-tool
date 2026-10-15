@@ -2,7 +2,7 @@
 
 Date: 2026-10-15  
 Branch: `feature/legacy-compatibility-export`  
-Status: **design only — no implementation in this branch**
+Status: **Compatibility Firewall v2 implemented + bounded iPhone 16/17 editing-contract recovery; current native/non-native pipelines remain authoritative; future source-specific adapters still require real fixtures and physical Apple Photos qualification**
 
 ## 1. Purpose
 
@@ -785,3 +785,41 @@ The feature succeeds when the following statement becomes true:
 > Given a future Apple Camera HEIC whose contract has changed, Stylio can first preserve it safely while the contract is unknown; after an explicit source adapter has been researched and validated, Stylio can create a separate copy whose actual HEIF/Styles/Texture/Portrait/HDR structure matches a known-good baseline contract and remains editable in Apple Photos, while preserving original image data wherever the target allows.
 
 Anything weaker than that—especially simply changing “27.3” to “27.0.1”—is not Legacy Compatibility Export.
+
+## 31. Compatibility Firewall v2 implementation
+
+The implemented compatibility boundary is now deliberately stricter than the initial generic recovery design.
+
+The hard routing invariant is:
+
+```text
+known-compatible  → existing native pipeline, unchanged
+non-native        → existing non-native/raster pipeline, unchanged
+unknown contract  → Compatibility Firewall v2
+```
+
+The firewall introduces six independent authorization layers before an unknown iPhone 16/17 file can be rebuilt:
+
+1. **Fingerprint v2.** The fingerprint includes item/reference/property counts, construction methods, semantic property and reference topology, editing-family multiplicity, unknown essential and non-essential properties, Styles/Texture/MakerNote evidence and protected photo roles.
+2. **Canonical structural signature.** A deterministic `c2-...` 128-bit structural identifier is derived from sanitized canonical JSON. It is an adapter lookup key, not a security signature or substitute for fixture evidence.
+3. **Risk classification.** Unknown changes are divided into discardable editing changes, photographic semantic changes, container changes and ambiguous dependencies. Only the first category may enter generic recovery.
+4. **Graph preflight.** `recovery-preflight.js` checks bounded resource counts, extents, construction methods, dangling references, property associations, duplicate editing families, editing-graph cycles and unknown properties before profile loading, decoding or thumbnail generation.
+5. **Semantic boundary policy.** Primary/HDR/depth/matte/thumbnail/Exif resources form a protected set, and protection follows the complete `dimg` descendant closure so auxiliary grid tiles cannot fall outside the firewall merely because they carry no `auxC` URI themselves. Unknown dependencies crossing from the editing graph into that set are preserve-only unless the exact relationship is already part of the known target contract. In particular, a new Apple `photo:aux:` resource is treated as photographic rather than disposable editing metadata.
+6. **Two-way postflight.** The mutation budget validates not only that source resources were preserved, but also that every newly introduced output item/reference belongs to the declared target editing graph. Non-MakerNote capture Exif is compared semantically and byte-exact at field payload level, while explicitly budgeted MakerNote edits remain isolated. A final semantic role/topology diff propagates photographic roles through protected `dimg` descendants and independently verifies those payloads.
+
+The exporter is additionally versioned independently through compatibility-engine, fingerprint, conversion-plan, report and target-registry versions. The target registry has an explicit kill switch and qualification state. A target can therefore be disabled after a future Photos regression without altering the current native pipeline.
+
+The real source-adapter registry remains intentionally empty until a future contract exists. Future adapters must declare exact structural signatures (or an explicitly reviewed predicate), evidence, target contracts, capability mapping, allowed mutations, information loss and physical qualification. Ambiguous adapter matches fail closed.
+
+An atomic safe-export wrapper exists for callers that prefer preservation to exceptions. Any parser, preflight, sanitizer, builder, mutation-budget or target-verification failure returns the exact original bytes; a partially rebuilt file is never published.
+
+Developer tooling now supports:
+
+- contract inspection with canonical signatures and optional preflight;
+- standalone dry-run compatibility preflight;
+- semantic before/after comparison including cross-boundary dependencies;
+- versioned privacy-safe target manifests and validation;
+- future-adapter manifest validation;
+- disabled exact-signature adapter scaffolding for a newly captured future fixture.
+
+The web processing route also runs the graph preflight before expensive compatibility work. Current known native photos never execute that preflight because the classifier leaves them on their established native route.

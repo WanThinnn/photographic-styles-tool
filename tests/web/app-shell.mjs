@@ -9,7 +9,7 @@ import {bindTabGlass} from '../../web/src/ui/shell/tab-glass.js';
 function harness({blockedStorage=false,initialState=null,deferBack=false,thumbnails=false,standalone=false}={}){
   let doc;
   class Element extends EventTarget{
-    constructor(tag='div'){super();this.tagName=tag;this.children=[];this.dataset={};this.attrs=new Map();this.css=new Map();this.style={setProperty:(k,v)=>this.css.set(k,v)};this.hidden=false;this.open=false;this.className='';this.classes=new Set();this.classList={toggle:(k,enabled)=>{if(enabled)this.classes.add(k);else this.classes.delete(k);},add:k=>this.classes.add(k),remove:k=>this.classes.delete(k),contains:k=>this.classes.has(k)};}
+    constructor(tag='div'){super();this.tagName=tag;this.children=[];this.dataset={};this.attrs=new Map();this.css=new Map();this.style={setProperty:(k,v)=>this.css.set(k,v),removeProperty:k=>this.css.delete(k)};this.hidden=false;this.open=false;this.className='';this.classes=new Set();this.classList={toggle:(k,enabled)=>{if(enabled)this.classes.add(k);else this.classes.delete(k);},add:k=>this.classes.add(k),remove:k=>this.classes.delete(k),contains:k=>this.classes.has(k)};}
     get childNodes(){return [...this.children];}
     get firstElementChild(){return this.children[0];}
     get isConnected(){return !!this.parentElement||this===doc.body;}
@@ -45,6 +45,7 @@ function harness({blockedStorage=false,initialState=null,deferBack=false,thumbna
   for(const id of ['photo-workspace','photo-content','close-photo','photo-title','settings-screen','guide-screen','history-search','toggle-search','history-search-field','clear-search','search-button-label','history-search-summary','history-no-matches','.app-tabs','.app-dock','header-guide','open-ai-settings','ai-settings','depth-model','history-items','history-empty','history-count','current-task','task-content','process-screen','history-screen']){
     const el=new Element();nodes.set(id,el);doc.body.append(el);
   }
+  for(const id of ['task-summary','history-queue-summary','history-queue-note']){const el=new Element();nodes.set(id,el);doc.body.append(el);}
   const main=new Element('main');main.scrollTop=0;nodes.set('main',main);doc.body.append(main);
   const tabs=['process','history','guide','settings'].map(name=>{const el=new Element('button');el.dataset.screen=name;doc.body.append(el);return el;});
   const sheets=['ai-settings'].map(id=>nodes.get(id));
@@ -99,6 +100,24 @@ test('current task is independent of selected photo; updates preserve the focuse
   assert.equal(task.querySelector('.task-copy>span').textContent,'Working 50%');
 });
 
+test('Activity shows every running photo while History also shows waiting photos',()=>{
+  const h=harness(),records=[];
+  h.shell.batch(()=>{
+    for(const name of ['first','second','third'])records.push(h.shell.register(h.row(),name));
+    records[0].update('processing','Reading');records[1].update('processing','Encoding');
+  });
+  assert.equal(h.$('history-items').children.length,3);
+  assert.equal(h.$('task-content').children.length,2);
+  assert.equal(h.$('history-items').firstElementChild.dataset.state,'queued');
+  const waitingCopy=h.$('history-items').firstElementChild.querySelector('.task-copy');
+  records[0].progress(50);
+  assert.equal(h.$('history-items').firstElementChild.querySelector('.task-copy'),waitingCopy,'another job progress must not rebuild an unchanged queued card');
+  records[1].update('ready','Ready');
+  assert.equal(h.$('task-content').children.length,1);
+  records[0].update('ready','Ready');records[2].update('processing','Reading');
+  assert.equal(h.$('task-content').firstElementChild.querySelector('.task-copy>strong').textContent,'third');
+});
+
 test('task indicator shows overall percentage when supplied, with stage fallback and stable geometry',()=>{
   const h=harness(),record=h.shell.register(h.row(),'stage.heic');
   const symbol=()=>h.$('task-content').firstElementChild.querySelector('.task-symbol');
@@ -128,9 +147,10 @@ test('History thumbnails decode lazily, use small cached images, and preserve re
   assert.equal(historyCard.querySelector('.task-symbol').className,'task-symbol');
   h.intersect(historyCard);
   await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail'),undefined,'queued photos retain a waiting icon and avoid decoding');
+  record.update('ready','Ready');await new Promise(resolve=>setImmediate(resolve));
   assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail').className,'task-thumbnail');
   assert.equal(h.$('history-items').firstElementChild.querySelector('.task-thumbnail').alt,'');
-  record.update('ready','Ready');await new Promise(resolve=>setImmediate(resolve));
   assert.equal(h.$('task-content').firstElementChild.querySelector('.task-thumbnail').className,'task-thumbnail','Activity uses the same small photo thumbnail once ready');
   h.$('history-items').firstElementChild.click();
   assert.equal(h.$('photo-workspace').open,true);
@@ -268,6 +288,18 @@ test('browser Back closes search and leaves the selected destination valid',()=>
   assert.equal(h.$('process-screen').hidden,false);
 });
 
+test('Search close tap retains input focus until activation so keyboard clearance cannot move the target',()=>{
+  const h=harness(),close=h.$('toggle-search');
+  const idle=new Event('pointerdown',{cancelable:true});close.dispatchEvent(idle);
+  assert.equal(idle.defaultPrevented,false);
+  close.click();assert.equal(h.doc.activeElement,h.$('history-search'));
+  const down=new Event('pointerdown',{cancelable:true});close.dispatchEvent(down);
+  assert.equal(down.defaultPrevented,true);
+  close.dispatchEvent(new Event('click'));
+  assert.equal(h.$('history-search-field').hidden,true);
+  assert.equal(h.doc.activeElement,close);
+});
+
 
 test('dock clears stale offsets on resume and only lifts for a real Search keyboard resize',()=>{
   const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map(),classes=new Set(['is-searching']);
@@ -292,17 +324,19 @@ test('dock clears stale offsets on resume and only lifts for a real Search keybo
   const beforeKeyboard=scheduled;
   viewport.dispatchEvent(new Event('resize'));viewport.dispatchEvent(new Event('scroll'));
   assert.equal(scheduled,beforeKeyboard+1,'resize/scroll coalesce into one frame');flush();
-  assert.equal(values.get('--dock-viewport-bottom'),'574px');
+  assert.equal(values.has('--dock-viewport-bottom'),false,'chrome uses keyboard clearance without a viewport-height override');
   assert.equal(values.get('--dock-keyboard-offset'),'126px');
   viewport.height=500;viewport.dispatchEvent(new Event('resize'));flush();
   assert.equal(values.get('--dock-keyboard-offset'),'176px');
+  win.dispatchEvent(new Event('resize'));flush();
+  assert.equal(values.get('--dock-keyboard-offset'),'176px','a simultaneous layout resize must not cancel the Search keyboard position');
   viewport.scale=1.5;viewport.dispatchEvent(new Event('resize'));flush();
   assert.equal(values.has('--dock-keyboard-offset'),false,'pinch zoom is never treated as a keyboard');
   viewport.scale=1;win.dispatchEvent(new Event('pagehide'));
   assert.equal(values.has('--dock-keyboard-offset'),false,'pagehide clears keyboard offsets');
   dispose();viewport.dispatchEvent(new Event('resize'));assert.equal(frame,null);
 });
-test('freshly installed standalone PWA re-samples a transient short layout viewport after load settles',()=>{
+test('standalone dock lets CSS handle viewport corrections after load settles',()=>{
   const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
   viewport.height=720;viewport.offsetTop=0;viewport.scale=1;win.visualViewport=viewport;win.innerHeight=756;
   win.navigator={standalone:true};win.matchMedia=()=>({matches:true});
@@ -312,9 +346,9 @@ test('freshly installed standalone PWA re-samples a transient short layout viewp
   const doc={documentElement:{clientHeight:756},activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?{hidden:true}:input,addEventListener(){},removeEventListener(){}};
   const flush=()=>{const next=frame;frame=null;next?.();};
   const dispose=bindDockViewport({win,doc});flush();
-  assert.equal(values.get('--dock-shell-height'),'756px');
+  assert.equal(values.has('--dock-shell-height'),false);
   win.innerHeight=812;doc.documentElement.clientHeight=812;win.dispatchEvent(new Event('load'));flush();
-  assert.equal(values.get('--dock-shell-height'),'812px','first launch must re-anchor once the real standalone layout viewport settles');
+  assert.equal(values.has('--dock-shell-height'),false,'a later JS correction must not pin a pixel height either');
   dispose();
 });
 
@@ -328,13 +362,49 @@ test('standalone dock follows the visible layout viewport instead of overshootin
   const doc={documentElement:{clientHeight:756},activeElement:null,visibilityState:'visible',querySelector:()=>dock,getElementById:id=>id==='history-search-field'?{hidden:true}:input,addEventListener(){},removeEventListener(){}};
   const flush=()=>{const next=frame;frame=null;next?.();};
   const dispose=bindDockViewport({win,doc});flush();
-  assert.equal(values.get('--dock-shell-height'),'756px','physical screen height must not push the dock below the visible app viewport');
+  assert.equal(values.has('--dock-shell-height'),false,'neither physical nor JavaScript heights may override the CSS viewport');
   win.innerHeight=720;doc.documentElement.clientHeight=720;win.dispatchEvent(new Event('resize'));flush();
-  assert.equal(values.get('--dock-shell-height'),'720px','dock tracks a later viewport correction instead of keeping a stale larger floor');
+  assert.equal(values.has('--dock-shell-height'),false,'dock never keeps a stale pixel floor');
   dispose();
 });
 test('dock viewport enhancement is optional without VisualViewport',()=>{
   assert.doesNotThrow(()=>bindDockViewport({win:{},doc:{querySelector:()=>({}),getElementById:()=>({})}})());
+});
+
+test('Search keyboard clearance uses the chrome bounds even when innerHeight is stale',()=>{
+  const win=new EventTarget(),viewport=new EventTarget(),input=new EventTarget(),values=new Map();
+  win.innerHeight=756;viewport.height=530;viewport.offsetTop=14;viewport.scale=1;win.visualViewport=viewport;
+  let frame;win.requestAnimationFrame=fn=>{frame=fn;return 1;};win.cancelAnimationFrame=()=>{frame=null;};
+  const style={setProperty:(key,value)=>values.set(key,value),removeProperty:key=>values.delete(key)};
+  const dock={style,classList:{contains:()=>true}};
+  const chrome={style,getBoundingClientRect:()=>({bottom:844})};
+  const doc={activeElement:input,visibilityState:'visible',querySelector:()=>dock,
+    getElementById:id=>id==='app-chrome'?chrome:id==='history-search-field'?{hidden:false}:input,
+    addEventListener(){},removeEventListener(){}};
+  const dispose=bindDockViewport({win,doc});
+  input.dispatchEvent(new Event('focus'));viewport.dispatchEvent(new Event('resize'));frame();
+  assert.equal(values.get('--dock-keyboard-offset'),'300px');
+  win.dispatchEvent(new Event('pageshow'));
+  assert.equal(values.has('--dock-keyboard-offset'),false);
+  dispose();
+});
+
+test('standalone cold launches never pin the dock to stale JavaScript viewport heights',()=>{
+  const win=new EventTarget(),input=new EventTarget(),viewport=new EventTarget(),values=new Map();
+  win.innerHeight=756;win.navigator={standalone:true};win.visualViewport=viewport;
+  viewport.height=720;viewport.offsetTop=0;viewport.scale=1;
+  win.matchMedia=()=>({matches:true});
+  win.requestAnimationFrame=fn=>{fn();return 1;};win.cancelAnimationFrame=()=>{};
+  win.setTimeout=()=>1;win.clearTimeout=()=>{};
+  const doc={documentElement:{clientHeight:756},activeElement:null,
+    querySelector:()=>({style:{setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k)}}),
+    getElementById:id=>id==='history-search-field'?{hidden:true}:input,
+    addEventListener(){},removeEventListener(){}};
+  const dispose=bindDockViewport({win,doc});
+  assert.equal(values.has('--dock-shell-height'),false,'CSS viewport must own resting geometry even if JS remains stale for the entire session');
+  win.dispatchEvent(new Event('pageshow'));
+  assert.equal(values.has('--dock-shell-height'),false);
+  dispose();
 });
 
 function glassHarness({reduced=false}={}){

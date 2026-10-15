@@ -2,6 +2,10 @@
   display: none
 }
 
+#task-content { display: grid; gap: 10px }
+.queue-summary,.queue-note { margin: 0 0 10px; color: var(--muted); font-size: .8125rem; line-height: 1.45; font-variant-numeric: tabular-nums }
+.queue-note { margin-top: -12px }
+
 .current-task h3 {
   font-size: .875rem;
   font-weight: 600;

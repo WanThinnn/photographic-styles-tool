@@ -1,3 +1,3 @@
 import {startApplication} from './src/app/application.js';
 
-startApplication();
+export const bootState=await startApplication();

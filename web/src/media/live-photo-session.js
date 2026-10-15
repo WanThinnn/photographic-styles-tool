@@ -19,7 +19,7 @@ export function createLivePhotoSession({T}){
         return;
       }
       liveMovies.set(metadata.contentIdentifier, { bytes, ui });
-      ui.set(T("live.waitphoto"));
+      ui.set(T("live.waitphoto"),'info');
       for (const photo of livePhotos) attachMovie(photo);
     } catch (e) {
       console.error("could not read Live Photo movie", file.name, e);

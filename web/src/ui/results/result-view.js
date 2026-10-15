@@ -2,7 +2,7 @@
 import {describeInWorker} from '../../media/heic-processing.js';
 import {formatBytes} from '../result-metadata.js';
 import {confirmAction} from '../confirm-dialog.js';
-export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell,historyStore,previewEnabled=()=>true}){
+export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCandidates,livePhotos,liveMovies,aiFeatures,refreshHistoryButton,shell,historyStore,previewEnabled=()=>true,preferences}){
   const detailIcon=key=>({
     'group.details':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/><circle cx="18" cy="17" r="2"/></svg>',
     'group.processing':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h7m4 0h5M4 12h3m4 0h9M4 17h9m4 0h3"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="17" r="2"/></svg>',
@@ -24,7 +24,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
     el.querySelector(".name").textContent = name;
     el.querySelector(".name").title = name;
     list.appendChild(el);
-    let previewSnapshot=restoredPreview||null,previewSnapshotPromise=Promise.resolve(previewSnapshot),persistedOutput=null,historyThumbnail=restoredThumbnail||null;
+    let previewSnapshot=restoredPreview||null,previewSnapshotPromise=Promise.resolve(previewSnapshot),persistedOutput=null,historyThumbnail=restoredThumbnail||null,lastOutput=null;
     const persistHistory=()=>persistedOutput&&historyStore?.save?.({
       id:historyId,name,file:persistedOutput,preview:previewSnapshot,thumbnail:historyThumbnail
     });
@@ -113,6 +113,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       return host;
     }
     const ui={
+      queued(){this.set(T('shell.queued'),'queued');},
       cleanup(fn){cleanups.add(fn);},
       progress(value){presentation?.progress?.(value);},
       dispose(){
@@ -190,10 +191,12 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
       },
       output(file,{metadata=true,persist=true}={}) {
         if(disposed)return;
+        lastOutput=file;
         const host=actions('normal');
         for(const a of host.querySelectorAll('a[href]')){URL.revokeObjectURL(a.href);resultUrls.delete(a.href);}
         host.replaceChildren();
         const canShare=Boolean(navigator.canShare?.({files:[file]}));
+        const preferDownload=preferences?.get('saveAction')==='download'||!canShare;
         const quickDownload=()=>{
           downloadedFiles.add(file);
           const url=URL.createObjectURL(file),anchor=document.createElement('a');
@@ -208,14 +211,18 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
           this.share(file,!!this.liveIdentifier);
           this.note(T('shell.sharehint'),'save');
         }else this.note('','save');
+        const shareActions=canShare?[{kind:'share',label:T('shell.quickshare'),run:quickShare}]:[];
+        const downloadAction={kind:'download',label:T('shell.quickdownload'),run:quickDownload};
         const quickActions=[
-          ...(canShare?[{kind:'share',label:T('shell.quickshare'),run:quickShare}]:[]),
-          {kind:'download',label:T('shell.quickdownload'),run:quickDownload},
+          ...(preferDownload?[downloadAction,...shareActions]:[...shareActions,downloadAction]),
           {kind:'delete',label:T('btn.removeresult'),danger:true,run:async()=>{if(await confirmAction({title:T('shell.remove'),detail:T('confirm.cannotundo'),confirmLabel:T('action.delete'),cancelLabel:T('action.cancel')}))ui.dispose();}},
         ];
         if(presentation?.quickActions)presentation.quickActions(quickActions);
         else presentation?.quickAction?.(quickActions[0].kind,quickActions[0].run,quickActions[0].label);
         this.link(file,file.name);
+        const shareButton=host.querySelector('button'),downloadLink=host.querySelector('a');
+        if(shareButton)shareButton.className=preferDownload?'dl alt':'dl';
+        if(downloadLink){downloadLink.className=preferDownload?'dl':'dl alt';if(preferDownload)host.prepend(downloadLink);}
         presentation?.source?.(file);
         if(persist){persistedOutput=file;void persistHistory();}
         this.liveExporter?.setOutput(file);
@@ -224,7 +231,7 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         this.outputPending(Boolean(this.outputPendingState));
       },
       set(text, cls) {
-        this.resultState=cls==='ok'?'ready':cls==='err'?'failed':cls==='info'?'info':'processing';
+        this.resultState=cls==='queued'?'queued':cls==='ok'?'ready':cls==='err'?'failed':cls==='info'?'info':'processing';
         this.resultStatus=cls==='ok'?T('st.ready'):text;
         presentation?.update(this.resultState,this.resultStatus);
         remove.disabled=!['ok','err','info'].includes(cls);
@@ -321,6 +328,9 @@ export function createResultView({list,T,aiText,resultCleanups,resultUrls,aiCand
         actions(group).prepend(b);
       },
     };
+    if(preferences?.subscribe)cleanups.add(preferences.subscribe(key=>{
+      if(key==='saveAction'&&lastOutput&&!disposed)ui.output(lastOutput,{metadata:false,persist:false});
+    }));
     remove.addEventListener('click',async()=>{if(await confirmAction({title:T('shell.remove'),detail:T('confirm.cannotundo'),confirmLabel:T('action.delete'),cancelLabel:T('action.cancel')}))ui.dispose();});resultCleanups.add(ui.dispose);return ui;
   }
 

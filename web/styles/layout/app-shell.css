@@ -6,6 +6,14 @@ main {
   padding: calc(env(safe-area-inset-top,0px) + 18px) max(24px,env(safe-area-inset-right,0px)) calc(var(--tab-height) + env(safe-area-inset-bottom,0px) + 32px) max(24px,env(safe-area-inset-left,0px))
 }
 
+/* Keep short destinations in the same root-scrolling state as Settings.
+   On standalone WebKit, switching to a non-scrollable document can restore the
+   shrunken browser-chrome viewport. A one-pixel overflow avoids that boundary;
+   it does not position the dock using screen pixels or lock document scrolling. */
+:root[data-standalone] main {
+  min-height: calc(100lvh + 1px)
+}
+
 .top {
   display: flex;
   align-items: center;
@@ -147,20 +155,29 @@ body.is-settings-destination .top-github-symbol {
   max-width: 34rem
 }
 
+/* A viewport-sized, unfiltered host owns placement. Keep the glass in its
+   child: WebKit can restore a stale viewport-unit/fixed-glass position on launch.
+   No screen-height guesses, document scroll locks or settling timers. */
+.app-chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(var(--dock-keyboard-offset,0px) + max(10px,calc(env(safe-area-inset-bottom,0px) - 12px)));
+  pointer-events: none
+}
+
 /* Four real destinations plus a separate search action. */
 .app-dock {
-  position: fixed;
-  z-index: 10;
-  /* Top + dynamic viewport avoids Safari's stale fixed-bottom anchor.
-     Keyboard height is supplied only while Search is focused. */
-  top: calc(var(--dock-viewport-bottom,var(--dock-shell-height,100lvh)) - max(10px,calc(env(safe-area-inset-bottom,0px) - 12px)));
-  left: 50%;
-  transform: translate(-50%,-100%);
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   width: min(36rem,calc(100% - 32px));
-  max-width: calc(100% - max(16px,env(safe-area-inset-left,0px)) - max(16px,env(safe-area-inset-right,0px)))
+  max-width: calc(100% - max(16px,env(safe-area-inset-left,0px)) - max(16px,env(safe-area-inset-right,0px)));
+  pointer-events: auto
 }
 
 .app-tabs {
@@ -197,6 +214,9 @@ body.is-settings-destination .top-github-symbol {
 }
 .app-tabs::before {
   content: "";
+  /* ::before does not inherit the element-only '*' box-sizing reset.
+     Its border must fit inside one tab, including percentage translations. */
+  box-sizing: border-box;
   position: absolute;
   top: 4px;
   bottom: 4px;
@@ -561,9 +581,8 @@ body.is-install-guide-open { overflow: hidden }
 
 @media(max-width:767px) {
   main {
-    /* Preserve the old content start: safe area + 24px inset + 48px header + 22px gap. */
-    padding-top: calc(env(safe-area-inset-top,0px) + 94px);
-    padding-inline: max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))
+    padding-top: calc(env(safe-area-inset-top,0px) + 92px);
+    padding-inline: max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))
   }
   .top {
     position: fixed;
@@ -571,9 +590,9 @@ body.is-install-guide-open { overflow: hidden }
     top: 0;
     left: 0;
     width: 100%;
-    min-height: calc(env(safe-area-inset-top,0px) + 82px);
+    min-height: calc(env(safe-area-inset-top,0px) + 76px);
     margin-bottom: 0;
-    padding: calc(env(safe-area-inset-top,0px) + 24px) max(20px,env(safe-area-inset-right,0px)) 10px max(20px,env(safe-area-inset-left,0px));
+    padding: calc(env(safe-area-inset-top,0px) + 24px) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));
     border-bottom: .5px solid transparent;
     background: var(--bg);
     box-sizing: border-box;
@@ -587,9 +606,11 @@ body.is-install-guide-open { overflow: hidden }
     -webkit-backdrop-filter: blur(30px) saturate(165%)
   }
   h1 {
-    font-size: 1.5rem;
+    font-size: 1.375rem;
     font-weight: 720
   }
+  .app-logo,.logo { width: 32px; height: 32px }
+  .logo { border-radius: 9px }
   .tagline {
     display: none
   }
@@ -608,13 +629,18 @@ body.is-install-guide-open { overflow: hidden }
     overflow-wrap: anywhere
   }
   .intro {
-    padding: 0 0 2px
+    padding: 0 0 2px;
+    text-align: start
   }
   .intro h2 {
-    font-size: 2rem
+    font-size: 2.125rem;
+    line-height: 1.2;
+    margin-bottom: 8px
   }
   .intro .sub {
-    font-size: .875rem
+    font-size: .9375rem;
+    line-height: 1.4;
+    margin-inline: 0
   }
 
 }
@@ -628,18 +654,23 @@ body.is-install-guide-open { overflow: hidden }
   }
 }
 
-@media(display-mode:standalone) {
-  main {
-    min-height: 100svh
-  }
-  .app-dock {
-    position: fixed;
-    top: calc(var(--dock-viewport-bottom,var(--dock-shell-height,100lvh)) - max(10px,calc(env(safe-area-inset-bottom,0px) - 12px)));
-    bottom: auto;
-    transform: translate(-50%,-100%)
+@media(prefers-reduced-transparency:reduce), (prefers-contrast:more) {
+  .top.has-scroll-divider {
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none
   }
 }
 
+@media(forced-colors:active) {
+  .top.has-scroll-divider {
+    background: Canvas;
+    border-bottom-color: CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none
+  }
+}
 
 /* Search expands in the same navigation layer, with a stable close target. */
 .dock-search-field {

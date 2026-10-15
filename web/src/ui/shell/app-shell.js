@@ -9,6 +9,7 @@ export function getAppShell(){return instance??=createAppShell();}
 
 export function createAppShell({doc=document,win=window,translate=key=>t(pickLanguage(),key)}={}){
   const $=id=>doc.getElementById(id),records=new Map();
+  let batchDepth=0;
   const photo=$('photo-workspace'),content=$('photo-content');
   const tabs=[...doc.querySelectorAll('[data-screen]')],tabNav=doc.querySelector('.app-tabs');
   bindDockViewport({doc,win});
@@ -68,6 +69,12 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       if(focus)searchButton.focus({preventScroll:true});
     }
   }
+  // A pointerdown normally blurs Search before click. That drops the keyboard
+  // clearance and moves Close away from the finger, swallowing the first tap.
+  // Keep focus until activation; keyboard/assistive activation still uses click.
+  searchButton.addEventListener('pointerdown',event=>{
+    if(searching&&doc.activeElement===searchInput)event.preventDefault();
+  });
   searchButton.addEventListener('click',()=>setSearch(!searching));
   searchInput.addEventListener('input',()=>{
     query=normalize(searchInput.value.trim());$('clear-search').hidden=!searchInput.value;render();
@@ -182,7 +189,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     }
   },{rootMargin:'80px'}):null;
   async function makeThumbnail(record){
-    if(record.thumbnailAttempted||record.thumbnailPending||record.thumbnail||!record.sourceFile||typeof win.createImageBitmap!=='function')return;
+    if(record.state!=='ready'||record.thumbnailAttempted||record.thumbnailPending||record.thumbnail||!record.sourceFile||typeof win.createImageBitmap!=='function')return;
     record.thumbnailAttempted=true;record.thumbnailPending=true;
     let bitmap;
     try{
@@ -192,6 +199,7 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       const context=canvas.getContext?.('2d');if(!context)return;
       context.drawImage(bitmap,0,0);
       record.thumbnail=canvas.toDataURL('image/jpeg',0.7);
+      record.revision++;
       record.onThumbnail?.(record.thumbnail);
       render();
     }catch{/* Browser could not decode this file; preserve its status icon. */}
@@ -210,15 +218,15 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     icon.dataset.progressLabel=percent!==null?`${percent}%`:'';
     icon.textContent=active?'':record.state==='ready'?'✓':record.state==='failed'?'!':'◷';
   }
-  function card(record,{history=false}={}){
+  function card(record){
     const card=doc.createElement('div');card.className='task-card';card.dataset.state=record.state;
     const open=doc.createElement('button');open.type='button';open.className='task-open';
     const icon=doc.createElement('span');icon.className='task-symbol';icon.setAttribute('aria-hidden','true');updateTaskIndicator(icon,record);
     const copy=doc.createElement('span');copy.className='task-copy';
     const name=doc.createElement('strong');name.textContent=record.name;
-    const status=doc.createElement('span');status.textContent=record.status||translate('shell.queued');
+    const status=doc.createElement('span');status.textContent=record.state==='queued'?translate('shell.queued'):record.status||translate('shell.queued');
     copy.append(name,status);
-    if(record.thumbnail&&(history||record.state==='ready')){
+    if(record.thumbnail&&record.state==='ready'){
       const image=doc.createElement('img');image.className='task-thumbnail';image.alt='';image.src=record.thumbnail;image.setAttribute('aria-hidden','true');open.append(image);
     }else open.append(icon);
     open.append(copy);
@@ -258,20 +266,24 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     card.addEventListener('click',()=>openPhoto(record.id));
     return card;
   }
-  function render(){
+  function render(force=false){
+    if(batchDepth)return;
     const all=[...records.values()];
     const history=$('history-items');
     const matching=all.filter(record=>!query||normalize(record.name+' '+record.status).includes(query));
     const cards=[...matching].reverse().map(record=>{
-      const next=card(record,{history:true});
+      if(!force&&record.historyCard&&record.renderedRevision===record.revision)return record.historyCard;
+      const next=card(record);
       if(record.historyCard){
         // Progress updates from another result can render many times per second. Keep an
         // already-open overflow menu mounted so its trigger/menu/focus state is not reset
         // underneath the user's finger while a different photo is processing.
-        if(!record.historyCard.querySelector('.task-action-wrap')?.classList.contains('is-open'))record.historyCard.replaceChildren(...next.childNodes);
+        if(!record.historyCard.querySelector('.task-action-wrap')?.classList.contains('is-open')){
+          record.historyCard.replaceChildren(...next.childNodes);record.renderedRevision=record.revision;
+        }
         record.historyCard.dataset.state=record.state;
-      }else record.historyCard=next;
-      if(thumbnailObserver&&record.sourceFile&&!record.thumbnail&&!record.thumbnailAttempted)thumbnailObserver.observe(record.historyCard);
+      }else{record.historyCard=next;record.renderedRevision=record.revision;}
+      if(record.state==='ready'&&thumbnailObserver&&record.sourceFile&&!record.thumbnail&&!record.thumbnailAttempted)thumbnailObserver.observe(record.historyCard);
       return record.historyCard;
     });
     for(const old of [...history.children])if(!cards.includes(old))old.remove();
@@ -285,28 +297,40 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
     $('history-count').hidden=!all.length;$('history-count').textContent=String(all.length);
     $('current-task').hidden=!all.length;
     // The running task is not coupled to whichever older photo is being edited.
-    const current=all.find(record=>!['ready','failed','info'].includes(record.state))||all.at(-1);
-    const task=$('task-content'),next=current?card(current):null,currentCard=task.firstElementChild;
-    const wantsQuick=Boolean(current?.state==='ready'&&current.quickActions?.length);
-    const hasQuick=Boolean(currentCard?.querySelector('.task-action-trigger'));
-    const wantsThumbnail=Boolean(current?.state==='ready'&&current.thumbnail);
-    const hasThumbnail=Boolean(currentCard?.querySelector('.task-thumbnail'));
-    if(next&&currentCard?.dataset.result===current.id&&wantsQuick===hasQuick&&wantsThumbnail===hasThumbnail){
-      currentCard.querySelector('.task-copy>span').textContent=current.status||translate('shell.queued');
-      currentCard.querySelector('.task-copy>strong').textContent=current.name;
-      const currentSymbol=currentCard.querySelector('.task-symbol');if(currentSymbol)updateTaskIndicator(currentSymbol,current);
-      currentCard.dataset.state=current.state;
-    }else{
-      if(next){next.dataset.result=current.id;next.querySelector('.task-copy>span').setAttribute('role','status');}
-      task.replaceChildren(...(next?[next]:[]));
+    const running=all.filter(record=>['processing','updating'].includes(record.state));
+    const queued=all.filter(record=>record.state==='queued');
+    const summaryText=translate('shell.queueSummary').replace('{active}',String(running.length)).replace('{queued}',String(queued.length));
+    for(const id of ['task-summary','history-queue-summary']){
+      const summary=$(id);if(summary){summary.hidden=!running.length&&!queued.length;summary.textContent=summaryText;}
     }
+    const queueNote=$('history-queue-note');if(queueNote)queueNote.hidden=!queued.length;
+    const visible=running.length?running:(queued.length?[queued[0]]:all.length?[all.at(-1)]:[]);
+    const task=$('task-content');
+    const taskCards=visible.map(current=>{
+      const currentCard=[...task.children].find(item=>item.dataset.result===current.id);
+      const wantsQuick=Boolean(current.state==='ready'&&current.quickActions?.length);
+      const hasQuick=Boolean(currentCard?.querySelector('.task-action-trigger'));
+      const wantsThumbnail=Boolean(current.state==='ready'&&current.thumbnail);
+      const hasThumbnail=Boolean(currentCard?.querySelector('.task-thumbnail'));
+      if(currentCard&&wantsQuick===hasQuick&&wantsThumbnail===hasThumbnail){
+        currentCard.querySelector('.task-copy>span').textContent=current.state==='queued'?translate('shell.queued'):current.status||translate('shell.queued');
+        currentCard.querySelector('.task-copy>strong').textContent=current.name;
+        const currentSymbol=currentCard.querySelector('.task-symbol');if(currentSymbol)updateTaskIndicator(currentSymbol,current);
+        currentCard.dataset.state=current.state;
+        return currentCard;
+      }
+      const next=card(current);next.dataset.result=current.id;next.querySelector('.task-copy>span').setAttribute('role','status');return next;
+    });
+    for(const old of [...task.children])if(!taskCards.includes(old))old.remove();
+    taskCards.forEach((item,index)=>{if(task.children[index]!==item)task.insertBefore(item,task.children[index]||null);});
   }
   showScreen(destination);
   return {
-    render,
+    render:()=>render(true),
+    batch(fn){batchDepth++;try{return fn();}finally{batchDepth--;if(!batchDepth)render();}},
     register(el,name,sourceFile,{thumbnail=null,onThumbnail=null}={}){
       const id='result-'+sessionId+'-'+(++serial),record={
-        id,el,name,state:'queued',status:'',progress:null,
+        id,el,name,state:'queued',status:'',progress:null,revision:0,
         sourceFile:sourceFile?.type==='video/quicktime'?null:sourceFile,
         thumbnail:typeof thumbnail==='string'&&thumbnail?thumbnail:null,
         onThumbnail:typeof onThumbnail==='function'?onThumbnail:null,
@@ -324,11 +348,11 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
       doc.body.classList.add('has-used-app');try{win.localStorage.setItem('stylio-has-processed','1');}catch{}
       render();
       return {
-        update(state,status){record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;if(state==='ready'&&record.sourceFile&&!record.thumbnail)void makeThumbnail(record);render();},
-        progress(value){record.progress=Number.isFinite(value)?Math.max(0,Math.min(100,value)):null;render();},
-        quickActions(items){record.quickActions=(items||[]).filter(item=>item&&typeof item.run==='function');render();},
-        quickAction(kind,run,label=''){record.quickActions=[{kind,run,label}];render();},
-        source(file){if(!record.sourceFile&&file?.type!=='video/quicktime'){record.sourceFile=file;record.thumbnail=null;record.thumbnailAttempted=false;}if(record.historyCard&&thumbnailObserver&&record.sourceFile&&!record.thumbnail)thumbnailObserver.observe(record.historyCard);render();},
+        update(state,status){record.revision++;record.state=state;record.status=status;if(!['processing','updating'].includes(state))record.progress=state==='ready'?100:null;if(state==='ready'&&record.sourceFile&&!record.thumbnail)void makeThumbnail(record);render();},
+        progress(value){record.revision++;record.progress=Number.isFinite(value)?Math.max(0,Math.min(100,value)):null;render();},
+        quickActions(items){record.revision++;record.quickActions=(items||[]).filter(item=>item&&typeof item.run==='function');render();},
+        quickAction(kind,run,label=''){record.revision++;record.quickActions=[{kind,run,label}];render();},
+        source(file){record.revision++;if(!record.sourceFile&&file?.type!=='video/quicktime'){record.sourceFile=file;record.thumbnail=null;record.thumbnailAttempted=false;}if(record.state==='ready'&&record.historyCard&&thumbnailObserver&&record.sourceFile&&!record.thumbnail)thumbnailObserver.observe(record.historyCard);render();},
         dispose(){
           const wasSelected=selected===id;if(wasSelected)closePhoto();
           observer?.disconnect();

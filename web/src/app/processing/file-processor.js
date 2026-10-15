@@ -15,8 +15,8 @@ import {waitForVisiblePage} from '../../ui/processing-scheduler.js';
 import {shouldRenderStyleDisplay} from '../../recommend/style-display-render.js';
 export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis}){
     const {addMissingSoftSkin,ensureDecode,stagePercent,modelDownloadStatus,styleProgress,styleResultNote,adaptiveStyleCompletionNotice,recommendHeicStyle}=analysis;
-  async function handleFile(file) {
-    const ui = row(file.name,file);
+  async function handleFile(file,preparedUi=null) {
+    const ui = preparedUi||row(file.name,file);
     const inputSize = file.size;
     const overall=value=>ui.progress?.(value);
     const mapped=(start,end,done,total)=>Number.isFinite(done)&&Number.isFinite(total)&&total>0?start+(end-start)*Math.max(0,Math.min(1,done/total)):start;
@@ -439,7 +439,7 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
       console.error("could not port", file.name, e);
       ui.set(T(e?.code==="APP_RESOURCE_UNAVAILABLE"?"err.resources":"err.unsupported"), "err");
     } finally {
-      // Samples belong to this serialized processing operation, not its history
+      // Samples belong to this runtime lane's operation, not its history
       // row. Release them after export while retaining only the downloadable file.
       releaseDecodeCache();releaseHevcEncoder();releaseRasterEncoder();releaseHeicProcessor();
     }

@@ -3,8 +3,18 @@
 import {applyLanguage,pickLanguage,rememberLanguage,t} from './i18n.js';
 import {AI_STRINGS} from './ai-strings.js';
 import {getAppShell} from './shell/app-shell.js';
+import {getProcessingPreferences,bindProcessingPreferences} from './processing-preferences.js';
 const shell=getAppShell();
+const processingPreferences=getProcessingPreferences();
+bindProcessingPreferences({preferences:processingPreferences});
 const selector=document.getElementById('lang'),boot=document.getElementById('boot');
+const styles=document.getElementById('app-styles');
+const stylesReady=new Promise((resolve,reject)=>{
+  if(!styles||styles.media==='all'){resolve();return;}
+  if(styles.dataset.failed==='true'){reject(Error('App styles unavailable'));return;}
+  styles.addEventListener('load',resolve,{once:true});
+  styles.addEventListener('error',()=>reject(Error('App styles unavailable')),{once:true});
+});
 function showBootError(message,retryLabel){
   boot.replaceChildren();boot.className='err app-error-banner';
   const icon=document.createElement('span');icon.className='app-error-icon';icon.setAttribute('aria-hidden','true');
@@ -66,6 +76,7 @@ syncTopBarDivider();
 const installGuide=document.getElementById('ios-install-guide');
 const installGuideContinue=document.getElementById('install-guide-continue');
 const appMain=document.querySelector('main');
+const appChrome=document.getElementById('app-chrome');
 const userAgent=navigator.userAgent||'';
 const iphoneSafari=/iPhone|iPod/i.test(userAgent)
   &&/AppleWebKit/i.test(userAgent)
@@ -79,6 +90,7 @@ function finishInstallGuideClose(){
   appMain?.classList.remove('is-install-guide-entering');
   document.body.classList.remove('is-install-guide-open');
   appMain?.removeAttribute('inert');
+  appChrome?.removeAttribute('inert');
   installGuideClosing=false;
 }
 function closeInstallGuide(){
@@ -100,6 +112,7 @@ if(iphoneSafari&&!standalone){
   installGuide.hidden=false;
   document.body.classList.add('is-install-guide-open');
   appMain?.setAttribute('inert','');
+  appChrome?.setAttribute('inert','');
 }
 installGuideContinue?.addEventListener('click',closeInstallGuide);
 
@@ -123,17 +136,18 @@ if(ios){
   const stopPageZoom=event=>event.preventDefault();
   for(const type of ['gesturestart','gesturechange','gestureend'])document.addEventListener(type,stopPageZoom,{passive:false});
 }
-const formatTipKey='photo-format-tip-dismissed-v1';
-let formatTipDismissed=false;
-try{formatTipDismissed=localStorage.getItem(formatTipKey)==='1';}catch{}
-formatTip.hidden=!ios||formatTipDismissed;
-if(!formatTip.hidden)drop.setAttribute('aria-describedby','ios-format-copy');
+function syncFormatTip(){
+  formatTip.hidden=!ios||!processingPreferences.get('originalHint');
+  if(!formatTip.hidden)drop.setAttribute('aria-describedby','ios-format-copy');else drop.removeAttribute('aria-describedby');
+}
+syncFormatTip();
+processingPreferences.subscribe(key=>{if(key==='originalHint')syncFormatTip();});
 document.getElementById('ios-format-dismiss').addEventListener('click',()=>{
-  formatTip.hidden=true;drop.removeAttribute('aria-describedby');
-  try{localStorage.setItem(formatTipKey,'1');}catch{}
+  processingPreferences.set('originalHint',false);
 });
 function render(){
   const lang=selector.value,strings=AI_STRINGS[lang]||AI_STRINGS.en;
+  document.getElementById('app-launch').setAttribute('aria-label',t(lang,'st.preparing'));
   document.getElementById('enhance-ai-label').textContent=strings.masterToggle;
   applyLanguage(lang);document.getElementById('ai-portrait-label').textContent=strings.toggle;
   shell.render();
@@ -150,6 +164,9 @@ selector.addEventListener('change',change);
 
 const refreshApp=document.getElementById('refresh-app'),refreshStatus=document.getElementById('refresh-app-status');
 refreshApp?.addEventListener('click',async()=>{
+  if(refreshApp.disabled)return;
+  const file=document.getElementById('file'),wasDisabled=file.disabled;
+  file.disabled=true;document.documentElement.dataset.updating='true';
   refreshApp.disabled=true;refreshStatus.textContent=t(selector.value,'settings.updating');
   try{
     const registration=await navigator.serviceWorker?.getRegistration?.('./')||await navigator.serviceWorker?.getRegistration?.();
@@ -162,6 +179,7 @@ refreshApp?.addEventListener('click',async()=>{
     await new Promise(resolve=>setTimeout(resolve,220));
     location.reload();
   }catch(error){
+    delete document.documentElement.dataset.updating;file.disabled=wasDisabled;
     console.warn('App update failed',error);
     refreshStatus.textContent=t(selector.value,'settings.updatefailed');
     refreshApp.disabled=false;
@@ -171,8 +189,7 @@ async function loadApplication(){
   let lastError;
   for(let attempt=0;attempt<3;attempt++){
     try{
-      await import(attempt===0?'../../app.js':`../../app.js?boot-retry=${attempt}-${Date.now()}`);
-      return;
+      return await import(attempt===0?'../../app.js':`../../app.js?boot-retry=${attempt}-${Date.now()}`);
     }catch(error){
       lastError=error;
       if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));
@@ -181,9 +198,15 @@ async function loadApplication(){
   throw lastError;
 }
 try{
-  await loadApplication();
+  const [application]=await Promise.all([loadApplication(),stylesReady]);
+  if(application.bootState!=='reloading'){
+    clearTimeout(window.stylioBootTimer);
+    document.getElementById('app-launch').hidden=true;
+  }
   selector.removeEventListener('change',change);
 }catch(error){
+  clearTimeout(window.stylioBootTimer);
+  document.getElementById('app-launch').hidden=true;
   console.error('Application scripts unavailable',error);
   showBootError(t(selector.value,'err.resources'),t(selector.value,'btn.retry'));
 }

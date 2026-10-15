@@ -3796,3 +3796,89 @@ Service-worker cache is v203.
 This is structural/application evidence. No new physical Apple Photos test or
 Safari memory/timing benchmark was performed, and no future-contract adapter was
 qualified by these changes.
+
+## 10.78 — PWA startup, queue visibility and real processing preferences (2026-10-15)
+
+The v196 six-second viewport resampling was insufficient for the newly reported
+Home Screen cold-launch case: stale `innerHeight` and `clientHeight` can continue
+overriding correct CSS geometry for the whole session. The v204 attempt used CSS
+`100dvh` and safe areas at rest; the user subsequently confirmed it still failed
+on their iPhone. It is superseded by 10.79 below.
+
+The release cache now serves app HTML/modules/styles without waiting for network
+revalidation on every launch. An inline loading screen paints while CSS/modules
+load, profiles/history no longer block readiness, heavy encoders remain lazy, and
+initial offline warming waits for worker activation when there is no controller.
+
+History now registers all imported files before processing. The default single-job
+queue can opt into two jobs using an isolated second runtime, with visible waiting
+states and all active jobs shown in Activity. Save-action preference, visible-work
+Wake Lock and the iOS original-format reminder replace the prior Settings mocks.
+
+Desktop browser validation completed three HEIC exports across both lanes, showed
+2 active + 1 waiting file, retained a dock bottom of 834 on a 390×844 viewport with
+both JS heights fixed at 756, and successfully booted fully offline after caching
+188 resources. Save preference and reminder interactions were exercised; Wake Lock
+lifecycle and refusal/late-completion cases have deterministic tests. No phone
+thermal, Safari lifecycle or physical Photos qualification is claimed. Full details
+and device checks: `docs/ui-ux/2026-10-15-pwa-startup-queue-settings.md`.
+
+Final automated web regression for this update: **370 passing tests, 15 optional
+private-fixture skips and zero failures**, plus PWA asset/i18n/static-release checks.
+
+## 10.79 — Theme-correct launch artwork and mobile chrome revision (2026-10-15)
+
+User feedback confirms the v204 dock geometry still required a force-quit on the
+physical iPhone. Prior Chromium viewport tests were not device acceptance.
+v205 removes `top:100dvh` placement: a fixed, unfiltered `inset:0` host outside
+`<main>` aligns a relative glass dock with flex and safe-area padding. The document
+keeps normal scrolling. No physical-screen floor, layout-height override, launch
+polling or body scroll lock is used. Focused Search alone can request keyboard
+clearance, measured from the host bounds; lifecycle resets discard that offset.
+
+Real-browser checks exposed a separate missed-Close-tap bug: input blur cleared
+the keyboard offset before click, moving the button away. Pointerdown now retains
+Search focus until activation; keyboard activation still works normally.
+
+The launch icon embeds the existing light/dark SVG geometry and uses critical
+theme CSS, so it is correct even with the stylesheet unavailable. Saved appearance
+overrides system appearance; System follows live changes. Mobile layout follows
+the local Ionic/iOS reference with compact header, 16pt margins, leading large
+title and one grouped photo picker surface. No framework or effect dependency
+was added; source/output photo geometry is unchanged.
+
+Validation: **372 passing web tests, 15 optional private-fixture skips, zero
+failures**; PWA/i18n checks pass. The repeatable mobile browser smoke covers 20
+scenarios including blocked-CSS launch themes, seven viewport sizes in both
+appearances, stale JS height, tab/scroll restoration, Search, production bootstrap,
+install-guide focus ownership and AI Settings. Physical iOS cold launch/reopen is
+still unqualified. See `docs/ui-ux/2026-10-15-pwa-startup-queue-settings.md`.
+
+## 10.80 — Short/long destination boundary, lens sizing and header clearance (2026-10-15)
+
+Physical feedback rejected v205 as a complete dock fix: Settings positions the
+dock correctly, while Process/empty History/collapsed Guide raise it again.
+Desktop measurements confirm a distinct root state: the short screens had
+scrollHeight equal to clientHeight, while Settings was scrollable. v206 marks
+standalone mode in the early head script and uses `min-height:calc(100lvh + 1px)`
+for main in that mode, preserving root scrollability across all destinations.
+The dock keeps the existing independent host. This removes the content-length
+boundary without JS screen floors, scroll locks, reloads or settling timers;
+physical WebKit acceptance remains outstanding.
+
+The end-tab lens mismatch was independently reproduced in Chromium. The global
+element-only box-sizing reset does not include `::before`; its border enlarged
+the percentage translation step, accumulating drift at Settings. Explicit
+border-box sizing fixes the actual lens width. At 402px, resting top/right
+insets changed from 5/-3 to 5/5 CSS pixels. Mobile header controls also move
+16pt down from the status area, with matching content clearance.
+
+Validation: 372 passing web tests, 15 optional private-fixture skips, zero
+failures; PWA/i18n checks pass. The mobile smoke now covers 21 scenarios, including
+Settings → Process → History → Guide → Settings with short content, preserved
+scroll, exact end-lens insets, and all prior startup/Search cases. Browser runs
+passed at 1× and 3× device scale; neither is physical iOS qualification.
+
+Follow-up v207 restores the user's preferred inset grey photo-picker surface,
+12pt outer padding and former 190pt minimum picker height. Its fill follows the
+theme background. The v206 dock/lens/header changes remain in place.

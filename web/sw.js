@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v203`;
+const CACHE_NAME = `${CACHE_PREFIX}v207`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -19,6 +19,12 @@ const APP_SHELL = [
   "./styles/components/portrait-editor.css",
   "./src/ui/shell/app-shell.js",
   "./src/ui/shell/dock-viewport.js",
+  "./src/ui/processing-preferences.js",
+  "./src/ui/screen-awake.js",
+  "./src/app/processing/task-queue.js",
+  "./src/app/processing/isolated-processor.js",
+  "./src/app/processing/lane-runtime.js",
+  "./processing-lane.html",
   "./src/ui/shell/tab-glass.js",
   "./styles/components/navigation-effects.css",
   "./src/ui/results/result-view.js",
@@ -195,6 +201,7 @@ const APP_SHELL = [
 // Only the initial screen gates activation. Preloading the whole converter
 // here left first visits waiting for every rarely-used processing module.
 const BOOT_SHELL=['./','./index.html','./styles.css',"./styles/foundations/tokens.css","./styles/foundations/base.css","./styles/layout/app-shell.css","./styles/layout/workspace.css","./styles/components/controls.css","./styles/components/sheets.css","./styles/components/results.css","./styles/components/portrait-editor.css","./src/ui/shell/app-shell.js",'./src/ui/page-bootstrap.js','./src/ui/i18n.js','./src/ui/ai-strings.js','./icons/photographic-styles.svg','./styles/components/materials.css','./THIRD_PARTY_NOTICES.txt','./src/ui/shell/dock-viewport.js','./src/ui/shell/tab-glass.js','./styles/components/navigation-effects.css'];
+BOOT_SHELL.push('./src/ui/processing-preferences.js');
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -283,6 +290,19 @@ async function networkFirst(request) {
   }
 }
 
+// A service-worker release owns a complete versioned app cache. Reopening that
+// release must not await the network for HTML or every imported module. Browser
+// SW update checks replace the release cache when sw.js changes.
+async function cachedApp(request,{navigation=false}={}){
+  try{
+    const cache=await caches.open(CACHE_NAME);
+    const hit=await cache.match(request,{ignoreSearch:true})
+      ||(navigation&&await cache.match('./index.html'));
+    if(hit)return isolated(hit);
+  }catch{}
+  return networkFirst(request);
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -323,7 +343,9 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      networkFirst(request).catch(async () => {
+      cachedApp(request,{navigation:request.destination!=='iframe'}).catch(async () => {
+        if(request.destination==='iframe')
+          return isolated(new Response('Processing runtime unavailable offline. Reconnect and retry.',{status:503}));
         let cached;
         try { cached = await caches.match("./index.html"); } catch {}
         return isolated(cached || new Response('Offline. Please reconnect and retry.', {status:503}));
@@ -332,5 +354,5 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(networkFirst(request));
+  event.respondWith(cachedApp(request));
 });

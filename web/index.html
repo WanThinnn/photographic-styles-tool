@@ -16,10 +16,34 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-v2.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192-v2.png">
-<script>(()=>{let t='system';try{const v=localStorage.getItem('stylio-theme-v1');if(v==='light'||v==='dark'||v==='system')t=v}catch{}const dark=t==='dark'||t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;const scheme=dark?'dark':'light';document.documentElement.style.colorScheme=scheme;document.getElementById('app-color-scheme').content=scheme;document.getElementById('app-theme-color').content=dark?'#000000':'#f2f2f7'})()</script>
-<link rel="stylesheet" href="styles.css">
+<style>
+html{background:#f2f2f7}html[data-theme="dark"]{background:#000}
+.app-launch{position:fixed;inset:0;z-index:110;display:grid;place-content:center;justify-items:center;gap:20px;background:#f2f2f7;color:#15151a;font:600 17px/1.4 system-ui;text-align:center}
+html[data-theme="dark"] .app-launch{background:#000;color:#f2f2f7}
+@media(prefers-color-scheme:dark){html:not([data-theme="light"]),html:not([data-theme="light"]) .app-launch{background:#000;color:#f2f2f7}}
+.app-launch[hidden]{display:none}.launch-mark{width:76px;height:76px}.launch-icon-background{fill:#2f6df6}.launch-icon-glyph{color:#fff}
+html[data-theme="dark"] .launch-icon-background{fill:url(#launch-dark)}html[data-theme="dark"] .launch-icon-glyph{color:#f5f5f7}
+@media(prefers-color-scheme:dark){html:not([data-theme="light"]) .launch-icon-background{fill:url(#launch-dark)}html:not([data-theme="light"]) .launch-icon-glyph{color:#f5f5f7}}
+.launch-spinner{width:24px;height:24px;border:3px solid #8e8e9333;border-top-color:#007aff;border-radius:50%;animation:launch-spin .8s linear infinite}
+.launch-retry{padding:12px 20px;color:#007aff;background:transparent;border:0;font:inherit}.launch-retry[hidden]{display:none}
+@keyframes launch-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.launch-spinner{animation:none}}
+</style>
+<script>(()=>{if(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)document.documentElement.dataset.standalone='';let t='system';try{const v=localStorage.getItem('stylio-theme-v1');if(v==='light'||v==='dark'||v==='system')t=v}catch{}const dark=t==='dark'||t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches;if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;const scheme=dark?'dark':'light';document.documentElement.style.colorScheme=scheme;document.getElementById('app-color-scheme').content=scheme;document.getElementById('app-theme-color').content=dark?'#000000':'#f2f2f7'})()</script>
+<link id="app-styles" rel="stylesheet" href="styles.css" media="print" fetchpriority="high" onload="this.media='all'" onerror="this.dataset.failed='true'">
+<noscript><link rel="stylesheet" href="styles.css"></noscript>
 </head>
 <body>
+<div id="app-launch" class="app-launch" role="status" aria-live="polite" aria-label="Starting Stylio">
+  <svg class="launch-mark" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+    <defs><linearGradient id="launch-dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b2b2f"/><stop offset=".62" stop-color="#151517"/><stop offset="1" stop-color="#080809"/></linearGradient></defs>
+    <rect class="launch-icon-background" x="1" y="1" width="510" height="510" rx="112.64"/>
+    <g class="launch-icon-glyph"><rect x="153.6" y="153.6" width="204.8" height="204.8" rx="56.889" stroke="currentColor" stroke-width="24.178"/><circle cx="325.689" cy="201.956" r="27.022" fill="currentColor"/></g>
+  </svg>
+  <span>Stylio</span><span class="launch-spinner" aria-hidden="true"></span>
+  <button id="launch-retry" class="launch-retry" type="button" data-i18n="btn.retry" hidden onclick="location.reload()">Retry</button>
+</div>
+<script>window.stylioBootTimer=setTimeout(()=>{const b=document.getElementById('launch-retry');if(b)b.hidden=false},12000)</script>
+<noscript><style>.app-launch{display:none}</style><p>Enable JavaScript to use Stylio.</p></noscript>
 <section id="ios-install-guide" class="ios-install-guide" role="dialog" aria-modal="true" aria-labelledby="install-guide-title" hidden>
   <div class="install-guide-shell">
     <div class="install-guide-hero" aria-hidden="true">
@@ -167,7 +191,7 @@
   </div>
 
   <p id="boot" role="status">Preparing the tool for first use…</p>
-  <section id="current-task" class="current-task" hidden aria-labelledby="task-heading"><h3 id="task-heading" data-i18n="shell.activity">Activity</h3><div id="task-content"></div></section>
+  <section id="current-task" class="current-task" hidden aria-labelledby="task-heading"><h3 id="task-heading" data-i18n="shell.activity">Activity</h3><p id="task-summary" class="queue-summary" role="status" hidden></p><div id="task-content"></div></section>
   </section>
   <section id="history-screen" class="app-screen" aria-labelledby="history-title" hidden>
   <div class="screen-heading"><h2 id="history-title" data-i18n="shell.history">History</h2><p data-i18n="shell.session">Available this session. Download copies before closing the app.</p></div>
@@ -181,29 +205,13 @@
     </div>
   </div>
   <p id="history-search-summary" class="search-summary" role="status" hidden></p>
+  <p id="history-queue-summary" class="queue-summary" role="status" hidden></p>
+  <p id="history-queue-note" class="queue-note" data-i18n="shell.queuerestore" hidden>The queue runs while the app is open. If iOS closes the app, select unfinished photos again.</p>
   <p id="history-no-matches" class="empty-state" data-i18n="shell.nomatches" hidden>No matching results.</p>
   <div id="history-items" class="history-items"></div>
   <div id="history-empty" class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><h3 data-i18n="shell.empty">A little history starts here.</h3><p data-i18n="shell.emptyhint">Choose photos in Process. Your results will appear here.</p></div>
   </section>
   <div id="list"></div>
-  <div class="app-dock">
-  <nav class="app-tabs glass-surface" aria-label="Stylio">
-    <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><span class="tab-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span id="history-count" class="tab-count" hidden></span></span><span data-i18n="shell.history">History</span></button>
-    <button type="button" data-screen="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15M6 8h3M6 11h3M15 8h3M15 11h3"/></svg><span data-i18n="shell.guide">Guide</span></button>
-    <button class="app-tab" data-screen="settings" aria-controls="settings-screen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.6 2a8 8 0 0 0-1.6.9l-2-.5-2.5 4.2 1.5 1.5a8 8 0 0 0 0 1.8l-1.5 1.5 2.5 4.2 2-.5a8 8 0 0 0 1.6.9l.6 2h5l.6-2a8 8 0 0 0 1.6-.9l2 .5 2.5-4.2-1.5-1.5a8 8 0 0 0 0-1.8l1.5-1.5-2.5-4.2-2 .5a8 8 0 0 0-1.6-.9l-.6-2Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="shell.settings">Settings</span></button>
-  </nav>
-  <div id="history-search-field" class="dock-search-field glass-surface" hidden>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-    <label for="history-search" class="sr-only" data-i18n="shell.search">Search history</label>
-    <input id="history-search" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" aria-controls="history-items" placeholder="Search history">
-    <button id="clear-search" type="button" class="search-clear" hidden aria-labelledby="clear-search-label">×<span id="clear-search-label" class="sr-only" data-i18n="shell.clearsearch">Clear search</span></button>
-  </div>
-  <button id="toggle-search" class="icon-button dock-search glass-surface" type="button" aria-expanded="false" aria-controls="history-search-field" aria-labelledby="search-button-label">
-    <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-    <svg class="search-close-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
-    <span id="search-button-label" class="sr-only" data-i18n="shell.search">Search history</span>
-  </button>
-</div>
   <section id="guide-screen" class="app-screen guide-screen" hidden aria-labelledby="guide-title">
     <div class="screen-heading"><h2 id="guide-title" data-i18n="shell.guide">Guide</h2></div>
     <div class="help-content guide-content">
@@ -278,13 +286,15 @@
 
       <h3 class="group-title" data-i18n="settings.processingprefs">Processing</h3>
       <div class="settings-group settings-future-group">
-        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 14v5h14v-5"/></svg></span><span class="settings-row-label" data-i18n="settings.defaultsave">Default save action</span><span class="settings-row-value" data-i18n="settings.shareSheet">Share sheet</span><span class="settings-chevron" aria-hidden="true"></span></div>
+        <label class="settings-nav-row" for="default-save-action"><span class="settings-leading-icon settings-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 14v5h14v-5"/></svg></span><span class="settings-row-label" data-i18n="settings.defaultsave">Default save action</span><select id="default-save-action" class="settings-save-select"><option value="share" data-i18n="settings.shareSheet">Share sheet</option><option value="download" data-i18n="settings.download">Download file</option></select></label>
         <div class="settings-separator"></div>
-        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 2h10v20H7z"/><path d="M10 5h4M10 19h4"/></svg></span><span class="settings-row-label" data-i18n="settings.keepscreen">Keep screen awake</span><span class="settings-row-value" data-i18n="settings.off">Off</span></div>
+        <label class="settings-nav-row settings-switch-row" for="keep-screen-awake"><span class="settings-leading-icon settings-icon-amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 2h10v20H7z"/><path d="M10 5h4M10 19h4"/></svg></span><span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.keepscreen">Keep screen awake</span><span id="keep-awake-status" class="settings-inline-note" data-i18n="settings.awakehint">Only while processing and the app is visible.</span></span><input id="keep-screen-awake" type="checkbox" role="switch" aria-describedby="keep-awake-status"></label>
         <div class="settings-separator"></div>
         <label class="settings-nav-row settings-switch-row" for="result-preview"><span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg></span><span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.resultpreview">Result preview</span><span class="settings-inline-note" data-i18n="settings.resultpreviewhint">Show photo previews after processing. Turn off on slower devices.</span></span><input id="result-preview" type="checkbox" role="switch" checked></label>
         <div class="settings-separator"></div>
-        <div class="settings-nav-row settings-static-row"><span class="settings-leading-icon settings-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="17" cy="17" r="3"/></svg></span><span class="settings-row-label" data-i18n="settings.originalformat">Prefer original format</span><span class="settings-row-value" data-i18n="settings.automatic">Automatic</span></div>
+        <label class="settings-nav-row settings-switch-row" for="parallel-processing"><span class="settings-leading-icon settings-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h6v14H4zM14 5h6v14h-6zM7 8v3M17 8v3"/></svg></span><span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.parallel">Parallel processing</span><span class="settings-inline-note" id="parallel-hint" data-i18n="settings.parallelhint">Process up to 2 photos at once. Uses more memory and battery and may warm your device.</span></span><input id="parallel-processing" type="checkbox" role="switch" aria-describedby="parallel-hint"></label>
+        <div class="settings-separator"></div>
+        <label class="settings-nav-row settings-switch-row" for="original-format-hint"><span class="settings-leading-icon settings-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="17" cy="17" r="3"/></svg></span><span class="settings-row-stack"><span class="settings-row-label" data-i18n="settings.originalformat">Original-format reminder</span><span class="settings-inline-note" data-i18n="settings.originalhint">Show how to choose original photos on iOS. Processed copies are HEIC.</span></span><input id="original-format-hint" type="checkbox" role="switch" checked></label>
       </div>
 
       <h3 class="group-title" data-i18n="shell.storage">On this device</h3>
@@ -321,6 +331,26 @@
     </div>
   </section>
 </main>
+<div id="app-chrome" class="app-chrome">
+  <div class="app-dock">
+  <nav class="app-tabs glass-surface" aria-label="Stylio">
+    <button type="button" data-screen="process" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span data-i18n="shell.process">Process</span></button><button type="button" data-screen="history"><span class="tab-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg><span id="history-count" class="tab-count" hidden></span></span><span data-i18n="shell.history">History</span></button>
+    <button type="button" data-screen="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15M6 8h3M6 11h3M15 8h3M15 11h3"/></svg><span data-i18n="shell.guide">Guide</span></button>
+    <button class="app-tab" data-screen="settings" aria-controls="settings-screen" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 3-.6 2a8 8 0 0 0-1.6.9l-2-.5-2.5 4.2 1.5 1.5a8 8 0 0 0 0 1.8l-1.5 1.5 2.5 4.2 2-.5a8 8 0 0 0 1.6.9l.6 2h5l.6-2a8 8 0 0 0 1.6-.9l2 .5 2.5-4.2-1.5-1.5a8 8 0 0 0 0-1.8l1.5-1.5-2.5-4.2-2 .5a8 8 0 0 0-1.6-.9l-.6-2Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="shell.settings">Settings</span></button>
+  </nav>
+  <div id="history-search-field" class="dock-search-field glass-surface" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+    <label for="history-search" class="sr-only" data-i18n="shell.search">Search history</label>
+    <input id="history-search" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" aria-controls="history-items" placeholder="Search history">
+    <button id="clear-search" type="button" class="search-clear" hidden aria-labelledby="clear-search-label">×<span id="clear-search-label" class="sr-only" data-i18n="shell.clearsearch">Clear search</span></button>
+  </div>
+  <button id="toggle-search" class="icon-button dock-search glass-surface" type="button" aria-expanded="false" aria-controls="history-search-field" aria-labelledby="search-button-label">
+    <svg class="search-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+    <svg class="search-close-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    <span id="search-button-label" class="sr-only" data-i18n="shell.search">Search history</span>
+  </button>
+</div>
+</div>
 <dialog id="photo-workspace" class="photo-workspace" aria-labelledby="photo-title" tabindex="-1">
   <header class="sheet-header"><button type="button" class="icon-button glass-surface" id="close-photo" aria-labelledby="close-photo-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-photo-label" class="sr-only" data-i18n="shell.closephoto">Close photo</span></button><h2 id="photo-title" data-i18n="shell.photo">Photo</h2></header>
   <div id="photo-content"></div>

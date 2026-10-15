@@ -4,6 +4,7 @@ import {AI_STRINGS} from '/src/ui/ai-strings.js';
 import {getAppShell} from '/src/ui/shell/app-shell.js';
 import {createResultView} from '/src/ui/results/result-view.js';
 const $=id=>document.getElementById(id),T=key=>t($('lang').value,key);
+clearTimeout(window.stylioBootTimer);$('app-launch').hidden=true;
 const fixtureParams=new URL(location.href).searchParams;
 const requestedLanguage=fixtureParams.get('lang');
 $('lang').value=['vi','en','zh'].includes(requestedLanguage)?requestedLanguage:pickLanguage();applyLanguage($('lang').value);
@@ -29,9 +30,9 @@ if(fixtureParams.get('state')==='resource-error'){
 }
 if(fixtureParams.get('state')==='install-guide'){
   tools.hidden=true;
-  const guide=$('ios-install-guide'),main=document.querySelector('main');
-  guide.hidden=false;document.body.classList.add('is-install-guide-open');main.setAttribute('inert','');
-  $('install-guide-continue').addEventListener('click',()=>{guide.hidden=true;document.body.classList.remove('is-install-guide-open');main.removeAttribute('inert');});
+  const guide=$('ios-install-guide'),main=document.querySelector('main'),chrome=$('app-chrome');
+  guide.hidden=false;document.body.classList.add('is-install-guide-open');main.setAttribute('inert','');chrome.setAttribute('inert','');
+  $('install-guide-continue').addEventListener('click',()=>{guide.hidden=true;document.body.classList.remove('is-install-guide-open');main.removeAttribute('inert');chrome.removeAttribute('inert');});
 }
 let result,version=0;
 function action(label,fn){const button=document.createElement('button');button.type='button';button.textContent=label;button.addEventListener('click',fn);tools.append(button);}

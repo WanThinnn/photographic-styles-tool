@@ -10,7 +10,7 @@ import {photoCaptureDate} from '../../media/photo-date.js';
 import {preserveNativeStyles,styleReconstructionRisk,nativeTextureCapture} from '../../styles/style-preservation.js';
 import {releaseHevcEncoder} from '../../codecs/ffmpeg-hevc.js';
 import {releaseHevcEncoder as releaseRasterEncoder} from '../../raster/ffmpeg-hevc.js';
-import {readImageFile,addTextureInWorker,repairTextureInWorker,restoreNativePortraitInWorker,preflightLegacyCompatibilityInWorker,legacyCompatibilityInWorker,patchInWorker,releaseHeicProcessor} from '../../media/heic-processing.js';
+import {readImageFile,addTextureInWorker,repairTextureInWorker,restoreNativePortraitInWorker,legacyCompatibilityInWorker,patchInWorker,releaseHeicProcessor} from '../../media/heic-processing.js';
 import {waitForVisiblePage} from '../../ui/processing-scheduler.js';
 import {shouldRenderStyleDisplay} from '../../recommend/style-display-render.js';
 export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcceleration,selectedAiLevel,handleMovie,liveMovies,livePhotos,attachMovie,ensureProfileIndex,getProfile,tryAiPortrait,analysis}){
@@ -112,20 +112,10 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
       };
       if(!input.discovery){preserveUnsupportedApple(input.discoveryError);return;}
       overall(12);let d = input.discovery;
-      const {classifyPhotoContract}=await import('../../compatibility/contract-classifier.js');
-      let compatibility;
-      try{compatibility=classifyPhotoContract(bytes);}
-      catch(error){preserveUnsupportedApple(error);return;}
-      let compatibilityPreflight=null;
-      if(compatibility.status==='unknown-apple-contract'&&compatibility.recovery.eligible){
-        try{
-          compatibilityPreflight=await preflightLegacyCompatibilityInWorker(bytes,{});
-        }catch(error){
-          console.warn('Compatibility preflight unavailable; preserving future source HEIC',error);
-          compatibilityPreflight={eligible:false,decision:'preserve-only',
-            blockers:[{code:'preflight-worker-failed',detail:String(error?.message||error)}]};
-        }
-      }
+      // Classification and preflight share the read worker's parsed graph.
+      // Keep plist parsing, topology sorting and signatures off the UI thread.
+      const {compatibility,compatibilityPreflight}=input;
+      if(!compatibility||input.compatibilityError){preserveUnsupportedApple(input.compatibilityError);return;}
       const legacyRecovery=compatibility.status==='unknown-apple-contract'
         &&compatibility.recovery.eligible&&compatibilityPreflight?.eligible===true;
       const preserveFuture=compatibility.status==='unknown-apple-contract'&&!legacyRecovery;
@@ -435,6 +425,7 @@ export function createFileProcessor({row,T,getLanguage,aiText,aiFeatures,gpuAcce
       overall(90);
       // Keep the first compatibility copy frozen at the verified target
       // boundary. Optional AI Portrait may be applied on a later normal pass.
+      if(unknownAppleContract){ui.output(shareFile);overall(100);ui.aiBusy(false);}
       if(!unknownAppleContract)await tryAiPortrait(bytes,shareFile,ui,file.name,file,preserveIncomplete);
       adaptiveStyleCompletionNotice(ui,adaptiveStyleRecommendation);
       if(preserveIncomplete)ui.portraitAdvice(T('warn.nativeeditmissing'));

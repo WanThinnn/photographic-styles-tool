@@ -1,4 +1,5 @@
 import {patch} from '../styles/port.js';
+import {discoverHeic} from '../core/heif.js';
 import {classifyPhotoContract} from './contract-classifier.js';
 import {fingerprintPhotoContract} from './contract-fingerprint.js';
 import {stripAppleEditingContract} from './legacy-sanitize.js';
@@ -20,7 +21,7 @@ function preflightFailureCode(preflight){
     return COMPATIBILITY_ERROR.RESOURCE_LIMIT_EXCEEDED;
   if(preflight.blockers.some(blocker=>[
     'cross-boundary-dependency','unknown-property-on-protected-resource',
-    'unknown-property-on-preserved-resource','editing-graph-cycle',
+    'unknown-property-on-preserved-resource','editing-graph-cycle','unknown-reference-on-protected-resource',
   ].includes(blocker.code)))return COMPATIBILITY_ERROR.AMBIGUOUS_DEPENDENCY;
   return COMPATIBILITY_ERROR.PREFLIGHT_FAILED;
 }
@@ -34,7 +35,8 @@ export async function legacyCompatibilityExport(source,profile,opts={}){
       'Legacy compatibility source exceeds the supported size budget',{
         actual:source.length,limit:COMPATIBILITY_LIMITS.maxSourceBytes,
       });
-  const sourceClassification=classifyPhotoContract(source);
+  const discovery=discoverHeic(source);
+  const sourceClassification=classifyPhotoContract(source,fingerprintPhotoContract(source,discovery));
   if(sourceClassification.status!=='unknown-apple-contract'){
     return {data:source,report:{...reportBase('legacy-compatibility-noop'),source:sourceClassification,
       target:sourceClassification.status==='known-compatible'?LEGACY_BASELINE_CONTRACT_ID:null}};
@@ -49,7 +51,7 @@ export async function legacyCompatibilityExport(source,profile,opts={}){
 
   const target=legacyTarget(opts.targetId||LEGACY_BASELINE_CONTRACT_ID);
 
-  const preflight=preflightLegacyCompatibilityExport(source,{classification:sourceClassification,targetId:target.id});
+  const preflight=preflightLegacyCompatibilityExport(source,{classification:sourceClassification,discovery,targetId:target.id});
   if(!preflight.eligible)
     throw compatibilityError(preflightFailureCode(preflight),
       'Legacy compatibility preflight refused to mutate this file',{preflight});

@@ -33,7 +33,13 @@ The branch now has the complete structural safety foundation:
 - the real source-adapter registry is intentionally empty until a genuine future source contract is captured and researched;
 - deterministic conversion plans, mutation-budget checks, output self-checks, sanitized inspector/comparer/manifest tooling, stable diagnostic error codes and a compatibility Details report are implemented.
 
-Automated regression currently records **313 passing tests, 15 optional fixture skips and 0 failures** across the compatibility path and the existing native/non-native/Portrait/HDR/UI pipelines used for this work. PWA asset checks, VI/EN/ZH copy checks, static-release checks, target-manifest build/validation and syntax checks also pass.
+After the review fixes, all `tests/web/*.mjs` suites importing `node:test`, run
+sequentially, record **354 passing tests, 15 optional fixture skips and 0 failures**.
+The compatibility suite includes behavioral output-completion tests for seven
+recovery/preservation/failure outcomes, documented Styles `k`/`l` flags,
+out-of-bounds primary/HDR/editing `idat` extents, unknown photographic references
+and worker-owned classification/preflight. Historical PWA/copy/manifest evidence
+below remains separate from physical Apple Photos qualification.
 
 Release gates remain deliberately split:
 

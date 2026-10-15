@@ -3758,3 +3758,41 @@ fixture exists yet, so no source-specific adapter can be truthfully implemented 
 physically qualified in advance. The system is prepared to preserve unknown future
 files, automatically recover only demonstrably editing-layer-only changes, and make a
 real adapter straightforward to add once future A/B fixtures exist.
+
+## 10.77 — Compatibility review corrections and worker reuse (2026-10-15)
+
+Four review findings were reproduced and corrected at file/application level:
+
+- Parseable unknown-contract recovery and preserve-only branches bypassed
+  `tryAiPortrait()`, which also published the File and completed progress. They now
+  publish once directly, reach 100% and clear the busy state without optional AI.
+- Construction-method-1 offsets were checked via the truthiness of an extracted
+  typed array. Out-of-range slices can be empty yet truthy. Preflight now checks
+  offset/end against the actual `idat` payload, including primary/HDR grid items
+  and disposable editing items; invalid sources return unchanged via safe export.
+- Unknown references were previously detected only beside Apple tag URI items.
+  Detection now includes protected photo/HDR/depth/thumbnail/Exif roles and their
+  `dimg` closure. Unknown types touching protected roles block recovery; unrelated
+  generic metadata references do not block the native route.
+- Styles key `l`, already documented with `k` in §4.1, was missing from the known
+  key set. Both flags now retain the existing native route and original metadata.
+
+The read worker now reuses discovery for fingerprint/classification and candidate
+preflight. This reduces source HEIC discovery from four calls to one during the
+read/classification/preflight sequence for a recovery candidate, removes synchronous
+contract parsing/signature work from the page, and avoids a separate source copy
+sent back to the worker for preflight. Bounds checks inspect the `idat` box once
+instead of reparsing `iloc` and copying each item. Export still independently
+validates its own input, sharing that discovery with its preflight.
+
+All web suites importing `node:test`, run sequentially, record **354 passing tests,
+15 optional private-fixture skips and zero failures**. New application regressions
+exercise successful recovery, preserve-only camera, preflight rejection, profile
+failure, builder failure, unparseable HEIC and classification failure; each must
+produce exactly one downloadable file, finish progress and preserve exact source
+bytes on fallback. Worker tests also verify the read decision and preflight.
+Service-worker cache is v203.
+
+This is structural/application evidence. No new physical Apple Photos test or
+Safari memory/timing benchmark was performed, and no future-contract adapter was
+qualified by these changes.

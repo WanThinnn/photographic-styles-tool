@@ -18,11 +18,23 @@ export async function executeJob(job, decode) {
     const bytes = new Uint8Array(await job.file.arrayBuffer());
     const format = imageFormat(bytes);
     let discovery=null,discoveryError=null;
+    let compatibility=null,compatibilityError=null,compatibilityPreflight=null;
     if(format==='heic'){
       try{discovery=discoverHeic(bytes);}
       catch(error){discoveryError=String(error?.message||error);}
+      if(discovery){
+        try{
+          const {fingerprintPhotoContract}=await import('../compatibility/contract-fingerprint.js');
+          const {classifyPhotoContract}=await import('../compatibility/contract-classifier.js');
+          compatibility=classifyPhotoContract(bytes,fingerprintPhotoContract(bytes,discovery));
+          if(compatibility.status==='unknown-apple-contract'&&compatibility.recovery.eligible){
+            const {preflightLegacyCompatibilityExport}=await import('../compatibility/recovery-preflight.js');
+            compatibilityPreflight=preflightLegacyCompatibilityExport(bytes,{classification:compatibility,discovery});
+          }
+        }catch(error){compatibilityError=String(error?.message||error);}
+      }
     }
-    return {bytes,format,discovery,discoveryError};
+    return {bytes,format,discovery,discoveryError,compatibility,compatibilityError,compatibilityPreflight};
   }
   if (job.operation === 'texture') return keepEditableHdr(addTexture(job.data,job.opts),job.data);
   if (job.operation === 'repair-texture') return keepEditableHdr(repairTextureCurve(job.data,job.opts),job.data);

@@ -4,7 +4,7 @@ import {
 import {URI_TEXTURE_STYLES,MATTE_2026_URIS} from '../styles/texture.js';
 
 export const KNOWN_STYLES_SCHEMAS=Object.freeze([13,14,16,131087,131088]);
-export const KNOWN_STYLES_KEYS=new Set(['0','1','2','3','4','5','6','7','c','d','e','f','g','h','i','j','k']);
+export const KNOWN_STYLES_KEYS=new Set(['0','1','2','3','4','5','6','7','c','d','e','f','g','h','i','j','k','l']);
 export const KNOWN_STYLE_SELECTION_KEYS=new Set(['0','1','2','3','4','5','6','7']);
 export const KNOWN_TEXTURE_KEYS=new Set([
   'Preset','CaptureType','CaptureMode','PortType','HardwareModel',

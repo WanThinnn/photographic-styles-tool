@@ -162,6 +162,13 @@ contract is intercepted before Texture, Soft Skin or Portrait mutation. A second
 Compatibility Firewall preflight then validates graph boundaries, resource limits,
 extents, properties, references and protected primary/HDR/depth/matte roles before
 any compatibility profile, decoder or thumbnail work is allowed.
+The read worker performs discovery, classification and eligible-source preflight
+using one parsed graph. The page consumes that decision without parsing the
+contract again or sending a second full photo copy for preflight. The exporter
+still independently validates its input before mutation. `idat` extents must fit
+inside the actual `idat` payload; a clamped/empty typed-array slice is not bounds
+evidence. Unknown reference types touching protected photographic resources also
+force preservation, even when neither endpoint has an Apple tag URI.
 When the change is demonstrably confined to the editing layer and the underlying
 HEIF/photo/HDR/depth contract remains proven, Stylio can create a separate Legacy
 Compatibility copy: it removes the unverified editing layer and rebuilds the same
@@ -173,6 +180,9 @@ unknown dependency crosses into HDR/depth/photo resources, the file is preserve-
 instead of being guessed at. A recognizable HEIC that the current parser cannot
 understand is likewise returned byte-for-byte as a preserved copy. Extra keys inside
 supported current Styles payloads remain byte-exact.
+The documented `k` and `l` flags are recognized as current Styles keys and do not
+trigger a rebuild. Both compatibility exports and preserve-only results publish a
+downloadable file and complete their progress without invoking optional Portrait.
 For a compatibility or preserve-only result, **Details → Apple compatibility** shows
 the user-facing contract outcome: newer Apple source format, known compatibility
 target (when rebuilt), whether photo/HDR/depth data were preserved, and any editing

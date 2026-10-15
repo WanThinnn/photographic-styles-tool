@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {be,box,concat,topBox} from '../../web/src/core/box.js';
+import {be,box,concat,topBox,metaChildren,findChild,boxes} from '../../web/src/core/box.js';
 import {buildBplist,parseBplist,BplistReal} from '../../web/src/core/bplist.js';
 import {injectAppleMakerNoteTag,extractAppleMakerNoteTag} from '../../web/src/core/exif.js';
 import {
@@ -39,6 +39,7 @@ import {
 import {CONTRACT_IDS,GENERIC_RECOVERY_STRATEGY_ID,LEGACY_BASELINE_CONTRACT_ID} from '../../web/src/compatibility/contract-registry.js';
 import {executeJob} from '../../web/src/media/heic-worker.js';
 import {photoContentIdentifier} from '../../web/src/media/live-photo.js';
+import {createFileProcessor} from '../../web/src/app/processing/file-processor.js';
 
 function nativeStyleExif(model='iPhone 16 Pro',{nativeTextureMarker=false}={}) {
   const value=new TextEncoder().encode(model+'\0');
@@ -277,6 +278,103 @@ test('known iPhone 16 native contract stays on the existing native path',async()
   assert.equal(result.safeOperations.normalNativePipeline,true);
   assert.equal(result.safeOperations.mayAddTexture,true);
   assert.equal(result.safeOperations.legacyCompatibilityExport,false);
+});
+
+test('documented Styles flags k/l keep iPhone 16/17 native metadata on its original route',async()=>{
+  for(const model of ['iPhone 16 Pro','iPhone 17 Pro']){
+    for(const schema of [16,131088]){
+      const {data,profile}=await profilePhoto({model,schema});
+      const source=addStylesKey(addStylesKey(data,'k',false),'l',false);
+      const classification=classifyPhotoContract(source);
+      assert.equal(classification.status,'known-compatible');
+      assert.deepEqual(classification.reasons,[]);
+      assert.equal(classification.safeOperations.normalNativePipeline,true);
+      const result=await legacyCompatibilityExport(source,profile);
+      assert.equal(result.data,source,'known native Styles must never be rebuilt');
+    }
+  }
+});
+
+test('preflight rejects idat extents beyond the containing box and safe export preserves the source',async()=>{
+  const {data,profile}=await profilePhoto({schema:999});
+  const d=discoverHeic(data),idat=findChild(metaChildren(data,d.meta),'idat');
+  const primary=d.iloc.items.get(d.primary);
+  assert.equal(primary.constructionMethod,1);
+  const idatBytes=idat.size-idat.hdr;
+  const cases=[
+    {id:d.primary,offset:0x7fffffff},
+    {id:d.primary,offset:idatBytes-1},
+    {id:d.primary,length:idatBytes+1},
+    {id:d.hdrGrid,offset:idatBytes},
+    {id:d.deltaGrid,offset:idatBytes},
+  ];
+  for(const {id,offset,length} of cases){
+    const item=d.iloc.items.get(id),malformed=data.slice();
+    assert.equal(item.constructionMethod,1);
+    if(offset!==undefined)malformed.set(be(offset,d.iloc.offsetSize),item.extents[0].offsetPos);
+    if(length!==undefined)malformed.set(be(length,d.iloc.lengthSize),item.extents[0].lengthPos);
+    const preflight=preflightLegacyCompatibilityExport(malformed);
+    assert.equal(preflight.eligible,false);
+    assert.ok(preflight.blockers.some(b=>b.code==='idat-out-of-bounds'&&b.detail.id===id));
+    const result=await safeLegacyCompatibilityExport(malformed,profile);
+    assert.equal(result.data,malformed);
+    assert.equal(result.report.mode,'legacy-compatibility-preserved');
+  }
+  assert.equal(preflightLegacyCompatibilityExport(data).eligible,true,'valid boundary extents remain accepted');
+});
+
+test('unknown references touching primary, HDR or depth cannot enter native mutation or generic recovery',async()=>{
+  const {data:base,profile}=await profilePhoto();
+  const baseGraph=discoverHeic(base),baseFtyp=topBox(base,'ftyp');
+  const [depthMeta,depthIds]=addItems(base.slice(baseGraph.meta.off,baseGraph.meta.off+baseGraph.meta.size),[{
+    key:'depth',itemType:'hvc1',uri:DEPTH_URI,refType:'auxl',refTo:[baseGraph.primary],
+  }]);
+  const data=rebuildHeic(base,baseGraph,base.slice(baseFtyp.off,baseFtyp.off+baseFtyp.size),depthMeta,
+    new Map([[depthIds.get('depth'),new Uint8Array([4,3,2,1])]]));
+  const d=discoverHeic(data);
+  const depth=[...d.infos.keys()].find(id=>auxUriForItem(d.props,id)===DEPTH_URI);
+  assert.ok(depth!==undefined);
+  for(const target of [d.primary,d.primaryTiles[0],d.hdrGrid,depth]){
+    const ft=topBox(data,'ftyp');
+    const [meta,ids]=addItems(data.slice(d.meta.off,d.meta.off+d.meta.size),[{
+      key:'futureSidecar',itemType:'mime',contentType:'application/octet-stream',refType:'futr',refTo:[target],
+    }]);
+    const source=rebuildHeic(data,d,data.slice(ft.off,ft.off+ft.size),meta,
+      new Map([[ids.get('futureSidecar'),new Uint8Array([1,2,3])]]));
+    const classification=classifyPhotoContract(source);
+    assert.equal(classification.status,'unknown-apple-contract');
+    assert.equal(classification.safeOperations.normalNativePipeline,false);
+    const preflight=preflightLegacyCompatibilityExport(source,{classification});
+    assert.equal(preflight.eligible,false);
+    assert.ok(preflight.blockers.some(b=>b.code==='unknown-reference-on-protected-resource'));
+    const result=await safeLegacyCompatibilityExport(source,profile);
+    assert.equal(result.data,source);
+    assert.equal(result.report.mode,'legacy-compatibility-preserved');
+  }
+  // A changed thumbnail relation must be detected even though discovery no
+  // longer recognizes the item as a thumbnail once thmb becomes unfamiliar.
+  const iref=findChild(metaChildren(data,d.meta),'iref');
+  const thumb=[...boxes(data,iref.off+iref.hdr+4,iref.off+iref.size)].find(b=>b.type==='thmb');
+  const future=data.slice();
+  future.set(new TextEncoder().encode('futr'),thumb.off+4);
+  assert.equal(classifyPhotoContract(future).status,'unknown-apple-contract');
+  assert.equal(preflightLegacyCompatibilityExport(future).eligible,false);
+});
+
+test('unrelated generic metadata references do not block the native route',async()=>{
+  const {data}=await profilePhoto();
+  const d=discoverHeic(data),ft=topBox(data,'ftyp');
+  let [meta,ids]=addItems(data.slice(d.meta.off,d.meta.off+d.meta.size),[
+    {key:'generic',itemType:'mime',contentType:'application/octet-stream'},
+  ]);
+  const target=ids.get('generic');
+  [meta,ids]=addItems(meta,[{
+    key:'genericSidecar',itemType:'mime',contentType:'application/octet-stream',refType:'futr',refTo:[target],
+  }]);
+  const source=rebuildHeic(data,d,data.slice(ft.off,ft.off+ft.size),meta,new Map([
+    [target,new Uint8Array([1])],[ids.get('genericSidecar'),new Uint8Array([2])],
+  ]));
+  assert.equal(classifyPhotoContract(source).status,'known-compatible');
 });
 
 test('contract fingerprint v2 and canonical signature are deterministic without changing native routing',async()=>{
@@ -904,17 +1002,99 @@ test('HEIC worker preserves bytes when a future HEIC container is recognizable b
 
 test('web processing keeps unknown Apple contracts outside mature native interpreters until firewall decision',()=>{
   const source=fs.readFileSync(new URL('../../web/src/app/processing/file-processor.js',import.meta.url),'utf8');
-  const classifyAt=source.indexOf('compatibility=classifyPhotoContract(bytes)');
+  const classifyAt=source.indexOf('const {compatibility,compatibilityPreflight}=input');
   const nativeStyleAt=source.indexOf('preserveNativeStyles(bytes,d)');
   assert.ok(classifyAt>=0&&nativeStyleAt>classifyAt);
-  assert.match(source,/catch\(error\)\{preserveUnsupportedApple\(error\);return;\}/);
+  assert.match(source,/if\(!compatibility\|\|input\.compatibilityError\)\{preserveUnsupportedApple/);
   assert.match(source,/const textureOnly=unknownAppleContract\?false:preserveNativeStyles\(bytes,d\)/);
   assert.match(source,/const nativeTexture=unknownAppleContract\?false:nativeTextureCapture\(bytes,d\)/);
   assert.match(source,/if\(!unknownAppleContract\)\{\s*const \{nativePortraitBaseState\}=await import/);
-  assert.equal((source.match(/preflightLegacyCompatibilityInWorker\(bytes/g)||[]).length,1);
+  assert.doesNotMatch(source,/classifyPhotoContract|preflightLegacyCompatibilityInWorker/);
   assert.match(source,/if \(!preserveIncomplete&&!compatibilityRecovered\)\{/);
   assert.doesNotMatch(source,/if\(compatibilityRecovered\)await tryAiPortrait/);
   assert.match(source,/if\(!unknownAppleContract\)await tryAiPortrait\(bytes,shareFile/);
+});
+
+test('read worker returns classification and preflight alongside the parsed HEIC',async()=>{
+  for(const schema of [14,999]){
+    const {data}=await profilePhoto({schema});
+    const file=new File([data],'source.HEIC',{type:'image/heic'});
+    const result=await executeJob({operation:'read',file});
+    assert.equal(result.compatibilityError,null);
+    assert.deepEqual(result.compatibility,classifyPhotoContract(data));
+    assert.equal(result.discovery.primary,discoverHeic(data).primary);
+    if(schema===999){
+      assert.equal(result.compatibilityPreflight.eligible,true);
+      assert.equal(result.compatibilityPreflight.sourceSignature,result.compatibility.sourceSignature);
+    }else assert.equal(result.compatibilityPreflight,null);
+  }
+  const raster=await executeJob({operation:'read',file:new File([new Uint8Array([0xff,0xd8,0xff])],'a.jpg')});
+  assert.equal(raster.compatibility,null);
+  assert.equal(raster.compatibilityPreflight,null);
+});
+
+test('processing publishes one downloadable file and completes every compatibility outcome',async context=>{
+  const {data,profile}=await profilePhoto({schema:999});
+  const {data:otherCamera}=await profilePhoto({schema:999,model:'iPhone 18 Pro'});
+  const blocked=addUnknownNonEssentialPrimaryProperty(data);
+  const unparseable=box('ftyp',concat([new TextEncoder().encode('heic'),new Uint8Array(4),new TextEncoder().encode('mif1')]));
+  const scenarios=[
+    {name:'successful recovery',source:data,suffix:'_LegacyCompatible.HEIC',operations:['read','legacy-compatibility'],features:true},
+    {name:'preserve-only camera',source:otherCamera,suffix:'_Preserved.HEIC',operations:['read'],preserved:true},
+    {name:'preflight blocked',source:blocked,suffix:'_Preserved.HEIC',operations:['read'],preserved:true},
+    {name:'profile failure',source:data,suffix:'_Preserved.HEIC',operations:['read'],preserved:true,profileFailure:true},
+    {name:'builder failure',source:data,suffix:'_Preserved.HEIC',operations:['read','legacy-compatibility'],preserved:true,builderFailure:true},
+    {name:'unparseable source',source:unparseable,suffix:'_Preserved.HEIC',operations:['read'],preserved:true},
+    {name:'classification failure',source:data,suffix:'_Preserved.HEIC',operations:['read'],preserved:true,classificationFailure:true},
+  ];
+  for(const scenario of scenarios)await context.test(scenario.name,async t=>{
+    const originalWorker=globalThis.Worker,operations=[],outputs=[],progress=[],busy=[],states=[];
+    let profileLoads=0;
+    t.mock.method(console,'warn',()=>{});
+    globalThis.Worker=class {
+      postMessage(job){
+        operations.push(job.operation);
+        queueMicrotask(async()=>{
+          try{
+            if(scenario.builderFailure&&job.operation==='legacy-compatibility')throw Error('builder failed');
+            const result=await executeJob(structuredClone(job),()=>assert.fail('unexpected decode'));
+            if(scenario.classificationFailure&&job.operation==='read'){
+              result.compatibility=null;result.compatibilityError='classification failed';
+            }
+            this.onmessage({data:{id:job.id,result:structuredClone(result)}});
+          }catch(error){this.onmessage({data:{id:job.id,error:error.message}});}
+        });
+      }
+      terminate(){}
+    };
+    const ui={
+      set:(...args)=>states.push(args),note(){},compatibilityReport(){},portraitAdvice(){},
+      metadata:async()=>{},output:file=>outputs.push(file),progress:value=>progress.push(value),aiBusy:value=>busy.push(value),
+    };
+    try{
+      const processor=createFileProcessor({
+        row:()=>ui,T:key=>key,getLanguage:()=> 'en',aiText:()=>({}),aiFeatures:{enabled:()=>scenario.features===true},
+        gpuAcceleration:{checked:false},selectedAiLevel:()=> 'standard',
+        liveMovies:new Map(),livePhotos:[],attachMovie(){},handleMovie:()=>assert.fail('unexpected movie'),
+        ensureProfileIndex:async()=>({'48-12':{primary_tiles:48,hdr_tiles:12}}),
+        getProfile:async()=>{profileLoads++;if(scenario.profileFailure)throw Error('profile unavailable');return profile;},
+        tryAiPortrait:()=>assert.fail('unknown contract must skip Portrait'),
+        analysis:{ensureDecode:async()=>false,addMissingSoftSkin:()=>assert.fail('unknown contract must skip Soft Skin'),adaptiveStyleCompletionNotice(){}},
+      });
+      await processor.handleFile(new File([scenario.source],'source.HEIC',{type:'image/heic',lastModified:1234}));
+      assert.equal(outputs.length,1,'result must be downloadable exactly once');
+      assert.equal(outputs[0].name,'source'+scenario.suffix);
+      assert.equal(progress.at(-1),100);
+      assert.equal(busy.at(-1),false);
+      assert.equal(states.some(([,kind])=>kind==='err'),false);
+      assert.deepEqual(operations,scenario.operations,'classification/preflight must share the read job');
+      if(scenario.preserved)assert.deepEqual(new Uint8Array(await outputs[0].arrayBuffer()),scenario.source);
+      else assert.equal(classifyPhotoContract(new Uint8Array(await outputs[0].arrayBuffer())).status,'known-compatible');
+      if(scenario.operations.length===1&&!scenario.profileFailure)assert.equal(profileLoads,0,'blocked input must not load profiles');
+    }finally{
+      if(originalWorker===undefined)delete globalThis.Worker;else globalThis.Worker=originalWorker;
+    }
+  });
 });
 
 test('HEIC worker exposes compatibility preflight without mutating bytes',async()=>{

@@ -13,7 +13,7 @@ test('Suggested Styles stays lazy when the independent feature is disabled',()=>
 });
 
 test('native preservation classification happens before any HEIC recommendation',()=>{
-  const contract=app.indexOf('compatibility=classifyPhotoContract(bytes)');
+  const contract=app.indexOf('const {compatibility,compatibilityPreflight}=input');
   const classify=app.indexOf('const textureOnly=unknownAppleContract?false:preserveNativeStyles(bytes,d);',contract);
   const nativeBranch=app.indexOf('if (nativeTexture && !hasTexture(d.infos))',classify);
   const patchBranch=app.indexOf('const needsExperimental = d.hdrGrid === null',nativeBranch);

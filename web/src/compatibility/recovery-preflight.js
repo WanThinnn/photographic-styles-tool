@@ -1,11 +1,12 @@
-import {discoverHeic,idatItemBytes,auxUriForItem} from '../core/heif.js';
+import {discoverHeic,auxUriForItem} from '../core/heif.js';
+import {metaChildren,findChild} from '../core/box.js';
 import {classifyPhotoContract} from './contract-classifier.js';
 import {
   protectedSemanticItemIds,editingClosureItemIds,editingGraphCycles,
   referenceBoundary,isKnownSafeEditingBoundaryReference,semanticRolesForItem,
 } from './graph-policy.js';
 import {COMPATIBILITY_LIMITS,COMPATIBILITY_ENGINE_VERSION,RECOVERY_PREFLIGHT_VERSION} from './versions.js';
-import {LEGACY_BASELINE_CONTRACT_ID} from './contract-registry.js';
+import {LEGACY_BASELINE_CONTRACT_ID,KNOWN_RENDERING_REFERENCE_TYPES} from './contract-registry.js';
 
 const DISCARDABLE_PREFIXES=[
   'styles-schema:','styles-unreadable','styles-key:','texture-people-version:','texture-unreadable',
@@ -57,6 +58,7 @@ export function sanitizeCompatibilityPreflight(preflight){
 
 export function preflightLegacyCompatibilityExport(source,{
   classification=null,
+  discovery=null,
   limits=COMPATIBILITY_LIMITS,
   targetId=LEGACY_BASELINE_CONTRACT_ID,
 }={}){
@@ -109,7 +111,7 @@ export function preflightLegacyCompatibilityExport(source,{
   }
 
   let d;
-  try{d=discoverHeic(source);}
+  try{d=discovery||discoverHeic(source);}
   catch(error){
     result.blockers.push(preflightFailure('parser-failed',String(error?.message||error)));
     return result;
@@ -148,6 +150,13 @@ export function preflightLegacyCompatibilityExport(source,{
       result.blockers.push(limitFailure('property-associations-per-item',associations,limits.maxPropertyAssociationsPerItem));
   }
 
+  // Validate idat-relative extents against the containing box, without copying
+  // payloads or reparsing iloc for every item. Typed-array slices clamp invalid
+  // ranges, so successful extraction alone cannot establish bounds.
+  let idat=null;
+  if([...d.iloc.items.values()].some(item=>item.constructionMethod===1)){
+    try{idat=findChild(metaChildren(source,d.meta),'idat');}catch{}
+  }
   for(const [id,item] of d.iloc.items){
     if(item.extents.length>limits.maxExtentsPerItem)
       result.blockers.push(limitFailure('extents-per-item:'+id,item.extents.length,limits.maxExtentsPerItem));
@@ -162,10 +171,16 @@ export function preflightLegacyCompatibilityExport(source,{
           result.blockers.push(preflightFailure('extent-out-of-bounds',{id,start,end,bytes:source.length}));
       }
     }else if(item.constructionMethod===1){
-      try{
-        const bytes=idatItemBytes(source,id,d.meta);
-        if(!bytes)result.blockers.push(preflightFailure('unsupported-idat-layout',id));
-      }catch(error){result.blockers.push(preflightFailure('idat-out-of-bounds',{id,message:String(error?.message||error)}));}
+      if(!idat||item.extents.length!==1){
+        result.blockers.push(preflightFailure('unsupported-idat-layout',id));
+        continue;
+      }
+      const bytes=idat.size-idat.hdr;
+      for(const extent of item.extents){
+        const start=item.baseOffset+extent.offset,end=start+extent.length;
+        if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end<start||end>bytes)
+          result.blockers.push(preflightFailure('idat-out-of-bounds',{id,start,end,bytes}));
+      }
     }else result.blockers.push(preflightFailure('unsupported-construction-method',{id,method:item.constructionMethod}));
   }
 
@@ -176,6 +191,12 @@ export function preflightLegacyCompatibilityExport(source,{
     if(!d.infos.has(ref.from))result.blockers.push(preflightFailure('dangling-reference-source',{type:ref.type,id:ref.from}));
     for(const id of ref.to)if(!d.infos.has(id))
       result.blockers.push(preflightFailure('dangling-reference-target',{type:ref.type,id}));
+    if(!KNOWN_RENDERING_REFERENCE_TYPES.has(ref.type)
+      &&(protectedIds.has(ref.from)||ref.to.some(id=>protectedIds.has(id))))
+      result.blockers.push(preflightFailure('unknown-reference-on-protected-resource',{
+        type:ref.type,fromRoles:semanticRolesForItem(d,ref.from),
+        toRoles:ref.to.map(id=>semanticRolesForItem(d,id)),
+      }));
     const boundary=referenceBoundary(d,ref,editingIds,protectedIds);
     if(boundary.crosses&&!isKnownSafeEditingBoundaryReference(d,ref,editingIds,protectedIds)){
       result.blockers.push(preflightFailure('cross-boundary-dependency',{

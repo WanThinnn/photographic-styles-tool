@@ -823,3 +823,23 @@ Developer tooling now supports:
 - disabled exact-signature adapter scaffolding for a newly captured future fixture.
 
 The web processing route also runs the graph preflight before expensive compatibility work. Current known native photos never execute that preflight because the classifier leaves them on their established native route.
+
+### Review fixes and read-worker optimization (2026-10-15)
+
+Discovery, fingerprint/classification and eligible-source preflight now share one
+parsed graph in the read worker. The page receives the decision with the original
+bytes; it neither computes a contract signature on the UI thread nor sends another
+full source copy for preflight. Export independently revalidates the source and
+shares that source discovery between fingerprinting and preflight.
+
+Preflight validates construction-method-1 offsets and lengths against the `idat`
+box payload directly, without extracting/copying each item or reparsing `iloc`.
+Unknown reference types touching protected photographic roles are detected even
+without a `tag:apple.com` endpoint and cannot enter generic recovery. Unrelated
+generic metadata references remain outside this rendering gate. Documented Styles
+flags `k`/`l` remain on the native route.
+
+Compatibility and preserve-only paths publish their final File directly, complete
+progress and release the busy state when optional Portrait is bypassed. Behavioral
+tests cover recovery, camera/graph preservation, profile/builder failures,
+unparseable input and classification failure.

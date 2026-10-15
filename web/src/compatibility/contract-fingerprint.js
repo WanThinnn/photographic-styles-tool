@@ -13,7 +13,7 @@ import {
   KNOWN_RENDERING_REFERENCE_TYPES,KNOWN_RENDERING_PROPERTY_TYPES,
   KNOWN_STYLES_KEYS,KNOWN_TEXTURE_KEYS,KNOWN_STYLE_SELECTION_KEYS,
 } from './contract-registry.js';
-import {semanticRolesForItem} from './graph-policy.js';
+import {protectedSemanticItemIds,semanticRolesForItem} from './graph-policy.js';
 import {CONTRACT_FINGERPRINT_VERSION,COMPATIBILITY_LIMITS} from './versions.js';
 
 function readBrands(data){
@@ -227,9 +227,10 @@ export function fingerprintPhotoContract(data,discovery=discoverHeic(data)){
   const unknownUrnUris=[...new Set(allApple.filter(e=>isApplePhotoUrn(e.uri)&&!isKnownApplePhotoUrn(e.uri)).map(e=>e.uri))].sort();
   const knownTagUris=[...new Set(allApple.filter(e=>isAppleTagUri(e.uri)&&isKnownAppleTagUri(e.uri)).map(e=>e.uri))].sort();
   const tagIds=new Set([...itemUris,...auxUris].filter(e=>isAppleTagUri(e.uri)).map(e=>e.id));
+  const renderingIds=new Set([...tagIds,...protectedSemanticItemIds(d)]);
   const unknownReferenceTypes=[...new Set(d.refs
     .filter(ref=>!KNOWN_RENDERING_REFERENCE_TYPES.has(ref.type)
-      &&(tagIds.has(ref.from)||ref.to.some(id=>tagIds.has(id))))
+      &&(renderingIds.has(ref.from)||ref.to.some(id=>renderingIds.has(id))))
     .map(ref=>ref.type))].sort();
   const unknownProperties=[],propertyTopology=[];
   let propertyAssociationCount=0;

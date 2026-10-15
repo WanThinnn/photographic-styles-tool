@@ -880,3 +880,13 @@ Implemented work:
 - real iPhone 16 HDR, native depth and Live Photo fixtures exercise preservation invariants.
 
 The first true source-specific adapter remains deliberately unimplemented. The registry stays empty until a genuine changed future contract is available for A/B research and physical Photos validation. This is not incomplete generic recovery; it is the release gate that prevents speculative conversion logic from becoming part of the normal pipeline.
+
+### Review follow-up (2026-10-15)
+
+Completed the review corrections: publish compatibility/preserved Files when
+Portrait is bypassed; validate `idat` bounds against its containing box; detect and
+block unknown references on protected photographic resources; recognize documented
+Styles `l`. Discovery, classification and candidate preflight share the read
+worker's graph, avoiding main-thread contract parsing and a separate photo copy
+for preflight. The exporter independently revalidates its source. Updated structural
+and behavioral evidence is recorded in `facts.md` §10.77 and the validation spec.

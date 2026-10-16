@@ -1,5 +1,10 @@
 # PWA startup, queue and processing settings — 2026-10-15
 
+Follow-up: the user confirmed v206/v207 places the dock correctly on iPhone.
+Its geometry remains in v208; see
+[iOS sheets and dark glass](2026-10-16-ios-sheets-materials.md) for current
+sheet and control behavior.
+
 This update supersedes the v196 viewport-settling approach in the earlier UI
 handoff. Cache version: **v207**. Both the v204 `100dvh` attempt and the v205
 fixed-host-only change failed physical iPhone feedback. The current revision

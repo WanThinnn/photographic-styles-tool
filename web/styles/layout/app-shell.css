@@ -224,8 +224,9 @@ body.is-settings-destination .top-github-symbol {
   width: calc((100% - 8px) / 4);
   border-radius: var(--capsule-radius);
   background: var(--selection-fill);
-  transform: translate3d(var(--lens-offset,var(--tab-rest-offset,calc(var(--tab-index,0) * 100%))),0,0);
-  transition: transform 360ms var(--spring-ease);
+  /* Position before the animated scale so nonzero tab offsets do not grow. */
+  translate: var(--lens-offset,var(--tab-rest-offset,calc(var(--tab-index,0) * 100%))) 0;
+  transition: translate 360ms var(--spring-ease);
   pointer-events: none
 }
 .app-tabs svg {
@@ -799,6 +800,14 @@ body.is-install-guide-open { overflow: hidden }
 .guide-more [data-i18n="guide.showless"] { display: none }
 .guide-card[open] .guide-more [data-i18n="guide.seemore"] { display: none }
 .guide-card[open] .guide-more [data-i18n="guide.showless"] { display: inline }
+
+/* Disclosure communicates expansion without a web-style "See more" link. */
+@media(max-width:767px) {
+  .guide-more { width: 12px; color: var(--muted) }
+  .guide-more>span { display: none!important }
+  .guide-more::after { content: ""; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform var(--duration-fast) }
+  .guide-card[open] .guide-more::after { transform: rotate(225deg) }
+}
 
 .guide-card-body {
   padding: 0 16px 16px;

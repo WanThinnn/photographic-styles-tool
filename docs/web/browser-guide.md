@@ -1,5 +1,8 @@
 # Stylio — browser build
 
+Current sheet/control/material behavior:
+[iOS sheets and dark glass](../ui-ux/2026-10-16-ios-sheets-materials.md).
+
 Current startup, toolbar, queue and working Settings behavior is documented in
 [PWA startup, queue and processing settings](../ui-ux/2026-10-15-pwa-startup-queue-settings.md).
 Processing is sequential by default; the opt-in second lane owns an isolated

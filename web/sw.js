@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "photographic-style-port-";
-const CACHE_NAME = `${CACHE_PREFIX}v207`;
+const CACHE_NAME = `${CACHE_PREFIX}v221`;
 // Filled by the static release builder. Also refresh older, unversioned clients.
 const RELEASE_ID = "development";
 // Immutable dependency identity, independent of UI/service-worker releases.
@@ -19,6 +19,8 @@ const APP_SHELL = [
   "./styles/components/portrait-editor.css",
   "./src/ui/shell/app-shell.js",
   "./src/ui/shell/dock-viewport.js",
+  "./src/ui/shell/sheet-gestures.js",
+  "./src/ui/shell/sheet-frame.js",
   "./src/ui/processing-preferences.js",
   "./src/ui/screen-awake.js",
   "./src/app/processing/task-queue.js",
@@ -201,7 +203,7 @@ const APP_SHELL = [
 // Only the initial screen gates activation. Preloading the whole converter
 // here left first visits waiting for every rarely-used processing module.
 const BOOT_SHELL=['./','./index.html','./styles.css',"./styles/foundations/tokens.css","./styles/foundations/base.css","./styles/layout/app-shell.css","./styles/layout/workspace.css","./styles/components/controls.css","./styles/components/sheets.css","./styles/components/results.css","./styles/components/portrait-editor.css","./src/ui/shell/app-shell.js",'./src/ui/page-bootstrap.js','./src/ui/i18n.js','./src/ui/ai-strings.js','./icons/photographic-styles.svg','./styles/components/materials.css','./THIRD_PARTY_NOTICES.txt','./src/ui/shell/dock-viewport.js','./src/ui/shell/tab-glass.js','./styles/components/navigation-effects.css'];
-BOOT_SHELL.push('./src/ui/processing-preferences.js');
+BOOT_SHELL.push('./src/ui/processing-preferences.js','./src/ui/shell/sheet-gestures.js','./src/ui/shell/sheet-frame.js');
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)

@@ -3882,3 +3882,137 @@ passed at 1× and 3× device scale; neither is physical iOS qualification.
 Follow-up v207 restores the user's preferred inset grey photo-picker surface,
 12pt outer padding and former 190pt minimum picker height. Its fill follows the
 theme background. The v206 dock/lens/header changes remain in place.
+
+## 10.81 — Device-accepted dock, mobile sheets and dark glass (2026-10-16)
+
+The user confirmed the toolbar now works on their iPhone after v206/v207.
+v208 keeps that host/scrollability/offset geometry intact.
+
+AI Settings had a reproducible missing-rim defect: mobile CSS explicitly removed
+the bottom border and lower corner radius; the whole dialog scrolled. The new
+floating frame retains all corners and its rim, sizes to content within the
+available safe viewport, and scrolls only the body. Header/handle downward drag
+can dismiss; control presses, cancellation, short/horizontal/upward drags and
+teardown are guarded. Feature state and processing contracts are unchanged.
+
+Per the user's correction, switches retain the old 63×44px control. The Model
+control CSS is identical to committed v207, including blue capsule, stops, knob
+and inline presentation. Its value mapping/model processing is unchanged.
+
+Dark navigation material follows the local Ionic reference: vertical rim rather
+than bright side/outer glow, transparent moving lens, 72% black resting fill and
+final-200ms release handoff. Light and accessibility modes keep separate rules.
+Mobile Guide uses chevrons; History menu actions have 44px targets. Other audited
+native-style surfaces remain intact.
+
+Validation: **375 web tests pass, 15 optional skips, zero failures; 50 browser
+checks pass**, including 24 sheet size/language/appearance combinations, Model
+levels, swipe dismissal, dark rest/hold/release, forced colors, reduced motion,
+History, Photo, Guide and confirmation. Physical sheet/optical acceptance remains
+outstanding. Details: `docs/ui-ux/2026-10-16-ios-sheets-materials.md`.
+
+## 10.82 — AirPods-style AI corners and stable launch/held lens (2026-10-16)
+
+v209 follows the user's native AirPods-card screenshot with broader mobile AI
+Settings corners and progressive continuous curvature. A circular fallback is
+provided; switch and Model control styling and resting dock geometry are retained.
+
+The loading ring shrank from 30px to 24px when the universal box-sizing reset
+arrived. Critical CSS now explicitly keeps a 30px border-box ring; themed app
+artwork remains 76px throughout. The held toolbar lens scaled its positional
+translation, explaining why Process was centered while the three later tabs
+drifted. Individual `translate` now positions the lens before animated scale.
+
+Validation: 375 passing web tests, 15 optional skips, zero failures; 54 browser
+checks pass, including stylesheet-arrival dimensions and actual transformed lens
+centers on all four tabs. Existing sheet, control, accessibility and dock checks
+remain. Physical iOS optical acceptance is still separate from browser checks.
+
+## 10.83 — More restrained AI Settings corners (2026-10-16)
+
+Device feedback rejects v209's overly broad AirPods-style corners. v210 removes
+those overrides and uses a modest 36–44px circular radius for phone widths up to
+600px. iPad/desktop retain the existing shared 32px radius. The privacy footer
+is removed from AI Settings, including its unused styles. Switches, Model,
+internal scrolling, launch dimensions and toolbar fixes remain intact.
+
+Validation: 27 targeted checks, 54 browser scenarios at 3× scale and PWA assets
+pass, including light/dark sheet layouts across phone, landscape and iPad widths.
+
+## 10.84 — Lower phone AI Settings with internal safe-area clearance (2026-10-16)
+
+v211 sets phone AI Settings' bottom frame gap to 8px, matching its side gaps.
+This lowers it by 14px where the iPhone bottom safe area is 34px. Safe-area
+clearance is kept inside the scrolling body instead of lifting the frame.
+Phone lower corners use 40–48px while top corners retain 36–44px; iPad/desktop
+keep their existing geometry. The browser smoke now emulates the 34px safe area
+and checks frame gaps and internal clearance explicitly.
+
+Validation: 55 browser scenarios at 3× scale, 27 targeted checks and PWA assets
+pass; the emulated safe-area check measures 8px side/bottom gaps and 26px internal
+bottom padding.
+
+## 10.85 — Continuous Camera-reference AI Settings frame (2026-10-16)
+
+v212 replaces phone AI Settings' circular corners with a continuous contour
+sampled from the user's Camera screenshot. Its side/bottom gaps measure about
+8pt; the corner fit uses ~92pt extent and exponent 3.77. SVG supplies the same
+outline and clipping geometry without depending on CSS corner-shape support.
+Layout-size changes update the path; drag/open transforms do not change it.
+Tablet/desktop return to their original 32px circular frame. Existing controls,
+internal safe-area clearance, processing and toolbar behavior remain.
+
+Validation: 378 passing web checks, 15 optional skips, zero failures; 55 browser
+scenarios pass at 3×. Curve samples, resize cleanup, clip/outline readiness and
+tablet fallback are checked. Physical Safari optical acceptance remains separate.
+
+## 10.86 — Accepted phone curve and centered privacy footer (2026-10-16)
+
+The user confirms v212's phone curvature is correct. v213 retains the frame and
+restores the localized privacy note at the bottom of AI Settings, centered.
+The last control group remains rounded; Model, switches and internal safe-area
+clearance are unchanged.
+
+Validation: all 55 browser scenarios at 3×, PWA assets and i18n checks pass.
+
+## 10.87 — Footer uses existing space without enlarging the sheet (2026-10-16)
+
+v214 corrects v213's extra footer height: the centered note shares the body's
+existing bottom padding. Its 4px top gap and 18px line are offset by -22px bottom
+margin, leaving the frame the same height as without a one-line note. Wrapped
+translations retain natural extra line height. The accepted phone curve and
+frame position are unchanged. The browser smoke compares visible/hidden footer
+heights and checks placement below Model inside the frame.
+
+Validation: all 56 browser scenarios at 3×, 24 stylesheet checks and PWA assets
+pass. Visible and hidden footer produce the same frame height.
+
+## 10.88 — AI Settings without the left close button (2026-10-16)
+
+v215 removes the AI Settings X, centers the title in one column, lowers the title
+6px and the grabber 4px without adding layout height. Swipe-down, Escape and
+outside dismissal remain. Photo close, the accepted frame and the user's current
+footer typography are retained. Optional close-button wiring handles its absence.
+
+Validation: 55 targeted checks, 56 browser scenarios at 3× and PWA assets pass.
+
+## 10.89 — Restore earlier corner styling after device feedback (2026-10-16)
+
+v220 removes the experimental concentric/shared group curves at the user's
+request. AI groups, including the Model group's bottom, return to 20px circular
+corners; Settings returns to 22px. Other menus/Appearance/picker restore their
+earlier shapes. Per-group observers and inner custom clipping are removed.
+The accepted outer phone frame remains. Keep the X and footer removed, the
+lowered header, compact inner spacing and original Model/switch controls.
+
+Validation: 55 targeted checks, 56 browser scenarios at 3× and PWA assets pass.
+
+## 10.90 — Compact centered AI footer (2026-10-16)
+
+v221 restores the localized privacy sentence at the user's request, centered
+at 12px with a 16px line height. The phone footer uses 6px above and 8px below
+the text, lifting the Model group about 14px. Preserve the accepted sheet
+frame, original inner corners, switches and Model control.
+
+Validation: 55 targeted checks, 56 browser scenarios at 3×, PWA assets and
+translation consistency checks pass.

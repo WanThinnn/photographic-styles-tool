@@ -3,6 +3,8 @@
 import {pickLanguage,t} from '../i18n.js';
 import {bindDockViewport} from './dock-viewport.js';
 import {bindTabGlass} from './tab-glass.js';
+import {bindSheetDismissGesture} from './sheet-gestures.js';
+import {bindContinuousSheetFrame} from './sheet-frame.js';
 
 let instance;
 export function getAppShell(){return instance??=createAppShell();}
@@ -155,20 +157,22 @@ export function createAppShell({doc=document,win=window,translate=key=>t(pickLan
   win.addEventListener?.('resize',syncTabLens);
   for(const [trigger,id]of [['open-ai-settings','ai-settings']]){
     const sheet=$(id);
+    const frame=bindContinuousSheetFrame({sheet,win});
     let closingTimer;
     const later=win.setTimeout?.bind(win)||setTimeout,clearLater=win.clearTimeout?.bind(win)||clearTimeout;
     const closeSheet=()=>{
       if(!sheet.open||sheet.classList.contains('is-closing'))return;
       if(win.matchMedia?.('(prefers-reduced-motion: reduce)').matches){sheet.close();return;}
       sheet.classList.add('is-closing');
-      closingTimer=later(()=>{closingTimer=null;sheet.classList.remove('is-closing');sheet.close();},175);
+      closingTimer=later(()=>{closingTimer=null;sheet.classList.remove('is-closing');sheet.close();},win.matchMedia?.('(max-width:767px)').matches?225:175);
     };
     $(trigger).addEventListener('click',()=>{
       for(const other of doc.querySelectorAll('dialog[open]'))if(other!==sheet)other.close();
       if(closingTimer!==undefined){clearLater(closingTimer);closingTimer=undefined;}
-      sheet.classList.remove('is-closing');sheet.showModal();sheet.focus({preventScroll:true});
+      sheet.classList.remove('is-closing');sheet.showModal();frame.refresh();sheet.focus({preventScroll:true});
     });
-    sheet.querySelector('[data-close-dialog]').addEventListener('click',closeSheet);
+    bindSheetDismissGesture({sheet,close:closeSheet,win});
+    sheet.querySelector('[data-close-dialog]')?.addEventListener('click',closeSheet);
     sheet.addEventListener('cancel',event=>{event.preventDefault();closeSheet();});
     sheet.addEventListener('click',event=>{
       if(event.target!==sheet)return;

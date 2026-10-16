@@ -24,7 +24,7 @@ html[data-theme="dark"] .app-launch{background:#000;color:#f2f2f7}
 .app-launch[hidden]{display:none}.launch-mark{width:76px;height:76px}.launch-icon-background{fill:#2f6df6}.launch-icon-glyph{color:#fff}
 html[data-theme="dark"] .launch-icon-background{fill:url(#launch-dark)}html[data-theme="dark"] .launch-icon-glyph{color:#f5f5f7}
 @media(prefers-color-scheme:dark){html:not([data-theme="light"]) .launch-icon-background{fill:url(#launch-dark)}html:not([data-theme="light"]) .launch-icon-glyph{color:#f5f5f7}}
-.launch-spinner{width:24px;height:24px;border:3px solid #8e8e9333;border-top-color:#007aff;border-radius:50%;animation:launch-spin .8s linear infinite}
+.launch-spinner{box-sizing:border-box;width:30px;height:30px;border:3px solid #8e8e9333;border-top-color:#007aff;border-radius:50%;animation:launch-spin .8s linear infinite}
 .launch-retry{padding:12px 20px;color:#007aff;background:transparent;border:0;font:inherit}.launch-retry[hidden]{display:none}
 @keyframes launch-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.launch-spinner{animation:none}}
 </style>
@@ -134,9 +134,12 @@ html[data-theme="dark"] .launch-icon-background{fill:url(#launch-dark)}html[data
     </button>
   </div>
   <dialog id="ai-settings" class="sheet" aria-labelledby="ai-sheet-title" tabindex="-1">
-    <header class="sheet-header"><button type="button" class="icon-button glass-surface" data-close-dialog aria-labelledby="close-ai-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-ai-label" class="sr-only" data-i18n="shell.closeai">Close AI settings</span></button><h2 id="ai-sheet-title" data-i18n="shell.aisettings">AI settings</h2></header>
+    <svg class="sheet-frame" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="ai-settings-frame-clip" clipPathUnits="userSpaceOnUse"><path/></clipPath></defs><path class="sheet-frame-outline"/></svg>
+    <span class="sheet-grabber" data-sheet-drag aria-hidden="true"></span>
+    <header class="sheet-header" data-sheet-drag><h2 id="ai-sheet-title" data-i18n="shell.aisettings">AI settings</h2></header>
     <div class="sheet-body ai-settings-panel">
     <h3 class="group-title" data-i18n="shell.effects">Effects</h3>
+    <div class="ai-options-group">
     <div class="portrait-option">
       <span class="ai-option-icon ai-option-icon-blue" aria-hidden="true"><svg class="ai-depth-focus-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H6a3 3 0 0 0-3 3v2M16 3h2a3 3 0 0 1 3 3v2M3 16v2a3 3 0 0 0 3 3h2M21 16v2a3 3 0 0 1-3 3h-2"/><path d="m8 9 4-2 4 2-4 2Z"/><path d="m8 12.4 4 2 4-2M8 15.4l4 2 4-2"/></svg></span>
       <div class="ai-option-copy"><label for="ai-portrait" id="ai-portrait-label">Depth Effect with AI</label>
@@ -159,7 +162,9 @@ html[data-theme="dark"] .launch-icon-background{fill:url(#launch-dark)}html[data
       </div>
       <input type="checkbox" id="ai-style-suggest" role="switch" disabled aria-describedby="ai-style-suggest-hint">
     </div>
+    </div>
     <h3 class="group-title" data-i18n="shell.processing">Processing options</h3>
+    <div class="ai-options-group">
     <div class="portrait-option gpu-option">
       <span class="ai-option-icon ai-option-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M19 9h3M2 15h3M19 15h3"/><path d="m10 15 4-6v5h2l-4 5v-4Z"/></svg></span>
       <div class="ai-option-copy">
@@ -184,6 +189,8 @@ html[data-theme="dark"] .launch-icon-background{fill:url(#launch-dark)}html[data
         </div>
       </fieldset>
     </div>
+    </div>
+    <p class="sheet-note" data-i18n="shell.private">Your photos stay on your device.</p>
     </div>
   </dialog>
   </section>

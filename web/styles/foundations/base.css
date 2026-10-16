@@ -50,6 +50,16 @@ button,a,input,select,summary {
   -webkit-tap-highlight-color: transparent
 }
 
+/* App chrome behaves as controls on touch, while filenames, help and editable
+   fields retain selection. Do not disable callouts on photos or export links. */
+@media(pointer:coarse) {
+  button,.app-tabs,.top h1 {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none
+  }
+}
+
 button {
   cursor: pointer
 }

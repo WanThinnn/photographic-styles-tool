@@ -3575,3 +3575,461 @@ Lightweight sequential checks: Texture 9 pass / 4 optional skips; Portrait expor
 or concurrent test runners were started. There is a separate working-tree change
 to the install-guide SVG in web/index.html; it is unrelated and left untouched by
 this processing task.
+
+## 10.75 — Legacy Compatibility Export foundation and iPhone 16/17 future-contract recovery (2026-10-15)
+
+The `feature/legacy-compatibility-export` branch now implements the defensive
+architecture proposed after §10.40. The normal pipeline remains authoritative:
+known iPhone 16/17 contracts continue through the existing native-preservation
+route; iPhone 18+ native Texture/Film detection remains unchanged; iPhone 15 and
+older, Android/raster imports and screenshots continue through the established
+non-native construction path. Compatibility recovery is entered only when an
+iPhone 16/17 file has concrete evidence of an unknown Apple editing contract.
+
+A canonical contract fingerprint now inventories HEIF container versions/layout,
+item/reference/property topology, primary/HDR codec roles, Styles schema, Texture
+contract, Apple auxiliary/tag URIs and relevant MakerNote evidence. The classifier
+detects unknown Styles/Texture payloads, new Apple tag namespaces, editing reference
+types, changed 0x54 selection contracts, an unexpected 0x65 native-Texture marker
+on 16/17, unknown essential properties and future container/codec layouts before
+the native mutators run. Container/core changes that are not proven safe are
+preserve-only; they are not forced through the legacy builder.
+
+For an unknown 16/17 contract whose photographic/container roles still satisfy the
+known recovery contract, the exporter strips only the Apple editing layer and
+reuses the mature non-native `patch()` path to rebuild the known editable
+Styles/StyleDelta/linear-thumbnail/2026 Texture graph around the source photo.
+Primary tiles, HDR resources, thumbnail, native depth, classic mattes and capture
+EXIF remain source-owned. A valid legacy 0x54 selection is retained; an unknown
+future 0x54 falls back to the validated profile marker rather than rejecting the
+photo. If a future 0x65 Texture marker appears on 16/17, it is removed only in the
+compatibility copy before the 2026 Texture graph is installed, avoiding two
+competing Texture contracts. No EXIF Software/iOS version string is rewritten.
+
+The compatibility mutation budget is stricter than the ordinary output check. Every
+source item not explicitly removed must still exist, non-EXIF source payloads and
+their property associations must remain byte-identical, surviving source references
+must remain exact, and all Apple MakerNote tags except the explicitly rebuilt 0x54
+and explicitly removed 0x65 case must remain type/payload identical. The output is
+rediscovered and must classify as the known target contract. Reprocessing that
+output is a no-op rather than adding duplicate editing resources.
+
+A future HEIC whose brand is recognizable but whose container cannot yet be parsed
+is no longer rejected as a processing failure: the read worker returns the original
+bytes with a discovery error and the UI publishes an exact `_Preserved.HEIC`
+copy. Likewise, any generic recovery failure falls back atomically to the untouched
+source and disables downstream Soft Skin/AI Portrait mutation for that result.
+This gives future releases a safe preservation state even when automatic recovery
+cannot run.
+
+Developer tooling now includes contract inspection/comparison and target-manifest
+generation. Sanitized mode removes filenames/item identifiers and payload hashes,
+retaining only contract-relevant structural evidence; target manifests require a
+neutral evidence ID, reject private/binary fields and explicitly record that physical
+Apple Photos qualification is still pending. The comparer reports semantic item,
+reference/property, MakerNote and payload-hash changes plus source primary/HDR/depth
+preservation in its non-sanitized research mode. The runtime target report also
+records the exact existing profile family selected by `profileFor()`, rather than
+pretending one donor graph covers every geometry.
+
+The target registry is explicit and currently marks the known baseline as
+`structural-only` with `physicalApplePhotos: false` and normal-user qualification
+disabled. The true source-adapter registry is intentionally empty: generic
+editing-layer recovery is a bounded fallback, not a claim that a future source
+contract has been semantically mapped. Adapter matching fails on ambiguity and the
+compatibility layer now uses stable diagnostic categories such as
+`unknown-source-contract`, `unsupported-container-layout`,
+`adapter-ambiguous`, `mutation-budget-violation` and
+`target-classification-failed`.
+
+The result UI now adds a compact **Apple compatibility** section only for compatibility
+or preserve-only results. It reports the source as a newer Apple format, whether a
+known compatibility target was rebuilt, photo/HDR/depth preservation and intentional
+loss of unrecognized editing metadata. Exact contract IDs stay in developer
+diagnostics; user-facing copy no longer describes an arbitrary future conversion as
+physically “verified”.
+
+Sequential regression after these changes records 287 passing tests, 15 optional
+fixture skips and zero failures across Legacy Compatibility, native Styles/Texture,
+Portrait/depth/HDR, raster/non-native import, Live Photo, date preservation,
+application/lifecycle/app-shell, Suggested Styles, startup/history and related
+suites. PWA asset consistency, static-release checks and VI/EN/ZH copy checks pass;
+all compatibility modules and the three developer tools pass `node --check`.
+Service-worker cache is v199 for the expanded compatibility module graph.
+
+This is strong structural coverage, not evidence that an arbitrary future Apple
+contract has already been physically validated. No genuine iOS 27.2/27.3/28
+changed-contract fixture exists in this work. The generic rebuild intentionally
+handles editing-layer changes while preserving the known photographic contract;
+a future change to depth/HDR auxiliary semantics, essential properties, codec or
+container layout remains preserve-only until an explicit adapter and physical
+Photos import/edit/save/reopen test exist. That boundary is deliberate: the goal
+is to keep future 16/17 photos usable without sacrificing the proven native and
+non-native pipelines through speculative rewrites.
+
+## 10.76 — Compatibility Firewall v2 hardening (2026-10-15)
+
+The compatibility subsystem was hardened again without changing the established
+routing contract. `known-compatible` photos still enter the pre-existing native
+pipeline, and `non-native` sources still enter the mature raster/non-native
+construction path. Only `unknown-apple-contract` is eligible to reach the new
+Compatibility Firewall.
+
+Contract fingerprinting is now version 2. Besides the prior Styles, Texture,
+MakerNote, Apple URI and container evidence, the fingerprint records item/reference/
+property counts, semantic property and reference topology, construction methods,
+editing-family multiplicity, and both essential and non-essential unknown property
+types. A canonical sanitized representation produces a deterministic 128-bit
+structural signature (`c2-...`). This signature is a lookup identity only; it is
+not treated as a cryptographic authenticity mechanism and never replaces fixture
+evidence or device validation.
+
+A graph policy now defines protected semantic photo resources independently of
+editing item IDs. The protected set includes primary/grid tiles, HDR, native depth,
+classic/Apple photographic mattes and auxiliaries, thumbnail and capture Exif.
+Editing graph closure is calculated separately. Unknown references crossing from
+editing metadata into a protected role fail closed unless the relation is one of the
+known target relationships. A future Apple `photo:aux:` tag is deliberately treated
+as photographic/preserve-only, not as disposable metadata merely because it uses
+the `tag:apple.com` namespace.
+
+`recovery-preflight.js` is the final mutation authority for future candidates. It
+runs before compatibility profile loading, image decode or thumbnail generation and
+checks source/file complexity limits, HEIF item/extents/construction methods, dangling
+references, property associations, unknown properties, duplicate editing families,
+editing graph cycles and cross-boundary dependencies. Unknown changes are classified
+as discardable editing changes, photographic semantic changes, container changes or
+ambiguous dependencies; generic rebuild is authorized only when all reasons belong
+to the discardable editing layer and the graph remains inside the proven photo
+contract.
+
+Compatibility state is independently versioned (`engine=2`, `fingerprint=2`,
+`plan=3`, `report=2`, `target-registry=2`). The target registry now carries
+explicit invariants, qualification state and a kill switch, so a historical target
+can be disabled after a future Photos regression without modifying native processing.
+The real source-adapter registry remains empty. Future adapters must declare exact
+contract signatures or an explicitly reviewed predicate, fixture/research evidence,
+capabilities, allowed mutations, information loss and physical Apple Photos
+qualification; normal-user availability is forbidden until physical qualification
+is true, and ambiguous adapter matches are rejected.
+
+The conversion plan is now v3 and lists exact source signature, planned removed
+editing IDs, allowed added target families, permitted MakerNote changes, property/
+reference mutation boundaries and information loss. Mutation-budget verification is
+two-way: it rejects both undeclared changes to surviving source resources and
+undeclared resources/references introduced by the rebuilt output. Target postflight
+also verifies the target schema/version families, URI/property/reference allowlists,
+duplicate resource limits and safe editing/photo boundaries. A final semantic role
+diff independently proves that protected photographic resources remain unchanged.
+
+The exporter has an atomic safe wrapper and worker operation. Any parser, preflight,
+sanitizer, builder, mutation-budget, semantic-preservation or target-verification
+failure returns the exact source bytes and a structured failure report; partially
+rebuilt bytes are never exposed as a result. The web processing route additionally
+executes preflight before expensive compatibility work. Existing current native
+photos never execute this path because classification leaves them on the native
+route.
+
+Developer research tooling now includes canonical signatures and optional preflight
+in the inspector, a standalone preflight command, semantic/cross-boundary reporting
+in the comparer, versioned target-manifest build/validation, strict adapter-manifest
+validation and a scaffold command that creates a **disabled** exact-signature adapter
+skeleton for a future fixture. Sanitized diagnostic modes remove filenames, payload
+hashes and item identifiers.
+
+Firewall-specific tests now record 56 passing tests and zero failures. They cover
+real current iPhone 16 routing, iPhone 18 Texture routing, unknown essential and
+non-essential properties, duplicate editing families, dangling refs, editing cycles,
+unsupported iloc/iref/ipma/codec variants, future Styles/Texture/MakerNote changes (including iPhone 16 `0x65` even when a known Texture graph is present),
+future metadata vs photographic auxiliaries, depth cross-boundary dependencies,
+resource limits, real iPhone 16 Pro 24 MP/HDR preservation, Live Photo identifier
+preservation, recursive protected `dimg` closure, non-MakerNote Exif preservation, plan v3, two-way mutation budgets, semantic preservation, atomic
+fallback and worker APIs.
+
+The broader Firewall v2 verification pass records **313 passing tests, 15 optional
+private-fixture skips and zero failures** across compatibility, native Styles/Texture,
+Portrait/depth/HDR, raster/non-native import, Live Photo, date preservation,
+application/lifecycle/app-shell, Suggested Styles, startup/history and module-path
+suites. PWA, static-release and VI/EN/ZH copy checks pass. Service-worker cache is
+v201 for the expanded compatibility module graph.
+
+The remaining boundary is intentional: no genuine future changed-contract iOS
+fixture exists yet, so no source-specific adapter can be truthfully implemented or
+physically qualified in advance. The system is prepared to preserve unknown future
+files, automatically recover only demonstrably editing-layer-only changes, and make a
+real adapter straightforward to add once future A/B fixtures exist.
+
+## 10.77 — Compatibility review corrections and worker reuse (2026-10-15)
+
+Four review findings were reproduced and corrected at file/application level:
+
+- Parseable unknown-contract recovery and preserve-only branches bypassed
+  `tryAiPortrait()`, which also published the File and completed progress. They now
+  publish once directly, reach 100% and clear the busy state without optional AI.
+- Construction-method-1 offsets were checked via the truthiness of an extracted
+  typed array. Out-of-range slices can be empty yet truthy. Preflight now checks
+  offset/end against the actual `idat` payload, including primary/HDR grid items
+  and disposable editing items; invalid sources return unchanged via safe export.
+- Unknown references were previously detected only beside Apple tag URI items.
+  Detection now includes protected photo/HDR/depth/thumbnail/Exif roles and their
+  `dimg` closure. Unknown types touching protected roles block recovery; unrelated
+  generic metadata references do not block the native route.
+- Styles key `l`, already documented with `k` in §4.1, was missing from the known
+  key set. Both flags now retain the existing native route and original metadata.
+
+The read worker now reuses discovery for fingerprint/classification and candidate
+preflight. This reduces source HEIC discovery from four calls to one during the
+read/classification/preflight sequence for a recovery candidate, removes synchronous
+contract parsing/signature work from the page, and avoids a separate source copy
+sent back to the worker for preflight. Bounds checks inspect the `idat` box once
+instead of reparsing `iloc` and copying each item. Export still independently
+validates its own input, sharing that discovery with its preflight.
+
+All web suites importing `node:test`, run sequentially, record **354 passing tests,
+15 optional private-fixture skips and zero failures**. New application regressions
+exercise successful recovery, preserve-only camera, preflight rejection, profile
+failure, builder failure, unparseable HEIC and classification failure; each must
+produce exactly one downloadable file, finish progress and preserve exact source
+bytes on fallback. Worker tests also verify the read decision and preflight.
+Service-worker cache is v203.
+
+This is structural/application evidence. No new physical Apple Photos test or
+Safari memory/timing benchmark was performed, and no future-contract adapter was
+qualified by these changes.
+
+## 10.78 — PWA startup, queue visibility and real processing preferences (2026-10-15)
+
+The v196 six-second viewport resampling was insufficient for the newly reported
+Home Screen cold-launch case: stale `innerHeight` and `clientHeight` can continue
+overriding correct CSS geometry for the whole session. The v204 attempt used CSS
+`100dvh` and safe areas at rest; the user subsequently confirmed it still failed
+on their iPhone. It is superseded by 10.79 below.
+
+The release cache now serves app HTML/modules/styles without waiting for network
+revalidation on every launch. An inline loading screen paints while CSS/modules
+load, profiles/history no longer block readiness, heavy encoders remain lazy, and
+initial offline warming waits for worker activation when there is no controller.
+
+History now registers all imported files before processing. The default single-job
+queue can opt into two jobs using an isolated second runtime, with visible waiting
+states and all active jobs shown in Activity. Save-action preference, visible-work
+Wake Lock and the iOS original-format reminder replace the prior Settings mocks.
+
+Desktop browser validation completed three HEIC exports across both lanes, showed
+2 active + 1 waiting file, retained a dock bottom of 834 on a 390×844 viewport with
+both JS heights fixed at 756, and successfully booted fully offline after caching
+188 resources. Save preference and reminder interactions were exercised; Wake Lock
+lifecycle and refusal/late-completion cases have deterministic tests. No phone
+thermal, Safari lifecycle or physical Photos qualification is claimed. Full details
+and device checks: `docs/ui-ux/2026-10-15-pwa-startup-queue-settings.md`.
+
+Final automated web regression for this update: **370 passing tests, 15 optional
+private-fixture skips and zero failures**, plus PWA asset/i18n/static-release checks.
+
+## 10.79 — Theme-correct launch artwork and mobile chrome revision (2026-10-15)
+
+User feedback confirms the v204 dock geometry still required a force-quit on the
+physical iPhone. Prior Chromium viewport tests were not device acceptance.
+v205 removes `top:100dvh` placement: a fixed, unfiltered `inset:0` host outside
+`<main>` aligns a relative glass dock with flex and safe-area padding. The document
+keeps normal scrolling. No physical-screen floor, layout-height override, launch
+polling or body scroll lock is used. Focused Search alone can request keyboard
+clearance, measured from the host bounds; lifecycle resets discard that offset.
+
+Real-browser checks exposed a separate missed-Close-tap bug: input blur cleared
+the keyboard offset before click, moving the button away. Pointerdown now retains
+Search focus until activation; keyboard activation still works normally.
+
+The launch icon embeds the existing light/dark SVG geometry and uses critical
+theme CSS, so it is correct even with the stylesheet unavailable. Saved appearance
+overrides system appearance; System follows live changes. Mobile layout follows
+the local Ionic/iOS reference with compact header, 16pt margins, leading large
+title and one grouped photo picker surface. No framework or effect dependency
+was added; source/output photo geometry is unchanged.
+
+Validation: **372 passing web tests, 15 optional private-fixture skips, zero
+failures**; PWA/i18n checks pass. The repeatable mobile browser smoke covers 20
+scenarios including blocked-CSS launch themes, seven viewport sizes in both
+appearances, stale JS height, tab/scroll restoration, Search, production bootstrap,
+install-guide focus ownership and AI Settings. Physical iOS cold launch/reopen is
+still unqualified. See `docs/ui-ux/2026-10-15-pwa-startup-queue-settings.md`.
+
+## 10.80 — Short/long destination boundary, lens sizing and header clearance (2026-10-15)
+
+Physical feedback rejected v205 as a complete dock fix: Settings positions the
+dock correctly, while Process/empty History/collapsed Guide raise it again.
+Desktop measurements confirm a distinct root state: the short screens had
+scrollHeight equal to clientHeight, while Settings was scrollable. v206 marks
+standalone mode in the early head script and uses `min-height:calc(100lvh + 1px)`
+for main in that mode, preserving root scrollability across all destinations.
+The dock keeps the existing independent host. This removes the content-length
+boundary without JS screen floors, scroll locks, reloads or settling timers;
+physical WebKit acceptance remains outstanding.
+
+The end-tab lens mismatch was independently reproduced in Chromium. The global
+element-only box-sizing reset does not include `::before`; its border enlarged
+the percentage translation step, accumulating drift at Settings. Explicit
+border-box sizing fixes the actual lens width. At 402px, resting top/right
+insets changed from 5/-3 to 5/5 CSS pixels. Mobile header controls also move
+16pt down from the status area, with matching content clearance.
+
+Validation: 372 passing web tests, 15 optional private-fixture skips, zero
+failures; PWA/i18n checks pass. The mobile smoke now covers 21 scenarios, including
+Settings → Process → History → Guide → Settings with short content, preserved
+scroll, exact end-lens insets, and all prior startup/Search cases. Browser runs
+passed at 1× and 3× device scale; neither is physical iOS qualification.
+
+Follow-up v207 restores the user's preferred inset grey photo-picker surface,
+12pt outer padding and former 190pt minimum picker height. Its fill follows the
+theme background. The v206 dock/lens/header changes remain in place.
+
+## 10.81 — Device-accepted dock, mobile sheets and dark glass (2026-10-16)
+
+The user confirmed the toolbar now works on their iPhone after v206/v207.
+v208 keeps that host/scrollability/offset geometry intact.
+
+AI Settings had a reproducible missing-rim defect: mobile CSS explicitly removed
+the bottom border and lower corner radius; the whole dialog scrolled. The new
+floating frame retains all corners and its rim, sizes to content within the
+available safe viewport, and scrolls only the body. Header/handle downward drag
+can dismiss; control presses, cancellation, short/horizontal/upward drags and
+teardown are guarded. Feature state and processing contracts are unchanged.
+
+Per the user's correction, switches retain the old 63×44px control. The Model
+control CSS is identical to committed v207, including blue capsule, stops, knob
+and inline presentation. Its value mapping/model processing is unchanged.
+
+Dark navigation material follows the local Ionic reference: vertical rim rather
+than bright side/outer glow, transparent moving lens, 72% black resting fill and
+final-200ms release handoff. Light and accessibility modes keep separate rules.
+Mobile Guide uses chevrons; History menu actions have 44px targets. Other audited
+native-style surfaces remain intact.
+
+Validation: **375 web tests pass, 15 optional skips, zero failures; 50 browser
+checks pass**, including 24 sheet size/language/appearance combinations, Model
+levels, swipe dismissal, dark rest/hold/release, forced colors, reduced motion,
+History, Photo, Guide and confirmation. Physical sheet/optical acceptance remains
+outstanding. Details: `docs/ui-ux/2026-10-16-ios-sheets-materials.md`.
+
+## 10.82 — AirPods-style AI corners and stable launch/held lens (2026-10-16)
+
+v209 follows the user's native AirPods-card screenshot with broader mobile AI
+Settings corners and progressive continuous curvature. A circular fallback is
+provided; switch and Model control styling and resting dock geometry are retained.
+
+The loading ring shrank from 30px to 24px when the universal box-sizing reset
+arrived. Critical CSS now explicitly keeps a 30px border-box ring; themed app
+artwork remains 76px throughout. The held toolbar lens scaled its positional
+translation, explaining why Process was centered while the three later tabs
+drifted. Individual `translate` now positions the lens before animated scale.
+
+Validation: 375 passing web tests, 15 optional skips, zero failures; 54 browser
+checks pass, including stylesheet-arrival dimensions and actual transformed lens
+centers on all four tabs. Existing sheet, control, accessibility and dock checks
+remain. Physical iOS optical acceptance is still separate from browser checks.
+
+## 10.83 — More restrained AI Settings corners (2026-10-16)
+
+Device feedback rejects v209's overly broad AirPods-style corners. v210 removes
+those overrides and uses a modest 36–44px circular radius for phone widths up to
+600px. iPad/desktop retain the existing shared 32px radius. The privacy footer
+is removed from AI Settings, including its unused styles. Switches, Model,
+internal scrolling, launch dimensions and toolbar fixes remain intact.
+
+Validation: 27 targeted checks, 54 browser scenarios at 3× scale and PWA assets
+pass, including light/dark sheet layouts across phone, landscape and iPad widths.
+
+## 10.84 — Lower phone AI Settings with internal safe-area clearance (2026-10-16)
+
+v211 sets phone AI Settings' bottom frame gap to 8px, matching its side gaps.
+This lowers it by 14px where the iPhone bottom safe area is 34px. Safe-area
+clearance is kept inside the scrolling body instead of lifting the frame.
+Phone lower corners use 40–48px while top corners retain 36–44px; iPad/desktop
+keep their existing geometry. The browser smoke now emulates the 34px safe area
+and checks frame gaps and internal clearance explicitly.
+
+Validation: 55 browser scenarios at 3× scale, 27 targeted checks and PWA assets
+pass; the emulated safe-area check measures 8px side/bottom gaps and 26px internal
+bottom padding.
+
+## 10.85 — Continuous Camera-reference AI Settings frame (2026-10-16)
+
+v212 replaces phone AI Settings' circular corners with a continuous contour
+sampled from the user's Camera screenshot. Its side/bottom gaps measure about
+8pt; the corner fit uses ~92pt extent and exponent 3.77. SVG supplies the same
+outline and clipping geometry without depending on CSS corner-shape support.
+Layout-size changes update the path; drag/open transforms do not change it.
+Tablet/desktop return to their original 32px circular frame. Existing controls,
+internal safe-area clearance, processing and toolbar behavior remain.
+
+Validation: 378 passing web checks, 15 optional skips, zero failures; 55 browser
+scenarios pass at 3×. Curve samples, resize cleanup, clip/outline readiness and
+tablet fallback are checked. Physical Safari optical acceptance remains separate.
+
+## 10.86 — Accepted phone curve and centered privacy footer (2026-10-16)
+
+The user confirms v212's phone curvature is correct. v213 retains the frame and
+restores the localized privacy note at the bottom of AI Settings, centered.
+The last control group remains rounded; Model, switches and internal safe-area
+clearance are unchanged.
+
+Validation: all 55 browser scenarios at 3×, PWA assets and i18n checks pass.
+
+## 10.87 — Footer uses existing space without enlarging the sheet (2026-10-16)
+
+v214 corrects v213's extra footer height: the centered note shares the body's
+existing bottom padding. Its 4px top gap and 18px line are offset by -22px bottom
+margin, leaving the frame the same height as without a one-line note. Wrapped
+translations retain natural extra line height. The accepted phone curve and
+frame position are unchanged. The browser smoke compares visible/hidden footer
+heights and checks placement below Model inside the frame.
+
+Validation: all 56 browser scenarios at 3×, 24 stylesheet checks and PWA assets
+pass. Visible and hidden footer produce the same frame height.
+
+## 10.88 — AI Settings without the left close button (2026-10-16)
+
+v215 removes the AI Settings X, centers the title in one column, lowers the title
+6px and the grabber 4px without adding layout height. Swipe-down, Escape and
+outside dismissal remain. Photo close, the accepted frame and the user's current
+footer typography are retained. Optional close-button wiring handles its absence.
+
+Validation: 55 targeted checks, 56 browser scenarios at 3× and PWA assets pass.
+
+## 10.89 — Restore earlier corner styling after device feedback (2026-10-16)
+
+v220 removes the experimental concentric/shared group curves at the user's
+request. AI groups, including the Model group's bottom, return to 20px circular
+corners; Settings returns to 22px. Other menus/Appearance/picker restore their
+earlier shapes. Per-group observers and inner custom clipping are removed.
+The accepted outer phone frame remains. Keep the X and footer removed, the
+lowered header, compact inner spacing and original Model/switch controls.
+
+Validation: 55 targeted checks, 56 browser scenarios at 3× and PWA assets pass.
+
+## 10.90 — Compact centered AI footer (2026-10-16)
+
+v221 restores the localized privacy sentence at the user's request, centered
+at 12px with a 16px line height. The phone footer uses 6px above and 8px below
+the text, lifting the Model group about 14px. Preserve the accepted sheet
+frame, original inner corners, switches and Model control.
+
+Validation: 55 targeted checks, 56 browser scenarios at 3×, PWA assets and
+translation consistency checks pass.
+
+## 10.91 — v1.0.0 release UI polish (2026-10-16)
+
+v222 adds trailing Settings/AI separator insets, moves mobile Guide chevrons
+inward, and gives dark tab glass more visible material and directional edge
+lighting without changing dock/lens geometry. A bounded active-lens optical
+pass has reduced-transparency/forced-color fallbacks. Update Stylio paints
+localized animated feedback before checking the worker/caches, retains it
+until reload and restores controls if the update fails.
+
+Release notes live under the corrected `release_note/` directory, with English
+v1.0.0 notes linked from all three README languages. Security work is deferred
+by the user; this release does not claim those audit findings have been fixed.
+
+Validation: 378 automated checks pass, 15 skip, 0 fail; 59 browser scenarios at
+3× and PWA/i18n checks pass. Slow update feedback, failure recovery and successful
+reload are exercised in the browser with external requests blocked.

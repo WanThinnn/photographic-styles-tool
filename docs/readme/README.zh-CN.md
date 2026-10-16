@@ -5,7 +5,7 @@
 **Stylio** — 名称由 Styles 与 Elio 组合而来 — 是一款开源、在设备本地运行的照片处理工具，专注于与 Apple Photos 的互操作能力，包括 Photographic Styles、iOS 27 Texture/Grain、AI 人像处理，以及尽可能保留照片的原始数据。
 
 > [!NOTE]
-> 当前版本：**v1.0.0**  
+> 当前版本：**[v1.0.0 — 发行说明](../../release_note/v1.0.0.md)**<br>
 > 独立开发、开源，与 Apple 无关联。
 
 ## 在线使用

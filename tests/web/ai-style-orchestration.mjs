@@ -13,11 +13,12 @@ test('Suggested Styles stays lazy when the independent feature is disabled',()=>
 });
 
 test('native preservation classification happens before any HEIC recommendation',()=>{
-  const classify=app.indexOf('const textureOnly = preserveNativeStyles(bytes,d);');
-  const nativeBranch=app.indexOf('if (nativeTexture && !hasTexture(d.infos))');
-  const patchBranch=app.indexOf('const needsExperimental = d.hdrGrid === null');
-  const recommend=app.indexOf("opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui)");
-  assert.ok(classify>=0&&classify<nativeBranch&&nativeBranch<patchBranch&&patchBranch<recommend);
+  const contract=app.indexOf('const {compatibility,compatibilityPreflight}=input');
+  const classify=app.indexOf('const textureOnly=unknownAppleContract?false:preserveNativeStyles(bytes,d);',contract);
+  const nativeBranch=app.indexOf('if (nativeTexture && !hasTexture(d.infos))',classify);
+  const patchBranch=app.indexOf('const needsExperimental = d.hdrGrid === null',nativeBranch);
+  const recommend=app.indexOf("opts.styleRecommendation=await recommendHeicStyle(bytes,d,ui)",patchBranch);
+  assert.ok(contract>=0&&contract<classify&&classify<nativeBranch&&nativeBranch<patchBranch&&patchBranch<recommend);
   assert.equal((app.match(/opts\.styleRecommendation=await recommendHeicStyle/g)||[]).length,1);
   const helper=app.slice(app.indexOf('async function recommendHeicStyle'),app.indexOf('async function handleFile'));
   const bypass=helper.indexOf("preserveNativeStyles(bytes,d))return null"),load=helper.indexOf("import('../../recommend/style-runtime.js')");

@@ -16,11 +16,13 @@
 
 .app-tabs::before {
   transform-origin: center;
-  border: .5px solid transparent;
+  border: .5px solid var(--tab-lens-rest-border,transparent);
+  background: var(--tab-lens-rest-background,var(--selection-fill));
+  box-shadow: var(--tab-lens-rest-shadow,none);
   scale: 1;
   contain: paint;
-  will-change: transform,scale;
-  transition: transform 360ms var(--spring-ease),background 360ms,box-shadow 440ms,border-color 200ms
+  will-change: translate,scale;
+  transition: translate 360ms var(--spring-ease),background 360ms,box-shadow 440ms,border-color 200ms
 }
 
 .app-tabs.is-pressing {
@@ -31,21 +33,23 @@
 .app-tabs.is-pressing::before,
 .app-tabs.is-dragging::before,
 .app-tabs.is-releasing::before {
-  background:
+  background: var(--tab-lens-active-background,
     radial-gradient(ellipse at 24% 12%,var(--glass-rim-top),transparent 64%),
-    var(--selection-active-fill);
-  border-color: var(--glass-rim-top) var(--glass-outline) var(--glass-rim-bottom);
-  box-shadow:
+    var(--selection-active-fill));
+  border-color: var(--tab-lens-active-border,var(--glass-rim-top) var(--glass-outline) var(--glass-rim-bottom));
+  box-shadow: var(--tab-lens-active-shadow,
     inset 0 1px 2px var(--glass-rim-top),
     inset 0 -1px 2px var(--glass-rim-bottom),
     inset 1px 0 3px var(--glass-rim-bottom),
     0 0 0 .5px var(--glass-outline),
-    0 6px 18px var(--glass-shade)
+    0 6px 18px var(--glass-shade));
+  -webkit-backdrop-filter: var(--tab-lens-active-filter,none);
+  backdrop-filter: var(--tab-lens-active-filter,none)
 }
 
 .app-tabs.is-pressing::before {
   animation: ios27-tab-lens-press 900ms linear both;
-  transition: transform 320ms var(--spring-ease),background 140ms,box-shadow 200ms,border-color 140ms
+  transition: translate 320ms var(--spring-ease),background 140ms,box-shadow 200ms,border-color 140ms
 }
 
 .app-tabs.is-dragging {
@@ -55,7 +59,7 @@
 
 .app-tabs.is-dragging::before {
   scale: var(--ios27-drag-lens-sx,var(--ios27-lens-held-sx,1.2)) var(--ios27-drag-lens-sy,var(--ios27-lens-held-sy,1.3));
-  transition: transform 90ms linear,scale 160ms var(--spring-ease),background 120ms,box-shadow 160ms
+  transition: translate 90ms linear,scale 160ms var(--spring-ease),background 120ms,box-shadow 160ms
 }
 
 .app-tabs.is-releasing {
@@ -64,8 +68,8 @@
 }
 
 .app-tabs.is-releasing::before {
-  animation: ios27-tab-lens-release 450ms linear both;
-  transition: transform 360ms var(--spring-ease),background 260ms,box-shadow 300ms
+  animation: ios27-tab-lens-release 450ms linear both,var(--tab-lens-release-material,none);
+  transition: translate 360ms var(--spring-ease),background 260ms,box-shadow 300ms
 }
 
 .app-tabs button {
@@ -101,7 +105,15 @@
 .app-tabs.is-pressing button.is-previewed>span:not(.tab-count),
 .app-tabs.is-dragging button.is-previewed>svg,
 .app-tabs.is-dragging button.is-previewed>span:not(.tab-count) {
-  filter: brightness(104%)
+  filter: brightness(var(--tab-held-icon-brightness,104%));
+  opacity: var(--tab-held-icon-opacity,1)
+}
+
+/* Retain the reference's final 200ms handoff, with a lit moving lens so it
+   remains visible over dark content. Geometry stays independent of material. */
+@keyframes dark-tab-release {
+  0%,55.556% { background: var(--tab-lens-active-background); border-color: var(--tab-lens-active-border); box-shadow: var(--tab-lens-active-shadow) }
+  100% { background: var(--tab-lens-rest-background); border-color: var(--tab-lens-rest-border); box-shadow: var(--tab-lens-rest-shadow) }
 }
 
 .dock-search.glass-surface:active {
@@ -141,11 +153,11 @@
 
 @media(pointer:coarse) {
   .app-tabs.is-dragging::before {
-    box-shadow:
+    box-shadow: var(--tab-lens-active-shadow,
       inset 0 1px 1px var(--glass-rim-top),
       inset 0 -1px 1px var(--glass-rim-bottom),
       0 0 0 .5px var(--glass-outline),
-      0 3px 10px var(--glass-shade)
+      0 3px 10px var(--glass-shade))
   }
 }
 
@@ -176,22 +188,28 @@
 }
 
 @media(prefers-reduced-transparency:reduce), (prefers-contrast:more) {
+  .app-tabs { --tab-lens-release-material: none }
   .app-tabs.is-pressing::before,
   .app-tabs.is-dragging::before,
   .app-tabs.is-releasing::before {
     background: var(--surface-secondary);
     border-color: var(--muted);
-    box-shadow: none
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none
   }
 }
 
 @media(forced-colors:active) {
+  .app-tabs { --tab-lens-release-material: none }
   .app-tabs::before,
   .app-tabs.is-pressing::before,
   .app-tabs.is-dragging::before,
   .app-tabs.is-releasing::before {
     background: Canvas;
     border-color: Highlight;
-    box-shadow: none
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none
   }
 }

@@ -29,7 +29,11 @@ test('four-tab floating dock has a separate search action and material fallbacks
   const material=readFileSync(new URL('../../web/styles/components/materials.css',import.meta.url),'utf8');
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const dock=layout.match(/\.app-dock \{([^}]+)\}/)[1];
-  assert.match(dock,/position: fixed/);assert.match(dock,/top: calc\(var\(--dock-viewport-bottom,var\(--dock-shell-height,100lvh\)\)/);assert.doesNotMatch(dock,/\n  bottom:/);
+  assert.match(dock,/position: relative/);
+  assert.doesNotMatch(dock,/100[sd l]*vh|top:|bottom:|translate/);
+  assert.match(layout,/\.app-chrome \{[^}]*position: fixed;[^}]*inset: 0;[^}]*align-items: flex-end;[^}]*pointer-events: none/s);
+  assert.match(dock,/pointer-events: auto/);
+  assert.ok(html.indexOf('</main>')<html.indexOf('id="app-chrome"'),'navigation must live outside content and its transforms');
   assert.match(layout,/min-height: var\(--tab-height\)/);
   assert.match(layout,/\.app-tabs button \{[^}]*color: var\(--nav-idle\)/s);
   assert.match(material,/prefers-reduced-transparency:reduce/);assert.match(material,/prefers-contrast:more/);
@@ -81,15 +85,15 @@ test('PWA locks page zoom while keeping native one-finger scrolling',()=>{
 });
 
 
-test('standalone shell keeps the intro visible, centers its copy, and anchors the dock from the safe bottom',()=>{
+test('shell keeps the intro visible and aligns viewport chrome at the safe bottom',()=>{
   const layout=readFileSync(new URL('../../web/styles/layout/app-shell.css',import.meta.url),'utf8');
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const i18n=readFileSync(new URL('../../web/src/ui/i18n.js',import.meta.url),'utf8');
   assert.doesNotMatch(layout,/\.has-used-app \.intro/);
   assert.match(layout,/\.intro \{[^}]*text-align: center/s);
-  assert.match(layout,/@media\(display-mode:standalone\)[\s\S]*?\.app-dock \{[^}]*position: fixed;[^}]*top: calc\(var\(--dock-viewport-bottom,var\(--dock-shell-height,100lvh\)\)[^}]*transform: translate\(-50%,-100%\)/s);
+  assert.match(layout,/\.app-chrome \{[^}]*padding-bottom: calc\(var\(--dock-keyboard-offset,0px\) \+ max\(10px,calc\(env\(safe-area-inset-bottom,0px\) - 12px\)\)\)/s);
   assert.match(i18n,/Portrait Lighting, Styles, Texture and Grain\.<br>Privately, on your device\./);
-  assert.equal([...html.matchAll(/class="icon-button glass-surface"[^>]*><svg/g)].length>=2,true);
+  assert.match(html,/class="icon-button glass-surface" id="close-photo"[^>]*><svg/);
 });
 
 test('portrait aperture keeps the yellow selector centered while the ruler moves and preserves the initial aperture dot',()=>{
@@ -110,9 +114,9 @@ test('process header and Smart Enhance controls use a tighter native grouping',(
   const workspace=readFileSync(new URL('../../web/styles/layout/workspace.css',import.meta.url),'utf8');
   assert.match(layout,/\.app-logo \{[^}]*width: 40px;[^}]*height: 40px/s);
   assert.match(layout,/h1 \{[^}]*font-size: 1\.375rem;[^}]*font-weight: 700/s);
-  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?h1 \{[^}]*font-size: 1\.5rem;[^}]*font-weight: 720/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?h1 \{[^}]*font-size: 1\.375rem;[^}]*font-weight: 720/s);
   assert.match(layout,/@media\(max-width:767px\)[\s\S]*?\.top \{[^}]*position: fixed;[^}]*top: 0;[^}]*width: 100%;[^}]*background: var\(--bg\)/s);
-  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?main \{[^}]*padding-top: calc\(env\(safe-area-inset-top,0px\) \+ 94px\)/s);
+  assert.match(layout,/@media\(max-width:767px\)[\s\S]*?main \{[^}]*padding-top: calc\(env\(safe-area-inset-top,0px\) \+ 92px\)/s);
   assert.match(workspace,/\.depth-options>\.ai-summary \{[^}]*display: flex;[^}]*align-items: center/s);
   assert.match(workspace,/\.depth-options>\.ai-summary>\.ai-settings-trigger \{[^}]*margin-left: auto/s);
 });
@@ -147,16 +151,16 @@ test('Portrait preview uses an Apple-like control strip with Photos info, toggle
   assert.match(strings,/"photosEditHint": "After saving, open the photo in Photos/);
 });
 
-test('AI Settings model row keeps a wide inline slider and vertically centered network icon on mobile and desktop',()=>{
+test('AI Settings preserves the original wide inline Model control on narrow sheets',()=>{
   const controls=readFileSync(new URL('../../web/styles/components/controls.css',import.meta.url),'utf8');
   const html=readFileSync(new URL('../../web/index.html',import.meta.url),'utf8');
   const strings=readFileSync(new URL('../../web/src/ui/ai-strings.js',import.meta.url),'utf8');
   const sheets=readFileSync(new URL('../../web/styles/components/sheets.css',import.meta.url),'utf8');
   assert.match(controls,/\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(82px,\.75fr\) minmax\(150px,1\.35fr\)/s);
-  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(108px,\.9fr\) minmax\(140px,1\.1fr\)/s);
-  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-icon \{[^}]*align-self: center;[^}]*justify-self: center/s);
-  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-copy \{[^}]*padding-left: 7px;[^}]*box-sizing: border-box/s);
-  assert.match(sheets,/\.ai-settings-panel>\.portrait-option\.depth-model-row>\.ai-option-copy \.ai-hint \{[^}]*text-wrap: balance/s);
+  assert.match(sheets,/\.ai-options-group>\.portrait-option\.depth-model-row \{[^}]*grid-template-columns: 36px minmax\(108px,\.9fr\) minmax\(140px,1\.1fr\)/s);
+  assert.match(sheets,/\.ai-options-group>\.portrait-option\.depth-model-row>\.ai-option-icon \{[^}]*align-self: center;[^}]*justify-self: center/s);
+  assert.match(sheets,/\.ai-options-group>\.portrait-option\.depth-model-row>\.ai-option-copy \{[^}]*padding-left: 7px;[^}]*box-sizing: border-box/s);
+  assert.match(sheets,/\.ai-options-group>\.portrait-option\.depth-model-row>\.ai-option-copy \.ai-hint \{[^}]*text-wrap: balance/s);
   assert.match(sheets,/@container \(max-width:22rem\)[\s\S]*?\.depth-model-control \{[^}]*grid-column: 3;[^}]*grid-row: 1;[^}]*min-width: 128px/s);
   assert.match(html,/class="ai-model-network-symbol" viewBox="0 0 28 28"/);
   assert.match(controls,/\.ai-model-network-symbol \{[^}]*width: 25px;[^}]*height: 25px/s);
@@ -435,10 +439,10 @@ test('tab glass ports measured iOS27 platter, lens, drag and release geometry wh
   assert.match(css,/\.app-tabs\.is-releasing \{[^}]*transition: transform 367ms linear\(0,0\.096 9%,0\.356 18%,0\.64 27%,0\.863 36%,1 45%,1\.078 54%,1\.092 59%,1\.018 95%,1\)/s);
   assert.match(css,/var\(--selection-active-fill\)/);
   assert.match(css,/\.app-tabs \{[^}]*overflow: visible;[^}]*contain: layout style/s);
-  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--selection-fill: #0000005c;[\s\S]*?--selection-active-fill: #08080bd9/s);
+  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--tab-lens-active-background: radial-gradient/s);
   assert.match(shell,/--tab-rest-offset/);
   assert.match(css,/touch-action: pan-y/);
-  assert.match(layout,/transform: translate3d\(var\(--lens-offset,var\(--tab-rest-offset,calc\(var\(--tab-index,0\) \* 100%\)\)\),0,0\)/);
+  assert.match(layout,/translate: var\(--lens-offset,var\(--tab-rest-offset,calc\(var\(--tab-index,0\) \* 100%\)\)\) 0/);
   assert.match(css,/\.app-tabs\.is-dragging::before/);
   assert.match(css,/contain: paint/);
   assert.match(layout,/\.tab-icon-wrap \{[^}]*position: relative/s);
@@ -458,5 +462,8 @@ test('tab glass ports measured iOS27 platter, lens, drag and release geometry wh
   assert.match(css,/prefers-reduced-motion:reduce/);
   assert.match(css,/prefers-reduced-transparency:reduce/);
   assert.match(css,/forced-colors:active/);
-  assert.doesNotMatch(css,/(?:^|\n)\s*(?:-webkit-)?backdrop-filter:/);
+  // The fixed placement host remains unfiltered; only the active dark lens
+  // uses a small optical pass, with high-contrast/transparency fallbacks.
+  assert.doesNotMatch(css,/\.app-tabs \{[^}]*backdrop-filter:/s);
+  assert.match(css,/backdrop-filter: var\(--tab-lens-active-filter,none\)/);
 });

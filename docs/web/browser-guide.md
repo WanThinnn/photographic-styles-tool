@@ -1,5 +1,13 @@
 # Stylio — browser build
 
+Current sheet/control/material behavior:
+[iOS sheets and dark glass](../ui-ux/2026-10-16-ios-sheets-materials.md).
+
+Current startup, toolbar, queue and working Settings behavior is documented in
+[PWA startup, queue and processing settings](../ui-ux/2026-10-15-pwa-startup-queue-settings.md).
+Processing is sequential by default; the opt-in second lane owns an isolated
+runtime so one photo's resource cleanup cannot terminate another photo's workers.
+
 After cloning, run `node tools/package-ai-style-models.mjs assemble` from the repository root before serving locally. Large Pro models are stored as Git-safe parts; Pages deployment reassembles and verifies them automatically.
 
 The static site published to GitHub Pages. Everything runs in the visitor's browser; photos

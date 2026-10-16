@@ -5,13 +5,14 @@ import {releaseHevcEncoder as releaseRasterEncoder} from '../../raster/ffmpeg-he
 import {releaseHeicProcessor} from '../../media/heic-processing.js';
 import {photoCaptureDate} from '../../media/photo-date.js';
 import {formatBytes} from '../../ui/result-metadata.js';
-export function createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcceleration,selectedAiLevel}){
+export function createPortraitController({aiFeatures,aiCandidates,aiText,gpuAcceleration,selectedAiLevel,lane=0}){
   // Keep the normal result for toggle-off/cancellation. Only opt-in adds Portrait.
   async function tryAiPortrait(source, outputFile, ui, name, sourceFile = null, preserveIncomplete = false) {
     const {portraitEligibility} = await import('../../portrait/ai-portrait-container.js');
-    const candidate = {outputFile, sourceFile, ui, name, state: 'new',
+    const candidate = {outputFile, sourceFile, ui, name, state: 'new',lane,
       skip: preserveIncomplete ? 'unverified-styles' : source ? portraitEligibility(source) : null};
     aiCandidates.push(candidate);
+    candidate.run=()=>runAiCandidate(candidate);
     if (aiFeatures.enabled('portrait')&&!candidate.skip) await runAiCandidate(candidate);
     else {
       if(candidate.skip){candidate.state='skipped';ui.aiState('');ui.note(candidate.skip==='unverified-styles'?aiText().compatibility:aiText().skip,candidate.skip==='unverified-styles'?'compatibility':'ai');}

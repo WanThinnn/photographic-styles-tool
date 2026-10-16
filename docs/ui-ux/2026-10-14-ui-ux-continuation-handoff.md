@@ -897,14 +897,14 @@ Batch v195 tiếp tục được refine trong cùng working tree; chưa commit/p
 
 ## 42. Batch v196 — first-launch PWA dock settling / AI Settings independent entry
 
-- Fix cold-launch PWA dock: không quay lại dùng VisualViewport cho resting geometry vì lịch sử v165–v167 đã chứng minh API này có thể giữ stale browser/keyboard metrics khi standalone resume. Thay vào đó dock tiếp tục neo theo `max(innerHeight, documentElement.clientHeight)` nhưng resample dài hơn trong 6 giây đầu (`80/240/520/900/1500/2500/4000/6000ms`) và thêm `window.load` trigger. Trường hợp iOS vừa Add to Home Screen mở lần đầu với layout viewport tạm thời ngắn sẽ tự re-anchor xuống đúng bottom khi layout standalone settle, không cần kill/reopen app.
+- Historical v196 approach: dock sampled `max(innerHeight, documentElement.clientHeight)` for six seconds. Both measurements can stay stale through an entire cold launch. The v204 `100dvh` and v205 fixed-host-only attempts also failed physical-iPhone feedback. **Current v206:** the separate chrome host remains, and standalone main keeps `100lvh + 1px` minimum height so short destinations do not cross into a non-scrollable root state. No JS pixel height positions the dock. See [PWA startup, queue and processing settings](2026-10-15-pwa-startup-queue-settings.md) for current behavior and validation limits.
 - Search keyboard path vẫn tách riêng và chỉ dùng VisualViewport sau focus + resize hợp lệ; warm reopen behavior cũ được giữ.
 - AI Settings không còn bị khóa chỉ vì `Smart Enhance photo` đang Off. Khi app/model sẵn sàng, Portrait/Sharpen/Adaptive Styles luôn thao tác được trong sheet.
 - Nếu người dùng bật một feature từ AI Settings trong lúc master đang Off, `Smart Enhance photo` tự chuyển On nhưng không ép bật Portrait thêm. Nếu người dùng tắt `Smart Enhance photo` ở màn Process, tất cả feature con vẫn bị tắt/cancel như trước.
 - Service Worker cache tăng **v196**.
 - Regression: **89/89 main lightweight suite pass**, **3/3 language pass**, PWA/i18n pass, VI/EN/ZH **217 strings**.
 
-Chưa commit/push. Working tree v196 là base hiện hành.
+Historical v196 notes above are superseded by the current startup/queue/UI document linked above.
 
 ---
 

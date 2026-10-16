@@ -3,14 +3,18 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {createAiFeatureControls} from '../../web/src/ui/ai-feature-controls.js';
+import {createTaskQueue} from '../../web/src/app/processing/task-queue.js';
+import {createProcessingPreferences,PROCESSING_STORAGE_KEYS} from '../../web/src/ui/processing-preferences.js';
+import {createScreenAwake} from '../../web/src/ui/screen-awake.js';
 
 // Exercise application wiring without downloading models, spawning workers or
 // decoding photos. Domain factories are injected at the module boundary.
 const source=readFileSync(new URL('../../web/src/app/application.js',import.meta.url),'utf8')
   .replace(/^import .*;\n/gm,'').replace('export function startApplication','function startApplication');
 const resultViewSource=readFileSync(new URL('../../web/src/ui/results/result-view.js',import.meta.url),'utf8');
-function harness({manualQueue=false,historyEntries=[]}={}){
+function harness({manualQueue=false,historyEntries=[],stallPreload=false,stallHistory=false,uncontrolled=false}={}){
   const nodes=new Map(),calls=[],captured={},batches=new Map();
+  const preferences=createProcessingPreferences({getItem:()=>null,setItem(){}});
   function batchFor(name){
     if(!batches.has(name)){
       let start,release;
@@ -33,11 +37,17 @@ function harness({manualQueue=false,historyEntries=[]}={}){
       click(){calls.push(['picker']);}};
     nodes.set(id,n);return n;
   }
+  const handleFile=async(file,ui,lane=0)=>{
+    const batch=batchFor(file);calls.push(['start',file,lane]);batch.start();ui?.set('Working');
+    if(manualQueue)await batch.gate;
+    calls.push(['end',file,lane]);
+  };
   const context={console,Event,setTimeout,clearTimeout,
     document:{getElementById:node,createElement:node,querySelectorAll:()=>[]},
     getAppShell:()=>({register(){},render(){}}),confirm:()=>true,
     localStorage:{getItem:()=>null,setItem(){}},sessionStorage:{getItem:()=>true},
-    navigator:{serviceWorker:{controller:{postMessage:message=>calls.push(['worker',message.type])}}},
+    navigator:{serviceWorker:{controller:uncontrolled?null:{postMessage:message=>calls.push(['worker',message.type])},
+      ready:Promise.resolve({active:{postMessage:message=>calls.push(['worker',message.type])}})}},
     matchMedia:()=>({matches:false}),
     VERSION:'test',AI_STRINGS:{en:{},vi:{}},pickLanguage:()=> 'en',
     rememberLanguage:lang=>calls.push(['language',lang]),applyLanguage(){},t:(_lang,key)=>key,
@@ -46,20 +56,18 @@ function harness({manualQueue=false,historyEntries=[]}={}){
     loadLibheif:async()=>{},releaseDecodeCache(){},releaseHevcEncoder(){},releaseRasterEncoder(){},releaseHeicProcessor(){},
     clearDownloadedAssets:async()=>{},waitForVisiblePage:async()=>{},
     createPhotoAnalysis:deps=>{captured.analysis=deps;return {kind:'analysis'};},
+    getProcessingPreferences:()=>preferences,PROCESSING_STORAGE_KEYS,createTaskQueue,createScreenAwake,
+    createIsolatedProcessor:()=>({handleFile:(file,ui)=>handleFile(file,ui,1),releaseResources:async()=>{},dispose(){}}),
     createLivePhotoSession:deps=>{captured.live=deps;return {liveMovies:new Map(),livePhotos:[],attachMovie(){},handleMovie(){}};},
-    createProfileRepository:()=>({preload:async()=>calls.push(['profiles']),ensureProfileIndex(){},getProfile(){}}),
-    createHistoryStore:()=>({list:async()=>historyEntries,clear:async()=>calls.push(['history-clear']),remove:async()=>{},save:async()=>{}}),
+    createProfileRepository:()=>({preload:async()=>{calls.push(['profiles']);if(stallPreload)await new Promise(()=>{});},ensureProfileIndex(){},getProfile(){}}),
+    createHistoryStore:()=>({list:async()=>stallHistory?new Promise(()=>{}):historyEntries,clear:async()=>calls.push(['history-clear']),remove:async()=>{},save:async()=>{}}),
     restoredFile:entry=>entry?.file||null,
     createResultView:deps=>{captured.results=deps;return (name,file,options={})=>{const item={name,file,options,outputs:[],states:[]};(captured.rows??=[]).push(item);return {output:(...args)=>item.outputs.push(args),set:(...args)=>item.states.push(args)};};},
     createPortraitController:deps=>{captured.portrait=deps;return {tryAiPortrait(){},runAiCandidate(){}};},
-    createFileProcessor:deps=>{captured.processing=deps;return {handleFiles:async files=>{
-      const batch=batchFor(files[0]);calls.push(['start',files[0]]);batch.start();
-      if(manualQueue)await batch.gate;
-      calls.push(['end',files[0]]);
-    }};},
+    createFileProcessor:deps=>{captured.processing=deps;return {handleFile};},
   };
   runInNewContext(source+'\nglobalThis.start=startApplication;',context);
-  return {nodes,node,calls,captured,start:context.start,
+  return {nodes,node,calls,captured,preferences,start:context.start,
     waitForStart:name=>batchFor(name).started,release:name=>batchFor(name).release()};
 }
 
@@ -91,14 +99,23 @@ test('separate picker/drop batches remain serialized and cache cleanup stays loc
   assert.equal(h.node('full-cleanup').disabled,true);
   assert.equal(h.node('clear-history').disabled,true);
   await h.waitForStart('first');
-  assert.deepEqual(h.calls.filter(([type])=>type==='start'),[['start','first']]);
+  assert.deepEqual(h.calls.filter(([type])=>type==='start'),[['start','first',0]]);
   h.release('first');await h.waitForStart('second');
   h.release('second');await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(h.calls.filter(([type])=>['start','end'].includes(type)),
-    [['start','first'],['end','first'],['start','second'],['end','second']]);
+    [['start','first',0],['end','first',0],['start','second',0],['end','second',0]]);
   assert.equal(h.node('clear-assets').disabled,false);
   assert.equal(h.node('full-cleanup').disabled,false);
   assert.equal(h.node('clear-history').disabled,false);
+});
+
+test('all selected photos appear in History before the first conversion finishes',async()=>{
+  const h=harness({manualQueue:true});await h.start();
+  const files=[{name:'queued-a.heic'},{name:'queued-b.heic'},{name:'queued-c.heic'}];
+  h.node('file').files=files;await h.node('file').fire('change');
+  assert.equal(h.captured.rows?.length,3,'every selected file needs a queued History entry immediately');
+  assert.deepEqual(h.captured.rows.map(row=>row.name),files.map(file=>file.name));
+  for(const file of files)h.release(file);
 });
 
 test('three-stop model range updates the displayed name and the actual processing level',async()=>{
@@ -123,6 +140,7 @@ test('ready output is persisted immediately and preview enrichment cannot block 
 test('persistent history is restored as ready downloadable results without reprocessing',async()=>{
   const file={name:'saved-result.heic',type:'image/heic',size:4096},preview={type:'image/jpeg',size:2048},thumbnail='data:image/jpeg;base64,thumb';
   const h=harness({historyEntries:[{id:'persisted-1',name:'original.heic',file,preview,thumbnail}]});await h.start();
+  await new Promise(resolve=>setImmediate(resolve));
   assert.equal(h.captured.rows.length,1);
   assert.equal(h.captured.rows[0].name,'original.heic');
   assert.equal(h.captured.rows[0].options.historyId,'persisted-1');
@@ -135,6 +153,42 @@ test('persistent history is restored as ready downloadable results without repro
   assert.equal(h.captured.rows[0].outputs[0][1].persist,false);
   assert.equal(h.captured.rows[0].states[0][0],'st.ready');
   assert.equal(h.captured.rows[0].states[0][1],'ok');
+});
+
+test('a stalled profile prefetch or history read never blocks app readiness',async()=>{
+  const h=harness({stallPreload:true,stallHistory:true});
+  assert.equal(await Promise.race([h.start().then(()=> 'ready'),new Promise(resolve=>setTimeout(()=>resolve('blocked'),30))]),'ready');
+  assert.equal(h.node('file').disabled,false);
+});
+
+test('first-visit offline preparation starts after the worker activates even before initial control',async()=>{
+  const h=harness({uncontrolled:true});await h.start();await new Promise(resolve=>setImmediate(resolve));
+  assert.ok(h.calls.some(([type,message])=>type==='worker'&&message==='WARM_CACHE'));
+});
+
+test('late history restoration cannot resurrect entries after the user clears History',async()=>{
+  let restore;
+  const h=harness({historyEntries:new Promise(resolve=>restore=resolve)});await h.start();
+  h.node('file').files=[{name:'new.heic'}];await h.node('file').fire('change');await new Promise(resolve=>setImmediate(resolve));
+  await h.node('clear-history').fire('click');
+  restore([{id:'old',name:'old.heic',file:{name:'old.heic',type:'image/heic'}}]);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.captured.rows.length,1,'only the new import was registered; cancelled restoration must not add the old entry');
+  assert.ok(h.calls.some(([type])=>type==='history-clear'));
+});
+
+test('parallel preference starts two isolated lanes and changing it does not interrupt active work',async()=>{
+  const h=harness({manualQueue:true});await h.start();
+  h.preferences.set('parallel',true);
+  h.node('file').files=['first','second','third'];await h.node('file').fire('change');
+  await Promise.all([h.waitForStart('first'),h.waitForStart('second')]);
+  assert.deepEqual(h.calls.filter(([type])=>type==='start'),[['start','first',0],['start','second',1]]);
+  h.preferences.set('parallel',false);h.release('first');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.calls.some(([type,file])=>type==='start'&&file==='third'),false);
+  h.release('second');await h.waitForStart('third');h.release('third');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.node('clear-assets').disabled,false);
 });
 
 test('clearing history releases result cleanups and clears the shared Live Photo/AI session',async()=>{

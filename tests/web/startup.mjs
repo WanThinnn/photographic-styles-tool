@@ -83,3 +83,40 @@ test('service worker activation does not wait for the full processing/offline gr
   assert.ok(!installed.includes('./app.js')&&!installed.some(p=>p.includes('/dng/')));
   events.activate({waitUntil:p=>wait=p});await wait;assert.ok(claimed);
 });
+
+test('cached app launches render immediately without waiting for a stalled network',async()=>{
+  const events={};
+  runInNewContext(readFileSync(new URL('../../web/sw.js',import.meta.url),'utf8'),{
+    URL,Headers,Response,console,
+    caches:{open:async()=>({match:async()=>new Response('cached app'),put:async()=>{}})},
+    fetch:()=>new Promise(()=>{}),self:{location:{origin:'https://example.test'},addEventListener:(name,fn)=>events[name]=fn},
+  });
+  for(const request of [
+    {method:'GET',mode:'navigate',url:'https://example.test/'},
+    {method:'GET',mode:'cors',url:'https://example.test/app.js'},
+  ]){
+    let pending;
+    events.fetch({request,respondWith:p=>pending=p});
+    const rendered=await Promise.race([pending.then(r=>r.text()),new Promise(resolve=>setTimeout(()=>resolve('network blocked boot'),30))]);
+    assert.equal(rendered,'cached app');
+  }
+});
+
+test('a new parallel iframe fetches its own document instead of falling back to cached app HTML',async()=>{
+  for(const offline of [false,true]){
+    const events={},requested=[];
+    const cache={match:async request=>request==='./index.html'?new Response('main app'):undefined,put:async()=>{}};
+    runInNewContext(readFileSync(new URL('../../web/sw.js',import.meta.url),'utf8'),{
+      URL,Headers,Response,console,caches:{open:async()=>cache},
+      fetch:async url=>{requested.push(url);if(offline)throw Error('offline');return new Response('processing lane');},
+      self:{location:{origin:'https://example.test'},addEventListener:(name,fn)=>events[name]=fn},
+    });
+    let pending;
+    events.fetch({request:{method:'GET',mode:'navigate',destination:'iframe',url:'https://example.test/processing-lane.html'},respondWith:p=>pending=p});
+    const response=await pending;
+    assert.equal(requested.length,1);
+    assert.equal(response.status,offline?503:200);
+    const text=await response.text();assert.notEqual(text,'main app');
+    if(!offline)assert.equal(text,'processing lane');
+  }
+});

@@ -24,7 +24,11 @@ export const MATTE_URI_SET = new Set(Object.values(MATTE_URIS));
 
 export const IROT_IDENTITY = box("irot", new Uint8Array([0]));
 
-const TIFF_TYPE_SIZES = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8 };
+// TIFF 6.0 plus TIFF/EP/BigTIFF scalar types Apple uses in MakerNote data.
+const TIFF_TYPE_SIZES = {
+  1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8,
+  13: 4, 16: 8, 17: 8, 18: 8,
+};
 export { TIFF_TYPE_SIZES };
 
 export function parsePitm(d, metaBox) {

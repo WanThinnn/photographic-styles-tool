@@ -4016,3 +4016,20 @@ frame, original inner corners, switches and Model control.
 
 Validation: 55 targeted checks, 56 browser scenarios at 3×, PWA assets and
 translation consistency checks pass.
+
+## 10.91 — v1.0.0 release UI polish (2026-10-16)
+
+v222 adds trailing Settings/AI separator insets, moves mobile Guide chevrons
+inward, and gives dark tab glass more visible material and directional edge
+lighting without changing dock/lens geometry. A bounded active-lens optical
+pass has reduced-transparency/forced-color fallbacks. Update Stylio paints
+localized animated feedback before checking the worker/caches, retains it
+until reload and restores controls if the update fails.
+
+Release notes live under the corrected `release_note/` directory, with English
+v1.0.0 notes linked from all three README languages. Security work is deferred
+by the user; this release does not claim those audit findings have been fixed.
+
+Validation: 378 automated checks pass, 15 skip, 0 fail; 59 browser scenarios at
+3× and PWA/i18n checks pass. Slow update feedback, failure recovery and successful
+reload are exercised in the browser with external requests blocked.

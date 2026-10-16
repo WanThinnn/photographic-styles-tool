@@ -1,6 +1,6 @@
 # iOS sheets and dark glass — 2026-10-16
 
-Cache release: **v221**. The user confirmed the v206/v207 dock placement works
+Cache release: **v222**. The user confirmed the v206/v207 dock placement works
 on their iPhone. Its host, scrollability workaround, offsets and tab geometry
 are retained.
 
@@ -233,3 +233,24 @@ Keep the accepted outer frame, the original inner corners and all controls.
 Validation: 55 targeted checks and all 56 browser scenarios at 3× pass,
 including measured footer size, centering and compact spacing. PWA assets and
 translation consistency checks pass.
+
+## v222 — Release polish and immediate update feedback
+
+Inset the trailing Settings separators by 16px and AI row separators by 12px;
+move mobile Guide disclosure arrows inward with 24px trailing summary padding.
+The accepted dock placement, lens positioning and Model/switch geometry remain.
+
+Dark mode now has a denser tab platter, directional resting highlights and a
+lit moving lens, with a bounded 3px brightness/saturation backdrop pass while
+held. Retain measured press/drag/release geometry and the reference's final
+200ms material handoff; high-contrast/forced-color fallbacks disable the optical
+pass. This intentionally supersedes the transparent moving lens from v208.
+It is an approximation for the web, not native optical-renderer parity.
+
+Update Stylio immediately shows localized animated feedback, paints it before
+service-worker/cache work, and keeps it through navigation. A failed check
+closes feedback and restores controls. Reduced motion disables the animation.
+
+Validation: 378 automated checks pass, 15 fixture-dependent checks skip and none
+fail; all 59 browser scenarios at 3× pass, including delayed/failed/successful
+updates and the unchanged four-tab lens placement. PWA/i18n checks pass.

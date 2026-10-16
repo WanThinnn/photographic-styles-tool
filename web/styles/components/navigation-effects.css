@@ -16,7 +16,9 @@
 
 .app-tabs::before {
   transform-origin: center;
-  border: .5px solid transparent;
+  border: .5px solid var(--tab-lens-rest-border,transparent);
+  background: var(--tab-lens-rest-background,var(--selection-fill));
+  box-shadow: var(--tab-lens-rest-shadow,none);
   scale: 1;
   contain: paint;
   will-change: translate,scale;
@@ -40,7 +42,9 @@
     inset 0 -1px 2px var(--glass-rim-bottom),
     inset 1px 0 3px var(--glass-rim-bottom),
     0 0 0 .5px var(--glass-outline),
-    0 6px 18px var(--glass-shade))
+    0 6px 18px var(--glass-shade));
+  -webkit-backdrop-filter: var(--tab-lens-active-filter,none);
+  backdrop-filter: var(--tab-lens-active-filter,none)
 }
 
 .app-tabs.is-pressing::before {
@@ -105,11 +109,11 @@
   opacity: var(--tab-held-icon-opacity,1)
 }
 
-/* Reference sheets-of-glass/animations.ts hands the transparent moving lens
-   back to the dark resting selection during the final 200ms of release. */
+/* Retain the reference's final 200ms handoff, with a lit moving lens so it
+   remains visible over dark content. Geometry stays independent of material. */
 @keyframes dark-tab-release {
-  0%,55.556% { background-color: transparent; border-color: #0000001f; box-shadow: inset 0 0 5px #0000003d }
-  100% { background-color: var(--selection-fill); border-color: transparent; box-shadow: none }
+  0%,55.556% { background: var(--tab-lens-active-background); border-color: var(--tab-lens-active-border); box-shadow: var(--tab-lens-active-shadow) }
+  100% { background: var(--tab-lens-rest-background); border-color: var(--tab-lens-rest-border); box-shadow: var(--tab-lens-rest-shadow) }
 }
 
 .dock-search.glass-surface:active {
@@ -149,11 +153,11 @@
 
 @media(pointer:coarse) {
   .app-tabs.is-dragging::before {
-    box-shadow:
+    box-shadow: var(--tab-lens-active-shadow,
       inset 0 1px 1px var(--glass-rim-top),
       inset 0 -1px 1px var(--glass-rim-bottom),
       0 0 0 .5px var(--glass-outline),
-      0 3px 10px var(--glass-shade)
+      0 3px 10px var(--glass-shade))
   }
 }
 
@@ -190,7 +194,9 @@
   .app-tabs.is-releasing::before {
     background: var(--surface-secondary);
     border-color: var(--muted);
-    box-shadow: none
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none
   }
 }
 
@@ -202,6 +208,8 @@
   .app-tabs.is-releasing::before {
     background: Canvas;
     border-color: Highlight;
-    box-shadow: none
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none
   }
 }

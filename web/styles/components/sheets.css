@@ -342,6 +342,7 @@ dialog::backdrop {
 .settings-separator {
   height: .5px;
   margin-left: 58px;
+  margin-right: 16px;
   background: var(--line)
 }
 
@@ -707,7 +708,7 @@ footer a {
   position: absolute;
   top: 0;
   left: 54px;
-  right: 0;
+  right: 12px;
   height: .5px;
   background: var(--line)
 }

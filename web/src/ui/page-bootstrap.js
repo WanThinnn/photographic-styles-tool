@@ -163,12 +163,16 @@ const change=()=>{rememberLanguage(selector.value);render();};
 selector.addEventListener('change',change);
 
 const refreshApp=document.getElementById('refresh-app'),refreshStatus=document.getElementById('refresh-app-status');
+const updateOverlay=document.getElementById('app-update-overlay');
 refreshApp?.addEventListener('click',async()=>{
   if(refreshApp.disabled)return;
   const file=document.getElementById('file'),wasDisabled=file.disabled;
   file.disabled=true;document.documentElement.dataset.updating='true';
   refreshApp.disabled=true;refreshStatus.textContent=t(selector.value,'settings.updating');
+  updateOverlay.hidden=false;refreshApp.setAttribute('aria-busy','true');
   try{
+    // Paint feedback before service-worker/cache work. Keep it visible until reload.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const registration=await navigator.serviceWorker?.getRegistration?.('./')||await navigator.serviceWorker?.getRegistration?.();
     await registration?.update?.();
     if(globalThis.caches){
@@ -179,6 +183,7 @@ refreshApp?.addEventListener('click',async()=>{
     await new Promise(resolve=>setTimeout(resolve,220));
     location.reload();
   }catch(error){
+    updateOverlay.hidden=true;refreshApp.removeAttribute('aria-busy');
     delete document.documentElement.dataset.updating;file.disabled=wasDisabled;
     console.warn('App update failed',error);
     refreshStatus.textContent=t(selector.value,'settings.updatefailed');

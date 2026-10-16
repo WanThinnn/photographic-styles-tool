@@ -5,7 +5,7 @@
 **Stylio** - a name formed from Styles and Elio - is an open-source, on-device photo processing tool focused on interoperability with Apple Photos: Photographic Styles, iOS 27 Texture/Grain, AI-powered Portrait, and preserving as much original photo data as possible.
 
 > [!NOTE]
-> Current version: **v1.0.0**  
+> Current version: **[v1.0.0 — Release notes](release_note/v1.0.0.md)**<br>
 > Independent and open-source. Not affiliated with Apple.
 
 ## Try it

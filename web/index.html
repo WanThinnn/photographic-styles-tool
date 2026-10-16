@@ -358,6 +358,9 @@ html[data-theme="dark"] .launch-icon-background{fill:url(#launch-dark)}html[data
   </button>
 </div>
 </div>
+<div id="app-update-overlay" class="app-update-overlay" hidden role="status" aria-live="polite">
+  <div class="app-update-card"><span class="app-update-spinner" aria-hidden="true"></span><p data-i18n="settings.updating">Checking for updates and refreshing Stylio…</p></div>
+</div>
 <dialog id="photo-workspace" class="photo-workspace" aria-labelledby="photo-title" tabindex="-1">
   <header class="sheet-header"><button type="button" class="icon-button glass-surface" id="close-photo" aria-labelledby="close-photo-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span id="close-photo-label" class="sr-only" data-i18n="shell.closephoto">Close photo</span></button><h2 id="photo-title" data-i18n="shell.photo">Photo</h2></header>
   <div id="photo-content"></div>

@@ -439,7 +439,7 @@ test('tab glass ports measured iOS27 platter, lens, drag and release geometry wh
   assert.match(css,/\.app-tabs\.is-releasing \{[^}]*transition: transform 367ms linear\(0,0\.096 9%,0\.356 18%,0\.64 27%,0\.863 36%,1 45%,1\.078 54%,1\.092 59%,1\.018 95%,1\)/s);
   assert.match(css,/var\(--selection-active-fill\)/);
   assert.match(css,/\.app-tabs \{[^}]*overflow: visible;[^}]*contain: layout style/s);
-  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--selection-fill: #000000b8;[\s\S]*?--selection-active-fill: transparent/s);
+  assert.match(tokens,/:root\[data-theme="dark"\][\s\S]*?--tab-lens-active-background: radial-gradient/s);
   assert.match(shell,/--tab-rest-offset/);
   assert.match(css,/touch-action: pan-y/);
   assert.match(layout,/translate: var\(--lens-offset,var\(--tab-rest-offset,calc\(var\(--tab-index,0\) \* 100%\)\)\) 0/);
@@ -462,5 +462,8 @@ test('tab glass ports measured iOS27 platter, lens, drag and release geometry wh
   assert.match(css,/prefers-reduced-motion:reduce/);
   assert.match(css,/prefers-reduced-transparency:reduce/);
   assert.match(css,/forced-colors:active/);
-  assert.doesNotMatch(css,/(?:^|\n)\s*(?:-webkit-)?backdrop-filter:/);
+  // The fixed placement host remains unfiltered; only the active dark lens
+  // uses a small optical pass, with high-contrast/transparency fallbacks.
+  assert.doesNotMatch(css,/\.app-tabs \{[^}]*backdrop-filter:/s);
+  assert.match(css,/backdrop-filter: var\(--tab-lens-active-filter,none\)/);
 });

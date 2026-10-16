@@ -725,6 +725,35 @@ body.is-install-guide-open { overflow: hidden }
 .app-dock.is-searching .dock-search-field { animation: search-expand 280ms var(--spring-ease) }
 .app-dock.has-searched:not(.is-searching) .app-tabs { animation: search-return 220ms ease-out }
 .dock-search.is-searching>svg { animation: search-return 200ms ease-out }
+.app-update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0003;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: update-feedback-in 180ms ease-out both
+}
+.app-update-overlay[hidden] { display: none }
+.app-update-card {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: min(280px,100%);
+  padding: 28px 24px;
+  border-radius: 28px;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--sheet-shadow);
+  text-align: center
+}
+.app-update-card p { margin: 0; font-size: .9375rem; line-height: 1.45 }
+.app-update-spinner { width: 30px; height: 30px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: launch-spin .8s linear infinite }
+@keyframes update-feedback-in { from { opacity: 0 } to { opacity: 1 } }
+@media(prefers-reduced-motion:reduce) { .app-update-overlay,.app-update-spinner { animation: none } }
 .search-summary { margin: -8px 0 0; color: var(--muted); font-size: .875rem }
 .settings-screen,.guide-screen { gap: 16px }
 .settings-content>.group-title:first-child { margin-top: 0 }
@@ -803,6 +832,7 @@ body.is-install-guide-open { overflow: hidden }
 
 /* Disclosure communicates expansion without a web-style "See more" link. */
 @media(max-width:767px) {
+  .guide-card>summary { padding-right: 24px }
   .guide-more { width: 12px; color: var(--muted) }
   .guide-more>span { display: none!important }
   .guide-more::after { content: ""; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform var(--duration-fast) }

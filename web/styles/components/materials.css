@@ -1,6 +1,7 @@
 /* Web adaptation of ionic-theme-ios27's glass material (MIT).
    Navigation/control chrome only — never blur or tint a photo preview.
-   No nested backdrop filters or continuously animated lighting. */
+   No continuously animated lighting. The active dark tab lens adds a small
+   bounded optical pass; the viewport placement host stays unfiltered. */
 .glass-surface,.photo-workspace .act {
   border: .5px solid transparent;
   background: var(--surface);

@@ -5,7 +5,7 @@
 **Stylio** - tên gọi được ghép từ Styles và Elio - là công cụ xử lý ảnh mã nguồn mở, chạy trực tiếp trên thiết bị, tập trung vào khả năng tương thích với Apple Photos: Photographic Styles, Texture/Grain của iOS 27, Portrait bằng AI và bảo toàn tối đa dữ liệu gốc của ảnh.
 
 > [!NOTE]
-> Phiên bản hiện tại: **v1.0.0**  
+> Phiên bản hiện tại: **[v1.0.0 — Ghi chú phát hành](../../release_note/v1.0.0.md)**<br>
 > Phát triển độc lập và mã nguồn mở. Không liên kết với Apple.
 
 ## Dùng thử

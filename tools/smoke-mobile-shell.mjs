@@ -315,19 +315,51 @@ try{
   await appPage.waitForFunction(()=>!document.getElementById('ai-settings').open);
   results.push({type:'model-values-and-sheet-swipe'});
 
-  await appPage.evaluate(()=>document.documentElement.dataset.theme='dark');
+  await appPage.evaluate(()=>{document.documentElement.dataset.theme='dark';const lang=document.getElementById('lang');lang.value='en';lang.dispatchEvent(new Event('change',{bubbles:true}));});
   await appPage.locator('[data-screen="guide"]').click();await appPage.waitForTimeout(950);
-  const darkRest=await appPage.locator('.app-tabs').evaluate(el=>({background:getComputedStyle(el,'::before').backgroundColor,shadow:getComputedStyle(el,'::before').boxShadow}));
-  assert.match(darkRest.background,/0\.72/);assert.equal(darkRest.shadow,'none');
+  const darkRest=await appPage.locator('.app-tabs').evaluate(el=>({background:getComputedStyle(el,'::before').backgroundColor,image:getComputedStyle(el,'::before').backgroundImage,shadow:getComputedStyle(el,'::before').boxShadow}));
+  assert.match(darkRest.background,/0\.72/);assert.match(darkRest.image,/linear-gradient/);
   await appPage.locator('.app-dock').screenshot({path:out+'/toolbar-dark-rest.png'});
   const tab=await appPage.locator('[data-screen="history"]').boundingBox();
   await appPage.mouse.move(tab.x+tab.width/2,tab.y+tab.height/2);await appPage.mouse.down();await appPage.waitForTimeout(250);
-  const darkHeld=await appPage.locator('.app-tabs').evaluate(el=>({background:getComputedStyle(el,'::before').backgroundColor,shadow:getComputedStyle(el,'::before').boxShadow}));
-  assert.match(darkHeld.background,/, 0\)/,'moving dark lens must stay transparent');
-  assert.ok(!darkHeld.shadow.includes('255'),'dark lens must not retain a white bevel');
+  const darkHeld=await appPage.locator('.app-tabs').evaluate(el=>({background:getComputedStyle(el,'::before').backgroundColor,image:getComputedStyle(el,'::before').backgroundImage,filter:getComputedStyle(el,'::before').backdropFilter,shadow:getComputedStyle(el,'::before').boxShadow}));
+  assert.match(darkHeld.background,/0\.72/,'moving dark lens needs visible material');
+  assert.match(darkHeld.image,/radial-gradient/);assert.match(darkHeld.filter,/brightness\(1\.5\)/);
+  assert.ok(darkHeld.shadow.includes('255'),'moving dark lens needs a lit edge');
   await appPage.locator('.app-dock').screenshot({path:out+'/toolbar-dark-held.png'});
   await appPage.mouse.up();await appPage.waitForTimeout(950);
   results.push({type:'dark-glass-material',rest:darkRest,held:darkHeld});
+
+  await appPage.locator('[data-screen="settings"]').click();
+  const separator=await appPage.locator('.settings-separator').first().evaluate(el=>{
+    const line=el.getBoundingClientRect(),group=el.parentElement.getBoundingClientRect();return {trailingGap:group.right-line.right};
+  });
+  assert.ok(separator.trailingGap>=16);results.push({type:'settings-separator-inset',...separator});
+  await appPage.screenshot({path:out+'/settings-dark.png'});
+  await appPage.locator('[data-screen="guide"]').click();
+  const disclosure=await appPage.locator('.guide-card summary').first().evaluate(el=>({paddingRight:parseFloat(getComputedStyle(el).paddingRight)}));
+  assert.equal(disclosure.paddingRight,24);results.push({type:'guide-disclosure-inset',...disclosure});
+
+  // Simulate slow update checks: feedback must render before the pending work.
+  await appPage.locator('[data-screen="settings"]').click();
+  await appPage.evaluate(()=>Object.defineProperty(navigator.serviceWorker,'getRegistration',{configurable:true,value:async()=>({update:()=>new Promise((resolve,reject)=>{window.auditFinishUpdate=resolve;window.auditFailUpdate=()=>reject(Error('Synthetic update failure'));})})}));
+  await appPage.locator('#refresh-app').click();await appPage.locator('#app-update-overlay').waitFor({state:'visible'});
+  assert.equal(await appPage.locator('#refresh-app').getAttribute('aria-busy'),'true');
+  await appPage.waitForFunction(()=>typeof window.auditFailUpdate==='function');
+  await appPage.waitForFunction(()=>Number(getComputedStyle(document.getElementById('app-update-overlay')).opacity)>.99);
+  await appPage.screenshot({path:out+'/update-feedback-dark.png'});
+  await appPage.evaluate(()=>window.auditFailUpdate());await appPage.locator('#app-update-overlay').waitFor({state:'hidden'});
+  assert.equal(await appPage.locator('#refresh-app').isEnabled(),true);
+  assert.equal(await appPage.locator('#file').isEnabled(),true);
+  // The successful path keeps the feedback visible until the navigation starts.
+  await appPage.evaluate(()=>{delete window.auditFinishUpdate;});
+  await appPage.locator('#refresh-app').click();await appPage.waitForFunction(()=>typeof window.auditFinishUpdate==='function');
+  await appPage.waitForTimeout(100);
+  await Promise.all([appPage.waitForEvent('load'),appPage.evaluate(()=>window.auditFinishUpdate())]);
+  await appPage.waitForFunction(()=>document.getElementById('app-launch').hidden&&!document.getElementById('file').disabled);
+  if(await appPage.locator('#install-guide-continue').isVisible())await appPage.locator('#install-guide-continue').click();
+  assert.equal(await appPage.locator('#app-update-overlay').isHidden(),true);
+  results.push({type:'update-feedback-slow-failure-and-reload'});
 
   await appPage.emulateMedia({reducedMotion:'reduce',forcedColors:'active'});
   assert.equal(await appPage.locator('.app-tabs').evaluate(el=>getComputedStyle(el).backdropFilter),'none');
